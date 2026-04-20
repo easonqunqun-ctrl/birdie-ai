@@ -1,0 +1,597 @@
+"""AI 对话业务逻辑（M3-T1：非流式 JSON 版本 + 会话管理）.
+
+T1 范围
+-------
+- 会话管理：创建/复用活跃会话（24h 内）、列表、历史、删除
+- 消息发送：非流式（`send_message_sync`）；用一个固定的"mock 回复"占位，
+  T2 会把 `_generate_reply` 替换为真正的 LLM 调用。
+- 配额：发送前预检 + 扣减；不做速率限制（T2 加）
+
+设计要点
+--------
+1. **"活跃会话" = 24h 内且未删除**；超过 24h 再进 chat 页后端给一个新 session。
+   这个阈值以 `last_message_at` 为锚点；新建但没发消息过的会话 `last_message_at`
+   取自 `created_at`。
+2. 创建时传了 `context_analysis_id` 则**总是新建会话**：让报告页"问 AI 教练"
+   每次都对应一条独立的会话，避免串台。
+3. `_generate_reply` 抽成顶层函数，T2 替换为真 LLM + SSE。
+   T1 测试里可 monkeypatch 它，跳过"假 LLM 回复"的随机性。
+4. 删除会话走**硬删**（CASCADE 会带走 messages）；软删留到 W8 归档策略一起做。
+"""
+
+from __future__ import annotations
+
+from collections.abc import AsyncIterator
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.exceptions import ForbiddenError, NotFoundError
+from app.core.security import new_id
+from app.integrations.llm import AbstractLLMClient, get_llm_client
+from app.models.analysis import SwingAnalysis
+from app.models.chat import ChatMessage, ChatSession
+from app.models.user import User
+from app.schemas.base import PageData, page_data
+from app.schemas.chat import (
+    ChatMessageItem,
+    ChatSessionListItem,
+    CreateSessionRequest,
+    CreateSessionResponse,
+    MessageAttachment,
+    SendMessageResponse,
+)
+from app.services import quota_service
+from app.services.chat_prompt import (
+    SYSTEM_PROMPT_VERSION,
+    build_system_prompt,
+    load_recent_analyses,
+)
+
+# ==================== 常量 ====================
+ACTIVE_SESSION_HOURS = 24
+WELCOME_MESSAGE = (
+    "你好！我是你的 AI 高尔夫教练小鸟。"
+    "随时可以问我挥杆技术、练习方法或高尔夫知识方面的问题。"
+)
+# 最长的消息预览字段（docs/03 §3.5 last_message_preview VARCHAR(200)，这里保守切 100）
+PREVIEW_MAX_LEN = 100
+
+
+# ==================== 内部辅助 ====================
+def _to_item(m: ChatMessage) -> ChatMessageItem:
+    return ChatMessageItem(
+        id=m.id,
+        role=m.role,  # type: ignore[arg-type]
+        content=m.content,
+        attachments=[MessageAttachment(**a) for a in (m.attachments or [])],
+        created_at=m.created_at,
+    )
+
+
+async def _ensure_session_owned(
+    db: AsyncSession, user: User, session_id: str
+) -> ChatSession:
+    """获取会话并校验归属；不存在 → 404，不属于本人 → 403."""
+    session = await db.get(ChatSession, session_id)
+    if session is None:
+        raise NotFoundError(code=40401, message="会话不存在")
+    if session.user_id != user.id:
+        raise ForbiddenError(code=40301, message="无权访问该会话")
+    return session
+
+
+async def _find_active_session(db: AsyncSession, user: User) -> ChatSession | None:
+    """返回最近一条 24h 内的活跃会话；找不到返回 None."""
+    threshold = datetime.now(UTC) - timedelta(hours=ACTIVE_SESSION_HOURS)
+    # last_message_at 可能为空（用户刚建但没发消息），用 coalesce(last_message_at, created_at)
+    activity = func.coalesce(ChatSession.last_message_at, ChatSession.created_at)
+    stmt = (
+        select(ChatSession)
+        .where(ChatSession.user_id == user.id)
+        .where(activity >= threshold)
+        .order_by(activity.desc())
+        .limit(1)
+    )
+    return (await db.execute(stmt)).scalar_one_or_none()
+
+
+async def _validate_context_analysis(
+    db: AsyncSession, user: User, analysis_id: str
+) -> SwingAnalysis:
+    """校验 context_analysis_id 存在且属于当前用户。"""
+    analysis = await db.get(SwingAnalysis, analysis_id)
+    if analysis is None:
+        raise NotFoundError(code=40401, message="分析记录不存在")
+    if analysis.user_id != user.id:
+        raise ForbiddenError(code=40301, message="无权访问该分析")
+    return analysis
+
+
+# ==================== 创建 / 获取会话 ====================
+async def create_or_get_session(
+    *, user: User, payload: CreateSessionRequest, db: AsyncSession
+) -> CreateSessionResponse:
+    """创建或复用活跃会话。
+
+    规则：
+    - 传了 `context_analysis_id` → **总是新建**（校验分析归属）
+    - 没传 → 24h 内有活跃会话则复用；否则新建
+    """
+    if payload.context_analysis_id is not None:
+        await _validate_context_analysis(db, user, payload.context_analysis_id)
+        session = await _create_session(
+            db, user, context_analysis_id=payload.context_analysis_id
+        )
+        messages: list[ChatMessage] = []
+    else:
+        existing = await _find_active_session(db, user)
+        if existing is not None:
+            session = existing
+            messages = await _list_session_messages(db, session.id, limit=50)
+        else:
+            session = await _create_session(db, user, context_analysis_id=None)
+            messages = []
+
+    return CreateSessionResponse(
+        session_id=session.id,
+        context_analysis_id=session.context_analysis_id,
+        messages=[_to_item(m) for m in messages],
+        created_at=session.created_at,
+    )
+
+
+async def _create_session(
+    db: AsyncSession, user: User, *, context_analysis_id: str | None
+) -> ChatSession:
+    session = ChatSession(
+        id=new_id("chat"),
+        user_id=user.id,
+        context_analysis_id=context_analysis_id,
+        message_count=0,
+    )
+    db.add(session)
+    await db.flush()
+    return session
+
+
+# ==================== 会话列表 ====================
+async def list_sessions(
+    *, user: User, page: int, page_size: int, db: AsyncSession
+) -> PageData[ChatSessionListItem]:
+    activity = func.coalesce(ChatSession.last_message_at, ChatSession.created_at)
+    base = select(ChatSession).where(ChatSession.user_id == user.id)
+    total = (
+        await db.execute(
+            select(func.count()).select_from(base.subquery())
+        )
+    ).scalar_one()
+
+    stmt = (
+        base.order_by(activity.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    rows = (await db.execute(stmt)).scalars().all()
+
+    items: list[ChatSessionListItem] = []
+    for s in rows:
+        preview = await _last_message_preview(db, s.id)
+        items.append(
+            ChatSessionListItem(
+                id=s.id,
+                context_analysis_id=s.context_analysis_id,
+                last_message_preview=preview,
+                last_message_at=s.last_message_at,
+                message_count=s.message_count,
+                created_at=s.created_at,
+            )
+        )
+    return page_data(items, total=total, page=page, page_size=page_size)
+
+
+async def _last_message_preview(db: AsyncSession, session_id: str) -> str | None:
+    stmt = (
+        select(ChatMessage.content)
+        .where(ChatMessage.session_id == session_id)
+        .order_by(ChatMessage.created_at.desc())
+        .limit(1)
+    )
+    content = (await db.execute(stmt)).scalar_one_or_none()
+    if content is None:
+        return None
+    return content[:PREVIEW_MAX_LEN]
+
+
+# ==================== 会话消息历史 ====================
+async def get_session_messages(
+    *, user: User, session_id: str, page: int, page_size: int, db: AsyncSession
+) -> PageData[ChatMessageItem]:
+    await _ensure_session_owned(db, user, session_id)
+
+    total_stmt = select(func.count(ChatMessage.id)).where(
+        ChatMessage.session_id == session_id
+    )
+    total = (await db.execute(total_stmt)).scalar_one()
+
+    stmt = (
+        select(ChatMessage)
+        .where(ChatMessage.session_id == session_id)
+        .order_by(ChatMessage.created_at.asc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    rows = (await db.execute(stmt)).scalars().all()
+    items = [_to_item(m) for m in rows]
+    return page_data(items, total=total, page=page, page_size=page_size)
+
+
+async def _list_session_messages(
+    db: AsyncSession, session_id: str, *, limit: int = 50
+) -> list[ChatMessage]:
+    stmt = (
+        select(ChatMessage)
+        .where(ChatMessage.session_id == session_id)
+        .order_by(ChatMessage.created_at.asc())
+        .limit(limit)
+    )
+    return list((await db.execute(stmt)).scalars().all())
+
+
+# ==================== 删除会话 ====================
+async def delete_session(
+    *, user: User, session_id: str, db: AsyncSession
+) -> None:
+    session = await _ensure_session_owned(db, user, session_id)
+    # CASCADE 会自动带走 messages（见 ChatSession.messages.cascade）
+    await db.delete(session)
+    await db.flush()
+
+
+# ==================== 发送消息：T2 真正接入 LLM + SSE 流 ====================
+HISTORY_WINDOW = 20  # 发给 LLM 的最大历史消息条数（user+assistant 合计）
+
+# drill_card heuristic 关键词 → drill_id 的映射
+# 只在 LLM 自然语言回复里命中任一关键词时，才追加 attachment；避免强行造假。
+# 真正让 LLM 通过 function call / JSON 输出 drill_id 是 W6 的事。
+_DRILL_KEYWORDS: list[tuple[tuple[str, ...], str, str]] = [
+    (("毛巾", "夹臂", "towel"), "drill_towel_arm", "毛巾夹臂练习"),
+    (("髋部旋转", "髋旋转", "hip rotation", "hip_rotation"), "drill_hip_rotation", "髋部旋转练习"),
+    (("半挥", "半挥杆", "节奏", "half swing", "half_swing"), "drill_half_swing", "半挥杆节奏练习"),
+]
+
+
+def _detect_drill_attachments(reply_text: str) -> list[dict]:
+    """扫回复文本，按关键词推断是否插入 drill_card attachment。
+
+    规则：每个 drill 最多插一张；若命中多个 drill，全都插。
+    附件字段与前端 `AnalysisRecommendation` 同构（name+drill_id），
+    最少集合即可让 T4 的前端渲染出"训练卡片"。
+    """
+    attachments: list[dict] = []
+    lowered = reply_text.lower()
+    for keywords, drill_id, name in _DRILL_KEYWORDS:
+        if any(kw.lower() in lowered for kw in keywords):
+            attachments.append(
+                {
+                    "type": "drill_card",
+                    "drill_id": drill_id,
+                    "name": name,
+                }
+            )
+    return attachments
+
+
+async def _build_llm_messages(
+    *,
+    db: AsyncSession,
+    user: User,
+    session: ChatSession,
+    user_message_content: str,
+    history: list[ChatMessage],
+) -> tuple[list[dict[str, str]], str]:
+    """构造 LLM 输入 messages：system + 最近 N 条历史 + 当前 user message。
+
+    返回 `(messages, system_prompt_version_used)`。
+    """
+    recent_analyses = await load_recent_analyses(db, user)
+    system_prompt = build_system_prompt(user, recent_analyses)
+
+    llm_messages: list[dict[str, str]] = [
+        {"role": "system", "content": system_prompt},
+    ]
+    for h in history[-HISTORY_WINDOW:]:
+        # 过滤掉 attachments；LLM 只需要纯文本上下文
+        if h.role in ("user", "assistant") and h.content:
+            llm_messages.append({"role": h.role, "content": h.content})
+    llm_messages.append({"role": "user", "content": user_message_content})
+    return llm_messages, SYSTEM_PROMPT_VERSION
+
+
+async def prepare_turn(
+    *, db: AsyncSession, user: User, session_id: str, content: str
+) -> tuple[ChatSession, ChatMessage, Any, list[dict[str, str]]]:
+    """发消息前置流程（同步/流式共用；**必须在 SSE 开流前调用**）:
+
+    1. 权限校验（40401 / 40301）
+    2. 配额扣减（40007）
+    3. 落 user_message（flush 让后续 _list 能看到）
+    4. 拉历史 + 构造 LLM messages
+
+    为什么不在 stream_message 里做这些？因为 `StreamingResponse` 一旦开始写
+    response，就没法再用标准异常处理器把 40401/40301 翻成 JSON error 响应了
+    （会抛 "Caught handled exception, but response already started"）。
+    所以 API 层要先调 `prepare_turn`，抛任何 AppException 时仍是普通 HTTP 响应。
+
+    返回 `(session, user_msg, quota, llm_messages)`。
+    """
+    session = await _ensure_session_owned(db, user, session_id)
+    quota = await quota_service.consume_chat_quota(db, user)
+
+    user_msg = ChatMessage(
+        id=new_id("msg"),
+        session_id=session.id,
+        role="user",
+        content=content,
+        attachments=[],
+    )
+    db.add(user_msg)
+    await db.flush()
+
+    # 拉历史时排除本条新 user_msg（我们会显式把它放在 messages 最后）
+    all_msgs = await _list_session_messages(db, session.id, limit=HISTORY_WINDOW + 1)
+    history = [m for m in all_msgs if m.id != user_msg.id]
+
+    llm_messages, prompt_version = await _build_llm_messages(
+        db=db,
+        user=user,
+        session=session,
+        user_message_content=content,
+        history=history,
+    )
+    # 首次或升版时写入 session
+    if session.system_prompt_version != prompt_version:
+        session.system_prompt_version = prompt_version
+
+    return session, user_msg, quota, llm_messages
+
+
+async def _finalize_success(
+    *,
+    db: AsyncSession,
+    session: ChatSession,
+    reply_text: str,
+    usage: dict[str, int] | None,
+) -> ChatMessage:
+    """LLM 成功后：落 assistant_message + 更新 session 元信息."""
+    attachments = _detect_drill_attachments(reply_text)
+    assistant_msg = ChatMessage(
+        id=new_id("msg"),
+        session_id=session.id,
+        role="assistant",
+        content=reply_text,
+        attachments=attachments,
+        prompt_tokens=(usage or {}).get("prompt_tokens"),
+        completion_tokens=(usage or {}).get("completion_tokens"),
+    )
+    db.add(assistant_msg)
+    session.last_message_at = datetime.now(UTC)
+    session.message_count = (session.message_count or 0) + 2
+    await db.flush()
+    return assistant_msg
+
+
+async def _finalize_llm_error(
+    *,
+    db: AsyncSession,
+    session: ChatSession,
+    user_msg: ChatMessage,
+    quota: Any,
+    partial_text: str,
+    error_message: str,
+) -> None:
+    """LLM 失败后：退配额 + 落一条带"回复中断"标记的 assistant_message（若有部分内容）.
+
+    注意：**不抛异常**，让 SSE 发送方优雅结束；同步版会再抛 AIChatServiceError。
+    """
+    await quota_service.refund_chat_quota(db, quota)
+    if partial_text:
+        # 有部分内容，保留下来并追加中断说明
+        assistant_msg = ChatMessage(
+            id=new_id("msg"),
+            session_id=session.id,
+            role="assistant",
+            content=partial_text + "\n\n[回复中断，请稍后重试]",
+            attachments=[],
+        )
+        db.add(assistant_msg)
+        session.last_message_at = datetime.now(UTC)
+        session.message_count = (session.message_count or 0) + 2
+    else:
+        # 用户消息已落库但无 AI 回复；只推进 message_count 到 +1
+        session.message_count = (session.message_count or 0) + 1
+    await db.flush()
+    # 不抛（供 SSE 使用）；调用方决定要不要抛
+    _ = (user_msg, error_message)  # 预留给后续可能的失败审计落库
+
+
+# ==================== 同步发消息（T3 前端先走这条 / SSE 降级） ====================
+async def send_message_sync(
+    *,
+    user: User,
+    session_id: str,
+    content: str,
+    db: AsyncSession,
+    llm_client: AbstractLLMClient | None = None,
+) -> SendMessageResponse:
+    """发消息并等 LLM 全部回完再整条返回（非流式 JSON）.
+
+    用途：
+    - T3 前端第一版（先 UI 后流式）接入
+    - 客户端 `Accept: application/json` 显式降级
+    - 测试里不想逐事件解析时方便断言
+
+    LLM 超时/失败 → 退配额 + 抛 `AIChatServiceError(50106)`（外层 API 转 502）。
+    """
+    from app.core.exceptions import AIChatServiceError
+
+    session, user_msg, quota, llm_messages = await prepare_turn(
+        db=db, user=user, session_id=session_id, content=content
+    )
+
+    client = llm_client or get_llm_client()
+    chunks: list[str] = []
+    usage: dict[str, int] | None = None
+    error_msg: str | None = None
+
+    try:
+        async for chunk in client.stream_chat(llm_messages):
+            if chunk.type == "content":
+                chunks.append(chunk.delta)
+            elif chunk.type == "done":
+                usage = chunk.usage
+            elif chunk.type == "error":
+                error_msg = chunk.error or "LLM 调用失败"
+                break
+    except Exception as exc:
+        error_msg = f"LLM 异常: {exc}"
+
+    partial = "".join(chunks)
+    if error_msg is not None:
+        await _finalize_llm_error(
+            db=db,
+            session=session,
+            user_msg=user_msg,
+            quota=quota,
+            partial_text=partial,
+            error_message=error_msg,
+        )
+        raise AIChatServiceError(message=error_msg)
+
+    assistant_msg = await _finalize_success(
+        db=db, session=session, reply_text=partial, usage=usage
+    )
+
+    remaining = quota_service.chat_remaining(quota)
+    if quota.total < 0:
+        remaining = -1
+
+    return SendMessageResponse(
+        user_message=_to_item(user_msg),
+        assistant_message=_to_item(assistant_msg),
+        quota_remaining=remaining,
+    )
+
+
+# ==================== 流式发消息（T2 核心：SSE） ====================
+async def stream_message(
+    *,
+    session: ChatSession,
+    user_msg: ChatMessage,
+    quota: Any,
+    llm_messages: list[dict[str, str]],
+    db: AsyncSession,
+    llm_client: AbstractLLMClient | None = None,
+) -> AsyncIterator[dict]:
+    """发消息并以 async generator 形式 yield SSE 事件字典（业务事件，不含 SSE 格式封装）.
+
+    调用方（API 层）必须先调 `prepare_turn` 做好权限校验 + 配额扣减 + 落 user_msg，
+    然后把返回的 4 元组原样传进来。**本函数不再抛 40x**；LLM 失败会 yield `error` 事件。
+
+    事件序列（正常情况）：
+      1) message_start          携带 user_message / assistant_message_id
+      2) content_delta × N      每块 LLM 增量
+      3) attachment × 0..K      命中 drill heuristic 时
+      4) message_end            携带 assistant_message_id、quota_remaining、usage
+
+    事件序列（失败情况）：
+      1) message_start
+      2) content_delta × M
+      3) error                  code=50106；配额已在此事件前退回
+
+    调用方负责：
+    - 把每个 dict 编码成 SSE 帧（`event: ...\\ndata: ...\\n\\n`）
+    - 生成器跑完后 commit 数据库
+    """
+    # 提前生成 assistant message id，方便前端在 message_start 时就占位一条气泡
+    assistant_msg_id = new_id("msg")
+
+    yield {
+        "type": "message_start",
+        "user_message_id": user_msg.id,
+        "assistant_message_id": assistant_msg_id,
+        "user_message": _to_item(user_msg).model_dump(mode="json"),
+    }
+
+    client = llm_client or get_llm_client()
+    chunks: list[str] = []
+    usage: dict[str, int] | None = None
+    error_msg: str | None = None
+
+    try:
+        async for chunk in client.stream_chat(llm_messages):
+            if chunk.type == "content":
+                chunks.append(chunk.delta)
+                yield {"type": "content_delta", "delta": chunk.delta}
+            elif chunk.type == "done":
+                usage = chunk.usage
+            elif chunk.type == "error":
+                error_msg = chunk.error or "LLM 调用失败"
+                break
+    except Exception as exc:
+        error_msg = f"LLM 异常: {exc}"
+
+    partial = "".join(chunks)
+
+    if error_msg is not None:
+        await _finalize_llm_error(
+            db=db,
+            session=session,
+            user_msg=user_msg,
+            quota=quota,
+            partial_text=partial,
+            error_message=error_msg,
+        )
+        yield {
+            "type": "error",
+            "code": 50106,
+            "message": "AI 教练暂时开小差了，请稍后再试",
+            "detail": error_msg,
+        }
+        return
+
+    # ====== 成功路径 ======
+    # attachments 先算出来，并在落库前通过 attachment 事件推送给前端
+    attachments = _detect_drill_attachments(partial)
+    for att in attachments:
+        yield {"type": "attachment", "attachment": att}
+
+    # 覆盖 assistant_msg_id（让落库的 id 与推送的 id 一致）
+    assistant_msg = ChatMessage(
+        id=assistant_msg_id,
+        session_id=session.id,
+        role="assistant",
+        content=partial,
+        attachments=attachments,
+        prompt_tokens=(usage or {}).get("prompt_tokens"),
+        completion_tokens=(usage or {}).get("completion_tokens"),
+    )
+    db.add(assistant_msg)
+    session.last_message_at = datetime.now(UTC)
+    session.message_count = (session.message_count or 0) + 2
+    await db.flush()
+
+    remaining = quota_service.chat_remaining(quota)
+    if quota.total < 0:
+        remaining = -1
+
+    yield {
+        "type": "message_end",
+        "assistant_message_id": assistant_msg.id,
+        "content": partial,
+        "attachments": attachments,
+        "quota_remaining": remaining,
+        "usage": usage,
+    }

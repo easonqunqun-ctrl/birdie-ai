@@ -1,0 +1,127 @@
+.drill-card {
+  margin-top: 16rpx;
+  padding: 24rpx;
+  background: #ffffff;
+  border: 2rpx solid var(--color-gold-soft);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  position: relative;
+
+  &:active {
+    opacity: 0.95;
+  }
+
+  &__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12rpx;
+  }
+
+  &__meta {
+    display: flex;
+    align-items: center;
+    flex: 1;
+  }
+
+  &__badge {
+    display: inline-block;
+    padding: 4rpx 12rpx;
+    margin-right: 12rpx;
+    font-size: 20rpx;
+    color: var(--color-gold-dark);
+    background: var(--color-gold-soft);
+    border-radius: 8rpx;
+  }
+
+  &__name {
+    font-size: 28rpx;
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
+
+  &__duration {
+    font-size: 22rpx;
+    color: var(--color-text-tertiary);
+  }
+
+  &__desc {
+    display: block;
+    font-size: 24rpx;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+    margin-bottom: 12rpx;
+  }
+
+  &__steps {
+    margin-top: 8rpx;
+    padding: 16rpx;
+    background: var(--color-bg-page);
+    border-radius: var(--radius-sm);
+  }
+
+  &__step {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 10rpx;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  &__step-index {
+    flex-shrink: 0;
+    width: 32rpx;
+    height: 32rpx;
+    margin-right: 12rpx;
+    font-size: 20rpx;
+    line-height: 32rpx;
+    text-align: center;
+    color: var(--color-on-primary);
+    background: var(--color-primary);
+    border-radius: 50%;
+  }
+
+  &__step-text {
+    flex: 1;
+    font-size: 24rpx;
+    color: var(--color-text-primary);
+    line-height: 1.5;
+  }
+
+  &__equipment {
+    display: block;
+    margin-top: 12rpx;
+    font-size: 22rpx;
+    color: var(--color-text-secondary);
+  }
+
+  &__footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 16rpx;
+    padding-top: 12rpx;
+    border-top: 1rpx solid var(--color-border);
+  }
+
+  &__toggle {
+    font-size: 24rpx;
+    color: var(--color-primary);
+  }
+
+  &__add-btn {
+    font-size: 24rpx !important;
+    padding: 0 24rpx !important;
+    min-height: 56rpx;
+    line-height: 56rpx !important;
+    background: var(--color-primary-tint) !important;
+    color: var(--color-primary) !important;
+    border-radius: 28rpx !important;
+
+    &::after {
+      border: none; /* 去掉小程序 Button 默认边框 */
+    }
+  }
+}

@@ -1,0 +1,88 @@
+"""用户模型（对齐 docs/03-数据库设计文档.md 3.1 节）."""
+
+from datetime import date, datetime
+
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, String
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.models.base import Base, SoftDeleteMixin, TimestampMixin
+
+
+class User(Base, TimestampMixin, SoftDeleteMixin):
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)  # usr_<nanoid>
+
+    # 微信身份
+    wechat_openid: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    wechat_unionid: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    # 资料
+    nickname: Mapped[str | None] = mapped_column(String(48), nullable=True)
+    avatar_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+
+    # 高尔夫档案
+    golf_level: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    primary_goals: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    weekly_practice_frequency: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    onboarding_completed: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+
+    # 会员
+    membership_type: Mapped[str] = mapped_column(String(20), default="free", server_default="'free'")
+    membership_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    membership_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    auto_renew: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+
+    # 邀请
+    invite_code: Mapped[str] = mapped_column(String(8), unique=True, nullable=False)
+    invited_by_user_id: Mapped[str | None] = mapped_column(
+        String(32),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    # 统计缓存
+    total_analyses: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    total_practices: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    best_score: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    current_streak_days: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    max_streak_days: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    last_practice_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # 关系（按需启用 lazy="selectin"）
+    analyses: Mapped[list["SwingAnalysis"]] = relationship(  # noqa: F821
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="noload",
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "golf_level IS NULL OR golf_level IN ('beginner', 'elementary', 'intermediate', 'advanced')",
+            name="chk_golf_level",
+        ),
+        CheckConstraint(
+            "weekly_practice_frequency IS NULL OR weekly_practice_frequency "
+            "IN ('occasional', 'once', 'frequent', 'daily')",
+            name="chk_weekly_frequency",
+        ),
+        CheckConstraint(
+            "membership_type IN ('free', 'monthly', 'yearly', 'family')",
+            name="chk_membership_type",
+        ),
+        Index("idx_users_invite_code", "invite_code"),
+        Index(
+            "idx_users_membership",
+            "membership_type",
+            "membership_expires_at",
+            postgresql_where="membership_type != 'free'",
+        ),
+        Index("idx_users_created_at", "created_at"),
+        Index("idx_users_alive", "deleted_at", postgresql_where="deleted_at IS NULL"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<User {self.id} {self.nickname or self.wechat_openid}>"

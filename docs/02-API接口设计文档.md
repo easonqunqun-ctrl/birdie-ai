@@ -1,0 +1,1838 @@
+# 「小鸟 AI」MVP API 接口设计文档
+
+> 版本：v1.0  
+> 日期：2026 年 4 月 14 日  
+> 后端框架：Python FastAPI  
+> 密级：内部机密
+
+---
+
+## 一、全局约定
+
+### 1.1 基础信息
+
+| 项目 | 值 |
+|------|------|
+| Base URL（开发） | `https://dev-api.xiaoniaoai.com/v1` |
+| Base URL（生产） | `https://api.xiaoniaoai.com/v1` |
+| 协议 | HTTPS（强制） |
+| 数据格式 | JSON（Content-Type: application/json） |
+| 字符编码 | UTF-8 |
+| 时间格式 | ISO 8601（`2026-04-14T10:30:00+08:00`） |
+| API 版本 | URL 路径版本控制（`/v1/`） |
+
+### 1.2 认证方案
+
+**JWT Bearer Token 认证**
+
+```
+Authorization: Bearer <jwt_token>
+```
+
+- Token 有效期：7 天
+- Token 刷新：过期前 24 小时内可用旧 Token 换取新 Token
+- 不需要认证的接口：登录、微信回调、健康检查
+
+**JWT Payload 结构**：
+
+```json
+{
+  "sub": "user_id",
+  "openid": "wx_openid",
+  "membership": "free|monthly|yearly|family",
+  "iat": 1713081000,
+  "exp": 1713685800
+}
+```
+
+### 1.3 统一响应格式
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": { ... }
+}
+```
+
+**分页响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "items": [ ... ],
+    "total": 100,
+    "page": 1,
+    "page_size": 20,
+    "has_more": true
+  }
+}
+```
+
+**错误响应**：
+
+```json
+{
+  "code": 40001,
+  "message": "视频时长不符合要求",
+  "detail": "视频时长为 2 秒，最低要求 3 秒"
+}
+```
+
+### 1.4 错误码规范
+
+| 错误码范围 | 类别 | 说明 |
+|-----------|------|------|
+| 0 | 成功 | 请求成功 |
+| 40000-40099 | 参数错误 | 请求参数校验失败 |
+| 40100-40199 | 认证错误 | Token 无效/过期/缺失 |
+| 40300-40399 | 权限错误 | 无操作权限 |
+| 40400-40499 | 资源错误 | 请求的资源不存在 |
+| 42900-42999 | 限流错误 | 请求频率超限 |
+| 50000-50099 | 服务端错误 | 系统内部错误 |
+| 50100-50199 | AI 引擎错误 | AI 分析/对话服务异常 |
+| 50200-50299 | 第三方服务错误 | 微信/支付/存储等外部服务异常 |
+
+**详细错误码清单**：
+
+| 错误码 | 消息 | 触发场景 |
+|--------|------|----------|
+| 40001 | 参数缺失 | 必填参数未传 |
+| 40002 | 参数格式错误 | 参数类型/格式不正确 |
+| 40003 | 视频格式不支持 | 非 MP4/MOV 格式 |
+| 40004 | 视频时长不符 | < 3 秒或 > 30 秒 |
+| 40005 | 文件过大 | 超过 100MB |
+| 40006 | 分析次数不足 | 免费额度用完 |
+| 40007 | 对话次数不足 | 每日对话限额用完（M3-T1） |
+| 40009 | 操作过于频繁 | 对话发送等高频业务的速率限制（M3-T2 启用；40009 比 42901 更聚焦业务） |
+| 40010 | 字段不允许修改 | 业务语义禁止（如 `onboarding_completed` 反向置 false） |
+| 40011 | 上传凭证无效 | `upload_id` 不存在、已过期或不属于当前用户（M2-T1） |
+| 40012 | 视频对象不存在 | 前端拿了凭证但未完成 POST 直传即调 `/analyses`（M2-T1） |
+| 40101 | Token 缺失 | 未携带 Authorization 头 |
+| 40102 | Token 无效 | Token 解析失败 |
+| 40103 | Token 过期 | Token 已过期 |
+| 40301 | 无会员权限 | 需要会员才能访问的功能 |
+| 40401 | 用户不存在 | user_id 无对应记录 |
+| 40402 | 分析记录不存在 | analysis_id 无对应记录 |
+| 40403 | 训练计划不存在 | plan_id 无对应记录 |
+| 40904 | 资源状态冲突 | 分析尚未完成却去取报告等状态冲突场景（M2-T1） |
+| 42901 | 请求过于频繁 | 触发限流 |
+| 50001 | 服务内部错误 | 未预期的服务端异常 |
+| 50101 | 视频分析失败 | AI 引擎处理失败 |
+| 50102 | 未检测到人体 | 视频中无法识别人体 |
+| 50103 | 未检测到挥杆 | 视频中无挥杆动作 |
+| 50104 | AI 引擎不可达 | Celery worker 连 AI 引擎超时/连接失败，耗尽重试后终态失败（M2-T2） |
+| 50105 | 视频画质不足 | 画质过低无法分析（W6 真实 AI 引擎上线后启用，MVP mock 暂不触发） |
+| 50106 | AI 对话服务异常 | LLM 服务不可用（M3-T2 启用；M2 时曾误写为 50105） |
+| 50201 | 微信服务异常 | 微信 API 调用失败 |
+| 50202 | 支付服务异常 | 微信支付接口异常 |
+| 50203 | 存储服务异常 | COS 上传/读取失败 |
+
+### 1.5 限流策略
+
+| 接口类别 | 限流规则 |
+|----------|----------|
+| 通用接口 | 100 次/分钟/用户 |
+| 视频上传 | 10 次/分钟/用户 |
+| 挥杆分析 | 5 次/分钟/用户 |
+| AI 对话 | 20 次/分钟/用户 |
+| 登录接口 | 10 次/分钟/IP |
+
+超过限流返回 HTTP 429 + 错误码 42901，响应头携带：
+
+```
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1713081060
+Retry-After: 30
+```
+
+---
+
+## 二、用户模块（/users）
+
+### 2.1 微信登录
+
+```
+POST /v1/auth/wechat-login
+```
+
+**无需认证**
+
+**请求体**：
+
+```json
+{
+  "code": "string（必填，wx.login 获取的临时 code）",
+  "invite_code": "string（选填，邀请码）"
+}
+```
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiIs...",
+    "expires_in": 604800,
+    "is_new_user": true,
+    "user": {
+      "id": "usr_abc123",
+      "nickname": "球友A",
+      "avatar_url": "https://cos.xiaoniaoai.com/avatars/default.png",
+      "golf_level": null,
+      "membership_type": "free",
+      "membership_expires_at": null,
+      "created_at": "2026-04-14T10:30:00+08:00"
+    }
+  }
+}
+```
+
+**处理逻辑**：
+
+1. 用 code 调用微信 `code2session` 获取 openid
+2. 查找已有用户 → 返回；新用户 → 创建记录
+3. 如有 invite_code → 绑定邀请关系
+4. 生成 JWT Token 返回
+
+---
+
+### 2.2 刷新 Token
+
+```
+POST /v1/auth/refresh-token
+```
+
+**需认证**（旧 Token 在过期前 24 小时可用）
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiIs...",
+    "expires_in": 604800
+  }
+}
+```
+
+---
+
+### 2.3 完成新用户引导
+
+```
+POST /v1/users/me/onboarding
+```
+
+**需认证**
+
+**请求体**：
+
+```json
+{
+  "golf_level": "beginner | elementary | intermediate | advanced",
+  "primary_goals": ["distance", "accuracy", "short_game", "putting", "consistency"],
+  "weekly_practice_frequency": "occasional | once | frequent | daily"
+}
+```
+
+**校验规则**：
+
+- `golf_level` 必填，枚举值
+- `primary_goals` 必填，数组，至少 1 项，最多 5 项
+- `weekly_practice_frequency` 必填，枚举值
+
+**成功响应**：返回完整 `UserResponse`（结构同 2.4），其中 `stats` / `quota` 可能为 `null`（引导成功即可，统计/配额放在 GET /me 拉取）。
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "id": "usr_abc123",
+    "nickname": "球友A",
+    "avatar_url": "https://cos.xiaoniaoai.com/avatars/default.png",
+    "golf_level": "beginner",
+    "primary_goals": ["distance", "accuracy"],
+    "weekly_practice_frequency": "frequent",
+    "membership_type": "free",
+    "membership_expires_at": null,
+    "onboarding_completed": true,
+    "stats": null,
+    "quota": null,
+    "created_at": "2026-04-01T10:30:00+08:00"
+  }
+}
+```
+
+---
+
+### 2.4 获取当前用户信息
+
+```
+GET /v1/users/me
+```
+
+**需认证**
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "id": "usr_abc123",
+    "nickname": "球友A",
+    "avatar_url": "https://cos.xiaoniaoai.com/avatars/usr_abc123.jpg",
+    "golf_level": "beginner",
+    "primary_goals": ["distance", "accuracy"],
+    "weekly_practice_frequency": "frequent",
+    "membership_type": "free",
+    "membership_expires_at": null,
+    "onboarding_completed": true,
+    "stats": {
+      "total_analyses": 12,
+      "total_practices": 28,
+      "streak_days": 7,
+      "best_score": 85,
+      "score_improvement": 18
+    },
+    "quota": {
+      "analysis_remaining": 2,
+      "analysis_total": 3,
+      "analysis_reset_at": "2026-05-01T00:00:00+08:00",
+      "chat_remaining_today": 3,
+      "chat_total_today": 5
+    },
+    "created_at": "2026-04-01T10:30:00+08:00"
+  }
+}
+```
+
+---
+
+### 2.5 更新用户信息
+
+```
+PATCH /v1/users/me
+```
+
+**需认证**
+
+**请求体**（所有字段均为选填，只传需要修改的）：
+
+```json
+{
+  "nickname": "string（2-12 个字符）",
+  "avatar_url": "string（头像 URL）",
+  "golf_level": "beginner | elementary | intermediate | advanced",
+  "primary_goals": ["distance", "accuracy"],
+  "weekly_practice_frequency": "occasional | once | frequent | daily",
+  "onboarding_completed": true
+}
+```
+
+**字段语义**：
+
+- 仅对"入传字段"进行修改（后端按 `exclude_unset` 处理），未传入的字段保持原值。
+- `onboarding_completed` 仅允许从 `false` 置为 `true`（首启页"跳过"入口）；**不允许**通过本接口反向置 `false`，否则返回错误码 `40010`。
+
+**成功响应**：返回更新后的完整用户对象（同 2.4）。
+
+---
+
+### 2.6 提交意见反馈
+
+```
+POST /v1/feedback
+```
+
+**需认证**
+
+**请求体**：
+
+```json
+{
+  "content": "string（必填，1-500 字）",
+  "contact": "string（选填，联系方式）"
+}
+```
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "感谢你的反馈",
+  "data": {
+    "feedback_id": "fb_xyz789"
+  }
+}
+```
+
+---
+
+### 2.7 申请账号注销
+
+```
+POST /v1/users/me/delete-request
+```
+
+**需认证**
+
+**请求体**：
+
+```json
+{
+  "reason": "string（选填，注销原因）",
+  "confirmation": "DELETE（必填，需用户输入 DELETE 确认）"
+}
+```
+
+**处理逻辑**：
+
+1. 校验 `confirmation` 字段必须为 "DELETE"
+2. 检查用户是否有未完成的订单（如有，拒绝注销）
+3. 创建注销申请，进入 7 天冷静期
+4. 冷静期内用户可随时登录取消注销
+5. 7 天后自动执行注销：软删除用户数据、清除视频文件、匿名化分析数据
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "注销申请已提交",
+  "data": {
+    "delete_scheduled_at": "2026-04-21T10:30:00+08:00",
+    "cancel_before": "2026-04-21T10:30:00+08:00",
+    "message": "你的账号将在 7 天后注销。期间你可以随时登录取消。"
+  }
+}
+```
+
+---
+
+### 2.8 取消账号注销
+
+```
+POST /v1/users/me/cancel-delete
+```
+
+**需认证**（仅在冷静期内有效）
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "注销申请已取消",
+  "data": {
+    "status": "active"
+  }
+}
+```
+
+---
+
+## 三、挥杆分析模块（/analyses）
+
+### 3.1 获取视频上传凭证
+
+```
+POST /v1/analyses/upload-token
+```
+
+**需认证**
+
+**请求体**：
+
+```json
+{
+  "file_name": "string（原始文件名）",
+  "file_size": 52428800,
+  "file_type": "video/mp4 | video/quicktime",
+  "duration": 8.5
+}
+```
+
+**校验逻辑**：
+
+1. 检查用户分析配额（免费用户检查剩余次数）
+2. 校验文件大小 ≤ 100MB
+3. 校验文件类型为 MP4/MOV
+4. 校验时长 3-30 秒
+5. 生成 COS 临时上传凭证
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "upload_id": "upl_abc123",
+    "cos_config": {
+      "bucket": "birdie-videos-1300000000",
+      "region": "ap-shanghai",
+      "key": "uploads/2026/04/14/usr_abc123/upl_abc123.mp4",
+      "credentials": {
+        "tmp_secret_id": "...",
+        "tmp_secret_key": "...",
+        "session_token": "...",
+        "expired_time": 1713084600
+      }
+    }
+  }
+}
+```
+
+---
+
+### 3.2 创建挥杆分析任务
+
+```
+POST /v1/analyses
+```
+
+**需认证**
+
+**请求体**：
+
+```json
+{
+  "upload_id": "upl_abc123（必填，上传凭证 ID）",
+  "camera_angle": "face_on | down_the_line（必填）",
+  "club_type": "driver | fairway_wood | iron_3 | iron_4 | iron_5 | iron_6 | iron_7 | iron_8 | iron_9 | wedge | putter | unknown（必填）"
+}
+```
+
+**处理逻辑**：
+
+1. 验证 upload_id 有效且视频已上传至 COS
+2. 扣减用户分析配额
+3. 创建分析记录（状态 `pending`）
+4. 将分析任务推入消息队列（会员用户进优先队列）
+5. 返回分析 ID
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "分析任务已创建",
+  "data": {
+    "analysis_id": "ana_def456",
+    "status": "pending",
+    "queue_position": 3,
+    "estimated_seconds": 25,
+    "created_at": "2026-04-14T10:35:00+08:00"
+  }
+}
+```
+
+---
+
+### 3.3 查询分析状态
+
+```
+GET /v1/analyses/{analysis_id}/status
+```
+
+**需认证**（仅查看自己的分析）
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "analysis_id": "ana_def456",
+    "status": "analyzing",
+    "stage": "pose_estimating | phase_segmenting | scoring | diagnosing | generating | completed | failed",
+    "stage_progress": 60,
+    "estimated_remaining_seconds": 12,
+    "error": null
+  }
+}
+```
+
+**状态枚举**：
+
+| status | stage | 说明 |
+|--------|-------|------|
+| pending | — | 排队等待 |
+| processing | preprocessing | 视频预处理 |
+| processing | pose_estimating | 姿态估计 |
+| processing | phase_segmenting | 挥杆阶段分割 |
+| processing | scoring | 动作评分 |
+| processing | diagnosing | 问题诊断 |
+| processing | generating | 生成报告 |
+| completed | — | 分析完成 |
+| failed | — | 分析失败 |
+
+**失败时的 error 字段**：
+
+```json
+{
+  "error": {
+    "code": 50102,
+    "message": "未检测到人体",
+    "quota_refunded": true
+  }
+}
+```
+
+---
+
+### 3.4 获取分析报告详情
+
+```
+GET /v1/analyses/{analysis_id}
+```
+
+**需认证**
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "id": "ana_def456",
+    "user_id": "usr_abc123",
+    "status": "completed",
+    "camera_angle": "down_the_line",
+    "club_type": "iron_7",
+    "video_url": "https://cos.xiaoniaoai.com/videos/ana_def456/original.mp4",
+    "skeleton_video_url": "https://cos.xiaoniaoai.com/videos/ana_def456/skeleton.mp4",
+
+    "overall_score": 78,
+    "score_change": 3,
+    "score_level": "good",
+
+    "phase_scores": {
+      "setup": { "score": 82, "label": "站位准备" },
+      "backswing": { "score": 74, "label": "上杆轨迹" },
+      "top": { "score": 80, "label": "顶点位置" },
+      "downswing": { "score": 65, "label": "下杆转换", "is_weakest": true },
+      "impact": { "score": 79, "label": "击球触球" },
+      "follow_through": { "score": 85, "label": "收杆平衡" }
+    },
+
+    "issues": [
+      {
+        "type": "casting",
+        "name": "抛杆（Casting）",
+        "severity": "high",
+        "description": "你的手腕在下杆初期就开始释放，导致击球时杆面打开，容易产生右曲球。这是目前最需要改善的环节。",
+        "key_frame_url": "https://cos.xiaoniaoai.com/videos/ana_def456/frames/casting.jpg",
+        "key_frame_timestamp": 1.8
+      },
+      {
+        "type": "bent_left_arm",
+        "name": "上杆左臂弯曲",
+        "severity": "medium",
+        "description": "上杆至顶点时左臂弯曲约 15°，影响挥杆弧度的一致性。",
+        "key_frame_url": "https://cos.xiaoniaoai.com/videos/ana_def456/frames/bent_arm.jpg",
+        "key_frame_timestamp": 1.2
+      }
+    ],
+
+    "recommendations": [
+      {
+        "drill_id": "drill_towel_arm",
+        "name": "毛巾夹臂练习",
+        "target_issue": "casting",
+        "description": "修复下杆时过早释放手腕",
+        "duration_minutes": 15,
+        "sets": 3,
+        "steps": [
+          "取一条小毛巾，折叠后夹在双臂之间（肘关节内侧）",
+          "做半挥杆练习，保持毛巾不掉落",
+          "感受双臂与身体的连接感",
+          "逐渐加大挥杆幅度",
+          "每组做 10 次挥杆，共 3 组"
+        ]
+      }
+    ],
+
+    "phase_timestamps": {
+      "setup": { "start": 0.0, "end": 0.8 },
+      "backswing": { "start": 0.8, "end": 1.5 },
+      "top": { "start": 1.5, "end": 1.7 },
+      "downswing": { "start": 1.7, "end": 2.0 },
+      "impact": { "start": 2.0, "end": 2.1 },
+      "follow_through": { "start": 2.1, "end": 2.8 }
+    },
+
+    "skeleton_data_url": "https://cos.xiaoniaoai.com/videos/ana_def456/skeleton.json",
+    "share_card_url": null,
+    "analyzed_at": "2026-04-14T10:35:25+08:00",
+    "created_at": "2026-04-14T10:35:00+08:00"
+  }
+}
+```
+
+---
+
+### 3.5 获取分析历史列表
+
+```
+GET /v1/analyses?page=1&page_size=20
+```
+
+**需认证**
+
+**查询参数**：
+
+| 参数 | 类型 | 必填 | 默认 | 说明 |
+|------|------|------|------|------|
+| page | int | 否 | 1 | 页码 |
+| page_size | int | 否 | 20 | 每页数量，最大 50 |
+| club_type | string | 否 | — | 按球杆类型筛选 |
+| date_from | string | 否 | — | 起始日期（ISO 8601） |
+| date_to | string | 否 | — | 截止日期 |
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "items": [
+      {
+        "id": "ana_def456",
+        "camera_angle": "down_the_line",
+        "club_type": "iron_7",
+        "overall_score": 78,
+        "score_change": 3,
+        "thumbnail_url": "https://cos.xiaoniaoai.com/videos/ana_def456/thumb.jpg",
+        "status": "completed",
+        "analyzed_at": "2026-04-14T10:35:25+08:00"
+      }
+    ],
+    "total": 12,
+    "page": 1,
+    "page_size": 20,
+    "has_more": false
+  }
+}
+```
+
+---
+
+### 3.6 获取示例分析报告（体验入口）
+
+```
+GET /v1/analyses/sample
+```
+
+**不需认证**（允许匿名访问，已登录用户带 Token 也会被静默识别，便于埋点但不做权限控制）
+
+**来源**：MVP §3.6「用示例视频先体验一下」。新用户在真正上传视频之前可以先看一份固定的演示报告，了解 AI 能给出什么样的诊断价值。
+
+**行为约束**：
+- **完全固定**：每次返回**完全一致**的数据（便于运营 / QA 做截图与自动化对比）。
+- **不入库**：不创建 `swing_analyses` 记录，也不会出现在 `GET /v1/analyses` 列表中。
+- **不计配额**：即使带 Token 访问，`user.quota.analysis_remaining` 不会变化。
+- **固定 id**：返回体 `id == "sample"`，前端报告页以此识别"示例模式"（可展示"这是演示"徽章、禁用/隐藏"再拍一段"以外的部分交互）。
+
+**请求**：无 body、无 query、无需 path 参数。
+
+**响应** — 200：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "id": "sample",
+    "user_id": "sample",
+    "status": "completed",
+    "camera_angle": "face_on",
+    "club_type": "iron_7",
+    "video_url": "https://xiaoniao-assets.oss-cn-hangzhou.aliyuncs.com/samples/swing_demo.mp4",
+    "video_duration": 2.8,
+    "skeleton_video_url": "https://xiaoniao-assets.oss-cn-hangzhou.aliyuncs.com/samples/swing_demo.mp4",
+    "thumbnail_url": "https://xiaoniao-assets.oss-cn-hangzhou.aliyuncs.com/samples/swing_demo_thumb.jpg",
+    "overall_score": 78,
+    "score_level": "good",
+    "phase_scores": {
+      "setup":         {"score": 85, "label": "站位准备", "is_weakest": false},
+      "backswing":     {"score": 78, "label": "上杆轨迹", "is_weakest": false},
+      "top":           {"score": 80, "label": "顶点位置", "is_weakest": false},
+      "downswing":     {"score": 72, "label": "下杆转换", "is_weakest": true},
+      "impact":        {"score": 78, "label": "击球触球", "is_weakest": false},
+      "follow_through":{"score": 82, "label": "收杆平衡", "is_weakest": false}
+    },
+    "phase_timestamps": {
+      "setup":         {"start": 0.0, "end": 0.8},
+      "backswing":     {"start": 0.8, "end": 1.5},
+      "top":           {"start": 1.5, "end": 1.7},
+      "downswing":     {"start": 1.7, "end": 2.0},
+      "impact":        {"start": 2.0, "end": 2.1},
+      "follow_through":{"start": 2.1, "end": 2.8}
+    },
+    "issues": [
+      {"type": "casting", "name": "抛杆（Casting）", "severity": "high", "description": "...", "key_frame_timestamp": 1.8, "key_frame_url": null},
+      {"type": "early_extension", "name": "提前伸展（Early Extension）", "severity": "medium", "description": "...", "key_frame_timestamp": 1.9, "key_frame_url": null}
+    ],
+    "recommendations": [
+      {"drill_id": "drill_towel_arm", "target_issue": "casting", "sort_order": 0},
+      {"drill_id": "drill_hip_rotation", "target_issue": "early_extension", "sort_order": 1}
+    ],
+    "share_card_url": null,
+    "analyzed_at": "2026-04-01T10:00:03Z",
+    "created_at": "2026-04-01T10:00:00Z"
+  }
+}
+```
+
+**实现说明**：数据源是 `backend/app/services/sample_fixture.py::build_sample_report()`，与 `ai_engine/app/sample_fixture.py::build_sample_analyze_result()` **保持同源**（改数值时两边都要改）。不走 AI 引擎 HTTP 调用，TTFB ≤ 100ms。
+
+---
+
+### 3.7 生成分享卡片
+
+```
+POST /v1/analyses/{analysis_id}/share-card
+```
+
+**需认证**
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "share_card_url": "https://cos.xiaoniaoai.com/cards/ana_def456.png",
+    "mini_program_path": "pages/analysis/detail?id=ana_def456&inviter=usr_abc123"
+  }
+}
+```
+
+---
+
+## 四、AI 对话模块（/chat）
+
+### 4.1 创建/获取对话会话
+
+```
+POST /v1/chat/sessions
+```
+
+**需认证**
+
+**请求体**：
+
+```json
+{
+  "context_analysis_id": "ana_def456（选填，关联分析报告 ID）"
+}
+```
+
+**逻辑说明**：
+
+- 如有未过期的活跃会话（24 小时内有消息），返回该会话
+- 如无活跃会话，创建新会话
+- 如传入 `context_analysis_id`，将该分析结果注入会话上下文
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "session_id": "chat_ghi789",
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "你好！我是你的 AI 高尔夫教练小鸟。随时可以问我挥杆技术、练习方法或高尔夫知识方面的问题。",
+        "timestamp": "2026-04-14T10:40:00+08:00"
+      }
+    ],
+    "context_analysis_id": "ana_def456",
+    "created_at": "2026-04-14T10:40:00+08:00"
+  }
+}
+```
+
+---
+
+### 4.2 发送消息（流式）
+
+```
+POST /v1/chat/sessions/{session_id}/messages
+```
+
+**需认证**
+
+**请求体**：
+
+```json
+{
+  "content": "string（必填，1-500 字）",
+  "attachments": [
+    {
+      "type": "image",
+      "url": "https://cos.xiaoniaoai.com/chat/usr_abc123/img001.jpg"
+    }
+  ]
+}
+```
+
+**响应方式**：Server-Sent Events（SSE）
+
+- **默认流式**：`Accept: text/event-stream`（或不带 `Accept`）→ 下述 SSE 序列
+- **非流式降级**：URL 追加 `?stream=false` → 普通 JSON `{code, data: {user_message, assistant_message, quota_remaining}}`，供低端机 / 单元测试使用（M3-T1）
+
+```
+Content-Type: text/event-stream
+
+event: message_start
+data: {"user_message_id": "msg_user_001", "assistant_message_id": "msg_asst_001", "user_message": {"id":"msg_user_001","session_id":"ses_xx","role":"user","content":"我的右曲球怎么办","created_at":"2026-04-14T12:00:00+00:00"}}
+
+event: content_delta
+data: {"delta": "根据你最近"}
+
+event: content_delta
+data: {"delta": "3 次挥杆分析，"}
+
+event: content_delta
+data: {"delta": "你的右曲球主要有两个原因：\n\n1. 下杆路径偏外..."}
+
+event: attachment
+data: {"attachment": {"type": "drill_card", "drill_id": "drill_towel_arm", "name": "毛巾夹臂练习", "description": "修复下杆时过早释放手腕", "duration_minutes": 15, "steps": [...]}}
+
+event: message_end
+data: {"assistant_message_id": "msg_asst_001", "content": "根据你最近 3 次挥杆分析...", "attachments": [...], "quota_remaining": 4, "usage": {"prompt_tokens": 1200, "completion_tokens": 350}}
+```
+
+**SSE 事件类型**（与后端 `chat_service.generate_stream_events` 实现一致）：
+
+| 事件 | data 字段 | 说明 |
+|------|----------|------|
+| `message_start` | `user_message_id`, `assistant_message_id`, `user_message{...}` | 回复开始，后端已把用户消息落库并扣减配额，同时**预留** assistant 消息 id（尚未落库）；前端据此替换乐观气泡 id |
+| `content_delta` | `delta` | 文本增量，按 LLM token-level 推送 |
+| `attachment` | `attachment{type,drill_id,name,description,duration_minutes,steps,...}` | 目前仅 `drill_card` 类型，由后端启发式关键字触发（M3-T2 `_detect_drill_attachments`） |
+| `message_end` | `assistant_message_id`, `content`（完整文本）, `attachments[]`, `quota_remaining`（-1 表示无限）, `usage{prompt_tokens, completion_tokens}` | 回复结束，assistant 消息已落库 |
+| `error` | `code`（`50106`）, `message`（用户可见）, `detail`（排查用） | 生成过程出错；后端已退还本轮配额，但 `message_start` 之前落库的 user 消息保留（前端可保留气泡） |
+
+**配额行为**：
+
+- 进 `message_start` 之前后端已 `quota.consume(1)` 且 commit → 即使 SSE 传输中断，配额也算扣减
+- LLM 异常（触发 `error` 事件）时，后端 `_finalize_llm_error` 会 `quota.refund(1)` + 保留 user 消息 + 若有 partial 文本则把 `partial + "\n\n[回复中断，请稍后重试]"` 作为 assistant 消息落库（无 partial 就只落 user 消息）
+- 因 `error` 事件本身**不携带** `quota_remaining`（只有 `code / message / detail`），前端收到 `error` 后建议用 `GET /users/me` 重拉配额快照
+
+---
+
+### 4.3 获取对话历史
+
+```
+GET /v1/chat/sessions/{session_id}/messages?page=1&page_size=50
+```
+
+**需认证**
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "items": [
+      {
+        "id": "msg_001",
+        "role": "assistant",
+        "content": "你好！我是你的 AI 高尔夫教练小鸟...",
+        "attachments": [],
+        "timestamp": "2026-04-14T10:40:00+08:00"
+      },
+      {
+        "id": "msg_002",
+        "role": "user",
+        "content": "我总是打出右曲球怎么办？",
+        "attachments": [],
+        "timestamp": "2026-04-14T10:40:15+08:00"
+      },
+      {
+        "id": "msg_003",
+        "role": "assistant",
+        "content": "根据你最近 3 次挥杆分析...",
+        "attachments": [
+          {
+            "type": "drill_card",
+            "drill_id": "drill_towel_arm",
+            "name": "毛巾夹臂练习"
+          }
+        ],
+        "timestamp": "2026-04-14T10:40:18+08:00"
+      }
+    ],
+    "total": 3,
+    "page": 1,
+    "page_size": 50,
+    "has_more": false
+  }
+}
+```
+
+---
+
+### 4.4 获取会话列表
+
+```
+GET /v1/chat/sessions?page=1&page_size=20
+```
+
+**需认证**
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "items": [
+      {
+        "id": "chat_ghi789",
+        "last_message": "根据你最近 3 次挥杆分析...",
+        "last_message_at": "2026-04-14T10:40:18+08:00",
+        "message_count": 6,
+        "created_at": "2026-04-14T10:40:00+08:00"
+      }
+    ],
+    "total": 5,
+    "page": 1,
+    "page_size": 20,
+    "has_more": false
+  }
+}
+```
+
+---
+
+### 4.5 上传对话图片（**W7 延后**）
+
+> **M3 实现状态**：**未实现，延后到 W7**。当前 `chat/messages` SSE 支持 `attachments[].image` 结构在响应侧呈现（drill_card 同理），但**用户上传图片链路**（小程序 chooseImage → 后端 COS 临时 key → `image_url` 回填消息）要和 W7 "会员付费凭证上传"一起做，统一 COS 凭证签发逻辑，避免重复实现。
+
+```
+POST /v1/chat/upload-image
+```
+
+**需认证**
+
+**请求方式**：`multipart/form-data`
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| file | File | 是 | 图片文件，支持 JPG/PNG/WEBP |
+| max size | — | — | 单张最大 5MB |
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "image_url": "https://cos.xiaoniaoai.com/chat/usr_abc123/img_20260414_001.jpg",
+    "width": 750,
+    "height": 1000
+  }
+}
+```
+
+**说明**：上传成功后将 `image_url` 作为消息附件的 `url` 字段传入发送消息接口。
+
+---
+
+### 4.6 获取快捷问题列表
+
+```
+GET /v1/chat/quick-questions
+```
+
+**需认证**
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "questions": [
+      {
+        "id": "qq_001",
+        "text": "我的挥杆有什么问题？",
+        "requires_analysis": true
+      },
+      {
+        "id": "qq_002",
+        "text": "推荐今天练什么",
+        "requires_analysis": false
+      },
+      {
+        "id": "qq_003",
+        "text": "怎么打好沙坑球？",
+        "requires_analysis": false
+      },
+      {
+        "id": "qq_004",
+        "text": "上杆时身体怎么转？",
+        "requires_analysis": false
+      }
+    ]
+  }
+}
+```
+
+**说明**：`requires_analysis` 为 true 时，需要用户至少有 1 次挥杆分析记录，否则点击后提示"请先完成一次挥杆分析"。
+
+---
+
+### 4.7 清空/删除会话
+
+```
+DELETE /v1/chat/sessions/{session_id}
+```
+
+**需认证**
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "对话已清空"
+}
+```
+
+---
+
+## 五、训练模块（/training）
+
+### 5.1 获取当前训练计划
+
+```
+GET /v1/training/plans/current
+```
+
+**需认证**
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "id": "plan_mno345",
+    "week_start": "2026-04-14",
+    "week_end": "2026-04-20",
+    "total_tasks": 5,
+    "completed_tasks": 2,
+    "ai_summary": "重点关注下杆时手腕释放时机，这是你目前最大的改善空间",
+    "tasks": [
+      {
+        "id": "task_001",
+        "drill_id": "drill_towel_arm",
+        "name": "毛巾夹臂练习",
+        "target_issue": "抛杆",
+        "scheduled_date": "2026-04-14",
+        "duration_minutes": 15,
+        "sets": 3,
+        "difficulty": "medium",
+        "status": "completed",
+        "completed_at": "2026-04-14T18:30:00+08:00",
+        "verification_analysis_id": null
+      },
+      {
+        "id": "task_002",
+        "drill_id": "drill_half_swing",
+        "name": "半挥杆节奏练习",
+        "target_issue": "挥杆节奏",
+        "scheduled_date": "2026-04-16",
+        "duration_minutes": 20,
+        "sets": 5,
+        "difficulty": "easy",
+        "status": "pending",
+        "completed_at": null,
+        "verification_analysis_id": null
+      }
+    ],
+    "created_at": "2026-04-14T10:36:00+08:00"
+  }
+}
+```
+
+---
+
+### 5.2 获取练习详情
+
+```
+GET /v1/training/drills/{drill_id}
+```
+
+**需认证**
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "id": "drill_towel_arm",
+    "name": "毛巾夹臂练习",
+    "target_issues": ["casting"],
+    "description": "通过在双臂间夹住毛巾进行挥杆练习，建立双臂与身体的连接感，纠正下杆时过早释放手腕的问题。",
+    "steps": [
+      "取一条小毛巾，折叠后夹在双臂之间（肘关节内侧）",
+      "做半挥杆练习，保持毛巾不掉落",
+      "感受双臂与身体的连接感",
+      "逐渐加大挥杆幅度",
+      "每组做 10 次挥杆，共 3 组"
+    ],
+    "duration_minutes": 15,
+    "sets": 3,
+    "difficulty": "medium",
+    "illustration_url": "https://cos.xiaoniaoai.com/drills/towel_arm/demo.gif",
+    "video_url": "https://cos.xiaoniaoai.com/drills/towel_arm/demo.mp4",
+    "tips": [
+      "如果毛巾反复掉落，可以先用更小幅度的挥杆练习",
+      "保持正常呼吸节奏，不要因为怕掉毛巾而过于紧张"
+    ]
+  }
+}
+```
+
+---
+
+### 5.3 完成训练任务（打卡）
+
+```
+POST /v1/training/tasks/{task_id}/complete
+```
+
+**需认证**
+
+**请求体**：
+
+```json
+{
+  "verification_analysis_id": "ana_xxx（选填，拍视频验证后的分析 ID）"
+}
+```
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "训练完成，继续加油！",
+  "data": {
+    "task_id": "task_001",
+    "status": "completed",
+    "completed_at": "2026-04-14T18:30:00+08:00",
+    "streak_days": 8,
+    "streak_milestone": null,
+    "plan_progress": {
+      "completed": 3,
+      "total": 5
+    }
+  }
+}
+```
+
+**streak_milestone**（里程碑，非空时前端展示成就弹窗）：
+
+```json
+{
+  "streak_milestone": {
+    "type": "streak_7",
+    "title": "连续打卡 7 天",
+    "description": "坚持就是进步，你太棒了！"
+  }
+}
+```
+
+---
+
+### 5.4 获取进步曲线数据
+
+```
+GET /v1/training/progress?period=30d
+```
+
+**需认证 + 需会员**
+
+**查询参数**：
+
+| 参数 | 类型 | 必填 | 默认 | 说明 |
+|------|------|------|------|------|
+| period | string | 否 | 30d | 时间范围：7d / 30d / 90d / all |
+| dimension | string | 否 | overall | 维度：overall / setup / backswing / top / downswing / impact / follow_through |
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "dimension": "overall",
+    "period": "30d",
+    "data_points": [
+      { "date": "2026-03-15", "score": 60, "analysis_id": "ana_001" },
+      { "date": "2026-03-20", "score": 65, "analysis_id": "ana_002" },
+      { "date": "2026-03-28", "score": 72, "analysis_id": "ana_003" },
+      { "date": "2026-04-05", "score": 75, "analysis_id": "ana_004" },
+      { "date": "2026-04-14", "score": 78, "analysis_id": "ana_005" }
+    ],
+    "summary": {
+      "start_score": 60,
+      "current_score": 78,
+      "improvement": 18,
+      "total_analyses": 12,
+      "total_practices": 28,
+      "max_streak_days": 12,
+      "most_improved_dimension": {
+        "name": "downswing",
+        "label": "下杆转换",
+        "improvement": 22
+      }
+    }
+  }
+}
+```
+
+---
+
+### 5.5 获取打卡日历
+
+```
+GET /v1/training/calendar?month=2026-04
+```
+
+**需认证**
+
+**查询参数**：
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| month | string | 是 | 年月，格式 YYYY-MM |
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "month": "2026-04",
+    "days": [
+      { "date": "2026-04-01", "practiced": true, "tasks_completed": 2, "analysis_done": false },
+      { "date": "2026-04-02", "practiced": true, "tasks_completed": 1, "analysis_done": true },
+      { "date": "2026-04-03", "practiced": false, "tasks_completed": 0, "analysis_done": false }
+    ],
+    "monthly_stats": {
+      "practice_days": 12,
+      "total_tasks_completed": 18,
+      "total_analyses": 5,
+      "current_streak": 7
+    }
+  }
+}
+```
+
+---
+
+## 六、支付模块（/payments）
+
+### 6.1 创建订阅订单
+
+```
+POST /v1/payments/subscriptions
+```
+
+**需认证**
+
+**请求体**：
+
+```json
+{
+  "plan_type": "monthly | yearly | family（必填）"
+}
+```
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "order_id": "ord_pqr678",
+    "plan_type": "yearly",
+    "amount": 29900,
+    "currency": "CNY",
+    "wechat_pay_params": {
+      "timeStamp": "1713081000",
+      "nonceStr": "abc123xyz",
+      "package": "prepay_id=wx14103...",
+      "signType": "RSA",
+      "paySign": "..."
+    }
+  }
+}
+```
+
+前端拿到 `wechat_pay_params` 后调用 `wx.requestPayment(params)` 唤起微信支付。
+
+---
+
+### 6.2 支付结果回调（微信通知后端）
+
+```
+POST /v1/payments/wechat-notify
+```
+
+**微信服务器调用，非前端接口**
+
+处理逻辑：
+1. 验证微信签名
+2. 更新订单状态为已支付
+3. 更新用户会员类型和到期时间
+4. 记录支付流水
+
+---
+
+### 6.3 查询订单状态
+
+```
+GET /v1/payments/orders/{order_id}
+```
+
+**需认证**
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "order_id": "ord_pqr678",
+    "plan_type": "yearly",
+    "amount": 29900,
+    "status": "paid | pending | failed | refunded",
+    "paid_at": "2026-04-14T10:38:00+08:00",
+    "membership_expires_at": "2027-04-14T10:38:00+08:00"
+  }
+}
+```
+
+---
+
+### 6.4 获取会员信息
+
+```
+GET /v1/payments/membership
+```
+
+**需认证**
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "membership_type": "yearly",
+    "started_at": "2026-04-14T10:38:00+08:00",
+    "expires_at": "2027-04-14T10:38:00+08:00",
+    "auto_renew": true,
+    "days_remaining": 365,
+    "payment_history": [
+      {
+        "order_id": "ord_pqr678",
+        "plan_type": "yearly",
+        "amount": 29900,
+        "paid_at": "2026-04-14T10:38:00+08:00"
+      }
+    ]
+  }
+}
+```
+
+---
+
+### 6.5 取消自动续费
+
+```
+POST /v1/payments/membership/cancel-auto-renew
+```
+
+**需认证**
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "已关闭自动续费，当前会员有效期至 2027-04-14",
+  "data": {
+    "auto_renew": false,
+    "expires_at": "2027-04-14T10:38:00+08:00"
+  }
+}
+```
+
+---
+
+## 七、邀请裂变模块（/invitations）
+
+### 7.1 获取邀请信息
+
+```
+GET /v1/invitations/me
+```
+
+**需认证**
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "invite_code": "BRD9X2",
+    "invite_url": "https://mp.weixin.qq.com/s?...",
+    "mini_program_path": "pages/index?invite=BRD9X2",
+    "stats": {
+      "total_invited": 8,
+      "valid_invited": 6,
+      "bonus_analyses_earned": 6,
+      "bonus_membership_days_earned": 7
+    },
+    "rewards": [
+      { "threshold": 5, "reward": "7天会员", "achieved": true },
+      { "threshold": 10, "reward": "15天会员", "achieved": false, "progress": "6/10" }
+    ]
+  }
+}
+```
+
+---
+
+### 7.2 获取邀请记录
+
+```
+GET /v1/invitations/records?page=1&page_size=20
+```
+
+**需认证**
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "items": [
+      {
+        "invitee_nickname": "球***A",
+        "invitee_avatar": "https://...",
+        "status": "valid",
+        "bonus_type": "analysis",
+        "bonus_amount": 1,
+        "invited_at": "2026-04-13T15:00:00+08:00"
+      }
+    ],
+    "total": 6,
+    "page": 1,
+    "page_size": 20,
+    "has_more": false
+  }
+}
+```
+
+---
+
+### 7.3 记录分享行为
+
+```
+POST /v1/invitations/share-action
+```
+
+**需认证**
+
+**请求体**：
+
+```json
+{
+  "share_type": "report | invite_poster | moments",
+  "target_id": "ana_def456（report 类型时必填）"
+}
+```
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "bonus_granted": true,
+    "bonus_type": "analysis",
+    "bonus_amount": 1,
+    "message": "分享成功，获得 1 次免费分析"
+  }
+}
+```
+
+---
+
+## 八、通用模块
+
+### 8.1 获取首页数据（聚合接口）
+
+```
+GET /v1/home
+```
+
+**需认证**
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "user_brief": {
+      "nickname": "球友A",
+      "avatar_url": "...",
+      "membership_type": "free",
+      "analysis_remaining": 2,
+      "analysis_total": 3
+    },
+    "recent_analyses": [
+      {
+        "id": "ana_def456",
+        "club_type": "iron_7",
+        "overall_score": 78,
+        "score_change": 3,
+        "thumbnail_url": "...",
+        "analyzed_at": "2026-04-14T10:35:25+08:00"
+      }
+    ],
+    "today_drill": {
+      "drill_id": "drill_towel_arm",
+      "name": "毛巾夹臂练习",
+      "target_issue": "抛杆",
+      "duration_minutes": 15,
+      "task_id": "task_001"
+    },
+    "daily_tip": {
+      "content": "练球前的 5 分钟热身，可以让你的挥杆更稳定。",
+      "tip_id": "tip_042"
+    },
+    "unread_notifications": 2
+  }
+}
+```
+
+---
+
+### 8.2 获取通知列表
+
+```
+GET /v1/notifications?page=1&page_size=20
+```
+
+**需认证**
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "items": [
+      {
+        "id": "notif_001",
+        "type": "analysis_complete",
+        "title": "挥杆分析完成",
+        "content": "你的挥杆分析已完成，评分 78 分",
+        "target_type": "analysis",
+        "target_id": "ana_def456",
+        "read": false,
+        "created_at": "2026-04-14T10:35:25+08:00"
+      }
+    ],
+    "total": 15,
+    "page": 1,
+    "page_size": 20,
+    "has_more": false,
+    "unread_count": 2
+  }
+}
+```
+
+---
+
+### 8.3 标记通知已读
+
+```
+POST /v1/notifications/read
+```
+
+**需认证**
+
+**请求体**：
+
+```json
+{
+  "notification_ids": ["notif_001", "notif_002"],
+  "read_all": false
+}
+```
+
+---
+
+### 8.4 健康检查
+
+```
+GET /v1/health
+```
+
+**无需认证**
+
+**成功响应**：
+
+```json
+{
+  "status": "ok",
+  "version": "1.0.0",
+  "timestamp": "2026-04-14T10:00:00+08:00",
+  "services": {
+    "database": "ok",
+    "redis": "ok",
+    "cos": "ok",
+    "ai_engine": "ok"
+  }
+}
+```
+
+---
+
+### 8.5 数据埋点上报
+
+```
+POST /v1/events
+```
+
+**需认证**
+
+**请求体**：
+
+```json
+{
+  "events": [
+    {
+      "event_name": "report_view",
+      "params": {
+        "analysis_id": "ana_def456",
+        "source": "home_list"
+      },
+      "timestamp": "2026-04-14T10:36:00+08:00"
+    }
+  ]
+}
+```
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success"
+}
+```
+
+---
+
+## 九、接口汇总表
+
+| # | 方法 | 路径 | 认证 | 说明 |
+|---|------|------|------|------|
+| 1 | POST | /v1/auth/wechat-login | 否 | 微信登录 |
+| 2 | POST | /v1/auth/refresh-token | 是 | 刷新 Token |
+| 3 | POST | /v1/users/me/onboarding | 是 | 完成引导 |
+| 4 | GET | /v1/users/me | 是 | 获取用户信息 |
+| 5 | PATCH | /v1/users/me | 是 | 更新用户信息 |
+| 6 | POST | /v1/feedback | 是 | 提交反馈 |
+| 7 | POST | /v1/users/me/delete-request | 是 | 申请账号注销 |
+| 8 | POST | /v1/users/me/cancel-delete | 是 | 取消账号注销 |
+| 9 | POST | /v1/analyses/upload-token | 是 | 获取上传凭证 |
+| 10 | POST | /v1/analyses | 是 | 创建分析任务 |
+| 11 | GET | /v1/analyses/{id}/status | 是 | 查询分析状态 |
+| 12 | GET | /v1/analyses/{id} | 是 | 获取分析报告 |
+| 13 | GET | /v1/analyses | 是 | 分析历史列表 |
+| 14 | GET | /v1/analyses/sample | 否 | 获取示例分析报告（免登体验，固定数据） |
+| 15 | POST | /v1/analyses/{id}/share-card | 是 | 生成分享卡片 |
+| 15 | POST | /v1/chat/sessions | 是 | 创建/获取会话（M3-T1 ✅） |
+| 16 | POST | /v1/chat/sessions/{id}/messages | 是 | 发送消息（SSE，M3-T2 ✅；`?stream=false` 非流式降级同端点，M3-T1 ✅） |
+| 17 | GET | /v1/chat/sessions/{id}/messages | 是 | 获取对话历史（M3-T1 ✅） |
+| 18 | GET | /v1/chat/sessions | 是 | 获取会话列表（M3-T1 ✅，UI 挂 W7） |
+| 19 | POST | /v1/chat/upload-image | 是 | 上传对话图片（**挂 W7**，M3 不做） |
+| 20 | GET | /v1/chat/quick-questions | 是 | 获取快捷问题列表（M3-T1 ✅） |
+| 21 | DELETE | /v1/chat/sessions/{id} | 是 | 删除会话（M3-T1 ✅） |
+| 22 | GET | /v1/training/plans/current | 是 | 获取当前训练计划 |
+| 23 | GET | /v1/training/drills/{id} | 是 | 获取练习详情 |
+| 24 | POST | /v1/training/tasks/{id}/complete | 是 | 完成训练打卡 |
+| 25 | GET | /v1/training/progress | 是 | 获取进步曲线 |
+| 26 | GET | /v1/training/calendar | 是 | 获取打卡日历 |
+| 27 | POST | /v1/payments/subscriptions | 是 | 创建订阅订单 |
+| 28 | POST | /v1/payments/wechat-notify | 否 | 微信支付回调 |
+| 29 | GET | /v1/payments/orders/{id} | 是 | 查询订单状态 |
+| 30 | GET | /v1/payments/membership | 是 | 获取会员信息 |
+| 31 | POST | /v1/payments/membership/cancel-auto-renew | 是 | 取消自动续费 |
+| 32 | GET | /v1/invitations/me | 是 | 获取邀请信息 |
+| 33 | GET | /v1/invitations/records | 是 | 获取邀请记录 |
+| 34 | POST | /v1/invitations/share-action | 是 | 记录分享行为 |
+| 35 | GET | /v1/home | 是 | 首页聚合数据 |
+| 36 | GET | /v1/notifications | 是 | 获取通知列表 |
+| 37 | POST | /v1/notifications/read | 是 | 标记通知已读 |
+| 38 | GET | /v1/health | 否 | 健康检查 |
+| 39 | POST | /v1/events | 是 | 数据埋点上报 |
+
+---
+
+*文档完*

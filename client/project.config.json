@@ -1,0 +1,26 @@
+{
+  "miniprogramRoot": "dist/weapp/",
+  "projectname": "xiaoniao-ai",
+  "description": "小鸟 AI 高尔夫智能教练",
+  "appid": "wx_placeholder_appid",
+  "setting": {
+    "urlCheck": false,
+    "es6": false,
+    "enhance": false,
+    "postcss": false,
+    "minified": false,
+    "newFeature": true,
+    "uglifyFileName": false,
+    "useIsolateContext": true,
+    "useCompilerModule": true,
+    "userConfirmedUseCompilerModuleSwitch": false,
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    }
+  },
+  "compileType": "miniprogram",
+  "libVersion": "2.25.0",
+  "condition": {}
+}

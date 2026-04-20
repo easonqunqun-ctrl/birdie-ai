@@ -1,0 +1,446 @@
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans SC',sans-serif;}
+
+.scene{background:#F0F2F5;padding:1.25rem 1rem;border-radius:var(--border-radius-lg);}
+.tab-bar{display:flex;gap:6px;margin-bottom:1.25rem;}
+.tab-btn{flex:1;padding:8px 0;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-secondary);font-size:11px;cursor:pointer;font-family:'Noto Sans SC',sans-serif;}
+.tab-btn.active{background:#1A237E;border-color:#1A237E;color:#fff;font-weight:500;}
+
+.screen{display:none;}
+.screen.active{display:block;}
+
+/* PHONE */
+.phone{width:100%;max-width:320px;margin:0 auto;background:#1a1a1a;border-radius:38px;padding:12px;box-shadow:0 20px 60px rgba(0,0,0,0.25),0 0 0 1px rgba(255,255,255,0.06);}
+.phone-inner{border-radius:28px;overflow:hidden;position:relative;}
+
+/* STATUS BAR */
+.sb{display:flex;justify-content:space-between;align-items:center;padding:10px 14px 6px;}
+.sb-time{font-size:12px;font-weight:700;}
+.sb-icons{display:flex;align-items:center;gap:4px;}
+
+/* ═══ SCREEN 1: HOME (LIGHT) ═══ */
+.home{background:#F8F9FA;min-height:600px;}
+.sb.light{background:#F8F9FA;} .sb.light .sb-time{color:#1A237E;} .sb.light svg{fill:#1A237E;}
+
+.home-nav{background:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:0.5px solid #EAEBEF;}
+.brand{display:flex;align-items:center;gap:7px;}
+.brand-name{font-size:16px;font-weight:900;color:#1A237E;letter-spacing:-0.5px;}
+.brand-name em{font-style:normal;color:#00D084;}
+.home-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#1A237E,#00D084);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;}
+
+/* CTA Hero Card */
+.cta-card{margin:14px 12px;background:linear-gradient(135deg,#1A237E 0%,#0D3B8E 50%,#0A5C40 100%);border-radius:20px;padding:20px 18px;position:relative;overflow:hidden;}
+.cta-eyebrow{color:rgba(255,255,255,0.55);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;}
+.cta-score{font-size:52px;font-weight:900;color:#fff;line-height:1;letter-spacing:-2px;}
+.cta-score sub{font-size:16px;font-weight:400;color:rgba(255,255,255,0.4);letter-spacing:0;vertical-align:middle;margin-left:4px;}
+.cta-trend{color:#00D084;font-size:12px;font-weight:600;margin:6px 0 16px;}
+.cta-btn{display:inline-flex;align-items:center;gap:8px;background:#00D084;color:#003D20;border:none;border-radius:12px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans SC',sans-serif;}
+.cta-deco{position:absolute;right:-10px;top:-10px;opacity:0.08;}
+
+/* Quick stats */
+.stats-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:0 12px 14px;}
+.stat-card{background:#fff;border-radius:14px;padding:10px 10px 8px;border:0.5px solid #EAEBEF;}
+.stat-val{font-size:20px;font-weight:700;color:#1A237E;}
+.stat-val.green{color:#00D084;}
+.stat-label{font-size:9px;color:#888;margin-top:2px;}
+
+/* Recent list */
+.list-head{padding:0 16px 8px;display:flex;justify-content:space-between;align-items:center;}
+.list-head h3{font-size:13px;font-weight:700;color:#1A237E;}
+.list-head a{font-size:11px;color:#00D084;}
+.swing-list{padding:0 12px;display:flex;flex-direction:column;gap:7px;}
+.swing-item{background:#fff;border:0.5px solid #EAEBEF;border-radius:14px;padding:10px 12px;display:flex;align-items:center;gap:10px;}
+.thumb{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.thumb.g{background:linear-gradient(135deg,#E8F5EE,#C8EAD8);}
+.thumb.b{background:linear-gradient(135deg,#E8EBF5,#C8CEE8);}
+.swing-info .t{font-size:12px;font-weight:600;color:#1A237E;}
+.swing-info .s{font-size:10px;color:#999;margin-top:1px;}
+.swing-score{text-align:right;}
+.swing-score .n{font-size:20px;font-weight:700;color:#1A237E;}
+.swing-score .d{font-size:10px;color:#00D084;font-weight:600;}
+.swing-score .dn{font-size:10px;color:#F4A923;font-weight:600;}
+
+/* Bottom Nav */
+.bnav{background:#fff;border-top:0.5px solid #EAEBEF;padding:10px 0 16px;display:flex;justify-content:space-around;margin-top:12px;}
+.ni{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;}
+.ni .nl{font-size:9px;color:#bbb;}
+.ni.active .nl{color:#1A237E;font-weight:600;}
+
+/* ═══ SCREEN 2: REPORT (DARK) ═══ */
+.report{background:#0D0D0D;min-height:600px;}
+.sb.dark{background:#0D0D0D;} .sb.dark .sb-time{color:#fff;} .sb.dark svg{fill:#fff;}
+
+.rpt-nav{background:#0D0D0D;padding:8px 14px 10px;display:flex;align-items:center;gap:10px;border-bottom:0.5px solid rgba(255,255,255,0.07);}
+.back{color:rgba(255,255,255,0.5);font-size:20px;line-height:1;}
+.rpt-title{color:#fff;font-size:14px;font-weight:700;flex:1;}
+.rpt-actions{display:flex;gap:8px;}
+.icon-btn{width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,0.06);border:0.5px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;}
+
+/* Video with skeleton */
+.video-wrap{margin:10px 12px;border-radius:16px;overflow:hidden;height:170px;position:relative;background:#000;}
+.video-bg{width:100%;height:100%;background:linear-gradient(180deg,#1a2a1a 0%,#0a1a0a 100%);display:flex;align-items:center;justify-content:center;position:relative;}
+.skeleton{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;}
+.phase-tag{position:absolute;top:10px;left:10px;background:rgba(0,208,132,0.15);border:0.5px solid rgba(0,208,132,0.4);border-radius:6px;color:#00D084;font-size:10px;padding:3px 9px;font-weight:500;}
+.angle-info{position:absolute;bottom:10px;left:10px;background:rgba(0,0,0,0.65);border-radius:6px;color:rgba(255,255,255,0.8);font-size:10px;padding:3px 9px;font-weight:500;}
+.angle-num{color:#00D084;font-weight:700;}
+
+/* Score band */
+.score-band{margin:0 12px 10px;background:#161616;border:0.5px solid rgba(255,255,255,0.07);border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:0;}
+.score-left{flex:0 0 auto;padding-right:14px;border-right:0.5px solid rgba(255,255,255,0.07);}
+.score-label{color:rgba(255,255,255,0.35);font-size:9px;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px;}
+.score-num{font-size:44px;font-weight:900;color:#fff;line-height:1;letter-spacing:-1px;}
+.score-up{color:#00D084;font-size:11px;font-weight:600;margin-top:3px;}
+.score-right{flex:1;padding-left:14px;}
+.dim-tags{display:flex;flex-wrap:wrap;gap:5px;}
+.dtag{background:rgba(255,255,255,0.04);border:0.5px solid rgba(255,255,255,0.08);border-radius:6px;padding:4px 8px;display:flex;flex-direction:column;gap:1px;}
+.dtag-name{font-size:8px;color:rgba(255,255,255,0.35);}
+.dtag-val{font-size:13px;font-weight:700;color:#fff;}
+.dtag-val.lo{color:#F4A923;}
+.dtag-val.hi{color:#00D084;}
+
+/* Radar + metrics */
+.radar-row{margin:0 12px 10px;display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.radar-card{background:#161616;border:0.5px solid rgba(255,255,255,0.07);border-radius:14px;padding:10px;display:flex;flex-direction:column;align-items:center;}
+.radar-score{font-size:28px;font-weight:900;color:#fff;margin-bottom:4px;}
+.radar-score-label{color:rgba(255,255,255,0.3);font-size:9px;}
+.metrics-col{display:flex;flex-direction:column;gap:6px;}
+.metric-box{background:#161616;border:0.5px solid rgba(255,255,255,0.07);border-radius:10px;padding:8px 10px;}
+.metric-name{font-size:9px;color:rgba(255,255,255,0.35);margin-bottom:2px;}
+.metric-val{font-size:15px;font-weight:700;color:#fff;}
+.metric-badge{display:inline-block;background:rgba(0,208,132,0.12);color:#00D084;border-radius:4px;font-size:8px;padding:1px 5px;margin-left:3px;font-weight:500;}
+.metric-badge.warn{background:rgba(244,169,35,0.12);color:#F4A923;}
+
+/* Coach tip */
+.coach-tip{margin:0 12px 10px;background:#161616;border:0.5px solid rgba(255,255,255,0.07);border-radius:14px;padding:11px 12px;display:flex;gap:10px;align-items:flex-start;}
+.coach-ava{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#1A237E,#00D084);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.coach-text{font-size:10px;color:rgba(255,255,255,0.6);line-height:1.6;}
+.coach-text strong{color:#fff;font-weight:600;}
+.coach-link{color:#00D084;font-size:10px;font-weight:500;margin-top:4px;display:block;}
+
+/* Video recs */
+.vid-row{margin:0 12px 12px;display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+.vid-card{background:#161616;border:0.5px solid rgba(255,255,255,0.07);border-radius:12px;overflow:hidden;}
+.vid-thumb{height:56px;background:linear-gradient(135deg,#0D1F12,#0A1825);display:flex;align-items:center;justify-content:center;position:relative;}
+.play-circle{width:22px;height:22px;border-radius:50%;background:rgba(0,208,132,0.85);display:flex;align-items:center;justify-content:center;}
+.vid-dur{position:absolute;bottom:4px;right:6px;font-size:8px;color:rgba(255,255,255,0.5);}
+.vid-info{padding:5px 7px;}
+.vid-name{font-size:9px;color:rgba(255,255,255,0.7);font-weight:500;}
+.vid-type{font-size:8px;color:rgba(255,255,255,0.3);margin-top:1px;}
+
+/* bottom nav dark */
+.bnav-dark{background:#0D0D0D;border-top:0.5px solid rgba(255,255,255,0.06);padding:10px 0 14px;display:flex;justify-content:space-around;}
+.ni-d{display:flex;flex-direction:column;align-items:center;gap:3px;}
+.ni-d .nl{font-size:9px;color:rgba(255,255,255,0.3);}
+.ni-d.active .nl{color:#00D084;font-weight:600;}
+</style>
+
+<div class="scene">
+  <h2 class="sr-only">小鸟AI 品牌对齐高保真UI — 浅色首页与深色分析报告</h2>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="sw('home',this)">首页（浅色）</button>
+    <button class="tab-btn" onclick="sw('report',this)">分析报告（深色）</button>
+  </div>
+
+  <div class="phone">
+    <div class="phone-inner">
+
+      <!-- ══ HOME ══ -->
+      <div id="s-home" class="screen active">
+        <div class="home">
+          <div class="sb light">
+            <span class="sb-time">9:41</span>
+            <div class="sb-icons">
+              <svg width="14" height="10" viewBox="0 0 14 10"><rect x="0" y="3" width="3" height="7" rx="0.5" opacity="0.4"/><rect x="4" y="2" width="3" height="8" rx="0.5" opacity="0.6"/><rect x="8" y="0" width="3" height="10" rx="0.5"/><rect x="12" y="0" width="2" height="10" rx="0.5"/></svg>
+              <svg width="22" height="10" viewBox="0 0 22 10"><rect x="0.5" y="0.5" width="18" height="9" rx="2" stroke="#1A237E" stroke-opacity="0.35" fill="none"/><rect x="19.5" y="3" width="2" height="4" rx="1" fill="#1A237E" fill-opacity="0.4"/><rect x="1.5" y="1.5" width="13" height="7" rx="1.5" fill="#1A237E"/></svg>
+            </div>
+          </div>
+
+          <div class="home-nav">
+            <div class="brand">
+              <!-- Birdie feather logo -->
+              <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+                <path d="M5 21C5 21 7.5 13 14 9C18.5 6.5 22 7 22 7C22 7 19.5 11.5 15.5 14.5C11.5 17.5 5 21 5 21Z" fill="#00D084"/>
+                <path d="M5 21C5 21 9.5 17.5 13.5 15.5C16.5 14 20 13.5 20 13.5" stroke="#00D084" stroke-width="1.2" stroke-linecap="round" opacity="0.45"/>
+                <path d="M7.5 19L9.5 15.5" stroke="white" stroke-width="0.8" stroke-linecap="round" opacity="0.4"/>
+                <path d="M10.5 17L12 14" stroke="white" stroke-width="0.8" stroke-linecap="round" opacity="0.3"/>
+                <circle cx="5.5" cy="20.5" r="1.8" fill="#00D084"/>
+                <path d="M5.8 20.8L5.2 22.5" stroke="#00D084" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
+              </svg>
+              <span class="brand-name">Birdie <em>AI</em></span>
+            </div>
+            <div class="home-avatar">张磊</div>
+          </div>
+
+          <!-- Hero card -->
+          <div class="cta-card">
+            <div class="cta-eyebrow">本月综合评分</div>
+            <div class="cta-score">78 <sub>/ 100</sub></div>
+            <div class="cta-trend">↑ 较上月提升 +6分</div>
+            <button class="cta-btn">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#003D20" stroke-width="1.5"/><path d="M6 5L11 8L6 11V5Z" fill="#003D20"/></svg>
+              开始挥杆分析
+            </button>
+            <!-- decorative radar -->
+            <svg class="cta-deco" width="110" height="110" viewBox="0 0 110 110" fill="none">
+              <polygon points="55,10 95,33 95,77 55,100 15,77 15,33" stroke="white" stroke-width="1" fill="none"/>
+              <polygon points="55,25 80,39 80,70 55,84 30,70 30,39" stroke="white" stroke-width="1" fill="none"/>
+              <polygon points="55,40 70,49 70,63 55,72 40,63 40,49" stroke="white" stroke-width="1" fill="none"/>
+              <polygon points="55,18 87,36 85,72 55,90 25,72 23,36" fill="white" opacity="0.15" stroke="white" stroke-width="1.5"/>
+            </svg>
+          </div>
+
+          <!-- Quick stats -->
+          <div class="stats-row">
+            <div class="stat-card">
+              <div class="stat-val green">12</div>
+              <div class="stat-label">本月分析次数</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-val">82</div>
+              <div class="stat-label">最高单次评分</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-val green">+6</div>
+              <div class="stat-label">月度进步幅度</div>
+            </div>
+          </div>
+
+          <!-- Recent swings -->
+          <div class="list-head">
+            <h3>最近挥杆记录</h3>
+            <a>查看全部</a>
+          </div>
+          <div class="swing-list">
+            <div class="swing-item">
+              <div class="thumb g">
+                <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M11 3C11 3 14.5 7 13.5 13C12.8 17 10 19 10 19" stroke="#00A066" stroke-width="2" stroke-linecap="round"/><circle cx="10" cy="19.2" r="1.8" fill="#00A066"/></svg>
+              </div>
+              <div class="swing-info" style="flex:1">
+                <div class="t">7号铁 · 侧面角度</div>
+                <div class="s">今天 14:32 · 室内练习场</div>
+              </div>
+              <div class="swing-score">
+                <div class="n">82</div>
+                <div class="d">↑ +4</div>
+              </div>
+            </div>
+            <div class="swing-item">
+              <div class="thumb b">
+                <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M11 3C11 3 14.5 7 13.5 13C12.8 17 10 19 10 19" stroke="#3D5A99" stroke-width="2" stroke-linecap="round"/><circle cx="10" cy="19.2" r="1.8" fill="#3D5A99"/></svg>
+              </div>
+              <div class="swing-info" style="flex:1">
+                <div class="t">5号木 · 正面角度</div>
+                <div class="s">昨天 10:15 · 户外球场</div>
+              </div>
+              <div class="swing-score">
+                <div class="n" style="color:#555">78</div>
+                <div class="d" style="color:#aaa">— 持平</div>
+              </div>
+            </div>
+            <div class="swing-item">
+              <div class="thumb" style="background:linear-gradient(135deg,#FFF4E0,#FFE4A0)">
+                <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M11 3C11 3 14.5 7 13.5 13C12.8 17 10 19 10 19" stroke="#C47A00" stroke-width="2" stroke-linecap="round"/><circle cx="10" cy="19.2" r="1.8" fill="#C47A00"/></svg>
+              </div>
+              <div class="swing-info" style="flex:1">
+                <div class="t">推杆 · 侧面角度</div>
+                <div class="s">3天前 · 室内球馆</div>
+              </div>
+              <div class="swing-score">
+                <div class="n" style="color:#C47A00">71</div>
+                <div class="dn">↓ −2</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bnav">
+            <div class="ni active">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="2" width="7" height="7" rx="2" fill="#1A237E"/><rect x="11" y="2" width="7" height="7" rx="2" fill="#DADDF0"/><rect x="2" y="11" width="7" height="7" rx="2" fill="#DADDF0"/><rect x="11" y="11" width="7" height="7" rx="2" fill="#DADDF0"/></svg>
+              <span class="nl" style="color:#1A237E">首页</span>
+            </div>
+            <div class="ni">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.5" stroke="#ccc" stroke-width="1.5"/><path d="M7.5 10L9.5 12L12.5 8" stroke="#ccc" stroke-width="1.5" stroke-linecap="round"/></svg>
+              <span class="nl">分析</span>
+            </div>
+            <div class="ni">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 17L10 4L16 17" stroke="#ccc" stroke-width="1.5" stroke-linecap="round"/><path d="M6.5 13H13.5" stroke="#ccc" stroke-width="1.5" stroke-linecap="round"/></svg>
+              <span class="nl">训练</span>
+            </div>
+            <div class="ni">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7.5" r="3" stroke="#ccc" stroke-width="1.5"/><path d="M3 18C3 14.7 6.1 12 10 12C13.9 12 17 14.7 17 18" stroke="#ccc" stroke-width="1.5" stroke-linecap="round"/></svg>
+              <span class="nl">我的</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ REPORT ══ -->
+      <div id="s-report" class="screen">
+        <div class="report">
+          <div class="sb dark">
+            <span class="sb-time">9:41</span>
+            <div class="sb-icons">
+              <svg width="14" height="10" viewBox="0 0 14 10" fill="white"><rect x="0" y="3" width="3" height="7" rx="0.5" opacity="0.4"/><rect x="4" y="2" width="3" height="8" rx="0.5" opacity="0.6"/><rect x="8" y="0" width="3" height="10" rx="0.5"/></svg>
+              <svg width="22" height="10" viewBox="0 0 22 10"><rect x="0.5" y="0.5" width="18" height="9" rx="2" stroke="white" stroke-opacity="0.3" fill="none"/><rect x="19.5" y="3" width="2" height="4" rx="1" fill="white" fill-opacity="0.35"/><rect x="1.5" y="1.5" width="13" height="7" rx="1.5" fill="white"/></svg>
+            </div>
+          </div>
+
+          <div class="rpt-nav">
+            <span class="back">‹</span>
+            <span class="rpt-title">挥杆分析报告</span>
+            <div class="rpt-actions">
+              <div class="icon-btn"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1V9M6 1L3 4M6 1L9 4" stroke="rgba(255,255,255,0.5)" stroke-width="1.2" stroke-linecap="round"/><path d="M1 9V11H11V9" stroke="rgba(255,255,255,0.5)" stroke-width="1.2" stroke-linecap="round"/></svg></div>
+              <div class="icon-btn"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="9.5" cy="2.5" r="1.5" stroke="rgba(255,255,255,0.5)" stroke-width="1.1"/><circle cx="2.5" cy="6" r="1.5" stroke="rgba(255,255,255,0.5)" stroke-width="1.1"/><circle cx="9.5" cy="9.5" r="1.5" stroke="rgba(255,255,255,0.5)" stroke-width="1.1"/><path d="M4 5L8 3.5M4 7L8 8.5" stroke="rgba(255,255,255,0.3)" stroke-width="1"/></svg></div>
+            </div>
+          </div>
+
+          <!-- Video with skeleton overlay -->
+          <div class="video-wrap">
+            <div class="video-bg">
+              <!-- Simulated golfer + green skeleton overlay -->
+              <svg width="90" height="150" viewBox="0 0 90 150" fill="none" style="opacity:0.9">
+                <!-- body silhouette -->
+                <ellipse cx="45" cy="18" rx="10" ry="10" fill="#2a3a2a"/>
+                <rect x="38" y="28" width="14" height="35" rx="4" fill="#2a3a2a"/>
+                <rect x="24" y="32" width="14" height="26" rx="4" fill="#2a3a2a" transform="rotate(-15 24 32)"/>
+                <rect x="52" y="32" width="14" height="26" rx="4" fill="#2a3a2a" transform="rotate(10 52 32)"/>
+                <rect x="38" y="60" width="8" height="30" rx="4" fill="#2a3a2a" transform="rotate(-5 38 60)"/>
+                <rect x="47" y="60" width="8" height="30" rx="4" fill="#2a3a2a" transform="rotate(5 47 60)"/>
+                <!-- green skeleton -->
+                <circle cx="45" cy="18" r="6" stroke="#00D084" stroke-width="1.5" fill="none"/>
+                <line x1="45" y1="24" x2="45" y2="52" stroke="#00D084" stroke-width="1.5"/>
+                <line x1="45" y1="34" x2="28" y2="44" stroke="#00D084" stroke-width="1.5"/>
+                <line x1="45" y1="34" x2="65" y2="38" stroke="#00D084" stroke-width="1.5"/>
+                <line x1="28" y1="44" x2="20" y2="56" stroke="#00D084" stroke-width="1.5"/>
+                <line x1="65" y1="38" x2="72" y2="52" stroke="#00D084" stroke-width="1.5"/>
+                <line x1="45" y1="52" x2="40" y2="78" stroke="#00D084" stroke-width="1.5"/>
+                <line x1="45" y1="52" x2="52" y2="78" stroke="#00D084" stroke-width="1.5"/>
+                <line x1="40" y1="78" x2="38" y2="100" stroke="#00D084" stroke-width="1.5"/>
+                <line x1="52" y1="78" x2="54" y2="100" stroke="#00D084" stroke-width="1.5"/>
+                <!-- club arc -->
+                <path d="M20 56 Q10 30 30 15 Q50 2 70 18" stroke="#00D084" stroke-width="1.2" stroke-dasharray="3,2" fill="none" opacity="0.6"/>
+                <!-- angle arc indicator -->
+                <path d="M65 38 A20 20 0 0 1 72 52" stroke="#F4A923" stroke-width="1.5" fill="none"/>
+                <text x="75" y="46" fill="#F4A923" font-size="8" font-family="sans-serif">48°</text>
+                <!-- joints -->
+                <circle cx="28" cy="44" r="2.5" fill="#00D084"/>
+                <circle cx="65" cy="38" r="2.5" fill="#00D084"/>
+                <circle cx="40" cy="78" r="2.5" fill="#00D084"/>
+                <circle cx="52" cy="78" r="2.5" fill="#00D084"/>
+                <circle cx="20" cy="56" r="2" fill="#00D084" opacity="0.7"/>
+                <circle cx="72" cy="52" r="2" fill="#00D084" opacity="0.7"/>
+              </svg>
+            </div>
+            <div class="phase-tag">● 挥杆预测</div>
+            <div class="angle-info">摆杆平面角：<span class="angle-num">48°（稳定）</span></div>
+          </div>
+
+          <!-- Score band -->
+          <div class="score-band">
+            <div class="score-left">
+              <div class="score-label">综合评分</div>
+              <div class="score-num">82</div>
+              <div class="score-up">↑ +4 较上次</div>
+            </div>
+            <div class="score-right">
+              <div class="dim-tags">
+                <div class="dtag"><span class="dtag-name">稳定性</span><span class="dtag-val hi">S8</span></div>
+                <div class="dtag"><span class="dtag-name">杆速</span><span class="dtag-val">HS</span></div>
+                <div class="dtag"><span class="dtag-name">顶点</span><span class="dtag-val lo">OG</span></div>
+                <div class="dtag"><span class="dtag-name">平衡</span><span class="dtag-val">BAL</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Radar + metrics -->
+          <div class="radar-row">
+            <div class="radar-card">
+              <div class="radar-score-label">负杆分</div>
+              <div class="radar-score">88</div>
+              <svg width="100" height="80" viewBox="0 0 100 80" fill="none">
+                <polygon points="50,8 80,24 80,56 50,72 20,56 20,24" stroke="rgba(255,255,255,0.07)" fill="none"/>
+                <polygon points="50,20 67,29 67,51 50,60 33,51 33,29" stroke="rgba(255,255,255,0.05)" fill="none"/>
+                <polygon points="50,12 76,27 74,54 50,67 26,54 24,27" fill="rgba(0,208,132,0.12)" stroke="#00D084" stroke-width="1.2"/>
+                <text x="50" y="6" fill="rgba(255,255,255,0.25)" font-size="6" text-anchor="middle" font-family="sans-serif">稳定性</text>
+                <text x="86" y="28" fill="rgba(255,255,255,0.25)" font-size="6" text-anchor="start" font-family="sans-serif">杆速</text>
+                <text x="84" y="60" fill="rgba(255,255,255,0.25)" font-size="6" text-anchor="start" font-family="sans-serif">顶点</text>
+                <text x="50" y="78" fill="rgba(255,255,255,0.25)" font-size="6" text-anchor="middle" font-family="sans-serif">平衡</text>
+                <text x="14" y="60" fill="rgba(255,255,255,0.25)" font-size="6" text-anchor="end" font-family="sans-serif">下杆</text>
+                <text x="14" y="28" fill="rgba(255,255,255,0.25)" font-size="6" text-anchor="end" font-family="sans-serif">上杆</text>
+              </svg>
+            </div>
+            <div class="metrics-col">
+              <div class="metric-box">
+                <div class="metric-name">杆头速度</div>
+                <div class="metric-val">105 mph <span class="metric-badge">优秀</span></div>
+              </div>
+              <div class="metric-box">
+                <div class="metric-name">上杆顶点</div>
+                <div class="metric-val">112° <span class="metric-badge warn">偏高</span></div>
+              </div>
+              <div class="metric-box">
+                <div class="metric-name">击球平面</div>
+                <div class="metric-val">48° <span class="metric-badge">稳定</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Coach tip -->
+          <div class="coach-tip">
+            <div class="coach-ava">
+              <svg width="16" height="16" viewBox="0 0 18 18" fill="none"><path d="M9 2C9 2 12 5 11 9C10.5 11.5 8 13 8 13" stroke="white" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="13" r="1.2" fill="white"/></svg>
+            </div>
+            <div>
+              <div class="coach-text"><strong>AI教练诊断：</strong>你的收杆重心稍微偏向左侧，这可能导致了左曲球。建议尝试「重心转移专项练习」。</div>
+              <span class="coach-link">查看推荐练习 →</span>
+            </div>
+          </div>
+
+          <!-- Video recs -->
+          <div class="vid-row">
+            <div class="vid-card">
+              <div class="vid-thumb">
+                <div class="play-circle"><svg width="8" height="10" viewBox="0 0 8 10" fill="#062e18"><path d="M1 1L7 5L1 9V1Z"/></svg></div>
+                <span class="vid-dur">1:45</span>
+              </div>
+              <div class="vid-info">
+                <div class="vid-name">重心控制 A</div>
+                <div class="vid-type">专项练习</div>
+              </div>
+            </div>
+            <div class="vid-card">
+              <div class="vid-thumb">
+                <div class="play-circle"><svg width="8" height="10" viewBox="0 0 8 10" fill="#062e18"><path d="M1 1L7 5L1 9V1Z"/></svg></div>
+                <span class="vid-dur">2:20</span>
+              </div>
+              <div class="vid-info">
+                <div class="vid-name">左脚重力应应练习</div>
+                <div class="vid-type">平衡训练</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bnav-dark">
+            <div class="ni-d"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="2" width="7" height="7" rx="2" fill="rgba(255,255,255,0.2)"/><rect x="11" y="2" width="7" height="7" rx="2" fill="rgba(255,255,255,0.2)"/><rect x="2" y="11" width="7" height="7" rx="2" fill="rgba(255,255,255,0.2)"/><rect x="11" y="11" width="7" height="7" rx="2" fill="rgba(255,255,255,0.2)"/></svg><span class="nl">首页</span></div>
+            <div class="ni-d active"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.5" stroke="#00D084" stroke-width="1.5"/><path d="M7.5 10L9.5 12L12.5 8" stroke="#00D084" stroke-width="1.5" stroke-linecap="round"/></svg><span class="nl" style="color:#00D084">分析</span></div>
+            <div class="ni-d"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 17L10 4L16 17" stroke="rgba(255,255,255,0.25)" stroke-width="1.5" stroke-linecap="round"/><path d="M6.5 13H13.5" stroke="rgba(255,255,255,0.25)" stroke-width="1.5" stroke-linecap="round"/></svg><span class="nl">训练</span></div>
+            <div class="ni-d"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7.5" r="3" stroke="rgba(255,255,255,0.25)" stroke-width="1.5"/><path d="M3 18C3 14.7 6.1 12 10 12C13.9 12 17 14.7 17 18" stroke="rgba(255,255,255,0.25)" stroke-width="1.5" stroke-linecap="round"/></svg><span class="nl">我的</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+function sw(name, btn) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('s-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+</script>

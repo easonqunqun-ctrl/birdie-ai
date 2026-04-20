@@ -1,0 +1,122 @@
+.onboarding {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 32px 32px 48px;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    margin-bottom: 48px;
+  }
+
+  &__progress {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  &__progress-bar {
+    flex: 1;
+    height: 8px;
+    background: var(--color-border);
+    border-radius: 9999px;
+    overflow: hidden;
+  }
+
+  &__progress-fill {
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      var(--color-primary) 0%,
+      var(--color-primary-soft) 100%
+    );
+    border-radius: inherit;
+    transition: width 0.25s ease-out;
+  }
+
+  &__progress-text {
+    font-size: 22px;
+    color: var(--color-text-secondary);
+    min-width: 48px;
+    text-align: right;
+  }
+
+  &__skip {
+    font-size: 26px;
+    color: var(--color-text-secondary);
+    padding: 8px 4px;
+
+    &--disabled {
+      opacity: 0.4;
+    }
+  }
+
+  &__step {
+    flex: 1;
+  }
+
+  &__title {
+    font-size: 40px;
+    font-weight: 700;
+    display: block;
+    margin-bottom: 48px;
+  }
+
+  &__options {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  &__option {
+    background: var(--color-bg-card);
+    border: 2px solid transparent;
+    border-radius: var(--radius-md);
+    padding: 24px;
+    transition: all 0.2s;
+
+    &--active {
+      border-color: var(--color-primary);
+      background: var(--color-primary-tint);
+    }
+  }
+
+  &__option-label {
+    font-size: 30px;
+    font-weight: 600;
+    display: block;
+  }
+
+  &__option-desc {
+    font-size: 24px;
+    color: var(--color-text-secondary);
+    display: block;
+    margin-top: 8px;
+  }
+
+  &__footer {
+    margin-top: 48px;
+    display: flex;
+    gap: 16px;
+  }
+
+  &__btn {
+    flex: 1;
+    background: var(--color-primary) !important;
+    color: var(--color-on-primary) !important;
+    font-size: 32px !important;
+    border-radius: var(--radius-xl) !important;
+    height: 96px !important;
+    line-height: 96px !important;
+
+    &--ghost {
+      background: var(--color-bg-card) !important;
+      color: var(--color-primary) !important;
+      border: 1px solid var(--color-border) !important;
+      flex: 0 0 40%;
+    }
+  }
+}

@@ -1,0 +1,339 @@
+/**
+ * 分析等待页（MVP §4.2）
+ *
+ * 完整职责：
+ *   1. 每 3 秒轮询 /analyses/{id}/status（useDidShow 恢复 / useDidHide 暂停）
+ *   2. 基于 "processing 已持续时间" **本地模拟** 5 阶段流转
+ *      （后端 mock 管道只会停在 preprocessing 一瞬间就跳到 completed，
+ *      严格按 stage 字段展示会让用户看不到中间状态；W6 真实 pipeline 上线后
+ *      再把优先级切成 "后端 stage 优先，本地动画兜底"）
+ *   3. 剩余秒数：优先采用后端 `estimated_remaining_seconds`，本地每秒 -1 平滑显示
+ *   4. "你知道吗" 小贴士：从 `constants/swingTips.ts` 随机起点 + 8s 滚动
+ *   5. status=completed → reLaunch 到 report 页
+ *   6. status=failed → 错误 UI，两个按钮（重新拍摄 / 回首页）；若 quota_refunded 加文案
+ *   7. > 120s 还没终态 → 展示"分析较长，稍后微信通知你"（UI 占位；W5 做真通知）
+ *   8. 连续 3 次轮询失败 → 停止轮询 + toast
+ *
+ * 设计选型记录：
+ *   - 阶段定义固化在本页 `STAGES`，后端 stage 字段的枚举值用来做"后端已经到该阶段"的
+ *     语义映射（stage → 阶段索引最小下限）；本地时间推进做上限推进
+ *   - 轮询用裸 setTimeout 递归，不用 setInterval —— 更容易按 useDidShow/Hide 精准控制
+ */
+
+import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { View, Text, Button } from '@tarojs/components'
+import Taro, { useDidHide, useDidShow, useRouter } from '@tarojs/taro'
+import { analysisService } from '@/services/analysisService'
+import { useAnalysisStore } from '@/store/analysisStore'
+import { SWING_TIPS, pickStartIndex } from '@/constants/swingTips'
+import type {
+  AnalysisStage,
+  AnalysisStatusResponse,
+} from '@/types/analysis'
+import './waiting.scss'
+
+/** 用户可见的阶段序列（UI 上展示） */
+const STAGES: { key: string; label: string; backendStages: AnalysisStage[] }[] = [
+  { key: 'received', label: '视频已接收', backendStages: ['preprocessing'] },
+  { key: 'pose', label: '识别人体姿态', backendStages: ['pose_estimating'] },
+  { key: 'swing', label: '分析挥杆动作', backendStages: ['phase_segmenting', 'scoring'] },
+  { key: 'diagnose', label: '生成诊断建议', backendStages: ['diagnosing', 'generating'] },
+  { key: 'render', label: '渲染分析报告', backendStages: [] },
+]
+
+/** 轮询间隔 / 保护阈值 */
+const POLL_INTERVAL_MS = 3000
+const TIMEOUT_FALLBACK_MS = 120_000
+const TIPS_ROTATE_MS = 8000
+const MAX_CONSECUTIVE_ERRORS = 3
+/** 每个虚拟阶段的最短展示时间（ms）——避免 mock 模式下一闪而过 */
+const MIN_STAGE_DWELL_MS = 1500
+
+function backendStageToMinIndex(stage: AnalysisStage | null | undefined): number {
+  if (!stage) return 0
+  const idx = STAGES.findIndex((s) => s.backendStages.includes(stage))
+  return idx === -1 ? 0 : idx
+}
+
+const AnalysisWaitingPage: FC = () => {
+  const router = useRouter()
+  const analysisId = (router.params as { id?: string }).id || ''
+
+  // ----- 数据 -----
+  const [status, setStatus] = useState<AnalysisStatusResponse | null>(null)
+  const [fatalError, setFatalError] = useState<string | null>(null)
+  const [serverRemaining, setServerRemaining] = useState<number | null>(null)
+  const [elapsedSec, setElapsedSec] = useState(0) // 从进入本页开始计
+  const [tipIdx, setTipIdx] = useState(() => pickStartIndex())
+  const [timedOut, setTimedOut] = useState(false)
+
+  // refs（跨生命周期保持）
+  const consecutiveErrorsRef = useRef(0)
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const secondTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const tipTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pageActiveRef = useRef(true)
+  const processingSinceRef = useRef<number | null>(null)
+  const hasRedirectedRef = useRef(false)
+  const enteredAtRef = useRef(Date.now())
+
+  const clearCurrent = useAnalysisStore((s) => s.clearCurrent)
+
+  // ---------------- 轮询核心 ----------------
+  const poll = useCallback(async () => {
+    if (!analysisId) return
+    try {
+      const s = await analysisService.getStatus(analysisId)
+      consecutiveErrorsRef.current = 0
+      setStatus(s)
+      setServerRemaining(
+        typeof s.estimated_remaining_seconds === 'number'
+          ? Math.max(0, s.estimated_remaining_seconds)
+          : null,
+      )
+      if (s.status === 'processing' && processingSinceRef.current === null) {
+        processingSinceRef.current = Date.now()
+      }
+      // 终态 -> 停止轮询
+      if (s.status === 'completed') {
+        if (!hasRedirectedRef.current) {
+          hasRedirectedRef.current = true
+          clearCurrent()
+          // 小延时让最后一格"渲染分析报告"有机会亮起
+          setTimeout(() => {
+            Taro.reLaunch({ url: `/pages/analysis/report?id=${analysisId}` })
+          }, 600)
+        }
+        return
+      }
+      if (s.status === 'failed') {
+        return // UI 会基于 status.status 渲染失败界面
+      }
+    } catch (e) {
+      consecutiveErrorsRef.current += 1
+      if (consecutiveErrorsRef.current >= MAX_CONSECUTIVE_ERRORS) {
+        setFatalError('网络似乎不太稳定，已暂停自动刷新')
+        Taro.showToast({ title: '网络异常，请稍后重试', icon: 'none' })
+        return
+      }
+    }
+    schedulePoll()
+  }, [analysisId, clearCurrent]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const schedulePoll = useCallback(() => {
+    if (pollTimerRef.current) clearTimeout(pollTimerRef.current)
+    if (!pageActiveRef.current) return
+    pollTimerRef.current = setTimeout(() => {
+      poll()
+    }, POLL_INTERVAL_MS)
+  }, [poll])
+
+  // 进入页 / useDidShow 时启动轮询
+  const start = useCallback(() => {
+    pageActiveRef.current = true
+    poll() // 立即拉一次
+  }, [poll])
+
+  const pause = useCallback(() => {
+    pageActiveRef.current = false
+    if (pollTimerRef.current) {
+      clearTimeout(pollTimerRef.current)
+      pollTimerRef.current = null
+    }
+  }, [])
+
+  // ---------------- 副作用：挂载/卸载/显隐 ----------------
+  useEffect(() => {
+    if (!analysisId) {
+      setFatalError('缺少分析任务 ID，无法加载等待页')
+      return
+    }
+    start()
+    // 每秒推进本地时钟（用于剩余秒数、经过秒数、阶段推进）
+    secondTimerRef.current = setInterval(() => {
+      setElapsedSec((v) => v + 1)
+      setServerRemaining((v) => (v === null || v <= 0 ? v : v - 1))
+    }, 1000)
+    tipTimerRef.current = setInterval(() => {
+      setTipIdx((i) => (i + 1) % SWING_TIPS.length)
+    }, TIPS_ROTATE_MS)
+
+    return () => {
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current)
+      if (secondTimerRef.current) clearInterval(secondTimerRef.current)
+      if (tipTimerRef.current) clearInterval(tipTimerRef.current)
+    }
+  }, [analysisId, start])
+
+  useDidShow(() => {
+    if (!analysisId) return
+    // 回到前台时，若之前没到终态，重启轮询
+    if (!hasRedirectedRef.current && status?.status !== 'failed') {
+      start()
+    }
+  })
+
+  useDidHide(() => {
+    pause()
+  })
+
+  // 120s 超时占位
+  useEffect(() => {
+    if (elapsedSec >= TIMEOUT_FALLBACK_MS / 1000 && !timedOut && status?.status !== 'completed') {
+      setTimedOut(true)
+    }
+  }, [elapsedSec, timedOut, status])
+
+  // ---------------- 派生：当前虚拟阶段索引 ----------------
+  const virtualStageIndex = useMemo(() => {
+    if (!status) return 0
+    if (status.status === 'completed') return STAGES.length - 1
+    if (status.status === 'failed') return -1 // 不展示阶段条
+    // 后端 stage 映射到的最小阶段
+    const minFromBackend = backendStageToMinIndex(status.stage)
+    // 本地时间推进：从 processingSince 起，每 MIN_STAGE_DWELL_MS 推进一格
+    // 兜底：如果 processingSince 还没设（即刚进 pending），按进入页时间算
+    const since = processingSinceRef.current ?? enteredAtRef.current
+    const elapsed = Date.now() - since
+    const localIdx = Math.min(
+      STAGES.length - 1,
+      Math.floor(elapsed / MIN_STAGE_DWELL_MS),
+    )
+    return Math.max(minFromBackend, localIdx)
+    // 依赖 elapsedSec 是**刻意的**：它本身不参与计算，但每秒变动能触发 useMemo 重新评估
+    // `Date.now() - processingSinceRef.current`，从而让本地模拟阶段自然推进
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, elapsedSec])
+
+  // 展示用的剩余秒数：优先后端，否则按"总估 25s - 已过秒"兜底
+  const displayRemaining = useMemo(() => {
+    if (status?.status === 'completed') return 0
+    if (status?.status === 'failed') return null
+    if (serverRemaining !== null) return serverRemaining
+    return Math.max(0, 25 - elapsedSec)
+  }, [serverRemaining, elapsedSec, status])
+
+  // ---------------- 事件 ----------------
+  const handleRetryShoot = () => {
+    clearCurrent()
+    Taro.reLaunch({ url: '/pages/analysis/capture' })
+  }
+  const handleGoHome = () => {
+    clearCurrent()
+    Taro.reLaunch({ url: '/pages/index/index' })
+  }
+
+  // ---------------- 渲染 ----------------
+  if (fatalError) {
+    return (
+      <View className='waiting waiting--error'>
+        <Text className='waiting__error-icon'>📡</Text>
+        <Text className='waiting__error-title'>{fatalError}</Text>
+        <Button className='waiting__btn waiting__btn--primary' onClick={handleGoHome}>
+          返回首页
+        </Button>
+      </View>
+    )
+  }
+
+  if (status?.status === 'failed') {
+    const err = status.error
+    return (
+      <View className='waiting waiting--failed'>
+        <Text className='waiting__failed-icon'>😣</Text>
+        <Text className='waiting__failed-title'>分析失败</Text>
+        <Text className='waiting__failed-msg'>
+          {err?.message || '抱歉，这次分析没能完成，请重新拍摄一次。'}
+        </Text>
+        {err?.quota_refunded && (
+          <Text className='waiting__failed-refund'>✅ 本次已退回分析次数</Text>
+        )}
+        <View className='waiting__failed-actions'>
+          <Button className='waiting__btn waiting__btn--primary' onClick={handleRetryShoot}>
+            重新拍摄
+          </Button>
+          <Button className='waiting__btn waiting__btn--ghost' onClick={handleGoHome}>
+            去首页
+          </Button>
+        </View>
+      </View>
+    )
+  }
+
+  const tip = SWING_TIPS[tipIdx]
+
+  return (
+    <View className='waiting'>
+      {/* 顶部大动画 + 倒计时 */}
+      <View className='waiting__hero'>
+        <View className='waiting__spinner'>
+          <View className='waiting__spinner-ring' />
+          <View className='waiting__spinner-core'>
+            <Text className='waiting__spinner-text'>AI</Text>
+          </View>
+        </View>
+        <Text className='waiting__title'>
+          {status?.status === 'completed' ? '分析完成' : 'AI 正在分析你的挥杆'}
+        </Text>
+        <Text className='waiting__countdown'>
+          {status?.status === 'completed'
+            ? '即将为你打开报告…'
+            : displayRemaining !== null
+              ? `预计还需 ${displayRemaining} 秒`
+              : '预计还需不到 30 秒'}
+        </Text>
+      </View>
+
+      {/* 阶段列表 */}
+      <View className='waiting__stages'>
+        {STAGES.map((s, idx) => {
+          const done = idx < virtualStageIndex
+          const active = idx === virtualStageIndex && status?.status !== 'completed'
+          const completed = status?.status === 'completed'
+          return (
+            <View
+              key={s.key}
+              className={[
+                'waiting__stage',
+                done || completed ? 'waiting__stage--done' : '',
+                active ? 'waiting__stage--active' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
+              <View className='waiting__stage-dot'>
+                {done || completed ? <Text>✓</Text> : active ? <View className='waiting__stage-pulse' /> : null}
+              </View>
+              <Text className='waiting__stage-label'>{s.label}</Text>
+            </View>
+          )
+        })}
+      </View>
+
+      {/* 超时占位 */}
+      {timedOut && status?.status !== 'completed' && (
+        <View className='waiting__timeout'>
+          <Text className='waiting__timeout-title'>⏳ 分析时间比预期长</Text>
+          <Text className='waiting__timeout-desc'>
+            别担心，任务还在后台跑。完成后我们会通过微信通知你（功能上线中）。
+            你也可以先去首页做点别的。
+          </Text>
+          <Button className='waiting__btn waiting__btn--ghost' onClick={handleGoHome}>
+            先回首页
+          </Button>
+        </View>
+      )}
+
+      {/* 小贴士 */}
+      <View className='waiting__tip'>
+        <View className='waiting__tip-header'>
+          <Text className='waiting__tip-cat'>{tip.category}</Text>
+          <Text className='waiting__tip-title'>你知道吗？</Text>
+        </View>
+        <Text className='waiting__tip-text'>{tip.text}</Text>
+      </View>
+    </View>
+  )
+}
+
+export default AnalysisWaitingPage

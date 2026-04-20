@@ -1,0 +1,148 @@
+# =====================================================
+# 「小鸟 AI」本地开发环境
+# 使用：make up 一键启动全套服务
+# =====================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: xiaoniao-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-xiaoniao}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-xiaoniao_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-xiaoniao}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-xiaoniao}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: xiaoniao-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: xiaoniao-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # 控制台 UI: http://localhost:9001
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # 自动创建 MinIO bucket（一次性运行后退出）
+  minio-init:
+    image: minio/mc:latest
+    container_name: xiaoniao-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 ${MINIO_ACCESS_KEY:-minioadmin} ${MINIO_SECRET_KEY:-minioadmin};
+      mc mb -p local/${MINIO_BUCKET:-xiaoniao-videos} || true;
+      mc anonymous set download local/${MINIO_BUCKET:-xiaoniao-videos};
+      echo 'MinIO bucket ready.';
+      "
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: xiaoniao-backend
+    restart: unless-stopped
+    env_file:
+      - .env.local
+    environment:
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+      MINIO_ENDPOINT: http://minio:9000
+      AI_ENGINE_URL: http://ai_engine:9000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "
+      uv run alembic upgrade head &&
+      uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      "
+
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: xiaoniao-celery-worker
+    restart: unless-stopped
+    env_file:
+      - .env.local
+    environment:
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+      MINIO_ENDPOINT: http://minio:9000
+      AI_ENGINE_URL: http://ai_engine:9000
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uv run celery -A app.celery_app worker --loglevel=info --concurrency=2
+
+  ai_engine:
+    build:
+      context: ./ai_engine
+      dockerfile: Dockerfile
+    container_name: xiaoniao-ai-engine
+    restart: unless-stopped
+    env_file:
+      - .env.local
+    environment:
+      AI_ENGINE_MOCK_MODE: "true"
+    ports:
+      # 宿主机 9100 → 容器内 9000；9000 已被 MinIO S3 API 占用。
+      # 容器间仍走 http://ai_engine:9000（见 .env 中的 AI_ENGINE_URL）。
+      - "9100:9000"
+    volumes:
+      - ./ai_engine:/app
+    command: uv run uvicorn app.main:app --host 0.0.0.0 --port 9000 --reload
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+
+networks:
+  default:
+    name: xiaoniao-network

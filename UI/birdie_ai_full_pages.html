@@ -1,0 +1,502 @@
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans SC',sans-serif;}
+.scene{background:#E8EAF0;padding:1.25rem 1rem;border-radius:var(--border-radius-lg);}
+.tab-bar{display:flex;gap:5px;margin-bottom:1.25rem;flex-wrap:wrap;}
+.tab-btn{flex:1;min-width:70px;padding:7px 4px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-secondary);font-size:10px;cursor:pointer;font-family:'Noto Sans SC',sans-serif;white-space:nowrap;}
+.tab-btn.active{background:#1A237E;border-color:#1A237E;color:#fff;font-weight:500;}
+.screen{display:none;}.screen.active{display:block;}
+
+/* PHONE SHELL */
+.phone{width:100%;max-width:320px;margin:0 auto;background:#1a1a1a;border-radius:38px;padding:12px;box-shadow:0 20px 60px rgba(0,0,0,0.3),0 0 0 1px rgba(255,255,255,0.07);}
+.phone-inner{border-radius:28px;overflow:hidden;position:relative;}
+
+/* STATUS BAR */
+.sb{display:flex;justify-content:space-between;align-items:center;padding:10px 14px 6px;}
+.sb-time{font-size:12px;font-weight:700;}
+.sb-l .sb-time{color:#1A237E;}.sb-l{background:#fff;}
+.sb-d .sb-time{color:#fff;}.sb-d{background:#0D0D0D;}
+.sb-g .sb-time{color:#1A237E;}.sb-g{background:#F4F6FC;}
+
+/* ═══ PAGE 1: ONBOARDING ═══ */
+.ob{background:#fff;min-height:590px;display:flex;flex-direction:column;}
+.ob-skip{padding:8px 16px 0;text-align:right;color:#aaa;font-size:11px;}
+.ob-hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 24px 10px;}
+.ob-icon{width:90px;height:90px;border-radius:28px;background:linear-gradient(135deg,#1A237E,#0D3B8E,#0A5C40);display:flex;align-items:center;justify-content:center;margin-bottom:20px;box-shadow:0 12px 32px rgba(26,35,126,0.25);}
+.ob-step-title{font-size:20px;font-weight:900;color:#1A237E;text-align:center;margin-bottom:10px;line-height:1.3;letter-spacing:-0.5px;}
+.ob-step-desc{font-size:13px;color:#888;text-align:center;line-height:1.7;}
+.ob-dots{display:flex;gap:6px;justify-content:center;margin:20px 0;}
+.dot{width:6px;height:6px;border-radius:3px;background:#E0E3F0;}
+.dot.active{width:20px;background:#1A237E;}
+.ob-btn{margin:0 20px 8px;background:#1A237E;color:#fff;border:none;border-radius:14px;padding:14px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans SC',sans-serif;width:calc(100% - 40px);}
+.ob-sec{margin:0 20px 20px;background:#F4F6FC;border:0.5px solid #E0E3F0;border-radius:14px;padding:14px;font-size:11px;color:#1A237E;text-align:center;}
+.ob-sec span{color:#888;}
+
+/* ═══ PAGE 2: AI CHAT ═══ */
+.chat-bg{background:#0D0D0D;min-height:590px;display:flex;flex-direction:column;}
+.chat-nav{background:#0D0D0D;padding:8px 14px 10px;display:flex;align-items:center;gap:10px;border-bottom:0.5px solid rgba(255,255,255,0.07);}
+.back{color:rgba(255,255,255,0.4);font-size:20px;}
+.coach-pill{display:flex;align-items:center;gap:8px;flex:1;}
+.coach-ava{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#1A237E,#00D084);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.coach-name{color:#fff;font-size:13px;font-weight:700;}
+.coach-online{color:#00D084;font-size:9px;margin-top:1px;}
+.nav-more{color:rgba(255,255,255,0.3);font-size:18px;}
+
+.context-card{margin:10px 12px;background:rgba(0,208,132,0.06);border:0.5px solid rgba(0,208,132,0.18);border-radius:12px;padding:9px 12px;display:flex;align-items:center;gap:10px;}
+.ctx-icon{width:28px;height:28px;border-radius:8px;background:rgba(0,208,132,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.ctx-text{font-size:10px;color:rgba(255,255,255,0.5);}
+.ctx-text strong{color:#00D084;display:block;font-size:11px;margin-bottom:1px;}
+
+.msgs{flex:1;padding:8px 12px;display:flex;flex-direction:column;gap:10px;overflow:hidden;}
+.msg-row{display:flex;gap:7px;}
+.msg-row.u{flex-direction:row-reverse;}
+.m-ava{width:26px;height:26px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;}
+.m-ava.ai{background:linear-gradient(135deg,#1A237E,#00D084);}
+.m-ava.usr{background:#1A237E;color:#7C9EF0;}
+.bbl{padding:9px 12px;border-radius:14px;font-size:11px;line-height:1.6;max-width:215px;}
+.bbl.ai{background:rgba(255,255,255,0.05);border:0.5px solid rgba(255,255,255,0.09);color:rgba(255,255,255,0.82);border-top-left-radius:4px;}
+.bbl.usr{background:#1A237E;color:#C5CCF5;border-top-right-radius:4px;}
+.bbl .hi{color:#00D084;font-weight:600;}
+.bbl .warn{color:#F4A923;font-weight:600;}
+.mini-report{background:rgba(255,255,255,0.04);border:0.5px solid rgba(255,255,255,0.08);border-radius:10px;padding:8px 10px;margin-top:6px;max-width:200px;}
+.mr-label{font-size:9px;color:rgba(255,255,255,0.35);margin-bottom:5px;}
+.mr-bars{display:flex;flex-direction:column;gap:3px;}
+.mr-bar-row{display:flex;align-items:center;gap:6px;}
+.mr-bar-name{font-size:8px;color:rgba(255,255,255,0.4);width:32px;}
+.mr-bar-bg{flex:1;height:3px;background:rgba(255,255,255,0.07);border-radius:2px;}
+.mr-bar-fill{height:3px;border-radius:2px;}
+.mr-bar-val{font-size:8px;color:rgba(255,255,255,0.5);width:18px;text-align:right;}
+
+.quick-chips{display:flex;gap:6px;flex-wrap:wrap;padding:6px 12px 4px;}
+.chip{background:rgba(255,255,255,0.04);border:0.5px solid rgba(255,255,255,0.1);border-radius:20px;padding:5px 10px;font-size:10px;color:rgba(255,255,255,0.5);cursor:pointer;white-space:nowrap;}
+
+.chat-input-row{padding:8px 12px 14px;border-top:0.5px solid rgba(255,255,255,0.06);display:flex;gap:8px;align-items:center;}
+.chat-input-box{flex:1;background:rgba(255,255,255,0.05);border:0.5px solid rgba(255,255,255,0.1);border-radius:20px;padding:8px 14px;color:rgba(255,255,255,0.4);font-size:11px;display:flex;align-items:center;justify-content:space-between;}
+.mic-ico{opacity:0.35;}
+.send-btn{width:32px;height:32px;border-radius:50%;background:#00D084;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+
+/* ═══ PAGE 3: TRAINING ═══ */
+.train-bg{background:#F4F6FC;min-height:590px;}
+.train-nav{background:#fff;padding:10px 16px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:0.5px solid #EAEBEF;}
+.train-title{font-size:15px;font-weight:900;color:#1A237E;}
+.train-date{font-size:11px;color:#aaa;}
+.calendar-strip{background:#fff;margin:0 0 10px;padding:8px 12px;display:flex;gap:6px;border-bottom:0.5px solid #EAEBEF;overflow:hidden;}
+.cal-day{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 2px;border-radius:10px;}
+.cal-day.today{background:#1A237E;}
+.cal-day.done{background:#E8F5EE;}
+.cal-dn{font-size:9px;color:#bbb;}
+.cal-day.today .cal-dn{color:rgba(255,255,255,0.6);}
+.cal-dd{font-size:13px;font-weight:700;color:#555;}
+.cal-day.today .cal-dd{color:#fff;}
+.cal-day.done .cal-dd{color:#00A066;}
+.cal-dot{width:4px;height:4px;border-radius:50%;background:#E0E3F0;}
+.cal-day.done .cal-dot{background:#00D084;}
+.cal-day.today .cal-dot{background:rgba(255,255,255,0.5);}
+
+.plan-head{padding:6px 16px 8px;display:flex;justify-content:space-between;align-items:center;}
+.plan-head h3{font-size:12px;font-weight:700;color:#1A237E;}
+.plan-head span{font-size:10px;color:#00D084;font-weight:600;}
+.progress-bar-wrap{margin:0 12px 10px;background:#fff;border:0.5px solid #EAEBEF;border-radius:12px;padding:10px 12px;}
+.pb-top{display:flex;justify-content:space-between;margin-bottom:8px;}
+.pb-label{font-size:11px;font-weight:600;color:#1A237E;}
+.pb-pct{font-size:11px;font-weight:700;color:#00D084;}
+.pb-bg{height:6px;background:#F0F2F5;border-radius:3px;}
+.pb-fill{height:6px;border-radius:3px;background:linear-gradient(90deg,#00D084,#00A066);}
+
+.task-list{padding:0 12px;display:flex;flex-direction:column;gap:8px;}
+.task-card{background:#fff;border:0.5px solid #EAEBEF;border-radius:14px;overflow:hidden;}
+.task-card.done-card{border-color:#C8EAD8;background:#F8FDF9;}
+.task-top{padding:10px 12px;display:flex;align-items:center;gap:10px;}
+.task-num{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;}
+.task-num.todo{background:#EEF0F9;color:#1A237E;}
+.task-num.done{background:#E8F5EE;color:#00A066;}
+.task-num.active{background:#1A237E;color:#fff;}
+.task-info{flex:1;}
+.task-name{font-size:12px;font-weight:700;color:#1A237E;}
+.task-name.done-txt{color:#00A066;}
+.task-meta{font-size:10px;color:#aaa;margin-top:1px;}
+.task-check{width:22px;height:22px;border-radius:50%;border:1.5px solid #E0E3F0;display:flex;align-items:center;justify-content:center;}
+.task-check.checked{background:#00D084;border-color:#00D084;}
+.task-expand{background:#F8F9FF;border-top:0.5px solid #EAEBEF;padding:8px 12px;display:flex;gap:8px;align-items:center;}
+.task-vid-thumb{width:44px;height:36px;border-radius:7px;background:linear-gradient(135deg,#1A237E,#0D3B8E);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.task-tip{font-size:10px;color:#666;flex:1;line-height:1.5;}
+.task-tip strong{color:#1A237E;display:block;margin-bottom:2px;}
+.start-btn{background:#1A237E;color:#fff;border:none;border-radius:8px;padding:5px 10px;font-size:10px;font-weight:700;cursor:pointer;font-family:'Noto Sans SC',sans-serif;white-space:nowrap;}
+
+.streak-card{margin:10px 12px 14px;background:linear-gradient(135deg,#1A237E,#0A3A6E);border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:12px;}
+.streak-icon{font-size:24px;width:40px;text-align:center;}
+.streak-info .n{font-size:20px;font-weight:900;color:#fff;}
+.streak-info .l{font-size:10px;color:rgba(255,255,255,0.5);}
+.streak-badge{margin-left:auto;background:rgba(0,208,132,0.15);border:0.5px solid rgba(0,208,132,0.3);border-radius:8px;padding:5px 9px;color:#00D084;font-size:10px;font-weight:600;}
+
+/* ═══ PAGE 4: MEMBERSHIP ═══ */
+.mem-bg{background:#F4F6FC;min-height:590px;}
+.mem-nav{background:#fff;padding:10px 16px 12px;display:flex;align-items:center;gap:8px;border-bottom:0.5px solid #EAEBEF;}
+.mem-title{font-size:15px;font-weight:900;color:#1A237E;flex:1;}
+
+.mem-hero{margin:12px;background:linear-gradient(135deg,#1A237E 0%,#0D3B8E 60%,#0A5040 100%);border-radius:18px;padding:16px;position:relative;overflow:hidden;}
+.mem-hero-tag{display:inline-block;background:rgba(0,208,132,0.2);border:0.5px solid rgba(0,208,132,0.4);border-radius:6px;color:#00D084;font-size:9px;padding:2px 9px;margin-bottom:10px;font-weight:600;letter-spacing:0.5px;}
+.mem-hero-title{font-size:18px;font-weight:900;color:#fff;letter-spacing:-0.5px;margin-bottom:4px;}
+.mem-hero-sub{font-size:11px;color:rgba(255,255,255,0.5);}
+.mem-deco{position:absolute;right:-8px;top:-8px;opacity:0.06;}
+
+.plan-tabs{display:flex;gap:6px;margin:0 12px 10px;background:#fff;border:0.5px solid #EAEBEF;border-radius:12px;padding:4px;}
+.plan-tab{flex:1;padding:8px 0;border-radius:9px;font-size:11px;color:#999;cursor:pointer;text-align:center;font-weight:500;}
+.plan-tab.active{background:#1A237E;color:#fff;font-weight:700;}
+
+.plan-cards{padding:0 12px;display:flex;flex-direction:column;gap:8px;}
+.plan-card{background:#fff;border:0.5px solid #EAEBEF;border-radius:14px;padding:12px 14px;position:relative;}
+.plan-card.featured{border:1.5px solid #1A237E;}
+.plan-badge{position:absolute;top:-1px;right:12px;background:#1A237E;color:#fff;font-size:9px;padding:3px 9px;border-radius:0 0 7px 7px;font-weight:700;}
+.plan-name{font-size:13px;font-weight:700;color:#1A237E;margin-bottom:2px;}
+.plan-price{display:flex;align-items:baseline;gap:3px;margin-bottom:8px;}
+.plan-price .big{font-size:26px;font-weight:900;color:#1A237E;}
+.plan-price .unit{font-size:11px;color:#aaa;}
+.plan-price .orig{font-size:11px;color:#ccc;text-decoration:line-through;margin-left:4px;}
+.plan-perks{display:flex;flex-direction:column;gap:5px;}
+.perk{display:flex;align-items:center;gap:7px;font-size:11px;color:#555;}
+.perk svg{flex-shrink:0;}
+.perk.off{color:#ccc;}
+.plan-cta{margin:10px 12px 8px;background:#1A237E;color:#fff;border:none;border-radius:12px;padding:14px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans SC',sans-serif;width:calc(100% - 24px);}
+.free-cta{margin:0 12px 14px;background:#F4F6FC;border:0.5px solid #E0E3F0;color:#1A237E;border-radius:12px;padding:12px;font-size:12px;font-weight:500;cursor:pointer;font-family:'Noto Sans SC',sans-serif;width:calc(100% - 24px);text-align:center;}
+.mem-trust{padding:0 16px 12px;display:flex;justify-content:center;gap:16px;}
+.trust-item{display:flex;align-items:center;gap:4px;font-size:10px;color:#aaa;}
+
+/* Shared bottom nav light */
+.bnav{background:#fff;border-top:0.5px solid #EAEBEF;padding:10px 0 16px;display:flex;justify-content:space-around;}
+.ni{display:flex;flex-direction:column;align-items:center;gap:3px;}
+.ni .nl{font-size:9px;color:#bbb;}
+.ni.active .nl{color:#1A237E;font-weight:700;}
+.bnav-dark{background:#0D0D0D;border-top:0.5px solid rgba(255,255,255,0.06);padding:10px 0 14px;display:flex;justify-content:space-around;}
+.ni-d{display:flex;flex-direction:column;align-items:center;gap:3px;}
+.ni-d .nl{font-size:9px;color:rgba(255,255,255,0.25);}
+.ni-d.active .nl{color:#00D084;font-weight:700;}
+</style>
+
+<div class="scene">
+  <h2 class="sr-only">小鸟AI 完整页面设计 — 新用户引导、AI教练对话、训练打卡、会员订阅</h2>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="sw('ob',this)">新用户引导</button>
+    <button class="tab-btn" onclick="sw('chat',this)">AI教练</button>
+    <button class="tab-btn" onclick="sw('train',this)">训练打卡</button>
+    <button class="tab-btn" onclick="sw('mem',this)">会员订阅</button>
+  </div>
+
+  <div class="phone">
+    <div class="phone-inner">
+
+      <!-- ══ ONBOARDING ══ -->
+      <div id="s-ob" class="screen active">
+        <div class="ob">
+          <div class="sb sb-l">
+            <span class="sb-time">9:41</span>
+            <div style="display:flex;gap:4px;align-items:center;">
+              <svg width="14" height="10" viewBox="0 0 14 10" fill="#1A237E"><rect x="0" y="3" width="3" height="7" rx="0.5" opacity="0.4"/><rect x="4" y="2" width="3" height="8" rx="0.5" opacity="0.6"/><rect x="8" y="0" width="3" height="10" rx="0.5"/></svg>
+              <svg width="22" height="10" viewBox="0 0 22 10"><rect x="0.5" y="0.5" width="18" height="9" rx="2" stroke="#1A237E" stroke-opacity="0.3" fill="none"/><rect x="1.5" y="1.5" width="13" height="7" rx="1.5" fill="#1A237E"/></svg>
+            </div>
+          </div>
+          <div class="ob-skip">跳过</div>
+          <div class="ob-hero">
+            <div class="ob-icon">
+              <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                <path d="M10 38C10 38 15 24 26 17C33 12.5 40 13 40 13C40 13 36 21 29 27C22 33 10 38 10 38Z" fill="#00D084"/>
+                <path d="M10 38C10 38 18 33 24 29C29 26 36 25 36 25" stroke="#00D084" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
+                <path d="M14 35L17 29" stroke="white" stroke-width="1.2" stroke-linecap="round" opacity="0.4"/>
+                <path d="M18 32L21 27" stroke="white" stroke-width="1.2" stroke-linecap="round" opacity="0.3"/>
+                <circle cx="11" cy="37" r="3" fill="#00D084"/>
+              </svg>
+            </div>
+            <div class="ob-step-title">拍一段视频<br>就能获得专业教练级反馈</div>
+            <div class="ob-step-desc">AI 分析你的挥杆姿势、识别问题、给出个性化训练方案，随时随地，就像随身带着专业教练</div>
+
+            <!-- Feature highlights -->
+            <div style="width:100%;margin-top:22px;display:flex;flex-direction:column;gap:10px;">
+              <div style="display:flex;align-items:center;gap:12px;background:#F4F6FC;border-radius:12px;padding:10px 14px;">
+                <div style="width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#E8EBF8,#C8CEF0);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="#1A237E" stroke-width="1.3"/><path d="M5.5 8L7 9.5L10.5 6" stroke="#1A237E" stroke-width="1.3" stroke-linecap="round"/></svg>
+                </div>
+                <div><div style="font-size:11px;font-weight:700;color:#1A237E;">AI 挥杆分析</div><div style="font-size:10px;color:#999;margin-top:1px;">骨骼追踪 · 6维评分 · 问题诊断</div></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;background:#F4F6FC;border-radius:12px;padding:10px 14px;">
+                <div style="width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#E8F5EE,#C8EAD8);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2C8 2 11 5 10.5 9C10 12 8 14 8 14" stroke="#00A066" stroke-width="1.3" stroke-linecap="round"/><circle cx="8" cy="14" r="1.2" fill="#00A066"/><path d="M4.5 6L10.5 4" stroke="#00A066" stroke-width="1" stroke-linecap="round" opacity="0.5"/></svg>
+                </div>
+                <div><div style="font-size:11px;font-weight:700;color:#1A237E;">AI 私人教练对话</div><div style="font-size:10px;color:#999;margin-top:1px;">结合你的数据 · 中文专业解答</div></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;background:#F4F6FC;border-radius:12px;padding:10px 14px;">
+                <div style="width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#FFF4E0,#FFE4A0);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 14L8 3L13 14" stroke="#C47A00" stroke-width="1.3" stroke-linecap="round"/><path d="M5 11H11" stroke="#C47A00" stroke-width="1.3" stroke-linecap="round"/></svg>
+                </div>
+                <div><div style="font-size:11px;font-weight:700;color:#1A237E;">个性化训练计划</div><div style="font-size:10px;color:#999;margin-top:1px;">自动生成 · 进步可视化追踪</div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="ob-dots">
+            <div class="dot active"></div><div class="dot"></div><div class="dot"></div>
+          </div>
+          <button class="ob-btn">微信一键登录，免费开始</button>
+          <div class="ob-sec"><span>首次使用享 </span>3次免费分析<span>，无需绑卡</span></div>
+        </div>
+      </div>
+
+      <!-- ══ AI CHAT ══ -->
+      <div id="s-chat" class="screen">
+        <div class="chat-bg">
+          <div class="sb sb-d">
+            <span class="sb-time">9:41</span>
+            <div style="display:flex;gap:4px;align-items:center;">
+              <svg width="14" height="10" viewBox="0 0 14 10" fill="white"><rect x="0" y="3" width="3" height="7" rx="0.5" opacity="0.4"/><rect x="4" y="2" width="3" height="8" rx="0.5" opacity="0.7"/><rect x="8" y="0" width="3" height="10" rx="0.5"/></svg>
+              <svg width="22" height="10" viewBox="0 0 22 10"><rect x="0.5" y="0.5" width="18" height="9" rx="2" stroke="white" stroke-opacity="0.3" fill="none"/><rect x="1.5" y="1.5" width="13" height="7" rx="1.5" fill="white"/></svg>
+            </div>
+          </div>
+          <div class="chat-nav">
+            <span class="back">‹</span>
+            <div class="coach-pill">
+              <div class="coach-ava"><svg width="16" height="16" viewBox="0 0 18 18" fill="none"><path d="M9 2C9 2 12 5 11 9C10.5 11.5 8 13 8 13" stroke="white" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="13" r="1.2" fill="white"/></svg></div>
+              <div><div class="coach-name">小鸟 AI 教练</div><div class="coach-online">● 在线</div></div>
+            </div>
+            <span class="nav-more">···</span>
+          </div>
+
+          <!-- Context card -->
+          <div class="context-card">
+            <div class="ctx-icon"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="#00D084" stroke-width="1.2"/><path d="M4.5 7L6 8.5L9.5 5" stroke="#00D084" stroke-width="1.2" stroke-linecap="round"/></svg></div>
+            <div class="ctx-text"><strong>已关联今天的挥杆报告</strong>7号铁 · 综合评分 82分 · 3项问题</div>
+          </div>
+
+          <div class="msgs">
+            <div class="msg-row">
+              <div class="m-ava ai"><svg width="12" height="12" viewBox="0 0 18 18" fill="none"><path d="M9 2C9 2 12 5 11 9C10.5 11.5 8 13 8 13" stroke="white" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="13" r="1.2" fill="white"/></svg></div>
+              <div>
+                <div class="bbl ai">你好张磊！看了你今天的报告，<span class="hi">82分</span>，比上次进步了 4 分，很稳！<br><br>下杆转换是当前最值得重点改善的环节，有什么想问的吗？</div>
+              </div>
+            </div>
+
+            <div class="msg-row u">
+              <div class="m-ava usr">张</div>
+              <div class="bbl usr">我总是打右曲球，具体是什么原因？</div>
+            </div>
+
+            <div class="msg-row">
+              <div class="m-ava ai"><svg width="12" height="12" viewBox="0 0 18 18" fill="none"><path d="M9 2C9 2 12 5 11 9C10.5 11.5 8 13 8 13" stroke="white" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="13" r="1.2" fill="white"/></svg></div>
+              <div>
+                <div class="bbl ai">根据你近 3 次挥杆数据，右曲球主要来自：<br><br><span class="hi">① 手腕过早释放</span> — 下杆初期手腕提前"甩"，导致击球时杆面打开<br><br><span class="warn">② 下杆路径偏外 3.8°</span> — 理想值应在 0–2° 之间<br><br>当前最需要改善的是第 ① 点：</div>
+                <div class="mini-report">
+                  <div class="mr-label">本次挥杆各维度评分</div>
+                  <div class="mr-bars">
+                    <div class="mr-bar-row"><span class="mr-bar-name">站位</span><div class="mr-bar-bg"><div class="mr-bar-fill" style="width:85%;background:#00D084;"></div></div><span class="mr-bar-val">85</span></div>
+                    <div class="mr-bar-row"><span class="mr-bar-name">上杆</span><div class="mr-bar-bg"><div class="mr-bar-fill" style="width:78%;background:#00D084;"></div></div><span class="mr-bar-val">78</span></div>
+                    <div class="mr-bar-row"><span class="mr-bar-name">下杆</span><div class="mr-bar-bg"><div class="mr-bar-fill" style="width:63%;background:#F4A923;"></div></div><span class="mr-bar-val" style="color:#F4A923;">63</span></div>
+                    <div class="mr-bar-row"><span class="mr-bar-name">击球</span><div class="mr-bar-bg"><div class="mr-bar-fill" style="width:80%;background:#00D084;"></div></div><span class="mr-bar-val">80</span></div>
+                    <div class="mr-bar-row"><span class="mr-bar-name">收杆</span><div class="mr-bar-bg"><div class="mr-bar-fill" style="width:88%;background:#00D084;"></div></div><span class="mr-bar-val">88</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="msg-row u">
+              <div class="m-ava usr">张</div>
+              <div class="bbl usr">有推荐的练习动作吗？</div>
+            </div>
+
+            <div class="msg-row">
+              <div class="m-ava ai"><svg width="12" height="12" viewBox="0 0 18 18" fill="none"><path d="M9 2C9 2 12 5 11 9C10.5 11.5 8 13 8 13" stroke="white" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="13" r="1.2" fill="white"/></svg></div>
+              <div class="bbl ai">推荐两个练习：<br><br><span class="hi">1. 毛巾夹臂练习</span> — 修复手腕释放时机，约 15 分钟<br><span class="hi">2. 慢速下杆感知练习</span> — 建立正确肌肉记忆，约 10 分钟<br><br>已加入你今天的训练计划 ✓</div>
+            </div>
+          </div>
+
+          <div class="quick-chips">
+            <div class="chip">上杆怎么改进？</div>
+            <div class="chip">推荐练习视频</div>
+            <div class="chip">和上次对比</div>
+          </div>
+
+          <div class="chat-input-row">
+            <div class="chat-input-box">
+              <span>问小鸟AI教练...</span>
+              <svg class="mic-ico" width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="4" y="1" width="6" height="8" rx="3" stroke="rgba(255,255,255,0.5)" stroke-width="1.2"/><path d="M2 7C2 9.8 4.2 12 7 12C9.8 12 12 9.8 12 7" stroke="rgba(255,255,255,0.5)" stroke-width="1.2" stroke-linecap="round"/><line x1="7" y1="12" x2="7" y2="14" stroke="rgba(255,255,255,0.5)" stroke-width="1.2"/></svg>
+            </div>
+            <div class="send-btn"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 6.5H11M7.5 3L11 6.5L7.5 10" stroke="#003D20" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ TRAINING ══ -->
+      <div id="s-train" class="screen">
+        <div class="train-bg">
+          <div class="sb sb-g">
+            <span class="sb-time">9:41</span>
+            <div style="display:flex;gap:4px;align-items:center;">
+              <svg width="14" height="10" viewBox="0 0 14 10" fill="#1A237E"><rect x="0" y="3" width="3" height="7" rx="0.5" opacity="0.4"/><rect x="4" y="2" width="3" height="8" rx="0.5" opacity="0.7"/><rect x="8" y="0" width="3" height="10" rx="0.5"/></svg>
+              <svg width="22" height="10" viewBox="0 0 22 10"><rect x="0.5" y="0.5" width="18" height="9" rx="2" stroke="#1A237E" stroke-opacity="0.3" fill="none"/><rect x="1.5" y="1.5" width="13" height="7" rx="1.5" fill="#1A237E"/></svg>
+            </div>
+          </div>
+          <div class="train-nav">
+            <div><div class="train-title">今日训练计划</div><div class="train-date">2026年4月20日 · 星期一</div></div>
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="#1A237E" stroke-width="1.3"/><path d="M10 6V10L12.5 12.5" stroke="#1A237E" stroke-width="1.3" stroke-linecap="round"/></svg>
+          </div>
+
+          <!-- Calendar strip -->
+          <div class="calendar-strip">
+            <div class="cal-day done"><span class="cal-dn">一</span><span class="cal-dd">14</span><span class="cal-dot"></span></div>
+            <div class="cal-day done"><span class="cal-dn">二</span><span class="cal-dd">15</span><span class="cal-dot"></span></div>
+            <div class="cal-day"><span class="cal-dn">三</span><span class="cal-dd">16</span><span class="cal-dot"></span></div>
+            <div class="cal-day done"><span class="cal-dn">四</span><span class="cal-dd">17</span><span class="cal-dot"></span></div>
+            <div class="cal-day"><span class="cal-dn">五</span><span class="cal-dd">18</span><span class="cal-dot"></span></div>
+            <div class="cal-day"><span class="cal-dn">六</span><span class="cal-dd">19</span><span class="cal-dot"></span></div>
+            <div class="cal-day today"><span class="cal-dn">日</span><span class="cal-dd">20</span><span class="cal-dot"></span></div>
+          </div>
+
+          <!-- Progress -->
+          <div class="progress-bar-wrap">
+            <div class="pb-top"><span class="pb-label">今日完成进度</span><span class="pb-pct">1 / 3 项</span></div>
+            <div class="pb-bg"><div class="pb-fill" style="width:33%;"></div></div>
+          </div>
+
+          <div class="plan-head">
+            <h3>今日任务</h3>
+            <span>AI 根据报告生成</span>
+          </div>
+
+          <div class="task-list">
+            <!-- Done task -->
+            <div class="task-card done-card">
+              <div class="task-top">
+                <div class="task-num done">✓</div>
+                <div class="task-info">
+                  <div class="task-name done-txt">热身：肩部旋转拉伸</div>
+                  <div class="task-meta">10分钟 · 已完成 09:15</div>
+                </div>
+                <div class="task-check checked"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5L4 7L8 3" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+              </div>
+            </div>
+
+            <!-- Active task -->
+            <div class="task-card">
+              <div class="task-top">
+                <div class="task-num active">2</div>
+                <div class="task-info">
+                  <div class="task-name">毛巾夹臂练习</div>
+                  <div class="task-meta">15分钟 · 修复手腕释放时机</div>
+                </div>
+                <div class="task-check"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="5" cy="5" r="4" stroke="#E0E3F0" stroke-width="1.2"/></svg></div>
+              </div>
+              <div class="task-expand">
+                <div class="task-vid-thumb"><svg width="12" height="14" viewBox="0 0 12 14" fill="none"><path d="M2 1L10 7L2 13V1Z" fill="white" opacity="0.6"/></svg></div>
+                <div class="task-tip"><strong>动作要领</strong>夹住毛巾保持双臂内收，感受下杆时手腕延迟释放的时机。</div>
+                <button class="start-btn">开始</button>
+              </div>
+            </div>
+
+            <!-- Pending task -->
+            <div class="task-card">
+              <div class="task-top">
+                <div class="task-num todo">3</div>
+                <div class="task-info">
+                  <div class="task-name">慢速下杆感知练习</div>
+                  <div class="task-meta">10分钟 · 建立肌肉记忆</div>
+                </div>
+                <div class="task-check"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="5" cy="5" r="4" stroke="#E0E3F0" stroke-width="1.2"/></svg></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Streak -->
+          <div class="streak-card">
+            <div style="font-size:20px;">🔥</div>
+            <div class="streak-info">
+              <div class="n">7</div>
+              <div class="l">连续打卡天数</div>
+            </div>
+            <div class="streak-badge">本周目标 5/7</div>
+          </div>
+
+          <div class="bnav">
+            <div class="ni"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="2" width="7" height="7" rx="2" fill="#DADDF0"/><rect x="11" y="2" width="7" height="7" rx="2" fill="#DADDF0"/><rect x="2" y="11" width="7" height="7" rx="2" fill="#DADDF0"/><rect x="11" y="11" width="7" height="7" rx="2" fill="#DADDF0"/></svg><span class="nl">首页</span></div>
+            <div class="ni"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.5" stroke="#ccc" stroke-width="1.5"/><path d="M7.5 10L9.5 12L12.5 8" stroke="#ccc" stroke-width="1.5" stroke-linecap="round"/></svg><span class="nl">分析</span></div>
+            <div class="ni active"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 17L10 4L16 17" stroke="#1A237E" stroke-width="1.5" stroke-linecap="round"/><path d="M6.5 13H13.5" stroke="#1A237E" stroke-width="1.5" stroke-linecap="round"/></svg><span class="nl" style="color:#1A237E">训练</span></div>
+            <div class="ni"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7.5" r="3" stroke="#ccc" stroke-width="1.5"/><path d="M3 18C3 14.7 6.1 12 10 12C13.9 12 17 14.7 17 18" stroke="#ccc" stroke-width="1.5" stroke-linecap="round"/></svg><span class="nl">我的</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ MEMBERSHIP ══ -->
+      <div id="s-mem" class="screen">
+        <div class="mem-bg">
+          <div class="sb sb-g">
+            <span class="sb-time">9:41</span>
+            <div style="display:flex;gap:4px;align-items:center;">
+              <svg width="14" height="10" viewBox="0 0 14 10" fill="#1A237E"><rect x="0" y="3" width="3" height="7" rx="0.5" opacity="0.4"/><rect x="4" y="2" width="3" height="8" rx="0.5" opacity="0.7"/><rect x="8" y="0" width="3" height="10" rx="0.5"/></svg>
+              <svg width="22" height="10" viewBox="0 0 22 10"><rect x="0.5" y="0.5" width="18" height="9" rx="2" stroke="#1A237E" stroke-opacity="0.3" fill="none"/><rect x="1.5" y="1.5" width="13" height="7" rx="1.5" fill="#1A237E"/></svg>
+            </div>
+          </div>
+          <div class="mem-nav">
+            <span style="font-size:20px;color:#aaa;">‹</span>
+            <span class="mem-title">会员订阅</span>
+          </div>
+
+          <div class="mem-hero">
+            <div class="mem-hero-tag">解锁无限分析</div>
+            <div class="mem-hero-title">成为小鸟 AI 会员</div>
+            <div class="mem-hero-sub">无限次挥杆分析 · AI教练全天候陪练 · 完整进步追踪</div>
+            <svg class="mem-deco" width="120" height="120" viewBox="0 0 120 120" fill="none">
+              <polygon points="60,10 103,35 103,85 60,110 17,85 17,35" stroke="white" stroke-width="1.5" fill="none"/>
+              <polygon points="60,25 88,41 88,79 60,95 32,79 32,41" stroke="white" stroke-width="1" fill="none"/>
+              <polygon points="60,18 96,38 94,82 60,100 26,82 24,38" fill="white" stroke="white" stroke-width="1"/>
+            </svg>
+          </div>
+
+          <!-- Plan toggle -->
+          <div class="plan-tabs">
+            <div class="plan-tab">月付</div>
+            <div class="plan-tab active">季付 <span style="color:#00D084;font-size:9px;">省20%</span></div>
+            <div class="plan-tab">年付 <span style="color:#F4A923;font-size:9px;">省40%</span></div>
+          </div>
+
+          <div class="plan-cards">
+            <!-- Featured plan -->
+            <div class="plan-card featured">
+              <div class="plan-badge">最受欢迎</div>
+              <div class="plan-name">会员季付</div>
+              <div class="plan-price">
+                <span class="big">¥49</span>
+                <span class="unit">/ 月</span>
+                <span class="orig">¥69</span>
+              </div>
+              <div class="plan-perks">
+                <div class="perk"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" fill="#E8F5EE"/><path d="M4.5 7L6 8.5L9.5 5" stroke="#00A066" stroke-width="1.3" stroke-linecap="round"/></svg>无限次挥杆分析</div>
+                <div class="perk"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" fill="#E8F5EE"/><path d="M4.5 7L6 8.5L9.5 5" stroke="#00A066" stroke-width="1.3" stroke-linecap="round"/></svg>AI教练无限对话</div>
+                <div class="perk"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" fill="#E8F5EE"/><path d="M4.5 7L6 8.5L9.5 5" stroke="#00A066" stroke-width="1.3" stroke-linecap="round"/></svg>完整进步曲线与历史报告</div>
+                <div class="perk"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" fill="#E8F5EE"/><path d="M4.5 7L6 8.5L9.5 5" stroke="#00A066" stroke-width="1.3" stroke-linecap="round"/></svg>优先分析队列（更快出结果）</div>
+                <div class="perk"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" fill="#E8F5EE"/><path d="M4.5 7L6 8.5L9.5 5" stroke="#00A066" stroke-width="1.3" stroke-linecap="round"/></svg>自定义训练计划</div>
+              </div>
+            </div>
+          </div>
+
+          <button class="plan-cta">7天免费体验，随时可取消</button>
+          <div class="free-cta">继续使用免费版（每月3次分析）</div>
+
+          <div class="mem-trust">
+            <div class="trust-item"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1L7.5 4.2L11 4.7L8.5 7.1L9.1 10.6L6 9L2.9 10.6L3.5 7.1L1 4.7L4.5 4.2L6 1Z" stroke="#bbb" stroke-width="1" fill="none"/></svg>随时取消</div>
+            <div class="trust-item"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="4" width="10" height="7" rx="1.5" stroke="#bbb" stroke-width="1"/><path d="M4 4V3C4 1.9 4.9 1 6 1C7.1 1 8 1.9 8 3V4" stroke="#bbb" stroke-width="1" stroke-linecap="round"/></svg>微信支付安全</div>
+            <div class="trust-item"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="#bbb" stroke-width="1"/><path d="M4 6L5.5 7.5L8 4.5" stroke="#bbb" stroke-width="1" stroke-linecap="round"/></svg>无自动扣费</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+function sw(name,btn){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('s-'+name).classList.add('active');
+  btn.classList.add('active');
+}
+</script>

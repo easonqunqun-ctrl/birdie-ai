@@ -1,0 +1,68 @@
+"""AI Engine 输入输出 schema."""
+
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+
+class AnalyzeRequest(BaseModel):
+    """挥杆分析请求."""
+
+    analysis_id: str = Field(..., description="后端分配的分析 ID，用于回调")
+    video_url: str = Field(..., description="视频文件 URL（COS/MinIO）")
+    camera_angle: Literal["face_on", "down_the_line"]
+    club_type: str = Field(..., description="球杆类型")
+    callback_url: str | None = Field(default=None, description="完成后回调后端的 URL")
+
+
+class PhaseScore(BaseModel):
+    score: int
+    label: str
+    is_weakest: bool = False
+
+
+class IssueItem(BaseModel):
+    type: str
+    name: str
+    severity: Literal["high", "medium", "low"]
+    description: str
+    key_frame_timestamp: float | None = None
+
+
+class RecommendationItem(BaseModel):
+    drill_id: str
+    name: str
+    target_issue: str
+    description: str
+    duration_minutes: int
+    sets: int
+    steps: list[str]
+
+
+class PhaseTimestamps(BaseModel):
+    setup: dict[str, float]
+    backswing: dict[str, float]
+    top: dict[str, float]
+    downswing: dict[str, float]
+    impact: dict[str, float]
+    follow_through: dict[str, float]
+
+
+class AnalyzeResult(BaseModel):
+    """完整分析结果."""
+
+    analysis_id: str
+    status: Literal["completed", "failed"]
+    overall_score: int | None = None
+    phase_scores: dict[str, PhaseScore] | None = None
+    phase_timestamps: PhaseTimestamps | None = None
+    issues: list[IssueItem] = Field(default_factory=list)
+    recommendations: list[RecommendationItem] = Field(default_factory=list)
+
+    skeleton_video_url: str | None = None
+    skeleton_data_url: str | None = None
+    thumbnail_url: str | None = None
+
+    duration_ms: int | None = None
+    error_code: int | None = None
+    error_message: str | None = None

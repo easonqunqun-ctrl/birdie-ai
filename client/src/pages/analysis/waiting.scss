@@ -1,0 +1,306 @@
+page {
+  background: var(--color-primary);
+}
+
+.waiting {
+  min-height: 100vh;
+  padding: 48px 32px 80px;
+  color: var(--color-on-primary);
+
+  /* ==================== Hero ==================== */
+  &__hero {
+    text-align: center;
+    margin-bottom: 56px;
+  }
+
+  &__spinner {
+    position: relative;
+    width: 200px;
+    height: 200px;
+    margin: 0 auto 32px;
+  }
+
+  &__spinner-ring {
+    position: absolute;
+    inset: 0;
+    border: 6rpx solid rgba(201, 162, 39, 0.25);
+    border-top-color: var(--color-gold);
+    border-radius: 50%;
+    animation: waiting-spin 1.4s linear infinite;
+  }
+
+  &__spinner-core {
+    position: absolute;
+    inset: 24px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &__spinner-text {
+    font-size: 48px;
+    font-weight: 700;
+    color: var(--color-gold);
+    letter-spacing: 2px;
+  }
+
+  &__title {
+    display: block;
+    font-size: 36px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  &__countdown {
+    display: block;
+    font-size: 26px;
+    opacity: 0.8;
+  }
+
+  /* ==================== 阶段列表 ==================== */
+  &__stages {
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: var(--radius-md);
+    padding: 24px;
+    margin-bottom: 32px;
+  }
+
+  &__stage {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 16px 0;
+    position: relative;
+
+    &:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      left: 20px;
+      top: 52px;
+      bottom: -16px;
+      width: 2rpx;
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    &--done::after {
+      background: var(--color-gold);
+    }
+  }
+
+  &__stage-dot {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12);
+    color: var(--color-on-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    line-height: 1;
+    flex-shrink: 0;
+    z-index: 1;
+  }
+
+  &__stage-pulse {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--color-gold);
+    animation: waiting-pulse 1.2s ease-in-out infinite;
+  }
+
+  &__stage--done &__stage-dot {
+    background: var(--color-gold);
+    color: var(--color-primary-dark);
+    font-weight: 700;
+  }
+
+  &__stage--active &__stage-dot {
+    background: rgba(201, 162, 39, 0.15);
+    border: 2rpx solid var(--color-gold);
+  }
+
+  &__stage-label {
+    font-size: 28px;
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  &__stage--done &__stage-label,
+  &__stage--active &__stage-label {
+    color: var(--color-on-primary);
+    font-weight: 500;
+  }
+
+  /* ==================== 超时占位 ==================== */
+  &__timeout {
+    background: rgba(245, 158, 11, 0.12);
+    border: 2rpx solid rgba(245, 158, 11, 0.4);
+    border-radius: var(--radius-md);
+    padding: 24px;
+    margin-bottom: 32px;
+  }
+
+  &__timeout-title {
+    display: block;
+    font-size: 28px;
+    font-weight: 600;
+    color: #f4c66b;
+    margin-bottom: 8px;
+  }
+
+  &__timeout-desc {
+    display: block;
+    font-size: 24px;
+    opacity: 0.85;
+    line-height: 1.5;
+    margin-bottom: 16px;
+  }
+
+  /* ==================== 小贴士 ==================== */
+  &__tip {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-md);
+    padding: 28px 24px;
+  }
+
+  &__tip-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  &__tip-cat {
+    font-size: 22px;
+    padding: 4px 12px;
+    background: var(--color-gold-soft);
+    color: var(--color-gold-dark);
+    border-radius: var(--radius-sm);
+    font-weight: 500;
+  }
+
+  &__tip-title {
+    font-size: 26px;
+    font-weight: 600;
+    color: var(--color-gold);
+  }
+
+  &__tip-text {
+    display: block;
+    font-size: 26px;
+    line-height: 1.6;
+    color: var(--color-on-primary);
+    opacity: 0.9;
+  }
+
+  /* ==================== 失败分支 ==================== */
+  &--failed {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 120px 32px;
+  }
+
+  &__failed-icon {
+    font-size: 120px;
+    margin-bottom: 24px;
+  }
+
+  &__failed-title {
+    font-size: 40px;
+    font-weight: 600;
+    margin-bottom: 16px;
+  }
+
+  &__failed-msg {
+    font-size: 26px;
+    line-height: 1.5;
+    text-align: center;
+    opacity: 0.85;
+    margin-bottom: 16px;
+  }
+
+  &__failed-refund {
+    display: block;
+    padding: 12px 20px;
+    background: rgba(47, 143, 93, 0.2);
+    border-radius: var(--radius-sm);
+    color: #9be2b7;
+    font-size: 24px;
+    margin-bottom: 40px;
+  }
+
+  &__failed-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+    max-width: 560px;
+  }
+
+  /* ==================== 顶层网络错误分支 ==================== */
+  &--error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 160px 32px;
+  }
+
+  &__error-icon {
+    font-size: 120px;
+    margin-bottom: 24px;
+  }
+
+  &__error-title {
+    font-size: 28px;
+    opacity: 0.9;
+    margin-bottom: 48px;
+    text-align: center;
+  }
+
+  /* ==================== 按钮 ==================== */
+  &__btn {
+    border-radius: var(--radius-xl) !important;
+    height: 96px !important;
+    line-height: 96px !important;
+    font-size: 30px !important;
+    font-weight: 600 !important;
+
+    &--primary {
+      background: var(--color-gold) !important;
+      color: var(--color-primary-dark) !important;
+    }
+
+    &--ghost {
+      background: transparent !important;
+      border: 2rpx solid rgba(255, 255, 255, 0.6) !important;
+      color: var(--color-on-primary) !important;
+    }
+  }
+}
+
+@keyframes waiting-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes waiting-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.4);
+    opacity: 0.5;
+  }
+}

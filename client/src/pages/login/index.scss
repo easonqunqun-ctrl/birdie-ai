@@ -1,0 +1,99 @@
+.login {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, var(--color-primary-tint) 0%, var(--color-bg-card) 60%);
+  padding: 96px 48px 64px;
+
+  &__brand {
+    text-align: center;
+    margin-bottom: 96px;
+  }
+
+  &__logo {
+    font-size: 120px;
+    display: block;
+    margin-bottom: 16px;
+  }
+
+  &__title {
+    font-size: 56px;
+    font-weight: 700;
+    color: var(--color-primary);
+    display: block;
+    margin-bottom: 16px;
+  }
+
+  &__slogan {
+    font-size: 28px;
+    color: var(--color-text-secondary);
+    display: block;
+  }
+
+  &__features {
+    margin-bottom: 96px;
+  }
+
+  &__feature {
+    display: flex;
+    align-items: center;
+    margin-bottom: 32px;
+    padding: 24px;
+    background: var(--color-bg-card);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+  }
+
+  &__feature-icon {
+    font-size: 48px;
+    margin-right: 24px;
+  }
+
+  &__feature-text {
+    font-size: 28px;
+    color: var(--color-text-primary);
+  }
+
+  &__actions {
+    margin-top: auto;
+  }
+
+  &__btn {
+    background: var(--color-primary) !important;
+    color: var(--color-on-primary) !important;
+    font-size: 32px !important;
+    font-weight: 600 !important;
+    border-radius: var(--radius-xl) !important;
+    height: 96px !important;
+    line-height: 96px !important;
+    margin-bottom: 32px;
+  }
+
+  &__agreement {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &__checkbox {
+    width: 32px;
+    height: 32px;
+    border: 2px solid var(--color-border);
+    border-radius: 50%;
+    margin-right: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-on-primary);
+
+    &--checked {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+    }
+  }
+
+  &__agreement-text {
+    font-size: 24px;
+    color: var(--color-text-secondary);
+  }
+}

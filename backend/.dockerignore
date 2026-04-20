@@ -1,0 +1,20 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+.git/
+.gitignore
+.env
+.env.*
+!.env.example
+# 注意：pyproject.toml 声明 readme = "README.md"，构建阶段需要它，不要在此忽略。
+tests/

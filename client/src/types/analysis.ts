@@ -1,0 +1,196 @@
+/**
+ * 挥杆分析端到端类型声明
+ *
+ * 与 `backend/app/schemas/analysis.py` 严格对齐。所有新字段出现在后端时，
+ * 这里必须同步更新；前后端契约以本文件为准。
+ *
+ * 注：已有的通用分析结构（SwingAnalysis / AnalysisIssue / AnalysisRecommendation 等）
+ * 仍保留在 `./api.ts` 中供旧代码引用；本文件聚焦 T3 新增的上传 / 任务创建 / 轮询
+ * 所需的入参与出参 DTO。
+ */
+
+import type { CameraAngle, ClubType, PageData } from './api'
+
+/* ==================== 上传凭证 ==================== */
+export interface UploadTokenRequest {
+  file_name: string
+  file_size: number
+  file_type: string // 'video/mp4' | 'video/quicktime'
+  duration: number // 秒
+}
+
+export interface UploadTokenResponse {
+  upload_id: string
+  /** MinIO / COS bucket URL，供前端 POST multipart 到此 */
+  upload_url: string
+  /** 服务端约定的对象 key，必须回填到 form fields 里的 `key` 字段 */
+  key: string
+  /** 后端已在 fields 里放好 `key / Content-Type / policy / signature / ...`，前端原样转发 */
+  fields: Record<string, string>
+  expires_at: string
+}
+
+/* ==================== 创建任务 ==================== */
+export interface CreateAnalysisRequest {
+  upload_id: string
+  camera_angle: CameraAngle
+  club_type: ClubType
+}
+
+export interface CreateAnalysisResponse {
+  analysis_id: string
+  status: 'pending' | 'processing'
+  /** 队列里排在前面的任务数（仅参考） */
+  queue_position: number
+  /** 按 25s 基线估算的剩余秒数；精度不高，等待页本地倒计时即可 */
+  estimated_seconds: number
+  created_at: string
+}
+
+/* ==================== 状态查询 ==================== */
+export type AnalysisStatus = 'pending' | 'processing' | 'completed' | 'failed'
+export type AnalysisStage =
+  | 'preprocessing'
+  | 'pose_estimating'
+  | 'phase_segmenting'
+  | 'scoring'
+  | 'diagnosing'
+  | 'generating'
+
+export interface AnalysisErrorInfo {
+  code: number
+  message: string
+  /** 配额是否已退回（仅 failed 时出现） */
+  quota_refunded?: boolean
+}
+
+export interface AnalysisStatusResponse {
+  analysis_id: string
+  status: AnalysisStatus
+  stage: AnalysisStage | null
+  stage_progress: number // 0-100
+  /** 剩余秒数估算；可能为 0 或 null */
+  estimated_remaining_seconds: number | null
+  error: AnalysisErrorInfo | null
+}
+
+/* ==================== 报告查询（T5 用） ==================== */
+export interface PhaseScore {
+  score: number
+  label: string
+  is_weakest: boolean
+}
+
+export interface PhaseWindow {
+  start: number
+  end: number
+}
+
+export interface AnalysisIssueDetail {
+  type: string
+  name: string
+  severity: 'high' | 'medium' | 'low'
+  description: string
+  key_frame_url?: string | null
+  key_frame_timestamp?: number | null
+}
+
+export interface AnalysisRecommendationDetail {
+  drill_id: string
+  target_issue: string | null
+  /** 排序权重；sort_order 越小越靠前 */
+  sort_order?: number
+}
+
+/** 评分分级（和 backend/app/schemas/analysis.py::score_level 保持同步） */
+export type AnalysisScoreLevel =
+  | 'excellent'
+  | 'great'
+  | 'good'
+  | 'fair'
+  | 'needs_improvement'
+
+export interface AnalysisReportResponse {
+  id: string
+  /** 后端返回 user_id；一般前端不展示，只用来埋点或校对 */
+  user_id?: string
+  status: AnalysisStatus
+  camera_angle: CameraAngle
+  club_type: ClubType
+  video_url: string
+  /** 视频时长（秒）；backend 会返回 decimal 转 float */
+  video_duration?: number | null
+  skeleton_video_url?: string | null
+  skeleton_data_url?: string | null
+  thumbnail_url?: string | null
+  overall_score?: number | null
+  score_level?: AnalysisScoreLevel | null
+  score_change?: number | null
+  phase_scores?: Record<string, PhaseScore> | null
+  phase_timestamps?: Record<string, PhaseWindow> | null
+  issues: AnalysisIssueDetail[]
+  recommendations: AnalysisRecommendationDetail[]
+  /** 分享卡片（W7 再生成，MVP 期为 null） */
+  share_card_url?: string | null
+  error?: AnalysisErrorInfo | null
+  created_at: string
+  analyzed_at?: string | null
+}
+
+/* ==================== 列表 ==================== */
+export interface AnalysisListItem {
+  id: string
+  status: AnalysisStatus
+  club_type: ClubType
+  camera_angle: CameraAngle
+  thumbnail_url?: string | null
+  overall_score?: number | null
+  score_level?: AnalysisScoreLevel | null
+  /** 与上一次同类型分析的分数差；可能为负 */
+  score_change?: number | null
+  analyzed_at?: string | null
+  created_at: string
+}
+
+export type AnalysisListResponse = PageData<AnalysisListItem>
+
+/* ==================== 前端校验常量 ==================== */
+export const VIDEO_CONSTRAINTS = {
+  MIN_DURATION_SECONDS: 3,
+  MAX_DURATION_SECONDS: 30,
+  MAX_SIZE_BYTES: 100 * 1024 * 1024,
+  ACCEPTED_EXTENSIONS: ['mp4', 'mov'] as const,
+} as const
+
+/* ==================== UI 标签映射 ==================== */
+export const CAMERA_ANGLE_LABEL: Record<CameraAngle, string> = {
+  face_on: '正面（Face-On）',
+  down_the_line: '侧面（Down-the-Line）',
+}
+
+export const CAMERA_ANGLE_DESC: Record<CameraAngle, string> = {
+  face_on: '站在球员正对面拍摄，看挥杆平面与重心',
+  down_the_line: '沿击球方向延长线拍摄，看挥杆轨迹',
+}
+
+export const CLUB_TYPE_LABEL: Record<ClubType, string> = {
+  driver: '1 号木（Driver）',
+  fairway_wood: '球道木',
+  iron_3: '3 号铁',
+  iron_4: '4 号铁',
+  iron_5: '5 号铁',
+  iron_6: '6 号铁',
+  iron_7: '7 号铁',
+  iron_8: '8 号铁',
+  iron_9: '9 号铁',
+  wedge: '挖起杆（Wedge）',
+  putter: '推杆（Putter）',
+  unknown: '其他 / 不确定',
+}
+
+/** UI 上按常用度分组（默认选中 7 号铁） */
+export const CLUB_TYPE_GROUPS: { title: string; items: ClubType[] }[] = [
+  { title: '木杆', items: ['driver', 'fairway_wood'] },
+  { title: '铁杆', items: ['iron_3', 'iron_5', 'iron_7', 'iron_9'] },
+  { title: '其他', items: ['wedge', 'putter', 'unknown'] },
+]

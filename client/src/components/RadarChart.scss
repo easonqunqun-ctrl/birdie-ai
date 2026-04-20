@@ -1,0 +1,51 @@
+.radar {
+  position: relative;
+  width: 100%;
+  /* 保持正方形 */
+  aspect-ratio: 1 / 1;
+  max-width: 640rpx;
+  margin: 0 auto;
+
+  &__canvas {
+    display: block;
+    margin: 0 auto;
+  }
+
+  &__label {
+    position: absolute;
+    /* 用 transform 让锚点居中 */
+    transform: translate(-50%, -50%);
+    text-align: center;
+    min-width: 100rpx;
+    padding: 6rpx 12rpx;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 2rpx 8rpx rgba(26, 74, 59, 0.1);
+  }
+
+  &__label-name {
+    display: block;
+    font-size: 22rpx;
+    color: var(--color-text-secondary);
+    line-height: 1.2;
+  }
+
+  &__label-score {
+    display: block;
+    font-size: 28rpx;
+    font-weight: 700;
+    color: var(--color-primary);
+    line-height: 1.2;
+    margin-top: 2rpx;
+  }
+
+  &__label--weakest {
+    background: var(--color-gold);
+    box-shadow: 0 2rpx 8rpx rgba(201, 162, 39, 0.4);
+  }
+
+  &__label--weakest .radar__label-name,
+  &__label--weakest .radar__label-score {
+    color: var(--color-primary-dark);
+  }
+}

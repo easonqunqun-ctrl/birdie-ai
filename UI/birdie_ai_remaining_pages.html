@@ -1,0 +1,593 @@
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans SC',sans-serif;}
+.scene{background:#E8EAF0;padding:1.25rem 1rem;border-radius:var(--border-radius-lg);}
+.tab-bar{display:flex;gap:4px;margin-bottom:1.25rem;flex-wrap:wrap;}
+.tab-btn{flex:1;min-width:56px;padding:7px 3px;border:0.5px solid #D0D3E0;border-radius:var(--border-radius-md);background:#fff;color:#888;font-size:10px;cursor:pointer;font-family:'Noto Sans SC',sans-serif;white-space:nowrap;text-align:center;}
+.tab-btn.active{background:#1A237E;border-color:#1A237E;color:#fff;font-weight:600;}
+.screen{display:none;}.screen.active{display:block;}
+.phone{width:100%;max-width:320px;margin:0 auto;background:#1a1a1a;border-radius:38px;padding:12px;box-shadow:0 20px 60px rgba(0,0,0,0.25),0 0 0 1px rgba(255,255,255,0.06);}
+.phone-inner{border-radius:28px;overflow:hidden;}
+.sb{display:flex;justify-content:space-between;align-items:center;padding:10px 14px 6px;background:#fff;}
+.sb-time{font-size:12px;font-weight:700;color:#1A237E;}
+.sb-r{display:flex;gap:4px;align-items:center;}
+.page{background:#F4F6FC;min-height:590px;}
+.top-nav{background:#fff;padding:10px 16px 12px;display:flex;align-items:center;gap:10px;border-bottom:0.5px solid #EAEBEF;}
+.nav-back{font-size:22px;color:#aaa;cursor:pointer;}
+.nav-title{font-size:15px;font-weight:900;color:#1A237E;flex:1;}
+.bnav{background:#fff;border-top:0.5px solid #EAEBEF;padding:10px 0 16px;display:flex;justify-content:space-around;}
+.ni{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;}
+.ni .nl{font-size:9px;color:#ccc;}
+.ni.active .nl{color:#1A237E;font-weight:700;}
+
+/* ══ SHOOT PAGE ══ */
+.shoot-page{background:#0D0D0D;min-height:590px;display:flex;flex-direction:column;}
+.shoot-sb{display:flex;justify-content:space-between;align-items:center;padding:10px 14px 6px;background:#0D0D0D;}
+.shoot-sb .sb-time{color:#fff;}
+.viewfinder{flex:1;position:relative;background:linear-gradient(180deg,#0a1a0a 0%,#0D0D0D 100%);display:flex;align-items:center;justify-content:center;margin:8px 12px;border-radius:18px;overflow:hidden;min-height:280px;}
+.vf-grid{position:absolute;inset:0;}
+.vf-corner{position:absolute;width:22px;height:22px;border-color:#00D084;border-style:solid;border-width:0;}
+.vf-tl{top:12px;left:12px;border-top-width:2px;border-left-width:2px;border-top-left-radius:4px;}
+.vf-tr{top:12px;right:12px;border-top-width:2px;border-right-width:2px;border-top-right-radius:4px;}
+.vf-bl{bottom:12px;left:12px;border-bottom-width:2px;border-left-width:2px;border-bottom-left-radius:4px;}
+.vf-br{bottom:12px;right:12px;border-bottom-width:2px;border-right-width:2px;border-bottom-right-radius:4px;}
+.vf-guide{text-align:center;}
+.vf-guide-icon{width:60px;height:120px;border:2px dashed rgba(0,208,132,0.4);border-radius:8px;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;}
+.vf-guide-text{color:rgba(255,255,255,0.5);font-size:11px;}
+.shoot-tips{padding:8px 14px;display:flex;gap:8px;overflow:hidden;}
+.tip-chip{background:rgba(255,255,255,0.07);border:0.5px solid rgba(255,255,255,0.12);border-radius:20px;padding:5px 11px;font-size:10px;color:rgba(255,255,255,0.6);white-space:nowrap;display:flex;align-items:center;gap:4px;}
+.tip-chip .dot{width:5px;height:5px;border-radius:50%;background:#00D084;flex-shrink:0;}
+.shoot-selector{padding:8px 12px;display:flex;gap:6px;}
+.sel-item{flex:1;background:rgba(255,255,255,0.06);border:0.5px solid rgba(255,255,255,0.1);border-radius:10px;padding:7px;text-align:center;}
+.sel-item.on{background:rgba(0,208,132,0.1);border-color:rgba(0,208,132,0.35);}
+.sel-label{font-size:9px;color:rgba(255,255,255,0.4);margin-bottom:2px;}
+.sel-val{font-size:11px;font-weight:700;color:rgba(255,255,255,0.8);}
+.sel-item.on .sel-val{color:#00D084;}
+.shoot-controls{padding:10px 20px 18px;display:flex;align-items:center;justify-content:space-between;background:#0D0D0D;}
+.ctrl-side{display:flex;flex-direction:column;align-items:center;gap:4px;}
+.ctrl-icon{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,0.07);border:0.5px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;}
+.ctrl-label{font-size:9px;color:rgba(255,255,255,0.35);}
+.shutter{width:68px;height:68px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;border:4px solid rgba(255,255,255,0.3);}
+.shutter-inner{width:54px;height:54px;border-radius:50%;background:#fff;}
+.upload-row{padding:0 12px 12px;display:flex;align-items:center;justify-content:center;}
+.upload-btn{background:rgba(255,255,255,0.06);border:0.5px solid rgba(255,255,255,0.15);border-radius:12px;padding:9px 20px;color:rgba(255,255,255,0.6);font-size:11px;font-weight:500;display:flex;align-items:center;gap:6px;}
+
+/* ══ ANALYZING PAGE ══ */
+.ana-page{background:#fff;min-height:590px;}
+.ana-header{padding:12px 16px 16px;border-bottom:0.5px solid #EAEBEF;}
+.ana-title{font-size:16px;font-weight:900;color:#1A237E;margin-bottom:3px;}
+.ana-sub{font-size:11px;color:#aaa;}
+.ana-preview{margin:14px 12px;border-radius:14px;overflow:hidden;height:140px;background:linear-gradient(135deg,#1A237E,#0D3B8E);display:flex;align-items:center;justify-content:center;position:relative;}
+.ana-preview-thumb{opacity:0.3;}
+.ana-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;}
+.spin-ring{width:44px;height:44px;border-radius:50%;border:3px solid rgba(0,208,132,0.2);border-top-color:#00D084;animation:spin 1s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.steps{margin:0 12px 14px;display:flex;flex-direction:column;gap:0;}
+.step{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:0.5px solid #F0F2F5;}
+.step:last-child{border-bottom:none;}
+.step-icon{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.step-icon.done{background:#E8F5EE;}
+.step-icon.active{background:#E8EBF8;animation:pulse 1.5s ease-in-out infinite;}
+.step-icon.wait{background:#F4F6FC;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.5;}}
+.step-text{flex:1;}
+.step-name{font-size:12px;font-weight:600;}
+.step-name.done{color:#00A066;}
+.step-name.active{color:#1A237E;}
+.step-name.wait{color:#ccc;}
+.step-sub{font-size:10px;color:#aaa;margin-top:1px;}
+.step-sub.active{color:#1A237E;}
+.eta-bar{margin:0 12px 14px;background:#F4F6FC;border-radius:12px;padding:11px 14px;display:flex;align-items:center;justify-content:space-between;}
+.eta-label{font-size:11px;color:#aaa;}
+.eta-val{font-size:13px;font-weight:700;color:#1A237E;}
+.fact-card{margin:0 12px 14px;background:#E8EBF8;border:0.5px solid #C8CEEC;border-radius:12px;padding:11px 14px;}
+.fact-tag{font-size:9px;color:#1A237E;font-weight:700;letter-spacing:0.5px;margin-bottom:5px;}
+.fact-text{font-size:11px;color:#555;line-height:1.6;}
+.leave-hint{text-align:center;padding:0 16px 14px;font-size:10px;color:#bbb;line-height:1.6;}
+
+/* ══ PROGRESS PAGE ══ */
+.prog-page{background:#F4F6FC;min-height:590px;}
+.prog-score-hero{margin:12px;background:linear-gradient(135deg,#1A237E,#0D3B8E);border-radius:16px;padding:16px;display:flex;gap:14px;align-items:center;}
+.psh-left{flex:1;}
+.psh-eyebrow{color:rgba(255,255,255,0.5);font-size:10px;letter-spacing:0.8px;margin-bottom:4px;}
+.psh-score{font-size:48px;font-weight:900;color:#fff;line-height:1;letter-spacing:-2px;}
+.psh-trend{color:#00D084;font-size:12px;font-weight:600;margin-top:4px;}
+.psh-stats{display:flex;gap:10px;margin-top:12px;}
+.psh-stat{background:rgba(255,255,255,0.1);border-radius:8px;padding:6px 10px;text-align:center;}
+.psh-stat-n{font-size:14px;font-weight:700;color:#fff;}
+.psh-stat-l{font-size:9px;color:rgba(255,255,255,0.45);margin-top:1px;}
+.chart-card{margin:0 12px 10px;background:#fff;border:0.5px solid #EAEBEF;border-radius:16px;padding:14px;}
+.cc-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+.cc-title{font-size:12px;font-weight:700;color:#1A237E;}
+.dim-switch{display:flex;gap:4px;}
+.ds-btn{background:#F4F6FC;border:0.5px solid #E0E3F0;border-radius:6px;padding:3px 8px;font-size:9px;color:#888;cursor:pointer;}
+.ds-btn.on{background:#1A237E;border-color:#1A237E;color:#fff;font-weight:600;}
+.chart-area{height:110px;position:relative;}
+.chart-axis-y{position:absolute;left:0;top:0;bottom:20px;display:flex;flex-direction:column;justify-content:space-between;}
+.ay-label{font-size:8px;color:#ccc;}
+.chart-lines{position:absolute;left:24px;right:0;top:0;bottom:20px;}
+.chart-dates{position:absolute;left:24px;right:0;bottom:0;display:flex;justify-content:space-between;}
+.date-label{font-size:8px;color:#ccc;}
+.stats-grid{margin:0 12px 10px;display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.stat-box{background:#fff;border:0.5px solid #EAEBEF;border-radius:14px;padding:12px 14px;}
+.stat-n{font-size:22px;font-weight:900;color:#1A237E;}
+.stat-n.green{color:#00A066;}
+.stat-l{font-size:10px;color:#aaa;margin-top:2px;}
+.dim-progress{margin:0 12px 14px;background:#fff;border:0.5px solid #EAEBEF;border-radius:16px;padding:14px;}
+.dp-head{font-size:12px;font-weight:700;color:#1A237E;margin-bottom:10px;}
+.dp-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
+.dp-name{font-size:10px;color:#888;width:42px;flex-shrink:0;}
+.dp-bg{flex:1;height:5px;background:#F0F2F5;border-radius:3px;}
+.dp-fill{height:5px;border-radius:3px;}
+.dp-val{font-size:11px;font-weight:700;color:#1A237E;width:24px;text-align:right;}
+.dp-delta{font-size:9px;width:26px;text-align:right;}
+
+/* ══ SHARE CARD PAGE ══ */
+.share-page{background:#F4F6FC;min-height:590px;}
+.share-card-wrap{margin:12px;background:#fff;border:0.5px solid #EAEBEF;border-radius:16px;overflow:hidden;}
+.sc-video{height:150px;background:linear-gradient(160deg,#1A237E,#0D3B8E,#094A30);display:flex;align-items:center;justify-content:center;position:relative;}
+.sc-badge{position:absolute;top:10px;left:10px;background:rgba(0,208,132,0.85);color:#003D20;font-size:10px;font-weight:700;padding:3px 9px;border-radius:6px;}
+.sc-body{padding:14px 16px;}
+.sc-brand{display:flex;align-items:center;gap:7px;margin-bottom:12px;}
+.sc-brand-name{font-size:14px;font-weight:900;color:#1A237E;}
+.sc-brand-name em{font-style:normal;color:#00D084;}
+.sc-label{font-size:10px;color:#aaa;margin-bottom:3px;}
+.sc-score-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.sc-score{font-size:36px;font-weight:900;color:#1A237E;letter-spacing:-1px;}
+.sc-score-bar{flex:1;height:6px;background:#F0F2F5;border-radius:3px;}
+.sc-score-fill{height:6px;border-radius:3px;background:linear-gradient(90deg,#1A237E,#00D084);}
+.sc-meta{display:flex;gap:12px;margin-bottom:12px;}
+.sc-meta-item{font-size:10px;color:#888;}
+.sc-meta-item strong{color:#1A237E;display:block;font-size:13px;font-weight:700;}
+.sc-divider{height:0.5px;background:#EAEBEF;margin-bottom:12px;}
+.sc-footer{display:flex;align-items:center;justify-content:space-between;}
+.sc-qr{width:42px;height:42px;background:#F4F6FC;border-radius:8px;display:flex;align-items:center;justify-content:center;border:0.5px solid #E0E3F0;}
+.sc-invite{font-size:10px;color:#aaa;line-height:1.5;}
+.sc-invite strong{color:#1A237E;display:block;}
+.share-actions{margin:0 12px 10px;display:flex;gap:8px;}
+.sa-btn{flex:1;border-radius:12px;padding:12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans SC',sans-serif;text-align:center;border:none;}
+.sa-btn.primary{background:#1A237E;color:#fff;}
+.sa-btn.secondary{background:#F4F6FC;border:0.5px solid #E0E3F0;color:#1A237E;}
+.share-channels{margin:0 12px 14px;display:flex;gap:8px;justify-content:center;}
+.ch-item{display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;}
+.ch-icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;}
+.ch-label{font-size:9px;color:#888;}
+
+/* ══ PROFILE PAGE ══ */
+.profile-page{background:#F4F6FC;min-height:590px;}
+.profile-hero{background:#fff;padding:20px 16px 16px;border-bottom:0.5px solid #EAEBEF;}
+.ph-row{display:flex;align-items:center;gap:14px;margin-bottom:16px;}
+.ph-avatar{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#1A237E,#00D084);display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;font-weight:700;flex-shrink:0;}
+.ph-name{font-size:16px;font-weight:900;color:#1A237E;}
+.ph-sub{font-size:11px;color:#aaa;margin-top:2px;}
+.ph-edit{margin-left:auto;background:#F4F6FC;border:0.5px solid #E0E3F0;border-radius:8px;padding:5px 12px;font-size:11px;color:#1A237E;font-weight:500;}
+.member-banner{background:linear-gradient(135deg,#1A237E,#0A4A8E);border-radius:12px;padding:11px 14px;display:flex;align-items:center;gap:10px;}
+.mb-icon{width:28px;height:28px;border-radius:8px;background:rgba(0,208,132,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.mb-text{flex:1;}
+.mb-title{font-size:12px;font-weight:700;color:#fff;}
+.mb-sub{font-size:10px;color:rgba(255,255,255,0.5);margin-top:1px;}
+.mb-cta{background:#00D084;color:#003D20;border:none;border-radius:8px;padding:5px 11px;font-size:10px;font-weight:700;cursor:pointer;font-family:'Noto Sans SC',sans-serif;white-space:nowrap;}
+.stats-row-p{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:10px 12px;}
+.stat-p{background:#fff;border:0.5px solid #EAEBEF;border-radius:12px;padding:10px;text-align:center;}
+.stat-p-n{font-size:18px;font-weight:900;color:#1A237E;}
+.stat-p-l{font-size:9px;color:#aaa;margin-top:2px;}
+.menu-section{margin:10px 12px 0;}
+.menu-label{font-size:10px;color:#aaa;font-weight:600;letter-spacing:0.5px;margin-bottom:6px;padding:0 2px;}
+.menu-card{background:#fff;border:0.5px solid #EAEBEF;border-radius:14px;overflow:hidden;margin-bottom:10px;}
+.menu-item{display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:0.5px solid #F4F6FC;}
+.menu-item:last-child{border-bottom:none;}
+.menu-ico{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.menu-name{font-size:12px;font-weight:600;color:#333;flex:1;}
+.menu-right{display:flex;align-items:center;gap:4px;}
+.menu-val{font-size:11px;color:#aaa;}
+.menu-arrow{color:#ccc;font-size:14px;}
+.menu-badge{background:#E8F5EE;color:#00A066;font-size:9px;padding:2px 7px;border-radius:10px;font-weight:600;}
+
+/* ══ SETTINGS PAGE ══ */
+.settings-page{background:#F4F6FC;min-height:590px;}
+.toggle{width:36px;height:20px;border-radius:10px;background:#E0E3F0;position:relative;cursor:pointer;flex-shrink:0;}
+.toggle.on{background:#1A237E;}
+.toggle-thumb{width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.15);}
+.toggle.on .toggle-thumb{left:18px;}
+.danger-item .menu-name{color:#E53935;}
+</style>
+
+<div class="scene">
+  <h2 class="sr-only">小鸟AI 剩余页面设计 — 拍摄、分析等待、进步曲线、分享卡片、个人中心、设置</h2>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="sw('shoot',this)">拍摄上传</button>
+    <button class="tab-btn" onclick="sw('ana',this)">分析等待</button>
+    <button class="tab-btn" onclick="sw('prog',this)">进步曲线</button>
+    <button class="tab-btn" onclick="sw('share',this)">分享卡片</button>
+    <button class="tab-btn" onclick="sw('profile',this)">个人中心</button>
+    <button class="tab-btn" onclick="sw('settings',this)">设置</button>
+  </div>
+
+  <div class="phone">
+    <div class="phone-inner">
+
+      <!-- ══ SHOOT ══ -->
+      <div id="s-shoot" class="screen active">
+        <div class="shoot-page">
+          <div class="shoot-sb">
+            <span class="sb-time" style="color:#fff;">9:41</span>
+            <div class="sb-r"><svg width="14" height="10" viewBox="0 0 14 10" fill="white"><rect x="0" y="3" width="3" height="7" rx="0.5" opacity="0.4"/><rect x="4" y="2" width="3" height="8" rx="0.5" opacity="0.7"/><rect x="8" y="0" width="3" height="10" rx="0.5"/></svg></div>
+          </div>
+          <!-- Nav -->
+          <div style="background:#0D0D0D;padding:6px 14px 8px;display:flex;align-items:center;gap:10px;">
+            <span style="color:rgba(255,255,255,0.4);font-size:20px;">‹</span>
+            <span style="color:#fff;font-size:14px;font-weight:700;flex:1;">拍摄挥杆</span>
+            <span style="color:rgba(255,255,255,0.4);font-size:11px;">教程</span>
+          </div>
+          <!-- Selector row -->
+          <div class="shoot-selector">
+            <div class="sel-item on"><div class="sel-label">拍摄角度</div><div class="sel-val">侧面</div></div>
+            <div class="sel-item"><div class="sel-label">球杆类型</div><div class="sel-val">7号铁</div></div>
+            <div class="sel-item"><div class="sel-label">拍摄模式</div><div class="sel-val">竖屏</div></div>
+          </div>
+          <!-- Viewfinder -->
+          <div class="viewfinder">
+            <div class="vf-corner vf-tl"></div><div class="vf-corner vf-tr"></div>
+            <div class="vf-corner vf-bl"></div><div class="vf-corner vf-br"></div>
+            <div class="vf-guide">
+              <div class="vf-guide-icon">
+                <svg width="28" height="56" viewBox="0 0 28 56" fill="none">
+                  <circle cx="14" cy="7" r="5" stroke="rgba(0,208,132,0.5)" stroke-width="1.5"/>
+                  <line x1="14" y1="12" x2="14" y2="28" stroke="rgba(0,208,132,0.5)" stroke-width="1.5" stroke-dasharray="2,1"/>
+                  <line x1="14" y1="18" x2="6" y2="24" stroke="rgba(0,208,132,0.5)" stroke-width="1.5"/>
+                  <line x1="14" y1="18" x2="22" y2="22" stroke="rgba(0,208,132,0.5)" stroke-width="1.5"/>
+                  <line x1="14" y1="28" x2="10" y2="42" stroke="rgba(0,208,132,0.5)" stroke-width="1.5"/>
+                  <line x1="14" y1="28" x2="18" y2="42" stroke="rgba(0,208,132,0.5)" stroke-width="1.5"/>
+                  <line x1="10" y1="42" x2="9" y2="52" stroke="rgba(0,208,132,0.5)" stroke-width="1.5"/>
+                  <line x1="18" y1="42" x2="19" y2="52" stroke="rgba(0,208,132,0.5)" stroke-width="1.5"/>
+                </svg>
+              </div>
+              <div class="vf-guide-text">将全身保持在框内</div>
+            </div>
+          </div>
+          <!-- Tips -->
+          <div class="shoot-tips">
+            <div class="tip-chip"><div class="dot"></div>距离 3-5 米</div>
+            <div class="tip-chip"><div class="dot"></div>光线充足</div>
+            <div class="tip-chip"><div class="dot"></div>拍完整挥杆</div>
+          </div>
+          <!-- Controls -->
+          <div class="shoot-controls">
+            <div class="ctrl-side">
+              <div class="ctrl-icon"><svg width="16" height="14" viewBox="0 0 16 14" fill="none"><rect x="1" y="3" width="14" height="10" rx="2" stroke="rgba(255,255,255,0.6)" stroke-width="1.3"/><path d="M5 3V2C5 1.4 5.4 1 6 1H10C10.6 1 11 1.4 11 2V3" stroke="rgba(255,255,255,0.6)" stroke-width="1.3"/><circle cx="8" cy="8" r="2.5" stroke="rgba(255,255,255,0.6)" stroke-width="1.3"/></svg></div>
+              <span class="ctrl-label">相册</span>
+            </div>
+            <div class="shutter"><div class="shutter-inner"></div></div>
+            <div class="ctrl-side">
+              <div class="ctrl-icon"><svg width="16" height="14" viewBox="0 0 16 14" fill="none"><path d="M3 7C3 4.8 4.8 3 7 3H9C11.2 3 13 4.8 13 7C13 9.2 11.2 11 9 11H7" stroke="rgba(255,255,255,0.6)" stroke-width="1.3" stroke-linecap="round"/><path d="M5 9L3 11L5 13" stroke="rgba(255,255,255,0.6)" stroke-width="1.3" stroke-linecap="round"/></svg></div>
+              <span class="ctrl-label">翻转</span>
+            </div>
+          </div>
+          <div class="upload-row">
+            <div class="upload-btn"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1V9M6.5 1L3.5 4M6.5 1L9.5 4" stroke="rgba(255,255,255,0.5)" stroke-width="1.3" stroke-linecap="round"/><path d="M1 9V11H12V9" stroke="rgba(255,255,255,0.5)" stroke-width="1.3" stroke-linecap="round"/></svg>从相册上传视频</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ ANALYZING ══ -->
+      <div id="s-ana" class="screen">
+        <div class="ana-page">
+          <div class="sb"><span class="sb-time">9:41</span><div class="sb-r"><svg width="14" height="10" viewBox="0 0 14 10" fill="#1A237E"><rect x="0" y="3" width="3" height="7" rx="0.5" opacity="0.4"/><rect x="4" y="2" width="3" height="8" rx="0.5" opacity="0.7"/><rect x="8" y="0" width="3" height="10" rx="0.5"/></svg></div></div>
+          <div style="padding:14px 16px 12px;border-bottom:0.5px solid #EAEBEF;background:#fff;">
+            <div style="font-size:16px;font-weight:900;color:#1A237E;margin-bottom:2px;">正在分析你的挥杆...</div>
+            <div style="font-size:11px;color:#aaa;">7号铁 · 侧面角度 · 请稍候</div>
+          </div>
+          <div class="ana-preview">
+            <div class="ana-preview-thumb">
+              <svg width="60" height="100" viewBox="0 0 60 100" fill="none">
+                <circle cx="30" cy="12" r="7" fill="rgba(255,255,255,0.3)"/>
+                <line x1="30" y1="19" x2="30" y2="45" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+                <line x1="30" y1="30" x2="16" y2="40" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+                <line x1="30" y1="30" x2="46" y2="35" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+                <line x1="30" y1="45" x2="24" y2="65" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+                <line x1="30" y1="45" x2="36" y2="65" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+              </svg>
+            </div>
+            <div class="ana-overlay"><div class="spin-ring"></div></div>
+          </div>
+          <div class="steps" style="margin:0 12px 12px;background:#fff;border:0.5px solid #EAEBEF;border-radius:14px;padding:4px 14px;">
+            <div class="step">
+              <div class="step-icon done"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6L5 8.5L9.5 3.5" stroke="#00A066" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+              <div class="step-text"><div class="step-name done">视频已接收</div></div>
+              <span style="font-size:10px;color:#00A066;font-weight:600;">✓</span>
+            </div>
+            <div class="step">
+              <div class="step-icon done"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6L5 8.5L9.5 3.5" stroke="#00A066" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+              <div class="step-text"><div class="step-name done">识别人体姿态</div></div>
+              <span style="font-size:10px;color:#00A066;font-weight:600;">✓</span>
+            </div>
+            <div class="step">
+              <div class="step-icon active"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="3" fill="#1A237E"/></svg></div>
+              <div class="step-text"><div class="step-name active">分析挥杆动作</div><div class="step-sub active">计算六维评分中...</div></div>
+            </div>
+            <div class="step">
+              <div class="step-icon wait"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="4" stroke="#E0E3F0" stroke-width="1.2"/></svg></div>
+              <div class="step-text"><div class="step-name wait">生成诊断建议</div></div>
+            </div>
+            <div class="step">
+              <div class="step-icon wait"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="4" stroke="#E0E3F0" stroke-width="1.2"/></svg></div>
+              <div class="step-text"><div class="step-name wait">渲染分析报告</div></div>
+            </div>
+          </div>
+          <div class="eta-bar">
+            <span class="eta-label">预计还需</span>
+            <span class="eta-val">约 15 秒</span>
+          </div>
+          <div class="fact-card">
+            <div class="fact-tag">你知道吗 💡</div>
+            <div class="fact-text">职业球手的上杆和下杆时间比例通常是 3:1，慢上杆能帮助你建立更好的节奏感。</div>
+          </div>
+          <div class="leave-hint">分析完成后将自动跳转报告页<br>你也可以先离开，完成后我们会通知你</div>
+        </div>
+      </div>
+
+      <!-- ══ PROGRESS ══ -->
+      <div id="s-prog" class="screen">
+        <div class="prog-page">
+          <div class="sb"><span class="sb-time">9:41</span><div class="sb-r"><svg width="14" height="10" viewBox="0 0 14 10" fill="#1A237E"><rect x="0" y="3" width="3" height="7" rx="0.5" opacity="0.4"/><rect x="4" y="2" width="3" height="8" rx="0.5" opacity="0.7"/><rect x="8" y="0" width="3" height="10" rx="0.5"/></svg></div></div>
+          <div class="top-nav"><div class="nav-title">我的进步曲线</div><span style="font-size:11px;color:#00A066;font-weight:600;">会员专属</span></div>
+
+          <div class="prog-score-hero">
+            <div class="psh-left">
+              <div class="psh-eyebrow">当前综合评分</div>
+              <div class="psh-score">82</div>
+              <div class="psh-trend">↑ 本月进步 +12分</div>
+              <div class="psh-stats">
+                <div class="psh-stat"><div class="psh-stat-n">28</div><div class="psh-stat-l">累计分析</div></div>
+                <div class="psh-stat"><div class="psh-stat-n">7</div><div class="psh-stat-l">连续打卡</div></div>
+                <div class="psh-stat"><div class="psh-stat-n">42</div><div class="psh-stat-l">练习次数</div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chart -->
+          <div class="chart-card">
+            <div class="cc-head">
+              <span class="cc-title">评分趋势</span>
+              <div class="dim-switch">
+                <div class="ds-btn on">综合</div>
+                <div class="ds-btn">下杆</div>
+                <div class="ds-btn">站位</div>
+              </div>
+            </div>
+            <div class="chart-area">
+              <div class="chart-axis-y">
+                <span class="ay-label">100</span>
+                <span class="ay-label">80</span>
+                <span class="ay-label">60</span>
+                <span class="ay-label">40</span>
+              </div>
+              <svg style="position:absolute;left:24px;right:0;top:0;bottom:20px;width:calc(100% - 24px);height:calc(100% - 20px)" viewBox="0 0 240 90" preserveAspectRatio="none">
+                <!-- Grid lines -->
+                <line x1="0" y1="0" x2="240" y2="0" stroke="#F0F2F5" stroke-width="1"/>
+                <line x1="0" y1="22" x2="240" y2="22" stroke="#F0F2F5" stroke-width="1"/>
+                <line x1="0" y1="45" x2="240" y2="45" stroke="#F0F2F5" stroke-width="1"/>
+                <line x1="0" y1="67" x2="240" y2="67" stroke="#F0F2F5" stroke-width="1"/>
+                <line x1="0" y1="89" x2="240" y2="89" stroke="#F0F2F5" stroke-width="1"/>
+                <!-- Area fill -->
+                <path d="M0 72 L34 68 L68 60 L102 65 L136 55 L170 48 L204 38 L240 18 L240 90 L0 90Z" fill="rgba(26,35,126,0.06)"/>
+                <!-- Line -->
+                <path d="M0 72 L34 68 L68 60 L102 65 L136 55 L170 48 L204 38 L240 18" stroke="#1A237E" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+                <!-- Dots -->
+                <circle cx="0" cy="72" r="3" fill="#fff" stroke="#1A237E" stroke-width="1.5"/>
+                <circle cx="68" cy="60" r="3" fill="#fff" stroke="#1A237E" stroke-width="1.5"/>
+                <circle cx="136" cy="55" r="3" fill="#fff" stroke="#1A237E" stroke-width="1.5"/>
+                <circle cx="204" cy="38" r="3" fill="#fff" stroke="#1A237E" stroke-width="1.5"/>
+                <circle cx="240" cy="18" r="4" fill="#1A237E" stroke="#fff" stroke-width="2"/>
+                <!-- Tooltip -->
+                <rect x="215" y="4" width="24" height="14" rx="4" fill="#1A237E"/>
+                <text x="227" y="14" fill="white" font-size="8" text-anchor="middle" font-family="sans-serif" font-weight="700">82</text>
+              </svg>
+              <div class="chart-dates">
+                <span class="date-label">3/20</span>
+                <span class="date-label">3/27</span>
+                <span class="date-label">4/3</span>
+                <span class="date-label">4/10</span>
+                <span class="date-label">今天</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Stats -->
+          <div class="stats-grid">
+            <div class="stat-box"><div class="stat-n green">+18</div><div class="stat-l">30天总进步分</div></div>
+            <div class="stat-box"><div class="stat-n">下杆</div><div class="stat-l">最大改善维度</div></div>
+          </div>
+
+          <!-- Dimension bars -->
+          <div class="dim-progress">
+            <div class="dp-head">各维度当前评分</div>
+            <div class="dp-row"><span class="dp-name">站位准备</span><div class="dp-bg"><div class="dp-fill" style="width:85%;background:#1A237E;"></div></div><span class="dp-val">85</span><span class="dp-delta" style="color:#00A066;">+5</span></div>
+            <div class="dp-row"><span class="dp-name">上杆轨迹</span><div class="dp-bg"><div class="dp-fill" style="width:78%;background:#1A237E;"></div></div><span class="dp-val">78</span><span class="dp-delta" style="color:#00A066;">+3</span></div>
+            <div class="dp-row"><span class="dp-name">下杆转换</span><div class="dp-bg"><div class="dp-fill" style="width:63%;background:#F4A923;"></div></div><span class="dp-val" style="color:#C47A00;">63</span><span class="dp-delta" style="color:#00A066;">+8</span></div>
+            <div class="dp-row"><span class="dp-name">击球触球</span><div class="dp-bg"><div class="dp-fill" style="width:80%;background:#1A237E;"></div></div><span class="dp-val">80</span><span class="dp-delta" style="color:#00A066;">+2</span></div>
+            <div class="dp-row" style="margin-bottom:0"><span class="dp-name">收杆平衡</span><div class="dp-bg"><div class="dp-fill" style="width:88%;background:#00A066;"></div></div><span class="dp-val">88</span><span class="dp-delta" style="color:#00A066;">+6</span></div>
+          </div>
+          <div class="bnav">
+            <div class="ni"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="2" width="7" height="7" rx="2" fill="#DADDF0"/><rect x="11" y="2" width="7" height="7" rx="2" fill="#DADDF0"/><rect x="2" y="11" width="7" height="7" rx="2" fill="#DADDF0"/><rect x="11" y="11" width="7" height="7" rx="2" fill="#DADDF0"/></svg><span class="nl">首页</span></div>
+            <div class="ni"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.5" stroke="#ccc" stroke-width="1.5"/></svg><span class="nl">分析</span></div>
+            <div class="ni"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 17L10 4L16 17" stroke="#ccc" stroke-width="1.5" stroke-linecap="round"/><path d="M6.5 13H13.5" stroke="#ccc" stroke-width="1.5" stroke-linecap="round"/></svg><span class="nl">训练</span></div>
+            <div class="ni active"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7.5" r="3" stroke="#1A237E" stroke-width="1.5"/><path d="M3 18C3 14.7 6.1 12 10 12C13.9 12 17 14.7 17 18" stroke="#1A237E" stroke-width="1.5" stroke-linecap="round"/></svg><span class="nl" style="color:#1A237E">我的</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ SHARE ══ -->
+      <div id="s-share" class="screen">
+        <div class="share-page">
+          <div class="sb"><span class="sb-time">9:41</span><div class="sb-r"><svg width="14" height="10" viewBox="0 0 14 10" fill="#1A237E"><rect x="0" y="3" width="3" height="7" rx="0.5" opacity="0.4"/><rect x="4" y="2" width="3" height="8" rx="0.5" opacity="0.7"/><rect x="8" y="0" width="3" height="10" rx="0.5"/></svg></div></div>
+          <div class="top-nav"><span class="nav-back">‹</span><div class="nav-title">分享我的成绩</div></div>
+          <!-- Share card preview -->
+          <div class="share-card-wrap">
+            <div class="sc-video">
+              <svg width="70" height="120" viewBox="0 0 70 120" fill="none">
+                <circle cx="35" cy="14" r="8" fill="rgba(255,255,255,0.2)" stroke="#00D084" stroke-width="1.2"/>
+                <line x1="35" y1="22" x2="35" y2="50" stroke="#00D084" stroke-width="1.3"/>
+                <line x1="35" y1="34" x2="20" y2="44" stroke="#00D084" stroke-width="1.3"/>
+                <line x1="35" y1="34" x2="54" y2="40" stroke="#00D084" stroke-width="1.3"/>
+                <line x1="20" y1="44" x2="12" y2="60" stroke="#00D084" stroke-width="1.3"/>
+                <line x1="54" y1="40" x2="60" y2="58" stroke="#00D084" stroke-width="1.3"/>
+                <line x1="35" y1="50" x2="28" y2="76" stroke="#00D084" stroke-width="1.3"/>
+                <line x1="35" y1="50" x2="43" y2="76" stroke="#00D084" stroke-width="1.3"/>
+                <line x1="28" y1="76" x2="26" y2="100" stroke="#00D084" stroke-width="1.3"/>
+                <line x1="43" y1="76" x2="46" y2="100" stroke="#00D084" stroke-width="1.3"/>
+                <circle cx="20" cy="44" r="2.5" fill="#00D084"/><circle cx="54" cy="40" r="2.5" fill="#00D084"/>
+                <circle cx="28" cy="76" r="2.5" fill="#00D084"/><circle cx="43" cy="76" r="2.5" fill="#00D084"/>
+                <path d="M12 60 Q2 36 20 18 Q38 2 58 14" stroke="#00D084" stroke-width="1" stroke-dasharray="4,3" fill="none" opacity="0.5"/>
+              </svg>
+              <div class="sc-badge">82分 · 优秀</div>
+            </div>
+            <div class="sc-body">
+              <div class="sc-brand">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M3 15C3 15 5 9 10 6C13.5 4 17 4.5 17 4.5C17 4.5 15 8.5 11.5 11C8 13.5 3 15 3 15Z" fill="#00D084"/><circle cx="3.5" cy="14.5" r="1.5" fill="#00D084"/></svg>
+                <span class="sc-brand-name">Birdie <em>AI</em></span>
+              </div>
+              <div class="sc-label">我的挥杆综合评分</div>
+              <div class="sc-score-row">
+                <div class="sc-score">82</div>
+                <div class="sc-score-bar"><div class="sc-score-fill" style="width:82%;"></div></div>
+              </div>
+              <div class="sc-meta">
+                <div class="sc-meta-item"><strong>+18分</strong>本月进步</div>
+                <div class="sc-meta-item"><strong>28次</strong>累计分析</div>
+                <div class="sc-meta-item"><strong>7天</strong>连续打卡</div>
+              </div>
+              <div class="sc-divider"></div>
+              <div class="sc-footer">
+                <div>
+                  <div style="font-size:10px;color:#1A237E;font-weight:700;margin-bottom:1px;">小鸟AI · 你的AI高尔夫私教</div>
+                  <div style="font-size:9px;color:#aaa;">扫码免费体验 · 首次3次分析免费</div>
+                </div>
+                <div class="sc-qr">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <rect x="2" y="2" width="8" height="8" rx="1" stroke="#1A237E" stroke-width="1.2" fill="none"/>
+                    <rect x="4" y="4" width="4" height="4" rx="0.5" fill="#1A237E"/>
+                    <rect x="14" y="2" width="8" height="8" rx="1" stroke="#1A237E" stroke-width="1.2" fill="none"/>
+                    <rect x="16" y="4" width="4" height="4" rx="0.5" fill="#1A237E"/>
+                    <rect x="2" y="14" width="8" height="8" rx="1" stroke="#1A237E" stroke-width="1.2" fill="none"/>
+                    <rect x="4" y="16" width="4" height="4" rx="0.5" fill="#1A237E"/>
+                    <rect x="14" y="14" width="3" height="3" fill="#1A237E" rx="0.5"/>
+                    <rect x="19" y="14" width="3" height="3" fill="#1A237E" rx="0.5"/>
+                    <rect x="14" y="19" width="3" height="3" fill="#1A237E" rx="0.5"/>
+                    <rect x="19" y="19" width="3" height="3" fill="#1A237E" rx="0.5"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="share-actions">
+            <button class="sa-btn primary">保存图片</button>
+            <button class="sa-btn secondary">分享给朋友</button>
+          </div>
+          <div style="padding:0 16px 8px;font-size:10px;color:#aaa;font-weight:600;">分享到</div>
+          <div class="share-channels">
+            <div class="ch-item"><div class="ch-icon" style="background:#07C160;"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M7 9C6.2 9 5.5 8.3 5.5 7.5S6.2 6 7 6 8.5 6.7 8.5 7.5 7.8 9 7 9ZM13 9C12.2 9 11.5 8.3 11.5 7.5S12.2 6 13 6 14.5 6.7 14.5 7.5 13.8 9 13 9Z" fill="white"/><path d="M10 3C6.1 3 3 5.7 3 9C3 11 4.1 12.8 5.8 14L5 17L8.4 15.3C8.9 15.4 9.5 15.5 10 15.5C13.9 15.5 17 12.8 17 9.5C17 6.2 13.9 3 10 3Z" stroke="white" stroke-width="1.3" fill="none"/></svg></div><span class="ch-label">微信好友</span></div>
+            <div class="ch-item"><div class="ch-icon" style="background:#FA9D3B;"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="white" stroke-width="1.3" fill="none"/><path d="M10 7V10L12 12" stroke="white" stroke-width="1.3" stroke-linecap="round"/></svg></div><span class="ch-label">朋友圈</span></div>
+            <div class="ch-item"><div class="ch-icon" style="background:#1A237E;"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 16L7 13H16C16.6 13 17 12.6 17 12V5C17 4.4 16.6 4 16 4H4C3.4 4 3 4.4 3 5V15L4 16Z" stroke="white" stroke-width="1.3" fill="none"/><line x1="7" y1="8" x2="13" y2="8" stroke="white" stroke-width="1.3" stroke-linecap="round"/><line x1="7" y1="10.5" x2="11" y2="10.5" stroke="white" stroke-width="1.3" stroke-linecap="round"/></svg></div><span class="ch-label">微信群</span></div>
+            <div class="ch-item"><div class="ch-icon" style="background:#F0F2F5;border:0.5px solid #E0E3F0;"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="#888" stroke-width="1.3" fill="none"/><path d="M7 10H13M10 7V13" stroke="#888" stroke-width="1.3" stroke-linecap="round"/></svg></div><span class="ch-label">更多</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ PROFILE ══ -->
+      <div id="s-profile" class="screen">
+        <div class="profile-page">
+          <div class="sb"><span class="sb-time">9:41</span><div class="sb-r"><svg width="14" height="10" viewBox="0 0 14 10" fill="#1A237E"><rect x="0" y="3" width="3" height="7" rx="0.5" opacity="0.4"/><rect x="4" y="2" width="3" height="8" rx="0.5" opacity="0.7"/><rect x="8" y="0" width="3" height="10" rx="0.5"/></svg></div></div>
+          <div class="top-nav"><div class="nav-title">我的</div><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M3 4H15M3 9H15M3 14H9" stroke="#1A237E" stroke-width="1.3" stroke-linecap="round"/></svg></div>
+          <div style="background:#fff;padding:16px 14px 14px;border-bottom:0.5px solid #EAEBEF;">
+            <div class="ph-row">
+              <div class="ph-avatar">张</div>
+              <div>
+                <div class="ph-name">张磊</div>
+                <div class="ph-sub">差点 25 · 高频练球者</div>
+              </div>
+              <div class="ph-edit">编辑资料</div>
+            </div>
+            <div class="member-banner">
+              <div class="mb-icon"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1L8.5 4.5L12 5L9.5 7.5L10 11L7 9.5L4 11L4.5 7.5L2 5L5.5 4.5Z" fill="#00D084"/></svg></div>
+              <div class="mb-text"><div class="mb-title">季度会员</div><div class="mb-sub">到期 2026年7月20日 · 还剩 91天</div></div>
+              <button class="mb-cta">续费</button>
+            </div>
+          </div>
+          <div class="stats-row-p">
+            <div class="stat-p"><div class="stat-p-n">28</div><div class="stat-p-l">累计分析</div></div>
+            <div class="stat-p"><div class="stat-p-n" style="color:#00A066;">82</div><div class="stat-p-l">最高评分</div></div>
+            <div class="stat-p"><div class="stat-p-n">7</div><div class="stat-p-l">连续打卡</div></div>
+          </div>
+          <div class="menu-section">
+            <div class="menu-label">我的数据</div>
+            <div class="menu-card">
+              <div class="menu-item"><div class="menu-ico" style="background:#E8EBF8;"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 12L5 6L8 9L11 4L13 7" stroke="#1A237E" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="menu-name">进步曲线</span><div class="menu-right"><span class="menu-badge">会员</span><span class="menu-arrow">›</span></div></div>
+              <div class="menu-item"><div class="menu-ico" style="background:#E8EBF8;"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="2" width="10" height="10" rx="2" stroke="#1A237E" stroke-width="1.2" fill="none"/><path d="M5 7L6.5 8.5L9 5.5" stroke="#1A237E" stroke-width="1.2" stroke-linecap="round"/></svg></div><span class="menu-name">全部分析报告</span><div class="menu-right"><span class="menu-val">28份</span><span class="menu-arrow">›</span></div></div>
+              <div class="menu-item"><div class="menu-ico" style="background:#E8F5EE;"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 12L7 2L11 12" stroke="#00A066" stroke-width="1.2" stroke-linecap="round"/><path d="M4.5 9H9.5" stroke="#00A066" stroke-width="1.2" stroke-linecap="round"/></svg></div><span class="menu-name">训练历史</span><div class="menu-right"><span class="menu-val">42次</span><span class="menu-arrow">›</span></div></div>
+            </div>
+            <div class="menu-label">邀请与奖励</div>
+            <div class="menu-card">
+              <div class="menu-item"><div class="menu-ico" style="background:#FFF4E0;"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1L8.5 4.5L12 5L9.5 7.5L10 11L7 9.5L4 11L4.5 7.5L2 5L5.5 4.5Z" stroke="#C47A00" stroke-width="1.2" fill="none"/></svg></div><span class="menu-name">邀请好友</span><div class="menu-right"><span style="font-size:10px;color:#00A066;font-weight:600;">+1次分析/人</span><span class="menu-arrow">›</span></div></div>
+              <div class="menu-item"><div class="menu-ico" style="background:#FFF4E0;"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="3" y="3" width="8" height="8" rx="1.5" stroke="#C47A00" stroke-width="1.2" fill="none"/><path d="M5.5 7L6.5 8L8.5 5.5" stroke="#C47A00" stroke-width="1.2" stroke-linecap="round"/></svg></div><span class="menu-name">我的邀请记录</span><div class="menu-right"><span class="menu-val">已邀请 3人</span><span class="menu-arrow">›</span></div></div>
+            </div>
+            <div class="menu-label">其他</div>
+            <div class="menu-card">
+              <div class="menu-item"><div class="menu-ico" style="background:#F4F6FC;"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="#888" stroke-width="1.2" fill="none"/><path d="M7 5V7.5L8.5 9" stroke="#888" stroke-width="1.2" stroke-linecap="round"/></svg></div><span class="menu-name">设置</span><span class="menu-arrow">›</span></div>
+              <div class="menu-item"><div class="menu-ico" style="background:#F4F6FC;"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="5.5" r="2.5" stroke="#888" stroke-width="1.2" fill="none"/><path d="M2 13C2 10.2 4.2 8 7 8C9.8 8 12 10.2 12 13" stroke="#888" stroke-width="1.2" stroke-linecap="round"/></svg></div><span class="menu-name">意见反馈</span><span class="menu-arrow">›</span></div>
+            </div>
+          </div>
+          <div style="height:14px;"></div>
+          <div class="bnav">
+            <div class="ni"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="2" width="7" height="7" rx="2" fill="#DADDF0"/><rect x="11" y="2" width="7" height="7" rx="2" fill="#DADDF0"/><rect x="2" y="11" width="7" height="7" rx="2" fill="#DADDF0"/><rect x="11" y="11" width="7" height="7" rx="2" fill="#DADDF0"/></svg><span class="nl">首页</span></div>
+            <div class="ni"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.5" stroke="#ccc" stroke-width="1.5"/></svg><span class="nl">分析</span></div>
+            <div class="ni"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 17L10 4L16 17" stroke="#ccc" stroke-width="1.5" stroke-linecap="round"/><path d="M6.5 13H13.5" stroke="#ccc" stroke-width="1.5" stroke-linecap="round"/></svg><span class="nl">训练</span></div>
+            <div class="ni active"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7.5" r="3" stroke="#1A237E" stroke-width="1.5"/><path d="M3 18C3 14.7 6.1 12 10 12C13.9 12 17 14.7 17 18" stroke="#1A237E" stroke-width="1.5" stroke-linecap="round"/></svg><span class="nl" style="color:#1A237E">我的</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ SETTINGS ══ -->
+      <div id="s-settings" class="screen">
+        <div class="settings-page">
+          <div class="sb"><span class="sb-time">9:41</span><div class="sb-r"><svg width="14" height="10" viewBox="0 0 14 10" fill="#1A237E"><rect x="0" y="3" width="3" height="7" rx="0.5" opacity="0.4"/><rect x="4" y="2" width="3" height="8" rx="0.5" opacity="0.7"/><rect x="8" y="0" width="3" height="10" rx="0.5"/></svg></div></div>
+          <div class="top-nav"><span class="nav-back">‹</span><div class="nav-title">设置</div></div>
+          <div style="background:#F4F6FC;min-height:520px;">
+            <div class="menu-section" style="padding-top:10px;">
+              <div class="menu-label">通知设置</div>
+              <div class="menu-card">
+                <div class="menu-item"><div class="menu-ico" style="background:#E8EBF8;"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2C4.8 2 3 3.8 3 6V9L2 10H12L11 9V6C11 3.8 9.2 2 7 2Z" stroke="#1A237E" stroke-width="1.2" fill="none"/><path d="M5.5 10C5.5 10.8 6.2 11.5 7 11.5C7.8 11.5 8.5 10.8 8.5 10" stroke="#1A237E" stroke-width="1.2" stroke-linecap="round"/></svg></div><span class="menu-name">分析完成通知</span><div class="menu-right"><div class="toggle on"><div class="toggle-thumb"></div></div></div></div>
+                <div class="menu-item"><div class="menu-ico" style="background:#E8EBF8;"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2C4.8 2 3 3.8 3 6V9L2 10H12L11 9V6C11 3.8 9.2 2 7 2Z" stroke="#1A237E" stroke-width="1.2" fill="none"/><path d="M5.5 10C5.5 10.8 6.2 11.5 7 11.5C7.8 11.5 8.5 10.8 8.5 10" stroke="#1A237E" stroke-width="1.2" stroke-linecap="round"/></svg></div><span class="menu-name">每日训练提醒</span><div class="menu-right"><div class="toggle on"><div class="toggle-thumb"></div></div></div></div>
+                <div class="menu-item"><div class="menu-ico" style="background:#E8EBF8;"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2C4.8 2 3 3.8 3 6V9L2 10H12L11 9V6C11 3.8 9.2 2 7 2Z" stroke="#1A237E" stroke-width="1.2" fill="none"/><path d="M5.5 10C5.5 10.8 6.2 11.5 7 11.5C7.8 11.5 8.5 10.8 8.5 10" stroke="#1A237E" stroke-width="1.2" stroke-linecap="round"/></svg></div><span class="menu-name">营销活动通知</span><div class="menu-right"><div class="toggle"><div class="toggle-thumb"></div></div></div></div>
+              </div>
+              <div class="menu-label">隐私设置</div>
+              <div class="menu-card">
+                <div class="menu-item"><div class="menu-ico" style="background:#F4F6FC;"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="5" width="10" height="8" rx="1.5" stroke="#888" stroke-width="1.2" fill="none"/><path d="M4 5V4C4 2.9 4.9 2 6 2H8C9.1 2 10 2.9 10 4V5" stroke="#888" stroke-width="1.2" stroke-linecap="round"/></svg></div><span class="menu-name">数据分析授权</span><div class="menu-right"><span class="menu-val">已授权</span><span class="menu-arrow">›</span></div></div>
+                <div class="menu-item"><div class="menu-ico" style="background:#F4F6FC;"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="#888" stroke-width="1.2" fill="none"/><line x1="7" y1="5" x2="7" y2="7.5" stroke="#888" stroke-width="1.2" stroke-linecap="round"/><circle cx="7" cy="9.5" r="0.8" fill="#888"/></svg></div><span class="menu-name">隐私政策</span><span class="menu-arrow">›</span></div>
+              </div>
+              <div class="menu-label">账号</div>
+              <div class="menu-card">
+                <div class="menu-item"><div class="menu-ico" style="background:#F4F6FC;"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="5.5" r="2.5" stroke="#888" stroke-width="1.2" fill="none"/><path d="M2 13C2 10.2 4.2 8 7 8C9.8 8 12 10.2 12 13" stroke="#888" stroke-width="1.2" stroke-linecap="round"/></svg></div><span class="menu-name">账号信息</span><div class="menu-right"><span class="menu-val">张磊</span><span class="menu-arrow">›</span></div></div>
+                <div class="menu-item"><div class="menu-ico" style="background:#F4F6FC;"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="2" width="10" height="10" rx="2" stroke="#888" stroke-width="1.2" fill="none"/><line x1="5" y1="7" x2="9" y2="7" stroke="#888" stroke-width="1.2" stroke-linecap="round"/></svg></div><span class="menu-name">清除缓存</span><div class="menu-right"><span class="menu-val">12.4MB</span><span class="menu-arrow">›</span></div></div>
+                <div class="menu-item"><div class="menu-ico" style="background:#FEF2F2;"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 2H5L3 4V12H11V4L9 2Z" stroke="#E53935" stroke-width="1.2" fill="none"/><line x1="5" y1="7" x2="9" y2="7" stroke="#E53935" stroke-width="1.2" stroke-linecap="round"/></svg></div><span class="menu-name danger-item" style="color:#E53935;">退出登录</span><span class="menu-arrow" style="color:#E53935;">›</span></div>
+              </div>
+              <div style="text-align:center;padding:10px 0 16px;font-size:10px;color:#ccc;">小鸟AI v1.0.0 · 内部测试版</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+function sw(n,b){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active'));
+  document.getElementById('s-'+n).classList.add('active');
+  b.classList.add('active');
+}
+</script>
