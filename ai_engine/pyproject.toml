@@ -12,13 +12,20 @@ dependencies = [
     "httpx>=0.27.0",
     "structlog>=24.1.0",
     "numpy>=1.26.0",
-    # 真实 AI 模型在 W6 才装：mediapipe, opencv-python, torch
+    # W6-T1：真实姿态估计管线依赖
+    # - mediapipe 0.10.x 自带 Pose 33 点模型，CPU 推理，无需单独下载权重
+    # - opencv-python-headless 做视频帧读取 / 质量指标 / 骨骼叠加绘制；必须 headless，
+    #   否则依赖 GTK 导致 Docker slim 容器启动失败
+    # - mediapipe 运行时隐式依赖 protobuf / absl-py / attrs，由 pip 自动拉
+    # 注意：mock 模式也能导入这两个包而不用（import 失败时 mock_pipeline 不受影响）
+    "mediapipe>=0.10.9,<0.11",
+    "opencv-python-headless>=4.9.0,<5",
 ]
 
 [project.optional-dependencies]
-ai = [
-    "mediapipe>=0.10.0",
-    "opencv-python>=4.9.0",
+# 后续如果要上 torch 模型（比如自训练的 swing 分类器），走 optional 依赖，
+# 避免让 mediapipe-only 的部署也强制安装 torch 大包
+ai-torch = [
     "torch>=2.2.0",
 ]
 

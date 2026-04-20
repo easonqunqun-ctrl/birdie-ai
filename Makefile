@@ -1,7 +1,8 @@
 .PHONY: help init up down restart logs ps clean reset \
         backend-shell backend-logs backend-test backend-lint backend-migrate backend-revision \
         backend-celery-logs backend-celery-shell \
-        ai-shell ai-logs \
+        ai-shell ai-logs ai-engine-test ai-engine-test-local ai-engine-lint \
+        ai-engine-synth-fixtures \
         client-install client-dev-weapp client-dev-rn-ios client-dev-rn-android client-build-weapp \
         check
 
@@ -30,8 +31,12 @@ help:
 	@echo "  make backend-celery-shell 进入 Celery worker 容器"
 	@echo ""
 	@echo "  ===== AI 引擎 ====="
-	@echo "  make ai-shell          进入 AI Engine 容器"
-	@echo "  make ai-logs           查看 AI Engine 日志"
+	@echo "  make ai-shell                 进入 AI Engine 容器"
+	@echo "  make ai-logs                  查看 AI Engine 日志"
+	@echo "  make ai-engine-test           在容器里运行 AI Engine 测试"
+	@echo "  make ai-engine-test-local     在宿主机 ai_engine/ 目录下 uv run pytest"
+	@echo "  make ai-engine-lint           ruff check ai_engine/app"
+	@echo "  make ai-engine-synth-fixtures 生成合成测试视频（需要本机装 ffmpeg）"
 	@echo ""
 	@echo "  ===== 客户端（Taro 双端） ====="
 	@echo "  make client-install         安装客户端依赖"
@@ -116,6 +121,20 @@ ai-shell:
 
 ai-logs:
 	docker compose --env-file .env.local logs -f --tail=200 ai_engine
+
+# 在容器内跑（要求 make up 已起 ai_engine，且镜像已 build 并装了 mediapipe + ffmpeg）
+ai-engine-test:
+	docker compose --env-file .env.local exec ai_engine uv run pytest -v
+
+# 在宿主机跑（用 uv 在 ai_engine/.venv 里跑；没装 mediapipe/ffmpeg 的测试会自动 skip）
+ai-engine-test-local:
+	cd ai_engine && uv run pytest -v
+
+ai-engine-lint:
+	cd ai_engine && uv run ruff check app/ tests/
+
+ai-engine-synth-fixtures:
+	@bash ai_engine/tests/fixtures/generate_synthetic.sh
 
 # ==================== 客户端 ====================
 client-install:

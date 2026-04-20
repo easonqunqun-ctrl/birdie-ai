@@ -106,6 +106,16 @@ ai_engine/app/models/*.pth
 ai_engine/app/models/*.onnx
 ai_engine/app/models/*.tflite
 
+# ==================== AI Engine 测试 fixtures（视频不入库） ====================
+# - real/ 的视频由 download_samples.sh 拉取或手动 drop（版权 + 体积考虑）
+# - synthetic/ 的视频由 generate_synthetic.sh 用 ffmpeg 本地生成
+# - expected/*.json 是 golden set，入库
+ai_engine/tests/fixtures/real/*.mp4
+ai_engine/tests/fixtures/real/*.mov
+ai_engine/tests/fixtures/synthetic/*.mp4
+# tmp 产物
+ai_engine/tests/fixtures/**/tmp_*
+
 # ==================== 测试覆盖率 ====================
 coverage/
 .nyc_output/
