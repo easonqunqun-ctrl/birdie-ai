@@ -13,12 +13,16 @@ dependencies = [
     "structlog>=24.1.0",
     "numpy>=1.26.0",
     # W6-T1：真实姿态估计管线依赖
-    # - mediapipe 0.10.x 自带 Pose 33 点模型，CPU 推理，无需单独下载权重
+    # - mediapipe **pin 0.10.14**（重要）：
+    #   Solutions API (`mediapipe.solutions.pose`) 在 0.10.20+ 开始被移除，
+    #   0.10.33 完全下线；必须 ≤0.10.14 才能用 `mp.solutions.pose.Pose`。
+    #   如果未来要升级，需要迁移到 Tasks API (`mediapipe.tasks.vision.PoseLandmarker`)，
+    #   那会引入手动下载 .task 模型文件的复杂度（见 pose.py 模块顶部 docstring）。
     # - opencv-python-headless 做视频帧读取 / 质量指标 / 骨骼叠加绘制；必须 headless，
     #   否则依赖 GTK 导致 Docker slim 容器启动失败
     # - mediapipe 运行时隐式依赖 protobuf / absl-py / attrs，由 pip 自动拉
     # 注意：mock 模式也能导入这两个包而不用（import 失败时 mock_pipeline 不受影响）
-    "mediapipe>=0.10.9,<0.11",
+    "mediapipe==0.10.14",
     "opencv-python-headless>=4.9.0,<5",
 ]
 
@@ -29,8 +33,8 @@ ai-torch = [
     "torch>=2.2.0",
 ]
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "pytest>=8.2.0",
     "pytest-asyncio>=0.23.0",
     "ruff>=0.5.0",

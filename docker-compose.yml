@@ -124,6 +124,13 @@ services:
     build:
       context: ./ai_engine
       dockerfile: Dockerfile
+      # MediaPipe 只发布了 x86_64/macOS-arm64/Windows 三种 wheel；Linux aarch64 没有。
+      # 为了让 Apple Silicon 开发机（arm64）和生产服务器（x86_64）都能跑同一份镜像，
+      # 强制 linux/amd64 构建。M1/M2 Mac 上会走 Rosetta 2 模拟，性能比原生 arm64
+      # 慢 1.5-2x，但对 CPU 推理 3-8s 的视频来说仍在 MVP §4.2 的 <30s 预算内。
+      platforms:
+        - linux/amd64
+    platform: linux/amd64
     container_name: xiaoniao-ai-engine
     restart: unless-stopped
     env_file:

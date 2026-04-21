@@ -123,8 +123,12 @@ ai-logs:
 	docker compose --env-file .env.local logs -f --tail=200 ai_engine
 
 # 在容器内跑（要求 make up 已起 ai_engine，且镜像已 build 并装了 mediapipe + ffmpeg）
+# 跑 pytest 前自动生成合成测试视频（T1 质量门失败分支需要）；已有则覆盖，总耗时 < 2s。
+# real/*.mp4 是版权受限的真实挥杆视频，不会自动生成，缺失时对应测试会自动 skip。
 ai-engine-test:
-	docker compose --env-file .env.local exec ai_engine uv run pytest -v
+	@docker compose --env-file .env.local exec ai_engine bash -c "\
+		bash tests/fixtures/generate_synthetic.sh && \
+		uv run pytest -v"
 
 # 在宿主机跑（用 uv 在 ai_engine/.venv 里跑；没装 mediapipe/ffmpeg 的测试会自动 skip）
 ai-engine-test-local:

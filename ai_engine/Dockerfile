@@ -3,8 +3,15 @@ FROM python:3.11-slim AS base
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
+# 系统依赖说明：
+#   - curl:          uv 安装器 + download_samples.sh 拉视频
+#   - ffmpeg:        W6-T1 视频转码（30fps / 720p / H.264 yuv420p）+ 合成异常视频
+#   - libgl1:        opencv-python-headless 运行时依赖（libGL.so.1）
+#   - libglib2.0-0:  opencv + mediapipe 运行时依赖
+#   - build-essential: mediapipe wheel 对某些架构（比如 ARM）可能需要编译
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    ffmpeg \
     libgl1 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
