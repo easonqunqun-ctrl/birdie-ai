@@ -1,10 +1,10 @@
 .PHONY: help init up down restart logs ps clean reset \
         backend-shell backend-logs backend-test backend-lint backend-migrate backend-revision \
         backend-celery-logs backend-celery-shell \
-        ai-shell ai-logs ai-engine-test ai-engine-test-local ai-engine-lint \
+        ai-shell ai-logs ai-engine-test ai-engine-test-local ai-engine-lint ai-engine-smoke \
         ai-engine-synth-fixtures \
-        client-install client-dev-weapp client-dev-rn-ios client-dev-rn-android client-build-weapp \
-        check
+        client-install client-dev-weapp client-dev-rn-ios client-dev-rn-android client-build-weapp client-tsc \
+        check test ci
 
 # 默认目标：显示帮助
 help:
@@ -47,6 +47,10 @@ help:
 	@echo ""
 	@echo "  ===== 健康检查 ====="
 	@echo "  make check             检查后端 /v1/health"
+	@echo ""
+	@echo "  ===== 质量门（T5） ====="
+	@echo "  make test              rollup：后端 + AI 引擎 + 客户端 tsc"
+	@echo "  make ci                test + 真实引擎 smoke（bouncing_box → 50103）"
 
 # ==================== 一键操作 ====================
 init:
@@ -134,11 +138,28 @@ ai-engine-test:
 ai-engine-test-local:
 	cd ai_engine && uv run pytest -v
 
+# W6-T5：优先跑容器内（不要求宿主机装 uv）；容器没起时 fallback 到宿主机 uv
 ai-engine-lint:
-	cd ai_engine && uv run ruff check app/ tests/
+	@if docker compose --env-file .env.local ps ai_engine --format json 2>/dev/null | grep -q '"State":"running"'; then \
+		docker compose --env-file .env.local exec -T ai_engine uv run ruff check app/ tests/; \
+	else \
+		cd ai_engine && uv run ruff check app/ tests/; \
+	fi
 
 ai-engine-synth-fixtures:
 	@bash ai_engine/tests/fixtures/generate_synthetic.sh
+
+# W6-T5：真实引擎 smoke（直接 curl /analyze 跑 bouncing_box，验证不崩 + 错误码正确）。
+# 用于 CI 保护：任何让 pipeline 彻底跑不起来的改动都会在这里露馅。
+ai-engine-smoke:
+	@echo "=> bouncing_box 应返回 50103（未检测到人物）"
+	@docker compose --env-file .env.local exec -T ai_engine bash -c '\
+		curl -sf http://localhost:9000/health > /dev/null && \
+		echo "health ok" && \
+		curl -s -X POST http://localhost:9000/analyze \
+			-H "content-type: application/json" \
+			-d "{\"analysis_id\":\"smoke\",\"user_id\":\"u\",\"video_url\":\"/app/tests/fixtures/synthetic/bouncing_box.mp4\",\"duration_ms\":3000,\"membership_status\":\"free\",\"camera_angle\":\"face_on\",\"club_type\":\"iron_7\"}" \
+			| python3 -c "import json,sys; d=json.load(sys.stdin); assert d[\"status\"]==\"failed\" and d[\"error_code\"]==50103, d; print(\"smoke ok:\", d[\"error_code\"], d[\"error_message\"])"'
 
 # ==================== 客户端 ====================
 client-install:
@@ -156,6 +177,21 @@ client-dev-rn-android:
 client-build-weapp:
 	cd client && pnpm build:weapp
 
+# W6-T5：客户端 TS 类型检查（不出 bundle，单纯类型门）
+client-tsc:
+	cd client && npx tsc --noEmit
+
 # ==================== 健康检查 ====================
 check:
 	@curl -s http://localhost:8000/v1/health | python3 -m json.tool || echo "✗ 后端未启动或异常"
+
+# ==================== 质量门 rollup（W6-T5） ====================
+# make test：常规 PR/commit 前的全量单测 + lint + tsc
+# make ci：在 test 基础上再跑 smoke（需 make up 已起真实 ai_engine）
+test: backend-lint backend-test ai-engine-lint ai-engine-test client-tsc
+	@echo ""
+	@echo "✓ backend + ai_engine + client 全部绿"
+
+ci: test ai-engine-smoke
+	@echo ""
+	@echo "✓ CI gate 全绿（含真实引擎 smoke）"

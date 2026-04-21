@@ -111,6 +111,8 @@ services:
       REDIS_HOST: redis
       MINIO_ENDPOINT: http://minio:9000
       AI_ENGINE_URL: http://ai_engine:9000
+    # W6-T5：Celery worker 本身不做推理，只是派发 + 回填 DB；1G 足够（httpx + 少量 JSON）
+    mem_limit: 1g
     volumes:
       - ./backend:/app
     depends_on:
@@ -118,6 +120,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # --concurrency=2 + ai_engine concurrency 隐含为 uvicorn 的 1 worker，
+    # 等于同时最多 2 条分析排队；本地 MacBook Pro 16GB 跑起来舒适。
+    # 生产扩容策略在 docs/release-notes/W6-real-engine-walkthrough.md 里记录。
     command: uv run celery -A app.celery_app worker --loglevel=info --concurrency=2
 
   ai_engine:
@@ -136,6 +141,9 @@ services:
     env_file:
       - .env.local
     # W6-T4：移除硬编码的 mock 覆盖；mock vs real 由 .env.local 控制（默认 false）
+    # W6-T5：单视频 MediaPipe 推理峰值 ~800MB（含 ffmpeg + opencv 缓冲），
+    # 2G 留 ~2.5x buffer，防止 OOM kill；生产多路并行时要线性抬高。
+    mem_limit: 2g
     ports:
       # 宿主机 9100 → 容器内 9000；9000 已被 MinIO S3 API 占用。
       # 容器间仍走 http://ai_engine:9000（见 .env 中的 AI_ENGINE_URL）。

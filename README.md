@@ -128,7 +128,21 @@ make logs               # 查看实时日志
 make ps                 # 查看服务状态
 make down               # 停止服务（保留数据）
 make reset              # 彻底重置（清理数据）
+
+# 质量门（W6-T5）
+make test               # backend + ai_engine + client tsc 全量单测 + lint
+make ci                 # test 基础上 + 真实引擎 smoke（bouncing_box → 50103）
 ```
+
+### 资源占用参考（W6-T5 实测）
+
+| 服务 | 镜像大小 | 峰值内存 | 并发 |
+|---|---|---|---|
+| `ai_engine` | ~2.5 GB（含 mediapipe + opencv + ffmpeg） | ~800 MB（单视频推理） | uvicorn 1 worker → 同一时刻 1 条 |
+| `celery-worker` | 共享 backend 镜像 | ~300 MB | `--concurrency=2` → 同一时刻 2 条派发到 ai_engine |
+| `backend` | ~450 MB | ~200 MB | uvicorn 1 worker（`--reload`） |
+
+生产扩容：ai_engine 单机 ≥ 4 GB；双 worker 要 **另起一个 ai_engine 容器**（uvicorn 不要 `--workers 2`，mediapipe 模型加载成本高且非线程安全）。
 
 ---
 

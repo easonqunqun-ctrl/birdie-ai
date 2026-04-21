@@ -1,4 +1,7 @@
-FROM python:3.11-slim AS base
+# W6-T5：显式 pin 到 slim-bookworm（GLIBC 2.36），避免 python:3.11-slim tag
+# 将来切到 trixie 时 mediapipe ABI 意外不兼容。bookworm 是 mediapipe 0.10.x
+# wheel 的验证过的目标。
+FROM python:3.11-slim-bookworm AS base
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
