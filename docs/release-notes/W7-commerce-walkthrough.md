@@ -137,16 +137,16 @@ curl -s -X POST "$BASE/payments/orders/$OID/mock-confirm" -H "$AUTH" | jq '.code
 
 ### 4.3 到期惰性降级
 
-`pytest tests/test_payments.py::test_membership_expired_downgrade_on_read` 的行为：
+`pytest tests/test_payments.py::test_expired_membership_auto_downgrades_on_read` 的行为：
 
-1. Fixture 建一个 `membership_type='monthly'`、`membership_expires_at=now() - 1 day` 的用户
-2. `GET /v1/users/me` 触发 `ensure_membership_valid` →
-   - `membership_type` 改回 `'free'`
-   - `analysis_quotas.total` 回压到 `3`（当月剩余）
-   - `chat_quotas.total` 回压到 `5`（今日剩余）
+1. Fixture 建一个 `membership_type='monthly'`、`membership_expires_at=now() - 1 day` 的用户，当月 `analysis_quotas.total=-1`
+2. 下次 `get_current_user` 触发 `payment_service.ensure_membership_valid` →
+   - `users.membership_type='free'`、`auto_renew=false`
+   - 当月 `analysis_quotas.total: -1 → 3`（`used` / `bonus` 不动）
+   - 当日 `chat_quotas.total: -1 → 5`（同上）
 3. 响应 `is_member=false`、`membership_days_remaining=0`
 
-**关键点**：不依赖定时作业。读前惰性判断 + UPDATE 使得即使 Celery 挂了也不会发生"会员过期但权益不降"的资损。
+**关键点**：不依赖定时作业；`get_current_user` 前的懒检查保证即使 Celery/定时作业全挂也不会出现"会员过期但权益未降"的资损。会员期内 `consume_analysis_quota` 不累加 `used`（因为 `total<0`），所以降级后自然得到 `used=0 + total=3 = 3 次新额度`，不用另做清理。
 
 ---
 
@@ -240,16 +240,17 @@ curl -s "$BASE/users/me/invite-info" -H "$AUTH" | jq '.data'
 #   "invite_code": "A8K3QZ",
 #   "total_invited": 6,
 #   "valid_count": 4,
-#   "registered_count": 2,
-#   "next_reward_at": 5,
-#   "days_to_next_reward": 1,
-#   "total_bonus_days_granted": 0
+#   "next_reward_at": 5,              # 下一档门槛
+#   "days_to_next_reward": 1,         # 还差 1 个 valid 到下一档
+#   "total_bonus_days": 0              # 已发放的总会员天数
 # }
 
 curl -s "$BASE/users/me/invitations" -H "$AUTH" | jq '.data'
 # [
-#   {"invitee_nickname":"张***丰","status":"valid","bonus_granted":false,"created_at":"..."},
-#   {"invitee_nickname":"李*","status":"registered","bonus_granted":false,"created_at":"..."}
+#   {"id":"inv_xxx","invitee_id":"usr_b","invitee_nickname_masked":"张***丰",
+#    "status":"valid","bonus_granted":false,"bonus_granted_at":null,"created_at":"..."},
+#   {"id":"inv_yyy","invitee_id":"usr_c","invitee_nickname_masked":"李*",
+#    "status":"registered","bonus_granted":false,"bonus_granted_at":null,"created_at":"..."}
 # ]
 ```
 
@@ -289,7 +290,7 @@ useShareAppMessage(() => ({
 curl -s -X POST "$BASE/shares/log" -H "$AUTH" \
   -H 'Content-Type: application/json' \
   -d '{"share_type":"report","target_id":"ana_xxx"}' | jq '.data'
-# {"share_id": "shr_yyy", "logged_at": "2026-04-20T..."}
+# {"id": "shr_yyy", "share_type": "report", "created_at": "2026-04-20T..."}
 ```
 
 ### 7.2 公开脱敏报告（访客态）
@@ -300,25 +301,30 @@ curl -s -X POST "$BASE/shares/log" -H "$AUTH" \
 # 无 Authorization header，走公开接口
 curl -s "$BASE/analyses/ana_xxx/public" | jq '.data'
 # {
-#   "analysis_id": "ana_xxx",
-#   "owner_nickname": "张***丰",                    # 脱敏
+#   "id": "ana_xxx",
+#   "owner_nickname_masked": "张***丰",             # 脱敏
 #   "overall_score": 82,
 #   "score_level": "良好",
+#   "camera_angle": "face_on",
+#   "club_type": "driver",
 #   "thumbnail_url": "https://minio.../ana_xxx/thumb.jpg",
-#   "top_issues": [                                  # 最多 3 条，只有名字和严重度
+#   "issues": [                                      # 最多 3 条（仅 high/medium），只有名字和严重度
 #     {"name":"头部过度移动","severity":"high"},
 #     {"name":"下杆过急","severity":"medium"},
 #     {"name":"收杆不充分","severity":"medium"}
 #   ],
-#   "created_at": "2026-04-19T..."
+#   "issues_total": 5,                               # 实际总 issue 数（全部严重度）
+#   "analyzed_at": "2026-04-19T..."
 # }
 ```
 
-**脱敏保证**（有测试锁定）：
-- 不含 `skeleton_video_url` / `skeleton_data_url`
-- 不含完整 `recommendations` / drill 详情
+**脱敏保证**（有测试锁定，`tests/test_shares.py`）：
+- 不含 `skeleton_video_url` / `skeleton_data_url` / `original_video_url`
+- 不含 `recommendations` / drill 详情
+- 不含 `phase_scores` / `phase_timestamps`
 - 不含 `user_id` / `phone` / `openid`
-- issue 不带 `detail` / `key_frame_url`（只有 name + severity）
+- issue 不带 `description` / `key_frame_url` / `key_frame_timestamp`（只有 `name` + `severity`）
+- issue 只取 `severity in (high, medium)` 的前 3 条
 
 ### 7.3 404 分支
 
