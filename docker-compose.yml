@@ -135,8 +135,7 @@ services:
     restart: unless-stopped
     env_file:
       - .env.local
-    environment:
-      AI_ENGINE_MOCK_MODE: "true"
+    # W6-T4：移除硬编码的 mock 覆盖；mock vs real 由 .env.local 控制（默认 false）
     ports:
       # 宿主机 9100 → 容器内 9000；9000 已被 MinIO S3 API 占用。
       # 容器间仍走 http://ai_engine:9000（见 .env 中的 AI_ENGINE_URL）。

@@ -3,10 +3,9 @@
  *
  * 完整职责：
  *   1. 每 3 秒轮询 /analyses/{id}/status（useDidShow 恢复 / useDidHide 暂停）
- *   2. 基于 "processing 已持续时间" **本地模拟** 5 阶段流转
- *      （后端 mock 管道只会停在 preprocessing 一瞬间就跳到 completed，
- *      严格按 stage 字段展示会让用户看不到中间状态；W6 真实 pipeline 上线后
- *      再把优先级切成 "后端 stage 优先，本地动画兜底"）
+ *   2. 基于后端 `stage` 字段映射到 5 阶段流转
+ *      （W6-T4：去掉了"processing 持续时间本地模拟"，因为 backend 自己有
+ *      stage 推进 task，会按真实预算推进 stage 字段；前端只读不算）
  *   3. 剩余秒数：优先采用后端 `estimated_remaining_seconds`，本地每秒 -1 平滑显示
  *   4. "你知道吗" 小贴士：从 `constants/swingTips.ts` 随机起点 + 8s 滚动
  *   5. status=completed → reLaunch 到 report 页
@@ -16,7 +15,7 @@
  *
  * 设计选型记录：
  *   - 阶段定义固化在本页 `STAGES`，后端 stage 字段的枚举值用来做"后端已经到该阶段"的
- *     语义映射（stage → 阶段索引最小下限）；本地时间推进做上限推进
+ *     语义映射（stage → 阶段索引）；前端不再做时间推进上限，避免与后端 stage 抢话语权
  *   - 轮询用裸 setTimeout 递归，不用 setInterval —— 更容易按 useDidShow/Hide 精准控制
  */
 
@@ -46,10 +45,11 @@ const POLL_INTERVAL_MS = 3000
 const TIMEOUT_FALLBACK_MS = 120_000
 const TIPS_ROTATE_MS = 8000
 const MAX_CONSECUTIVE_ERRORS = 3
-/** 每个虚拟阶段的最短展示时间（ms）——避免 mock 模式下一闪而过 */
-const MIN_STAGE_DWELL_MS = 1500
 
-function backendStageToMinIndex(stage: AnalysisStage | null | undefined): number {
+/** W6-T4：把后端 stage 字段映射到 STAGES 数组下标（找不到时返回 0）。
+ *  与之前的 `backendStageToMinIndex` 区别：不再叠加"本地时间推进"上限，
+ *  完全以 backend 为准。后端 stage_progress 推进顺序和这里 STAGES 顺序一致。 */
+function backendStageToIndex(stage: AnalysisStage | null | undefined): number {
   if (!stage) return 0
   const idx = STAGES.findIndex((s) => s.backendStages.includes(stage))
   return idx === -1 ? 0 : idx
@@ -73,9 +73,7 @@ const AnalysisWaitingPage: FC = () => {
   const secondTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const tipTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pageActiveRef = useRef(true)
-  const processingSinceRef = useRef<number | null>(null)
   const hasRedirectedRef = useRef(false)
-  const enteredAtRef = useRef(Date.now())
 
   const clearCurrent = useAnalysisStore((s) => s.clearCurrent)
 
@@ -91,9 +89,6 @@ const AnalysisWaitingPage: FC = () => {
           ? Math.max(0, s.estimated_remaining_seconds)
           : null,
       )
-      if (s.status === 'processing' && processingSinceRef.current === null) {
-        processingSinceRef.current = Date.now()
-      }
       // 终态 -> 停止轮询
       if (s.status === 'completed') {
         if (!hasRedirectedRef.current) {
@@ -184,26 +179,13 @@ const AnalysisWaitingPage: FC = () => {
     }
   }, [elapsedSec, timedOut, status])
 
-  // ---------------- 派生：当前虚拟阶段索引 ----------------
-  const virtualStageIndex = useMemo(() => {
+  // ---------------- 派生：当前阶段索引（W6-T4：完全以 backend 为准） ----------------
+  const stageIndex = useMemo(() => {
     if (!status) return 0
     if (status.status === 'completed') return STAGES.length - 1
-    if (status.status === 'failed') return -1 // 不展示阶段条
-    // 后端 stage 映射到的最小阶段
-    const minFromBackend = backendStageToMinIndex(status.stage)
-    // 本地时间推进：从 processingSince 起，每 MIN_STAGE_DWELL_MS 推进一格
-    // 兜底：如果 processingSince 还没设（即刚进 pending），按进入页时间算
-    const since = processingSinceRef.current ?? enteredAtRef.current
-    const elapsed = Date.now() - since
-    const localIdx = Math.min(
-      STAGES.length - 1,
-      Math.floor(elapsed / MIN_STAGE_DWELL_MS),
-    )
-    return Math.max(minFromBackend, localIdx)
-    // 依赖 elapsedSec 是**刻意的**：它本身不参与计算，但每秒变动能触发 useMemo 重新评估
-    // `Date.now() - processingSinceRef.current`，从而让本地模拟阶段自然推进
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, elapsedSec])
+    if (status.status === 'failed') return -1
+    return backendStageToIndex(status.stage)
+  }, [status])
 
   // 展示用的剩余秒数：优先后端，否则按"总估 25s - 已过秒"兜底
   const displayRemaining = useMemo(() => {
@@ -287,8 +269,8 @@ const AnalysisWaitingPage: FC = () => {
       {/* 阶段列表 */}
       <View className='waiting__stages'>
         {STAGES.map((s, idx) => {
-          const done = idx < virtualStageIndex
-          const active = idx === virtualStageIndex && status?.status !== 'completed'
+          const done = idx < stageIndex
+          const active = idx === stageIndex && status?.status !== 'completed'
           const completed = status?.status === 'completed'
           return (
             <View

@@ -34,6 +34,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import threading
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -55,6 +56,25 @@ log = structlog.get_logger("tasks.analysis")
 # AI Engine 可达性重试：首次失败后最多再尝试 2 次（共 3 次），指数退避 1s / 2s
 MAX_AI_ENGINE_RETRIES = 2
 RETRY_BACKOFF_BASE_SECONDS = 1
+
+# W6-T4：模拟阶段推进的时间表（秒）。
+# 因为 ai_engine 是单次 HTTP 调用，backend 拿不到真实 stage 进度；这里在 backend 侧
+# 用一个 fire-and-forget 的 asyncio task **按时间戳**推进 DB 里的 stage 字段，
+# docs/14 §T4 已注明这种"假推进"代价是"显示落后实际 0.5-2s"，用户无感。
+#
+# 总预算 30s（与 ai_engine CPU 预算一致）；最后一个阶段 generating 不在这里收尾，
+# 由主任务 `_mark_completed` 直接置 stage=None / status=completed。
+#
+# 数组顺序即推进顺序；累计时长 = 30s（generating 占位 3s 实际不会"睡完"，
+# 因为正常情况下 ai_engine 在 27-32s 内就会返回，stage_task 立刻被 cancel）。
+STAGE_PROGRESSION: list[tuple[str, int]] = [
+    ("preprocessing", 5),
+    ("pose_estimating", 10),
+    ("phase_segmenting", 4),
+    ("scoring", 4),
+    ("diagnosing", 4),
+    ("generating", 3),
+]
 
 
 # =====================================================================
@@ -98,29 +118,41 @@ async def _run_swing_analysis_async(analysis_id: str) -> None:
         log.info("analysis_already_terminal_skip", analysis_id=analysis_id)
         return
 
-    # 2) 调 ai_engine，带重试
+    # 2) 启动 stage 推进后台任务（让 waiting 页能看到 stage 变化）
+    # 注意：仅在第一次尝试时启动；重试期间 stage 已经停在最后推进到的位置，
+    # 重新启动反而会让 UI 上的进度往回跳。
+    stage_task = asyncio.create_task(_progress_stages_loop(analysis_id))
+
+    # 3) 调 ai_engine，带重试
     engine_result: dict | None = None
     last_exc: Exception | None = None
-    for attempt in range(MAX_AI_ENGINE_RETRIES + 1):
-        try:
-            client = get_ai_engine()
-            engine_result = await client.analyze(
-                analysis_id=analysis_id,
-                video_url=meta["video_url"],
-                camera_angle=meta["camera_angle"],
-                club_type=meta["club_type"],
-            )
-            break
-        except (httpx.TimeoutException, httpx.ConnectError, httpx.HTTPStatusError) as e:
-            last_exc = e
-            log.warning(
-                "ai_engine_retry",
-                analysis_id=analysis_id,
-                attempt=attempt,
-                err=repr(e),
-            )
-            if attempt < MAX_AI_ENGINE_RETRIES:
-                await asyncio.sleep(RETRY_BACKOFF_BASE_SECONDS * (2**attempt))
+    try:
+        for attempt in range(MAX_AI_ENGINE_RETRIES + 1):
+            try:
+                client = get_ai_engine()
+                engine_result = await client.analyze(
+                    analysis_id=analysis_id,
+                    video_url=meta["video_url"],
+                    camera_angle=meta["camera_angle"],
+                    club_type=meta["club_type"],
+                )
+                break
+            except (httpx.TimeoutException, httpx.ConnectError, httpx.HTTPStatusError) as e:
+                last_exc = e
+                log.warning(
+                    "ai_engine_retry",
+                    analysis_id=analysis_id,
+                    attempt=attempt,
+                    err=repr(e),
+                )
+                if attempt < MAX_AI_ENGINE_RETRIES:
+                    await asyncio.sleep(RETRY_BACKOFF_BASE_SECONDS * (2**attempt))
+    finally:
+        # 不论成功/失败，都把 stage 推进 task 收掉
+        # cancel 期间任何异常都吞掉：stage 推进只是"装饰"，不应影响主流程
+        stage_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            await stage_task
 
     if engine_result is None:
         # 终态失败：AI Engine 网络级不可达
@@ -133,10 +165,18 @@ async def _run_swing_analysis_async(analysis_id: str) -> None:
         return
 
     # 3) ai_engine 明确返回 failed（画质差、未检测到人体等）
+    # 错误码透传策略：
+    # - ai_engine 在 50101-50105 段返回业务错误码（见 ai_engine/app/errors.py）
+    # - backend 直接透传到 swing_analyses.error_code，不做"翻译"——前端按 docs/02 §1.4
+    #   看到的就是同一个码段
+    # - 50101-50105 全部都退配额（用户没消费成功）
+    # - 不在 50101-50105 段的码（理论上不应该出现）按 50100 兜底，仍退配额
     if engine_result.get("status") == "failed":
+        raw_code = engine_result.get("error_code")
+        error_code = raw_code if isinstance(raw_code, int) and 50100 <= raw_code <= 50199 else 50100
         await _mark_failed(
             analysis_id,
-            error_code=engine_result.get("error_code") or 50101,
+            error_code=error_code,
             error_message=engine_result.get("error_message") or "分析失败",
             refund=True,
         )
@@ -169,6 +209,48 @@ async def _mark_processing(analysis_id: str) -> dict | None:
             "club_type": analysis.club_type,
             "created_at": analysis.created_at,
         }
+
+
+async def _progress_stages_loop(analysis_id: str) -> None:
+    """W6-T4：后台任务，按 STAGE_PROGRESSION 时间表推进 DB 中的 stage / stage_progress。
+
+    设计说明
+    --------
+    - 每个 stage 在其预算时长内把 `stage_progress` 从 0 平滑推到 99（完成那一刻 = 100，
+      由下一个 stage 的开始覆盖；最后一个 stage 由 `_mark_completed` 覆盖到 100）
+    - 推进步长 1 秒一次，给前端 3 秒轮询足够的"看见变化"机会
+    - 主任务在 ai_engine 返回（成功 / 失败）后会 cancel 本 task；任何中间状态都
+      可以接受（cancel 时 stage 停在哪儿就停在哪儿，主任务的 _mark_completed /
+      _mark_failed 会覆写为终态）
+    - 使用独立的 AsyncSession，每个写入事务都短小（避免长事务持有 session 锁）
+    - 任何 DB 异常吞掉 + 继续推进；这层是装饰性 UI，不能因为一次写失败就崩
+    """
+    elapsed = 0  # 自该 stage 开始算起的秒数
+    try:
+        for stage_name, duration in STAGE_PROGRESSION:
+            # 每秒更新一次 progress
+            for sec in range(1, duration + 1):
+                # progress 占据该 stage 的 0-99；最后由 _mark_completed 提升到 100
+                progress = min(99, round(sec / duration * 99))
+                try:
+                    async with AsyncSessionLocal() as db:
+                        analysis = await db.get(SwingAnalysis, analysis_id)
+                        if analysis is None:
+                            return
+                        # 已 terminal 直接退出（_mark_completed/_mark_failed 已经写过）
+                        if analysis.status in {"completed", "failed"}:
+                            return
+                        analysis.stage = stage_name
+                        analysis.stage_progress = progress
+                        await db.commit()
+                except Exception as exc:  # pragma: no cover - 装饰性写入，吞掉
+                    log.debug("stage_progress_write_failed", analysis_id=analysis_id, err=repr(exc))
+                await asyncio.sleep(1)
+                elapsed += 1
+    except asyncio.CancelledError:
+        # 被主任务 cancel：正常路径，不算错
+        log.debug("stage_progress_cancelled", analysis_id=analysis_id, elapsed=elapsed)
+        raise
 
 
 async def _mark_failed(
@@ -293,6 +375,8 @@ def _dump_phase_timestamps(raw: dict | None) -> dict | None:
 __all__ = [
     "MAX_AI_ENGINE_RETRIES",
     "RETRY_BACKOFF_BASE_SECONDS",
+    "STAGE_PROGRESSION",
+    "_progress_stages_loop",
     "_run_swing_analysis_async",
     "run_swing_analysis",
 ]
