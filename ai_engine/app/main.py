@@ -9,6 +9,7 @@ from fastapi import FastAPI
 
 from app import __version__
 from app.config import settings
+from app.errors import PipelineError
 from app.mock_pipeline import run_mock_analysis
 from app.schemas import AnalyzeRequest, AnalyzeResult
 
@@ -72,14 +73,27 @@ async def analyze(req: AnalyzeRequest) -> AnalyzeResult:
     if settings.AI_ENGINE_MOCK_MODE:
         result = await run_mock_analysis(req)
     else:
-        # TODO W6：接入 real_pipeline
-        from app.schemas import AnalyzeResult as AR
-        result = AR(
-            analysis_id=req.analysis_id,
-            status="failed",
-            error_code=50101,
-            error_message="real pipeline not implemented yet, set AI_ENGINE_MOCK_MODE=true",
-        )
+        # 真实 pipeline：preprocess → pose → phases → features → scoring → diagnose → recommend
+        # PipelineError 在这里统一捕获为 failed 结果（业务错误码 + 友好文案）；
+        # 其它意外异常冒泡到 FastAPI 默认 500，由后端 Celery worker 重试/fallback 到 mock
+        # （docs/14 T4 任务会在 backend 侧实现 fallback）。
+        try:
+            from app.pipeline.real_pipeline import run_real_analysis
+
+            result = await run_real_analysis(req)
+        except PipelineError as exc:
+            log.warning(
+                "pipeline_error",
+                analysis_id=req.analysis_id,
+                code=exc.code,
+                error=str(exc),
+            )
+            result = AnalyzeResult(
+                analysis_id=req.analysis_id,
+                status="failed",
+                error_code=exc.code,
+                error_message=exc.user_message,
+            )
 
     log.info(
         "analyze_done",

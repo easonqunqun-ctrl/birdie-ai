@@ -54,6 +54,8 @@ ISSUE_TEMPLATES: list[dict] = [
     },
 ]
 
+# 13 个 drill：覆盖 docs/14 附录 A 映射表里全部 issue。drill_id 与
+# `client/src/constants/drillLibrary.ts` 保持同步；增删时两边必须一起改。
 DRILL_TEMPLATES: list[dict] = [
     {
         "drill_id": "drill_towel_arm",
@@ -68,6 +70,20 @@ DRILL_TEMPLATES: list[dict] = [
             "感受双臂与身体的连接感",
             "逐渐加大挥杆幅度",
             "每组做 10 次挥杆，共 3 组",
+        ],
+    },
+    {
+        "drill_id": "drill_impact_bag",
+        "name": "击球包练习",
+        "target_issue": "casting",
+        "description": "强化击球位置的手腕前倾与身体连动",
+        "duration_minutes": 10,
+        "sets": 3,
+        "steps": [
+            "将击球包（或厚枕头）放在球位前方",
+            "用半挥杆慢速击打，手腕保持前倾、杆头贴近身体",
+            "记录手腕第一次『解锁』的感觉",
+            "10 次为一组，共 3 组",
         ],
     },
     {
@@ -86,6 +102,34 @@ DRILL_TEMPLATES: list[dict] = [
         ],
     },
     {
+        "drill_id": "drill_inside_path",
+        "name": "内侧下杆路径练习",
+        "target_issue": "over_the_top",
+        "description": "用地上放杆引导下杆路径从内侧进入",
+        "duration_minutes": 15,
+        "sets": 3,
+        "steps": [
+            "在球位正后方 30cm 平行放一支练习杆",
+            "上杆后刻意让下杆杆头沿练习杆内侧通过",
+            "感受上半身被动、下半身主动的发力顺序",
+            "每组 10 次，共 3 组",
+        ],
+    },
+    {
+        "drill_id": "drill_wall_butt",
+        "name": "臀贴墙练习",
+        "target_issue": "early_extension",
+        "description": "保持臀部与墙接触，避免下杆髋部前移",
+        "duration_minutes": 10,
+        "sets": 3,
+        "steps": [
+            "背对墙站立，臀部轻贴墙面",
+            "做上杆到下杆的镜像动作，臀部始终不离开墙",
+            "感受脊柱角度在整个过程中保持不变",
+            "10 次为一组，共 3 组",
+        ],
+    },
+    {
         "drill_id": "drill_hip_rotation",
         "name": "髋部旋转练习",
         "target_issue": "sway_slide",
@@ -99,7 +143,110 @@ DRILL_TEMPLATES: list[dict] = [
             "30 次为一组，共 3 组",
         ],
     },
+    {
+        "drill_id": "drill_mirror_spine",
+        "name": "镜前脊柱角度练习",
+        "target_issue": "loss_of_posture",
+        "description": "借助镜子观察整挥中脊柱角是否恒定",
+        "duration_minutes": 10,
+        "sets": 2,
+        "steps": [
+            "面对落地镜做空挥",
+            "观察从 setup 到 impact 脊柱前倾角的变化",
+            "调整节奏直到差异 < 5°",
+            "每组 10 次，共 2 组",
+        ],
+    },
+    {
+        "drill_id": "drill_weight_shift",
+        "name": "重心转移节奏练习",
+        "target_issue": "hanging_back",
+        "description": "通过节奏口令建立『后-前-后』的重心流",
+        "duration_minutes": 15,
+        "sets": 3,
+        "steps": [
+            "站姿自然，口令『后、前、收』配合上杆/下杆/收杆",
+            "收杆时感受 80% 重心在前脚",
+            "对镜子检查完成姿势",
+            "每组 10 次，共 3 组",
+        ],
+    },
+    {
+        "drill_id": "drill_backswing_stop",
+        "name": "上杆截停练习",
+        "target_issue": "over_rotation",
+        "description": "防止过度转肩，控制上杆幅度",
+        "duration_minutes": 10,
+        "sets": 3,
+        "steps": [
+            "上杆到杆接近水平就停住，保持 2 秒",
+            "确认肩转约 90°，再开始下杆",
+            "体会『到位就停』的节奏",
+            "每组 10 次，共 3 组",
+        ],
+    },
+    {
+        "drill_id": "drill_shoulder_turn",
+        "name": "充分转肩练习",
+        "target_issue": "under_rotation",
+        "description": "强化上杆期充分转肩，提升力量传递",
+        "duration_minutes": 10,
+        "sets": 3,
+        "steps": [
+            "双手交叉抱肩",
+            "做上半身旋转，直到左肩触到下巴",
+            "保持髋部角度基本不变",
+            "20 次为一组，共 3 组",
+        ],
+    },
+    {
+        "drill_id": "drill_plane_board",
+        "name": "挥杆平面板练习",
+        "target_issue": "flat_shoulder",
+        "description": "借助倾斜板（或墙角）修正肩平面角",
+        "duration_minutes": 15,
+        "sets": 3,
+        "steps": [
+            "在挥杆轨迹一侧斜放练习板 / 枕头",
+            "上杆 / 下杆沿板面移动，既不过高也不过低",
+            "感受杆头始终在肩平面上",
+            "每组 10 次，共 3 组",
+        ],
+    },
+    {
+        "drill_id": "drill_alignment_stick",
+        "name": "瞄准杆站位练习",
+        "target_issue": "open_stance",
+        "description": "用瞄准杆纠正站位与目标线的夹角",
+        "duration_minutes": 5,
+        "sets": 2,
+        "steps": [
+            "在球位前方 2m 放置瞄准杆指向目标",
+            "双脚、双膝、肩线都与瞄准杆平行",
+            "检查自身影子 / 镜子里的角度",
+            "每组 10 次 setup 练习，共 2 组",
+        ],
+    },
+    {
+        "drill_id": "drill_grip_checkpoint",
+        "name": "握杆检查点练习",
+        "target_issue": "grip_weak",
+        "description": "按照标准握杆法复位左右手位置",
+        "duration_minutes": 5,
+        "sets": 1,
+        "steps": [
+            "左手握杆，确认看到 2-3 颗指关节",
+            "右手叠握，V 字指向右肩",
+            "保持握杆压力 4/10",
+            "练习 5 次，每次保持 10 秒",
+        ],
+    },
 ]
+
+# 运行时自检：drill_id 集合必须覆盖 pipeline.constants.ISSUE_DRILL_MAP 的全部目标
+# （missing 则推荐环节 log warning 但不崩）
+_DRILL_IDS = {d["drill_id"] for d in DRILL_TEMPLATES}
+assert len(_DRILL_IDS) == len(DRILL_TEMPLATES), "DRILL_TEMPLATES 中 drill_id 有重复"
 
 PHASE_LABELS = {
     "setup": "站位准备",

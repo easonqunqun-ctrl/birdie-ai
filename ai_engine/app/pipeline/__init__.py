@@ -1,13 +1,36 @@
 """W6 真实姿态分析 pipeline 模块。
 
-当前已完成：
-  - T1: `preprocess`（ffmpeg 转码 + 质量指标）+ `pose`（MediaPipe 33 点）
-
-待实现（各自 T 开工时补 export）：
-  - T2: phases / features / scoring / diagnose / recommend
-  - T3: visualize
+完成度：
+  - T1: `preprocess` + `pose`
+  - T2: `constants` / `phases` / `features` / `scoring` / `diagnose` / `recommend` / `real_pipeline`
+  - T3: `visualize`（待实现）
 """
 
+from app.pipeline.constants import (
+    FEATURES,
+    FEATURES_BY_PHASE,
+    ISSUE_DRILL_MAP,
+    ISSUE_TYPES,
+    MAX_RECOMMENDATIONS_PER_ANALYSIS,
+    PHASE_LABELS,
+    PHASE_ORDER,
+    PHASE_WEIGHTS,
+    feature_meta,
+    issue_meta,
+)
+from app.pipeline.diagnose import (
+    MIN_DISPLAY_CONFIDENCE,
+    DiagnosedIssue,
+    diagnose,
+)
+from app.pipeline.features import extract_features
+from app.pipeline.phases import (
+    MIN_MOTION_SPEED,
+    MIN_SWING_FRAMES,
+    PhaseInfo,
+    PhaseSegmentResult,
+    segment_phases,
+)
 from app.pipeline.pose import (
     LANDMARK_LEFT_ANKLE,
     LANDMARK_LEFT_ELBOW,
@@ -36,8 +59,41 @@ from app.pipeline.preprocess import (
     PreprocessResult,
     preprocess_video,
 )
+from app.pipeline.real_pipeline import run_real_analysis
+from app.pipeline.recommend import recommend
+from app.pipeline.scoring import (
+    score_all_phases,
+    score_feature,
+    score_overall,
+    score_phase,
+    weakest_phase,
+)
 
 __all__ = [
+    # constants
+    "FEATURES",
+    "FEATURES_BY_PHASE",
+    "ISSUE_DRILL_MAP",
+    "ISSUE_TYPES",
+    "MAX_RECOMMENDATIONS_PER_ANALYSIS",
+    "PHASE_LABELS",
+    "PHASE_ORDER",
+    "PHASE_WEIGHTS",
+    "feature_meta",
+    "issue_meta",
+    # diagnose
+    "DiagnosedIssue",
+    "MIN_DISPLAY_CONFIDENCE",
+    "diagnose",
+    # features
+    "extract_features",
+    # phases
+    "MIN_MOTION_SPEED",
+    "MIN_SWING_FRAMES",
+    "PhaseInfo",
+    "PhaseSegmentResult",
+    "segment_phases",
+    # pose
     "LANDMARK_LEFT_ANKLE",
     "LANDMARK_LEFT_ELBOW",
     "LANDMARK_LEFT_HIP",
@@ -51,15 +107,26 @@ __all__ = [
     "LANDMARK_RIGHT_KNEE",
     "LANDMARK_RIGHT_SHOULDER",
     "LANDMARK_RIGHT_WRIST",
+    "NUM_LANDMARKS",
+    "PoseResult",
+    "estimate_poses",
+    # preprocess
     "MAX_DURATION_SEC",
     "MAX_FRAME_LOSS_RATIO",
     "MIN_CLARITY_SCORE",
     "MIN_DURATION_SEC",
-    "NUM_LANDMARKS",
-    "PoseResult",
     "PreprocessResult",
     "TARGET_FPS",
     "TARGET_SHORT_SIDE",
-    "estimate_poses",
     "preprocess_video",
+    # real pipeline
+    "run_real_analysis",
+    # recommend
+    "recommend",
+    # scoring
+    "score_all_phases",
+    "score_feature",
+    "score_overall",
+    "score_phase",
+    "weakest_phase",
 ]
