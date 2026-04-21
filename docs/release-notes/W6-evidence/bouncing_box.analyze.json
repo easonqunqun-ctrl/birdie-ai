@@ -1,0 +1,15 @@
+{
+    "analysis_id": "evidence-bouncing_box",
+    "status": "failed",
+    "overall_score": null,
+    "phase_scores": null,
+    "phase_timestamps": null,
+    "issues": [],
+    "recommendations": [],
+    "skeleton_video_url": null,
+    "skeleton_data_url": null,
+    "thumbnail_url": null,
+    "duration_ms": null,
+    "error_code": 50103,
+    "error_message": "\u89c6\u9891\u4e2d\u672a\u68c0\u6d4b\u5230\u5b8c\u6574\u4eba\u7269\uff0c\u8bf7\u786e\u4fdd\u5168\u8eab\u5165\u955c"
+}

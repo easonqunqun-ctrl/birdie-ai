@@ -155,10 +155,12 @@ async def _run_swing_analysis_async(analysis_id: str) -> None:
             await stage_task
 
     if engine_result is None:
-        # 终态失败：AI Engine 网络级不可达
+        # 终态失败：AI Engine 网络级不可达（transport 错误，非业务错误）
+        # W6-T6：改用 50100 表示后端 → ai_engine 通道失败；
+        # 50101-50105 严格保留给 ai_engine 业务错误（见 docs/02 §1.4）
         await _mark_failed(
             analysis_id,
-            error_code=50104,
+            error_code=50100,
             error_message=f"AI 引擎不可达: {type(last_exc).__name__}",
             refund=True,
         )

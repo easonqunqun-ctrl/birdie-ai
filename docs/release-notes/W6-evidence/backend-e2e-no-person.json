@@ -1,0 +1,13 @@
+{
+  "description": "backend._run_swing_analysis_async 直调真实 ai_engine，bouncing_box.mp4 → 50103 + 配额退回",
+  "fixture": "/app/tests/fixtures/synthetic/bouncing_box.mp4",
+  "status": "failed",
+  "stage": null,
+  "stage_progress": 0,
+  "error_code": 50103,
+  "error_message": "视频中未检测到完整人物，请确保全身入镜",
+  "used_before": 1,
+  "used_after": 0,
+  "quota_refunded": true,
+  "captured_at": "2026-04-21"
+}

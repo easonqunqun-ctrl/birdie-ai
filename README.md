@@ -178,7 +178,7 @@ make ci                 # test 基础上 + 真实引擎 smoke（bouncing_box →
 - [x] **W2**：用户体系（双端登录打通、3 步引导、"我的"最小版；详见 [M1 任务拆分](./docs/11-M1任务拆分.md)）
 - [x] **W3-W4**：核心分析链路（上传 → Celery + Mock 分析 → 报告页 + 历史 + 示例视频体验；详见 [M2 任务拆分](./docs/12-M2任务拆分.md) 与 [W3-W4 走查记录](./docs/release-notes/W3-W4-walkthrough.md)）
 - [x] W5：AI 对话（LLM 流式接入）—— M3-T1 后端骨架/配额 ✅ · M3-T2 LLM 客户端 + system prompt + SSE 流式 ✅ · M3-T3 前端对话页 + 非流式打通 ✅ · M3-T4 前端 SSE 流式 + 打字动画 + drill_card ✅ · M3-T5 报告页/首页入口闭环 ✅ · M3-T6 文档同步 + walkthrough ✅
-- [ ] W6：AI 真实引擎替换
+- [x] **W6**：AI 真实引擎替换 —— W6-T1 预处理 + MediaPipe ✅ · T2 阶段分割 + 15 特征 + 评分 + 诊断 ✅ · T3 骨骼可视化 + MinIO ✅ · T4 真实引擎接入 + stage 推进 + 错误码透传 ✅ · T5 Docker + CI 质量门 ✅ · T6 文档同步 + walkthrough ✅（详见 [W6 任务拆分](./docs/14-W6任务拆分.md) 与 [W6 真实引擎 walkthrough](./docs/release-notes/W6-real-engine-walkthrough.md)）
 - [ ] W7：商业化与社交（支付 + 邀请 + 训练）
 - [ ] W8：双端发布准备
 

@@ -1,0 +1,15 @@
+{
+    "analysis_id": "evidence-blackscreen",
+    "status": "failed",
+    "overall_score": null,
+    "phase_scores": null,
+    "phase_timestamps": null,
+    "issues": [],
+    "recommendations": [],
+    "skeleton_video_url": null,
+    "skeleton_data_url": null,
+    "thumbnail_url": null,
+    "duration_ms": null,
+    "error_code": 50102,
+    "error_message": "\u89c6\u9891\u753b\u9762\u8fc7\u4e8e\u6a21\u7cca\uff0c\u8bf7\u5728\u5149\u7ebf\u5145\u8db3\u7684\u73af\u5883\u4e0b\u91cd\u62cd"
+}

@@ -150,10 +150,10 @@ async def test_e2e_timeout_exhausts_retries_and_refunds(
     aid = await _create_analysis(client, auth_headers, fake_minio)
     await _run_swing_analysis_async(aid)
 
-    # 状态 failed，错误码 50104 （AI 引擎不可达）
+    # 状态 failed，错误码 50100 （AI 引擎不可达 transport 级 — W6-T6 拆出）
     s = (await client.get(f"/v1/analyses/{aid}/status", headers=auth_headers)).json()["data"]
     assert s["status"] == "failed"
-    assert s["error"]["code"] == 50104
+    assert s["error"]["code"] == 50100
     assert "AI 引擎不可达" in s["error"]["message"]
     assert s["error"]["quota_refunded"] is True
 
