@@ -24,6 +24,11 @@ dependencies = [
     # 注意：mock 模式也能导入这两个包而不用（import 失败时 mock_pipeline 不受影响）
     "mediapipe==0.10.14",
     "opencv-python-headless>=4.9.0,<5",
+    # W6-T3：可视化产物落 MinIO
+    # - minio：跟 backend 用同一个 SDK（minio-py），轻量、无 boto3/botocore 依赖体积
+    # - pyarrow：把 (F, 33, 3) + visibility 写成 parquet（比 JSON 省 3-5x，前端 mini-cdn 可读）
+    "minio>=7.2.0",
+    "pyarrow>=16.0.0,<19",
 ]
 
 [project.optional-dependencies]

@@ -27,6 +27,9 @@ class IssueItem(BaseModel):
     severity: Literal["high", "medium", "low"]
     description: str
     key_frame_timestamp: float | None = None
+    # W6-T3：每条 issue 的关键帧截图（MinIO URL）。后端 schema 已存在同名字段，
+    # 这里补齐避免 ai_engine→backend 映射时丢字段。MVP 期 ai_engine 在 visualize 步骤生成。
+    key_frame_url: str | None = None
 
 
 class RecommendationItem(BaseModel):

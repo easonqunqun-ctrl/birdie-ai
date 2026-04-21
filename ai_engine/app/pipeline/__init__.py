@@ -61,6 +61,13 @@ from app.pipeline.preprocess import (
 )
 from app.pipeline.real_pipeline import run_real_analysis
 from app.pipeline.recommend import recommend
+from app.pipeline.visualize import (
+    VisualizeArtifacts,
+    dump_pose_parquet,
+    extract_issue_keyframes,
+    extract_keyframe,
+    render_skeleton_video,
+)
 from app.pipeline.scoring import (
     score_all_phases,
     score_feature,
@@ -123,6 +130,12 @@ __all__ = [
     "run_real_analysis",
     # recommend
     "recommend",
+    # visualize
+    "VisualizeArtifacts",
+    "dump_pose_parquet",
+    "extract_issue_keyframes",
+    "extract_keyframe",
+    "render_skeleton_video",
     # scoring
     "score_all_phases",
     "score_feature",

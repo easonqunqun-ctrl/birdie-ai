@@ -26,9 +26,12 @@ error_code=..., error_message=...)`。
 from __future__ import annotations
 
 import logging
+import shutil
 import time
 from pathlib import Path
 
+from app.config import settings
+from app.pipeline.constants import PHASE_LABELS
 from app.pipeline.diagnose import diagnose
 from app.pipeline.features import extract_features
 from app.pipeline.phases import segment_phases
@@ -36,7 +39,12 @@ from app.pipeline.pose import estimate_poses
 from app.pipeline.preprocess import preprocess_video
 from app.pipeline.recommend import recommend
 from app.pipeline.scoring import score_all_phases, score_overall, weakest_phase
-from app.pipeline.constants import PHASE_LABELS
+from app.pipeline.visualize import (
+    dump_pose_parquet,
+    extract_issue_keyframes,
+    make_artifacts_tmpdir,
+    render_skeleton_video,
+)
 from app.schemas import (
     AnalyzeRequest,
     AnalyzeResult,
@@ -44,6 +52,7 @@ from app.schemas import (
     PhaseScore,
     PhaseTimestamps,
 )
+from app.storage import get_storage
 
 log = logging.getLogger("ai_engine.real_pipeline")
 
@@ -67,7 +76,7 @@ async def run_real_analysis(req: AnalyzeRequest) -> AnalyzeResult:
     log.info(
         "preprocess_done",
         extra={
-            "frames": pre.frame_count,
+            "frames": pre.num_frames,
             "fps": fps,
             "duration_sec": pre.duration_sec,
             "clarity": round(pre.clarity_score, 2),
@@ -75,7 +84,7 @@ async def run_real_analysis(req: AnalyzeRequest) -> AnalyzeResult:
     )
 
     # 2. 姿态估计
-    pose_result = estimate_poses(pre.normalized_path)
+    pose_result = estimate_poses(pre.normalized_video_path)
     log.info(
         "pose_done",
         extra={
@@ -134,6 +143,15 @@ async def run_real_analysis(req: AnalyzeRequest) -> AnalyzeResult:
         },
     )
 
+    # 8. 可视化：3 类衍生产物 → MinIO（任一失败 → 占位 URL，主流程不受影响）
+    skeleton_url, thumb_url, skeleton_data_url, keyframe_urls = _produce_derived_assets(
+        analysis_id=req.analysis_id,
+        normalized_video_path=Path(pre.normalized_video_path),
+        pose_result=pose_result,
+        issues_raw=issues_raw,
+        fallback_video_url=req.video_url,
+    )
+
     issues = [
         IssueItem(
             type=it.type,
@@ -141,14 +159,10 @@ async def run_real_analysis(req: AnalyzeRequest) -> AnalyzeResult:
             severity=it.severity,
             description=it.description,
             key_frame_timestamp=it.key_frame_timestamp,
+            key_frame_url=keyframe_urls.get(it.type),
         )
         for it in issues_raw
     ]
-
-    # skeleton_video_url / thumbnail_url：T3 才接 MinIO。MVP 阶段继续沿用 mock 的
-    # "把原 URL 后缀改一下"占位模式，后端看到这个就能先把 analyzing 流程打通。
-    skeleton_url = _placeholder_suffix(req.video_url, "_skeleton.mp4")
-    thumb_url = _placeholder_suffix(req.video_url, "_thumb.jpg")
 
     duration_ms = int((time.perf_counter() - t0) * 1000)
     log.info(
@@ -159,13 +173,15 @@ async def run_real_analysis(req: AnalyzeRequest) -> AnalyzeResult:
             "weakest": weakest,
             "num_issues": len(issues),
             "num_recommendations": len(recommendations),
+            "skeleton_video_url": skeleton_url,
+            "skeleton_data_url": skeleton_data_url,
             "duration_ms": duration_ms,
         },
     )
 
     # 清理：预处理产物 tmp 视频（避免 Celery worker 容器被临时文件塞满）。
     try:
-        tmp = Path(pre.normalized_path)
+        tmp = Path(pre.normalized_video_path)
         if tmp.exists() and tmp != Path(req.video_url):
             tmp.unlink()
     except Exception:  # pragma: no cover - 清理失败不影响主流程
@@ -180,9 +196,102 @@ async def run_real_analysis(req: AnalyzeRequest) -> AnalyzeResult:
         issues=issues,
         recommendations=recommendations,
         skeleton_video_url=skeleton_url,
+        skeleton_data_url=skeleton_data_url,
         thumbnail_url=thumb_url,
         duration_ms=duration_ms,
     )
+
+
+# ============================================================
+# T3：衍生产物生成 + 上传
+# ============================================================
+
+
+def _produce_derived_assets(
+    *,
+    analysis_id: str,
+    normalized_video_path: Path,
+    pose_result,
+    issues_raw,
+    fallback_video_url: str,
+) -> tuple[str | None, str | None, str | None, dict[str, str]]:
+    """生成三类产物 + 上传 MinIO，返回 4 个 URL/字典。
+
+    任何一步失败：log warning，对应 URL 用占位（skeleton/thumb 用原视频后缀；
+    parquet/keyframe 用 None）；从不抛错，保证主分析流程不被产物失败拖垮。
+
+    Returns:
+        (skeleton_video_url, thumbnail_url, skeleton_data_url, {issue_type: keyframe_url})
+    """
+    storage = get_storage()
+    tmpdir = make_artifacts_tmpdir()
+    skeleton_url: str | None = None
+    thumb_url: str | None = None
+    skeleton_data_url: str | None = None
+    keyframe_urls: dict[str, str] = {}
+
+    try:
+        # ---------- A. 骨骼叠加视频 ----------
+        skeleton_path = render_skeleton_video(
+            normalized_video_path,
+            pose_result,
+            tmpdir / "skeleton.mp4",
+        )
+        if skeleton_path is not None:
+            skeleton_key = f"{settings.DERIVED_SKELETON_PREFIX}/{analysis_id}.mp4"
+            url = storage.put_file(skeleton_path, skeleton_key, content_type="video/mp4")
+            skeleton_url = url or _placeholder_suffix(fallback_video_url, "_skeleton.mp4")
+        else:
+            skeleton_url = _placeholder_suffix(fallback_video_url, "_skeleton.mp4")
+
+        # ---------- B. 缩略图：取视频前 1/6 处的一帧（接近 setup） ----------
+        # 不叠加骨骼，避免封面图被绿色线条干扰
+        from app.pipeline.visualize import extract_keyframe  # 局部 import 避免循环
+
+        thumb_frame_idx = max(0, min(pose_result.num_frames // 6, pose_result.num_frames - 1))
+
+        thumb_path = extract_keyframe(
+            normalized_video_path,
+            thumb_frame_idx,
+            tmpdir / "thumb.jpg",
+            pose_result=None,
+            overlay_pose=False,
+        )
+        if thumb_path is not None:
+            thumb_key = f"{settings.DERIVED_KEYFRAME_PREFIX}/{analysis_id}/thumb.jpg"
+            url = storage.put_file(thumb_path, thumb_key, content_type="image/jpeg")
+            thumb_url = url or _placeholder_suffix(fallback_video_url, "_thumb.jpg")
+        else:
+            thumb_url = _placeholder_suffix(fallback_video_url, "_thumb.jpg")
+
+        # ---------- C. issue 关键帧图（叠骨骼，便于用户看出问题位置）----------
+        keyframes_dir = tmpdir / "keyframes"
+        local_kf_paths = extract_issue_keyframes(
+            normalized_video_path, issues_raw, pose_result, keyframes_dir
+        )
+        for issue_type, local_path in local_kf_paths.items():
+            kf_key = f"{settings.DERIVED_KEYFRAME_PREFIX}/{analysis_id}/{issue_type}.jpg"
+            url = storage.put_file(local_path, kf_key, content_type="image/jpeg")
+            if url is not None:
+                keyframe_urls[issue_type] = url
+
+        # ---------- D. parquet 骨骼时序 ----------
+        parquet_path = dump_pose_parquet(pose_result, tmpdir / "pose.parquet")
+        if parquet_path is not None:
+            parquet_key = f"{settings.DERIVED_POSE_DATA_PREFIX}/{analysis_id}.parquet"
+            skeleton_data_url = storage.put_file(
+                parquet_path,
+                parquet_key,
+                content_type="application/vnd.apache.parquet",
+            )
+    finally:
+        # tmpdir 整体清理；产物已经在 MinIO，本地副本不需要保留
+        try:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+        except Exception:  # pragma: no cover
+            pass
+
+    return skeleton_url, thumb_url, skeleton_data_url, keyframe_urls
 
 
 def _placeholder_suffix(url: str, suffix: str) -> str:
