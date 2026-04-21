@@ -15,7 +15,10 @@ const config: UserConfigExport = {
   plugins: [],
   defineConstants: {
     API_BASE_URL: JSON.stringify(process.env.TARO_APP_API_BASE_URL || 'http://localhost:8000/v1'),
-    APP_ENV: JSON.stringify(process.env.TARO_APP_ENV || 'local')
+    APP_ENV: JSON.stringify(process.env.TARO_APP_ENV || 'local'),
+    // W7-T2：支付 mock 开关。默认 true，后端 `WECHAT_PAY_MOCK_MODE=true` 期间前端
+    // 跳过 wx.requestPayment 改走 `mockConfirm`。W8 接真实商户号后设为 false。
+    PAYMENT_MOCK: JSON.stringify(process.env.TARO_APP_PAYMENT_MOCK !== 'false')
   },
   copy: {
     patterns: [],

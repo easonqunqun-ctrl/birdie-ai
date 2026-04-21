@@ -55,14 +55,19 @@ const HomePage: FC = () => {
   }
 
   const handleStartAnalysis = () => {
-    // 配额为 0：免费用户本月用完 → 提示"去升级"，会员入口由 W7 再上
+    // W7-T2：免费用户本月用完 → 弹开通会员 modal
     const remaining = user?.quota?.analysis_remaining ?? 0
-    if (user && remaining <= 0) {
+    if (user && !user.is_member && remaining <= 0) {
       Taro.showModal({
         title: '本月免费次数已用完',
-        content: '你本月的免费分析已用完，下月 1 日自动刷新，或升级会员享受无限分析（即将上线）。',
-        showCancel: false,
-        confirmText: '我知道了',
+        content: '下月 1 日自动刷新，或开通会员享受无限分析。',
+        confirmText: '开通会员',
+        cancelText: '我知道了',
+        success: ({ confirm }) => {
+          if (confirm) {
+            Taro.navigateTo({ url: '/pages/profile/membership' })
+          }
+        },
       })
       return
     }

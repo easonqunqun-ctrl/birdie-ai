@@ -21,8 +21,10 @@
 
 import { FC, useEffect, useMemo, useState } from 'react'
 import { View, Text, Video, Image, Button, ScrollView } from '@tarojs/components'
-import Taro, { useRouter } from '@tarojs/taro'
+import Taro, { useRouter, useShareAppMessage } from '@tarojs/taro'
 import { analysisService } from '@/services/analysisService'
+import { shareService, type PublicReport } from '@/services/shareService'
+import { useUserStore } from '@/store/userStore'
 import { getDrillDetail } from '@/constants/drillLibrary'
 import { SCORE_LEVEL_META, scoreLevelFromScore } from '@/constants/scoreLevel'
 import {
@@ -49,30 +51,60 @@ const PLAYBACK_RATES = [0.5, 1, 1.5, 2] as const
 
 const ReportPage: FC = () => {
   const router = useRouter()
-  const analysisId = (router.params as { id?: string }).id || ''
+  const params = router.params as { id?: string; from_share?: string }
+  const analysisId = params.id || ''
+  // W7-T5：`from_share=1` 的 path 由朋友分享出来，被分享者点进来走"脱敏公开报告"分支
+  const fromShare = params.from_share === '1'
+  const currentUserToken = useUserStore((s) => s.token)
+
   const [report, setReport] = useState<AnalysisReportResponse | null>(null)
+  const [publicReport, setPublicReport] = useState<PublicReport | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [rate, setRate] = useState<number>(1)
 
-  // 拉一次报告
   useEffect(() => {
     if (!analysisId) {
       setError('缺少分析 ID')
       setLoading(false)
       return
     }
-    analysisService
-      .getReport(analysisId)
+    // 拉完整报告：未登录直接抛 401 → fallback 到公开版；
+    // 已登录但不是本人 → 后端 /analyses/{id} 返回 403（analysis_service），也 fallback
+    const loadFull = analysisService.getReport(analysisId)
+    if (fromShare || !currentUserToken) {
+      // 明确是分享链接或未登录 → 直接拿公开版，不去撞 401/403
+      shareService
+        .getPublicReport(analysisId)
+        .then((r) => {
+          setPublicReport(r)
+          setLoading(false)
+        })
+        .catch((e: Error) => {
+          setError(e.message || '加载报告失败')
+          setLoading(false)
+        })
+      return
+    }
+    loadFull
       .then((r) => {
         setReport(r)
         setLoading(false)
       })
       .catch((e: Error) => {
-        setError(e.message || '加载报告失败')
-        setLoading(false)
+        // 不是自己的 → 尝试公开版兜底
+        shareService
+          .getPublicReport(analysisId)
+          .then((pr) => {
+            setPublicReport(pr)
+            setLoading(false)
+          })
+          .catch(() => {
+            setError(e.message || '加载报告失败')
+            setLoading(false)
+          })
       })
-  }, [analysisId])
+  }, [analysisId, fromShare, currentUserToken])
 
   // 默认给 Taro.setNavigationBarTitle 一个更友好的标题
   useEffect(() => {
@@ -147,6 +179,49 @@ const ReportPage: FC = () => {
   const handleGoHome = () => Taro.reLaunch({ url: '/pages/index/index' })
   const handleShootAgain = () => Taro.reLaunch({ url: '/pages/analysis/capture' })
 
+  // ---------------- 分享（W7-T5）----------------
+  // 小程序分享只能通过「右上角胶囊 · 转发给朋友」或 `<Button open-type='share'>` 触发
+  // （`Taro.shareAppMessage` 自 2024 起已在各小程序平台禁用）。
+  // 底部的「分享报告」按钮改造成 `openType='share'`，点击会直接唤起原生转发面板。
+  useShareAppMessage(() => {
+    const score = report?.overall_score ?? publicReport?.overall_score
+    const clubLabel = report
+      ? CLUB_TYPE_LABEL[report.club_type]
+      : publicReport
+      ? CLUB_TYPE_LABEL[publicReport.club_type as keyof typeof CLUB_TYPE_LABEL] ?? '挥杆'
+      : '挥杆'
+    const title = score
+      ? `我的${clubLabel}挥杆打了 ${score} 分，你来挑战一下？`
+      : `我用小鸟 AI 分析了挥杆，你来看看`
+    return {
+      title,
+      path: `/pages/analysis/report?id=${analysisId}&from_share=1`,
+      imageUrl:
+        report?.thumbnail_url || publicReport?.thumbnail_url || ''
+    }
+  })
+
+  /**
+   * 点底部「分享报告」按钮（这个 Button 本身已加 `openType='share'`，
+   * 小程序会自动唤起转发面板；这里的 click handler 只做埋点）。
+   * 注意不要阻塞 UI：埋点请求设 silent=true，失败也不影响分享。
+   */
+  const handleShareClick = () => {
+    if (!analysisId || analysisId === 'sample') return
+    shareService
+      .logShare({ share_type: 'report', target_id: analysisId })
+      .catch(() => undefined)
+  }
+
+  /** 公开报告下 CTA：引导非本人访问者去首页体验 */
+  const handleCtaTryMine = () => {
+    if (currentUserToken) {
+      Taro.reLaunch({ url: '/pages/analysis/capture' })
+    } else {
+      Taro.reLaunch({ url: '/pages/login/index' })
+    }
+  }
+
   /**
    * "问 AI 教练"跳转。
    *
@@ -158,11 +233,11 @@ const ReportPage: FC = () => {
    */
   const handleAskCoach = () => {
     const prefill = encodeURIComponent('这次我的挥杆，需要重点改什么？')
-    const params = [`prefill=${prefill}`]
+    const queryParts = [`prefill=${prefill}`]
     if (analysisId && analysisId !== 'sample') {
-      params.push(`analysis_id=${analysisId}`)
+      queryParts.push(`analysis_id=${analysisId}`)
     }
-    Taro.navigateTo({ url: `/pages/coach/index?${params.join('&')}` })
+    Taro.navigateTo({ url: `/pages/coach/index?${queryParts.join('&')}` })
   }
 
   // ---------------- 渲染 ----------------
@@ -171,6 +246,86 @@ const ReportPage: FC = () => {
       <View className='report report--loading'>
         <Text>加载报告中…</Text>
       </View>
+    )
+  }
+
+  // W7-T5：公开（脱敏）报告分支 —— 被分享者访问别人的报告走这里
+  if (!report && publicReport) {
+    const pr = publicReport
+    const prLevel = pr.score_level ?? scoreLevelFromScore(pr.overall_score)
+    const prMeta = prLevel ? SCORE_LEVEL_META[prLevel] : null
+    const clubText = CLUB_TYPE_LABEL[pr.club_type as keyof typeof CLUB_TYPE_LABEL] ?? pr.club_type
+    const angleText = CAMERA_ANGLE_LABEL[pr.camera_angle as keyof typeof CAMERA_ANGLE_LABEL] ?? pr.camera_angle
+    return (
+      <ScrollView scrollY className='report report--public'>
+        <View className='report__public-hero'>
+          <Text className='report__public-owner'>{pr.owner_nickname_masked} 的挥杆报告</Text>
+          {pr.thumbnail_url && (
+            <Image
+              className='report__public-thumb'
+              mode='aspectFill'
+              src={pr.thumbnail_url}
+            />
+          )}
+        </View>
+
+        <View
+          className='report__score-card'
+          style={{
+            background: prMeta?.cssVar || 'var(--color-primary)',
+            color: prMeta?.textCssVar || 'var(--color-on-primary)'
+          }}
+        >
+          <View className='report__score-left'>
+            <Text className='report__score-emoji'>{prMeta?.emoji || '⛳️'}</Text>
+            <Text className='report__score-level'>{prMeta?.label || '完成分析'}</Text>
+            <Text className='report__score-caption'>{prMeta?.caption}</Text>
+          </View>
+          <View className='report__score-right'>
+            <Text className='report__score-value'>{pr.overall_score ?? '-'}</Text>
+            <Text className='report__score-unit'>分</Text>
+          </View>
+        </View>
+
+        <View className='report__meta'>
+          <Text className='report__meta-item'>📷 {angleText}</Text>
+          <Text className='report__meta-item'>🏌️ {clubText}</Text>
+        </View>
+
+        <View className='report__section'>
+          <View className='report__section-header'>
+            <Text className='report__section-title'>关键问题</Text>
+            <Text className='report__section-hint'>共 {pr.issues_total} 项</Text>
+          </View>
+          {pr.issues.length === 0 ? (
+            <Text className='report__empty'>🎉 这一杆没有明显问题！</Text>
+          ) : (
+            pr.issues.map((iss, i) => (
+              <View key={i} className='report__issue report__issue--public'>
+                <View className='report__issue-head'>
+                  <Text className='report__issue-name'>{iss.name}</Text>
+                  <Text className={`report__severity report__severity--${iss.severity}`}>
+                    {SEVERITY_LABEL[iss.severity] || iss.severity}
+                  </Text>
+                </View>
+              </View>
+            ))
+          )}
+        </View>
+
+        <View className='report__public-cta'>
+          <Text className='report__public-cta-title'>想知道你的挥杆问题？</Text>
+          <Text className='report__public-cta-desc'>
+            上传一段视频，AI 教练 30 秒给你专属报告
+          </Text>
+          <Button
+            className='report__btn report__btn--primary'
+            onClick={handleCtaTryMine}
+          >
+            立即体验
+          </Button>
+        </View>
+      </ScrollView>
     )
   }
 
@@ -428,7 +583,11 @@ const ReportPage: FC = () => {
 
       {/* ==================== 6. 底部动作栏 ==================== */}
       <View className='report__footer'>
-        <Button className='report__footer-btn' onClick={() => toastSoon('分享报告')}>
+        <Button
+          className='report__footer-btn'
+          openType='share'
+          onClick={handleShareClick}
+        >
           📤 分享报告
         </Button>
         <Button className='report__footer-btn' onClick={() => toastSoon('对比历史')}>

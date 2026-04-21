@@ -74,6 +74,12 @@ class Settings(BaseSettings):
     WECHAT_OPEN_SECRET: str = ""
 
     # ==================== 微信支付 ====================
+    # W7-T1：MVP 阶段默认 mock 模式。真实上线需：
+    #   1. 商户号（需 ICP 备案）+ 商户证书
+    #   2. `WECHAT_PAY_NOTIFY_URL` 指向公网可达回调地址 + 签名校验
+    #   3. 把 `WECHAT_PAY_MOCK_MODE` 切回 False，启用 `services/payment_service.py`
+    #      的真实分支（目前为 NotImplementedError）
+    WECHAT_PAY_MOCK_MODE: bool = True
     WECHAT_PAY_MCH_ID: str = ""
     WECHAT_PAY_API_KEY: str = ""
     WECHAT_PAY_CERT_PATH: str = ""

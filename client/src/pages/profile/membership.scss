@@ -1,0 +1,236 @@
+.membership {
+  padding: 32px;
+  background: var(--color-bg-page);
+  min-height: 100vh;
+  box-sizing: border-box;
+
+  &__hero {
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-soft) 100%);
+    color: var(--color-on-primary);
+    border-radius: var(--radius-md);
+    padding: 40px 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 32px;
+
+    &.is-member {
+      background: linear-gradient(135deg, var(--color-gold-dark, #c59b3f) 0%, var(--color-gold-soft, #f3deaa) 100%);
+      color: #3d2c00;
+    }
+  }
+
+  &__hero-badge {
+    font-size: 56px;
+    margin-bottom: 8px;
+  }
+
+  &__hero-title {
+    font-size: 36px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  &__hero-sub {
+    font-size: 26px;
+    opacity: 0.85;
+  }
+
+  &__plans {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 32px;
+  }
+
+  &__plan {
+    flex: 1;
+    background: var(--color-bg-card);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    padding: 28px 24px;
+    border: 2px solid transparent;
+    transition: border-color 0.2s;
+
+    &.is-active {
+      border-color: var(--color-primary);
+      box-shadow: 0 4px 18px rgba(34, 97, 72, 0.15);
+    }
+  }
+
+  &__plan-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+  }
+
+  &__plan-name {
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
+
+  &__plan-price {
+    font-size: 40px;
+    font-weight: 700;
+    color: var(--color-primary);
+  }
+
+  &__plan-duration {
+    font-size: 24px;
+    color: var(--color-text-tertiary);
+    display: block;
+  }
+
+  &__plan-badge {
+    display: inline-block;
+    margin-top: 12px;
+    font-size: 22px;
+    padding: 4px 12px;
+    border-radius: 12px;
+    background: var(--color-gold-soft, #f3deaa);
+    color: var(--color-gold-dark, #7a5400);
+  }
+
+  &__benefits {
+    background: var(--color-bg-card);
+    border-radius: var(--radius-md);
+    padding: 24px 32px;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 32px;
+  }
+
+  &__benefits-header {
+    margin-bottom: 16px;
+  }
+
+  &__benefits-title {
+    font-size: 28px;
+    font-weight: 600;
+  }
+
+  &__benefits-row {
+    display: flex;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--color-border);
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    &--head {
+      font-weight: 600;
+      color: var(--color-text-secondary);
+      font-size: 24px;
+    }
+  }
+
+  &__benefits-col {
+    flex: 1;
+    font-size: 26px;
+    color: var(--color-text-primary);
+    text-align: center;
+
+    &--label {
+      flex: 1.4;
+      text-align: left;
+      color: var(--color-text-secondary);
+    }
+
+    &--member {
+      color: var(--color-primary);
+      font-weight: 600;
+    }
+  }
+
+  &__cta {
+    background: var(--color-bg-card);
+    border-radius: var(--radius-md);
+    padding: 24px;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 32px;
+  }
+
+  &__btn {
+    background: var(--color-primary) !important;
+    color: var(--color-on-primary) !important;
+    border-radius: var(--radius-xl) !important;
+    height: 88px !important;
+    line-height: 88px !important;
+    font-size: 30px !important;
+    width: 100%;
+  }
+
+  &__cta-hint {
+    display: block;
+    text-align: center;
+    margin-top: 12px;
+    font-size: 22px;
+    color: var(--color-text-tertiary);
+  }
+
+  &__orders {
+    background: var(--color-bg-card);
+    border-radius: var(--radius-md);
+    padding: 24px 32px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  &__orders-header {
+    margin-bottom: 16px;
+  }
+
+  &__orders-title {
+    font-size: 28px;
+    font-weight: 600;
+  }
+
+  &__order {
+    padding: 16px 0;
+    border-bottom: 1px solid var(--color-border);
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  &__order-main {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  &__order-name {
+    font-size: 28px;
+    font-weight: 600;
+  }
+
+  &__order-status {
+    font-size: 22px;
+    padding: 2px 10px;
+    border-radius: 10px;
+
+    &--paid {
+      color: var(--color-primary);
+      background: var(--color-primary-tint);
+    }
+
+    &--pending {
+      color: var(--color-text-tertiary);
+      background: var(--color-border);
+    }
+  }
+
+  &__order-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 24px;
+    color: var(--color-text-tertiary);
+  }
+
+  &__order-amount {
+    color: var(--color-text-primary);
+    font-weight: 600;
+  }
+}

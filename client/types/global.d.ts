@@ -13,6 +13,8 @@ declare module '*.styl'
 
 declare const API_BASE_URL: string
 declare const APP_ENV: string
+/** W7-T2：支付 mock 开关；默认 true，W8 接真实商户号后设为 false */
+declare const PAYMENT_MOCK: boolean
 
 /**
  * 微信小程序全局对象；Taro 类型定义默认不注入 `wx`（走 Taro.xxx 封装），
@@ -29,5 +31,6 @@ declare namespace NodeJS {
     /** 自定义环境变量（来自 .env 或 cli --env） */
     TARO_APP_API_BASE_URL?: string
     TARO_APP_ENV?: string
+    TARO_APP_PAYMENT_MOCK?: string
   }
 }

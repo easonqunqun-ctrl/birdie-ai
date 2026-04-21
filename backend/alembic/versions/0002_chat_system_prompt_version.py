@@ -17,6 +17,7 @@ M3-T2 需要把"某次会话用的是哪版 system prompt"记下来，后续 pro
 from collections.abc import Sequence
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision: str = "0002"

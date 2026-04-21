@@ -15,7 +15,7 @@ from app.schemas.user import (
     UserStats,
     UserUpdateRequest,
 )
-from app.services import quota_service
+from app.services import payment_service, quota_service
 
 router = APIRouter()
 
@@ -30,6 +30,8 @@ def _build_user_response(user: User, *, include_stats: bool = True) -> UserRespo
         weekly_practice_frequency=user.weekly_practice_frequency,
         membership_type=user.membership_type,
         membership_expires_at=user.membership_expires_at,
+        is_member=payment_service.is_member(user),
+        membership_days_remaining=payment_service.days_remaining(user),
         onboarding_completed=user.onboarding_completed,
         stats=UserStats(
             total_analyses=user.total_analyses,

@@ -49,7 +49,7 @@ from app.core.database import AsyncSessionLocal
 from app.core.security import new_id
 from app.integrations.ai_engine import get_ai_engine
 from app.models.analysis import AnalysisIssue, AnalysisRecommendation, SwingAnalysis
-from app.services import quota_service
+from app.services import invitation_service, quota_service, training_service
 
 log = structlog.get_logger("tasks.analysis")
 
@@ -343,6 +343,36 @@ async def _mark_completed(analysis_id: str, engine_result: dict) -> None:
                     target_issue=r.get("target_issue"),
                     sort_order=idx,
                 )
+            )
+
+        # W7-T3：分析成功 → 同步生成/更新当周训练计划；任何异常都不能影响主流程落库
+        try:
+            await training_service.generate_or_update_weekly(
+                db,
+                user_id=analysis.user_id,
+                analysis_id=analysis.id,
+                issues=engine_result.get("issues") or [],
+            )
+        except Exception as exc:
+            log.warning(
+                "training_plan.generate_failed",
+                analysis_id=analysis.id,
+                user_id=analysis.user_id,
+                error=str(exc),
+            )
+
+        # W7-T4：被邀请者首次分析完成 → 结算 invitation（状态 registered → valid；
+        # inviter 累计 5 人发 7 天会员）。同样不能阻断分析主流程。
+        try:
+            await invitation_service.settle_on_first_analysis(
+                db, user_id=analysis.user_id, analysis_id=analysis.id
+            )
+        except Exception as exc:
+            log.warning(
+                "invitation.settle_failed",
+                analysis_id=analysis.id,
+                user_id=analysis.user_id,
+                error=str(exc),
             )
 
         await db.commit()

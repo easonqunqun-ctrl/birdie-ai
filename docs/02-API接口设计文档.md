@@ -1838,4 +1838,73 @@ POST /v1/events
 
 ---
 
+## 十、W7 实现偏差说明（2026-04 · 商业化与社交）
+
+> 设计阶段的接口形态（§五-§七）与 W7 实际落地存在以下路径/语义差异。**代码以本节为准**。路径差异不是 bug，而是为了让 `/users/me/*` 这一套集中聚合的路由前缀更一致（W1 开始的约定）。
+
+### 10.1 支付接口（原 §六 → 实际 §十）
+
+| 设计稿（§六） | W7 实际路径 | 备注 |
+|---|---|---|
+| `POST /v1/payments/subscriptions` | `POST /v1/payments/orders` | 请求体仍为 `{plan_type}`；返回 `{order_id, prepay_params}`，mock 模式下 `prepay_params = {"mock": true}` |
+| `POST /v1/payments/wechat-notify` | （**W8 接真实支付时落地**） | W7 目前用 `POST /v1/payments/orders/{id}/mock-confirm`（仅 `WECHAT_PAY_MOCK_MODE=true` 时可调）替代，直接跳 `paid` |
+| `GET /v1/payments/orders/{id}` | `GET /v1/payments/orders/{id}` | ✅ 无变化 |
+| `GET /v1/payments/membership` | `GET /v1/users/me/membership` | 返回 `{is_member, membership_type, expires_at, days_remaining, auto_renew}`；同时 `GET /v1/users/me` 的 `UserResponse` 也扩展了 `is_member` / `membership_days_remaining` 派生字段 |
+| `GET /v1/payments/plans` | `GET /v1/payments/plans` | **新增**：开通页套餐列表 |
+| `GET /v1/me/orders` | `GET /v1/users/me/orders` | 我的订单列表，按 `created_at DESC` |
+| `POST /v1/payments/membership/cancel-auto-renew` | （**W8 落地**） | 依赖真实支付委托扣款签约，W7 暂不支持 |
+
+### 10.2 训练接口（原 §五 → 实际路径）
+
+| 设计稿（§五） | W7 实际路径 | 备注 |
+|---|---|---|
+| `GET /v1/training/plans/current` | `GET /v1/users/me/training-plan/current` | 对齐 `/users/me/*` 聚合前缀；响应结构无变化 |
+| `POST /v1/training/tasks/{id}/complete` | `POST /v1/training-plan/tasks/{id}/complete` | 幂等：重复完成直接返回"已完成"；响应带 `current_streak_days` 供客户端即时刷新 |
+| `GET /v1/training/drills/{id}` | `GET /v1/drills`（列表） | W7 只提供列表；单条详情暂由客户端 `constants/drillLibrary.ts` 离线提供 |
+| `GET /v1/training/progress` | （**W8 落地**） | 依赖周/月聚合 UI；数据源 `practice_logs` 已采集 |
+| `GET /v1/training/calendar` | `GET /v1/users/me/practice-logs?month=YYYY-MM` | 月度练习记录；返回每天一条聚合（completed_count + duration_total） |
+
+### 10.3 邀请裂变接口（原 §七 → 实际路径）
+
+| 设计稿（§七） | W7 实际路径 | 备注 |
+|---|---|---|
+| `GET /v1/invitations/me` | `GET /v1/users/me/invite-info` | 返回 `{invite_code, total_invited, valid_count, next_reward_at, days_to_next_reward, total_bonus_days}`；`invite_url`（带小程序码）延后 W8 |
+| `GET /v1/invitations/records` | `GET /v1/users/me/invitations` | invitee 昵称经脱敏（"张***丰"），预防信息泄露 |
+| `POST /v1/invitations/share-action` | `POST /v1/shares/log`（见下） | 合并到统一的分享埋点接口 |
+
+### 10.4 分享接口（原 §三 §七 → 实际 `/shares/*`）
+
+| 设计稿 | W7 实际路径 | 备注 |
+|---|---|---|
+| `POST /v1/analyses/{id}/share-card`（§3.7） | （**W8 落地**） | 依赖 Canvas 离屏拼图 + 小程序码；W7 只做原生聊天分享卡片（`title + imageUrl + path`） |
+| —— | `POST /v1/shares/log` | **新增**。请求体 `{share_type: 'report'\|'invite_poster'\|'moments', target_id?}`；W7 只用 `report`；不做业务校验只埋点 |
+| —— | `GET /v1/analyses/{id}/public` | **新增 · 无需登录**。被分享者访问的脱敏报告；对 `is_sample`/未完成/不存在 → 404；只返回 `overall_score` + 最多 3 条 `high/medium` 问题名；**不含**骨骼视频/训练建议/key_frame_url/user_id |
+
+### 10.5 `UserResponse` 扩展字段（W7）
+
+```jsonc
+{
+  // ... W2 既有字段 ...
+  "membership_type": "monthly",             // free/monthly/yearly/family
+  "membership_expires_at": "2026-05-21T...",
+  "is_member": true,                         // 派生：membership_type!='free' && now()<expires_at
+  "membership_days_remaining": 29,           // 派生：max(0, (expires_at - now()).days)
+  "stats": {
+    "total_analyses": 12,
+    "streak_days": 4,                        // W7-T3：current_streak_days
+    "best_score": 82
+  }
+}
+```
+
+### 10.6 错误码新增
+
+| 码 | 触发 | 源 |
+|---|---|---|
+| 40006 | 分析配额已用完（免费 3 次/月） | `quota_service.py`（M1 既有；W7 复用，会员命中则跳过） |
+| 40402 | 分享的报告不存在/已删除/未完成/是示例 | `services/share_service.py::get_public_report` |
+| 40013 | 订单状态不允许本次操作（已支付重复 confirm / 已取消再支付等） | `services/payment_service.py::PaymentNotAllowedError` |
+
+---
+
 *文档完*

@@ -29,12 +29,11 @@ def _next_month_reset_at() -> datetime:
 
 
 def _is_member(user: User) -> bool:
-    """判断当前是否为有效会员."""
-    if user.membership_type == "free":
-        return False
-    if user.membership_expires_at is None:
-        return False
-    return user.membership_expires_at > datetime.now(UTC)
+    """判断当前是否为有效会员。W7-T1 起统一委托给 payment_service.is_member."""
+    # 循环导入规避：在函数内 import（payment_service 依赖本模块）
+    from app.services.payment_service import is_member
+
+    return is_member(user)
 
 
 # ==================== 分析配额 ====================

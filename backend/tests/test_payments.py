@@ -1,0 +1,326 @@
+"""W7-T1：支付与会员激活测试.
+
+覆盖：
+- 套餐列表
+- 下单 → mock-confirm → 订单 paid + 会员激活
+- 会员激活后配额变无限
+- 会员到期惰性降级（时间旅行 monkeypatch membership_expires_at）
+- 订单状态：重复支付、非 pending 支付拒绝
+- 年度套餐金额、时长正确
+- 续费叠加（未过期会员再次购买 → 从原到期日往后加）
+- 非 mock 模式下 mock-confirm 被拒
+- 无权操作他人订单
+"""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime, timedelta
+
+import pytest
+from httpx import AsyncClient
+from sqlalchemy import select
+
+from app.core.database import AsyncSessionLocal
+from app.models.payment import PaymentTransaction
+from app.models.user import User
+
+
+# ==================== 套餐列表 ====================
+@pytest.mark.asyncio
+async def test_list_plans_returns_monthly_and_yearly(
+    client: AsyncClient, auth_headers: dict[str, str]
+):
+    resp = await client.get("/v1/payments/plans", headers=auth_headers)
+    assert resp.status_code == 200
+    plans = resp.json()["data"]
+    assert {p["plan_type"] for p in plans} == {"monthly", "yearly"}
+    monthly = next(p for p in plans if p["plan_type"] == "monthly")
+    yearly = next(p for p in plans if p["plan_type"] == "yearly")
+    assert monthly["amount_cents"] == 3900
+    assert monthly["duration_days"] == 30
+    assert yearly["amount_cents"] == 29900
+    assert yearly["duration_days"] == 365
+    assert yearly["badge"]  # 有"立省"文案
+
+
+# ==================== 下单 → mock-confirm ====================
+@pytest.mark.asyncio
+async def test_create_order_returns_mock_prepay_params(
+    client: AsyncClient, auth_headers: dict[str, str]
+):
+    resp = await client.post(
+        "/v1/payments/orders",
+        headers=auth_headers,
+        json={"plan_type": "monthly"},
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()["data"]
+    assert data["mock_mode"] is True
+    assert data["prepay_params"]["mock"] is True
+    assert data["order"]["status"] == "pending"
+    assert data["order"]["amount"] == 3900
+    assert data["order"]["plan_type"] == "monthly"
+    assert data["order"]["paid_at"] is None
+
+
+@pytest.mark.asyncio
+async def test_mock_confirm_activates_membership_and_lifts_quotas(
+    client: AsyncClient, auth_headers: dict[str, str]
+):
+    # 先让用户产生当月分析配额 + 当日对话配额（通过 /users/me 触发 get_or_create）
+    me_before = (await client.get("/v1/users/me", headers=auth_headers)).json()["data"]
+    assert me_before["membership_type"] == "free"
+    assert me_before["quota"]["analysis_total"] == 3
+    assert me_before["quota"]["chat_total_today"] == 5
+
+    # 下单
+    create = (
+        await client.post(
+            "/v1/payments/orders", headers=auth_headers, json={"plan_type": "monthly"}
+        )
+    ).json()["data"]
+    order_id = create["order"]["id"]
+
+    # mock-confirm
+    confirm = await client.post(
+        f"/v1/payments/orders/{order_id}/mock-confirm", headers=auth_headers
+    )
+    assert confirm.status_code == 200, confirm.text
+    paid = confirm.json()["data"]
+    assert paid["status"] == "paid"
+    assert paid["paid_at"] is not None
+    assert paid["membership_end"] is not None
+
+    # /users/me 现在应该是会员 + 配额无限
+    me_after = (await client.get("/v1/users/me", headers=auth_headers)).json()["data"]
+    assert me_after["membership_type"] == "monthly"
+    assert me_after["is_member"] is True
+    assert 28 <= me_after["membership_days_remaining"] <= 31
+    assert me_after["quota"]["analysis_remaining"] == 9999
+    assert me_after["quota"]["chat_remaining_today"] == 9999
+
+    # /membership 返回一致
+    mem = (
+        await client.get("/v1/users/me/membership", headers=auth_headers)
+    ).json()["data"]
+    assert mem["is_member"] is True
+    assert mem["membership_type"] == "monthly"
+    assert mem["days_remaining"] >= 28
+
+
+@pytest.mark.asyncio
+async def test_yearly_plan_sets_expires_at_365_days_later(
+    client: AsyncClient, auth_headers: dict[str, str]
+):
+    create = (
+        await client.post(
+            "/v1/payments/orders", headers=auth_headers, json={"plan_type": "yearly"}
+        )
+    ).json()["data"]
+    order_id = create["order"]["id"]
+
+    await client.post(f"/v1/payments/orders/{order_id}/mock-confirm", headers=auth_headers)
+
+    me = (await client.get("/v1/users/me", headers=auth_headers)).json()["data"]
+    assert me["membership_type"] == "yearly"
+    # 约 365 天（允许 ±1 天的时区/跨日误差）
+    assert 363 <= me["membership_days_remaining"] <= 366
+
+
+# ==================== 已支付订单不可重复确认 ====================
+@pytest.mark.asyncio
+async def test_mock_confirm_rejects_already_paid_order(
+    client: AsyncClient, auth_headers: dict[str, str]
+):
+    create = (
+        await client.post(
+            "/v1/payments/orders", headers=auth_headers, json={"plan_type": "monthly"}
+        )
+    ).json()["data"]
+    order_id = create["order"]["id"]
+    await client.post(f"/v1/payments/orders/{order_id}/mock-confirm", headers=auth_headers)
+
+    # 再确认一次应失败
+    again = await client.post(
+        f"/v1/payments/orders/{order_id}/mock-confirm", headers=auth_headers
+    )
+    assert again.status_code == 400, again.text
+    assert again.json()["code"] == 40013
+
+
+# ==================== 他人订单不可操作 ====================
+@pytest.mark.asyncio
+async def test_cannot_confirm_another_users_order(
+    client: AsyncClient, auth_headers: dict[str, str]
+):
+    # 用户 A 下单
+    create = (
+        await client.post(
+            "/v1/payments/orders", headers=auth_headers, json={"plan_type": "monthly"}
+        )
+    ).json()["data"]
+    order_id = create["order"]["id"]
+
+    # 用户 B 登录 → 试图访问 A 的订单
+    from uuid import uuid4
+
+    login_b = await client.post(
+        "/v1/auth/wechat-login", json={"code": f"pytest_{uuid4().hex}"}
+    )
+    headers_b = {"Authorization": f"Bearer {login_b.json()['data']['token']}"}
+
+    confirm = await client.post(
+        f"/v1/payments/orders/{order_id}/mock-confirm", headers=headers_b
+    )
+    # 404（订单不存在当前用户视角）
+    assert confirm.status_code == 404
+
+
+# ==================== 无效套餐 ====================
+@pytest.mark.asyncio
+async def test_create_order_rejects_unknown_plan(
+    client: AsyncClient, auth_headers: dict[str, str]
+):
+    resp = await client.post(
+        "/v1/payments/orders", headers=auth_headers, json={"plan_type": "platinum"}
+    )
+    assert resp.status_code in (400, 422)
+
+
+# ==================== mock 模式关闭时拒绝 mock-confirm ====================
+@pytest.mark.asyncio
+async def test_mock_confirm_disabled_when_mock_mode_off(
+    monkeypatch: pytest.MonkeyPatch,
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+):
+    # 先用 mock 模式下单（create_order 里还会走 mock prepay）
+    create = (
+        await client.post(
+            "/v1/payments/orders", headers=auth_headers, json={"plan_type": "monthly"}
+        )
+    ).json()["data"]
+    order_id = create["order"]["id"]
+
+    # 然后关 mock 开关再去 confirm
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "WECHAT_PAY_MOCK_MODE", False)
+    resp = await client.post(
+        f"/v1/payments/orders/{order_id}/mock-confirm", headers=auth_headers
+    )
+    assert resp.status_code == 400
+    assert resp.json()["code"] == 40013
+
+
+# ==================== 续费叠加 ====================
+@pytest.mark.asyncio
+async def test_renew_extends_from_existing_expiry(
+    client: AsyncClient, auth_headers: dict[str, str]
+):
+    # 第一次购买月度
+    c1 = (
+        await client.post(
+            "/v1/payments/orders", headers=auth_headers, json={"plan_type": "monthly"}
+        )
+    ).json()["data"]
+    await client.post(
+        f"/v1/payments/orders/{c1['order']['id']}/mock-confirm", headers=auth_headers
+    )
+    me1 = (await client.get("/v1/users/me", headers=auth_headers)).json()["data"]
+    end1 = datetime.fromisoformat(me1["membership_expires_at"])
+
+    # 立即再买一次月度 → 应该从原到期日往后 +30 天
+    c2 = (
+        await client.post(
+            "/v1/payments/orders", headers=auth_headers, json={"plan_type": "monthly"}
+        )
+    ).json()["data"]
+    await client.post(
+        f"/v1/payments/orders/{c2['order']['id']}/mock-confirm", headers=auth_headers
+    )
+    me2 = (await client.get("/v1/users/me", headers=auth_headers)).json()["data"]
+    end2 = datetime.fromisoformat(me2["membership_expires_at"])
+
+    delta = end2 - end1
+    # 允许 ±2s 漂移
+    assert abs(delta.total_seconds() - 30 * 86400) < 5
+
+
+# ==================== 惰性降级 ====================
+@pytest.mark.asyncio
+async def test_expired_membership_auto_downgrades_on_read(
+    client: AsyncClient, auth_headers: dict[str, str]
+):
+    # 先开会员
+    c = (
+        await client.post(
+            "/v1/payments/orders", headers=auth_headers, json={"plan_type": "monthly"}
+        )
+    ).json()["data"]
+    await client.post(
+        f"/v1/payments/orders/{c['order']['id']}/mock-confirm", headers=auth_headers
+    )
+    me1 = (await client.get("/v1/users/me", headers=auth_headers)).json()["data"]
+    assert me1["is_member"] is True
+
+    # 直接改库：把 membership_expires_at 改到 1 小时前
+    user_id = me1["id"]
+    async with AsyncSessionLocal() as db:
+        u = await db.get(User, user_id)
+        u.membership_expires_at = datetime.now(UTC) - timedelta(hours=1)
+        await db.commit()
+
+    # 再调 /users/me → 应自动降级为 free + 配额回到 3 / 5
+    me2 = (await client.get("/v1/users/me", headers=auth_headers)).json()["data"]
+    assert me2["is_member"] is False
+    assert me2["membership_type"] == "free"
+    assert me2["membership_days_remaining"] == 0
+    assert me2["quota"]["analysis_total"] == 3
+    assert me2["quota"]["chat_total_today"] == 5
+
+
+# ==================== 订单查询 ====================
+@pytest.mark.asyncio
+async def test_list_and_get_my_orders(
+    client: AsyncClient, auth_headers: dict[str, str]
+):
+    ids = []
+    for plan in ("monthly", "yearly"):
+        c = (
+            await client.post(
+                "/v1/payments/orders", headers=auth_headers, json={"plan_type": plan}
+            )
+        ).json()["data"]
+        ids.append(c["order"]["id"])
+
+    listing = await client.get("/v1/users/me/orders", headers=auth_headers)
+    assert listing.status_code == 200
+    orders = listing.json()["data"]
+    assert {o["id"] for o in orders} >= set(ids)
+
+    detail = await client.get(f"/v1/payments/orders/{ids[0]}", headers=auth_headers)
+    assert detail.status_code == 200
+    assert detail.json()["data"]["id"] == ids[0]
+
+
+# ==================== 支付流水 ====================
+@pytest.mark.asyncio
+async def test_payment_transaction_is_recorded_on_mock_pay(
+    client: AsyncClient, auth_headers: dict[str, str]
+):
+    create = (
+        await client.post(
+            "/v1/payments/orders", headers=auth_headers, json={"plan_type": "monthly"}
+        )
+    ).json()["data"]
+    order_id = create["order"]["id"]
+    await client.post(f"/v1/payments/orders/{order_id}/mock-confirm", headers=auth_headers)
+
+    async with AsyncSessionLocal() as db:
+        stmt = select(PaymentTransaction).where(PaymentTransaction.order_id == order_id)
+        txns = list((await db.execute(stmt)).scalars().all())
+        assert len(txns) == 1
+        assert txns[0].transaction_type == "payment"
+        assert txns[0].amount == 3900
+        assert txns[0].wechat_notify_data == {"mock": True}

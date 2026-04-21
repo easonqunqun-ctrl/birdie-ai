@@ -59,6 +59,10 @@ export interface User {
   weekly_practice_frequency: WeeklyFreq | null
   membership_type: MembershipType
   membership_expires_at: string | null
+  /** W7-T1：后端派生字段，前端不必再计算时区偏差 */
+  is_member: boolean
+  /** W7-T1：会员剩余天数；非会员为 0 */
+  membership_days_remaining: number
   onboarding_completed: boolean
   stats?: UserStats
   quota?: UserQuota

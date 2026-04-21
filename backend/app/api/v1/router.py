@@ -2,7 +2,17 @@
 
 from fastapi import APIRouter
 
-from app.api.v1 import analyses, auth, chat, common, users
+from app.api.v1 import (
+    analyses,
+    auth,
+    chat,
+    common,
+    invitations,
+    payments,
+    shares,
+    training,
+    users,
+)
 
 api_router = APIRouter()
 
@@ -11,3 +21,14 @@ api_router.include_router(auth.router, prefix="/auth", tags=["认证"])
 api_router.include_router(users.router, prefix="/users", tags=["用户"])
 api_router.include_router(analyses.router, prefix="/analyses", tags=["分析"])
 api_router.include_router(chat.router, prefix="/chat", tags=["AI 对话"])
+api_router.include_router(payments.router, prefix="/payments", tags=["支付"])
+# /me/orders、/me/membership、/me/training-plan、/me/practice-logs 挂 /users/me 下（集中聚合）
+api_router.include_router(payments.me_router, prefix="/users/me", tags=["支付"])
+api_router.include_router(training.router, prefix="/training-plan", tags=["训练"])
+api_router.include_router(training.me_router, prefix="/users/me", tags=["训练"])
+api_router.include_router(training.drills_router, prefix="/drills", tags=["训练"])
+api_router.include_router(invitations.me_router, prefix="/users/me", tags=["邀请"])
+api_router.include_router(shares.shares_router, prefix="/shares", tags=["分享"])
+api_router.include_router(
+    shares.analyses_public_router, prefix="/analyses", tags=["分享"]
+)

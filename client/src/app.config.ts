@@ -17,7 +17,9 @@ export default defineAppConfig({
     'pages/coach/index',
     'pages/training/index',
     'pages/profile/index',
-    'pages/profile/edit'
+    'pages/profile/edit',
+    'pages/profile/membership',
+    'pages/profile/invitations'
   ],
   window: {
     backgroundTextStyle: 'light',

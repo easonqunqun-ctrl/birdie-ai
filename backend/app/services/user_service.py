@@ -15,6 +15,12 @@ async def get_user_by_id(db: AsyncSession, user_id: str) -> User:
     user = await db.get(User, user_id)
     if user is None or user.deleted_at is not None:
         raise NotFoundError(code=40401, message="用户不存在")
+    # W7-T1：会员到期惰性降级。调用方（含 get_current_user）所在的请求事务会
+    # 在响应阶段 commit；降级 UPDATE 随请求一起落库，无需额外 flush。
+    # 循环导入规避：在函数内 import
+    from app.services import payment_service
+
+    await payment_service.ensure_membership_valid(db, user)
     return user
 
 
@@ -59,6 +65,16 @@ async def login_or_create_user(
     )
     db.add(user)
     await db.flush()
+
+    # W7-T4：若带了有效 invite_code → 写 invitations 表 + 给双方 +1 当月分析 bonus。
+    # 循环导入规避：函数内 import。
+    if inviter_id is not None and invite_code:
+        from app.services import invitation_service
+
+        await invitation_service.bind_on_register(
+            db, invitee=user, invite_code=invite_code
+        )
+
     return user, True
 
 

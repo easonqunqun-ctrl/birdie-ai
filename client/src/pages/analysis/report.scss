@@ -496,4 +496,56 @@
       font-size: 26rpx !important;
     }
   }
+
+  /* ================= W7-T5 公开（分享）报告 ================= */
+  &--public {
+    background: var(--color-bg);
+  }
+
+  &__public-hero {
+    text-align: center;
+    padding: 40rpx 0 20rpx;
+  }
+
+  &__public-owner {
+    display: block;
+    font-size: 32rpx;
+    color: var(--color-text-primary);
+    font-weight: 600;
+    margin-bottom: 24rpx;
+  }
+
+  &__public-thumb {
+    width: 100%;
+    height: 360rpx;
+    border-radius: var(--radius-lg);
+    margin-bottom: 16rpx;
+  }
+
+  &__public-cta {
+    margin-top: 48rpx;
+    padding: 48rpx 32rpx;
+    border-radius: var(--radius-lg);
+    background: linear-gradient(135deg, var(--color-primary) 0%, #1fa875 100%);
+    color: #fff;
+    text-align: center;
+  }
+
+  &__public-cta-title {
+    display: block;
+    font-size: 36rpx;
+    font-weight: 700;
+    margin-bottom: 12rpx;
+  }
+
+  &__public-cta-desc {
+    display: block;
+    font-size: 26rpx;
+    opacity: 0.9;
+    margin-bottom: 32rpx;
+  }
+
+  &__issue--public {
+    cursor: default;
+  }
 }

@@ -167,6 +167,7 @@ make ci                 # test 基础上 + 真实引擎 smoke（bouncing_box →
 | [12-M2 任务拆分](./docs/12-M2任务拆分.md) | 核心分析链路（W3-W4）的 6 个子任务 |
 | [13-M3 任务拆分](./docs/13-M3任务拆分.md) | AI 对话教练（W5）的 6 个子任务 |
 | [14-W6 任务拆分](./docs/14-W6任务拆分.md) | AI 真实引擎替换（W6）的 6 个子任务 |
+| [15-W7 任务拆分](./docs/15-W7任务拆分.md) | 商业化与社交（W7）的 6 个子任务：会员/订单/训练/邀请/分享 |
 | [API 联调示例](./docs/api-examples/) | M1 端到端 curl 脚本（登录→引导→编辑→刷新） |
 | [AGENTS.md](./AGENTS.md) | AI 协同工作约定（Cursor 等会话首读） |
 
@@ -179,7 +180,7 @@ make ci                 # test 基础上 + 真实引擎 smoke（bouncing_box →
 - [x] **W3-W4**：核心分析链路（上传 → Celery + Mock 分析 → 报告页 + 历史 + 示例视频体验；详见 [M2 任务拆分](./docs/12-M2任务拆分.md) 与 [W3-W4 走查记录](./docs/release-notes/W3-W4-walkthrough.md)）
 - [x] W5：AI 对话（LLM 流式接入）—— M3-T1 后端骨架/配额 ✅ · M3-T2 LLM 客户端 + system prompt + SSE 流式 ✅ · M3-T3 前端对话页 + 非流式打通 ✅ · M3-T4 前端 SSE 流式 + 打字动画 + drill_card ✅ · M3-T5 报告页/首页入口闭环 ✅ · M3-T6 文档同步 + walkthrough ✅
 - [x] **W6**：AI 真实引擎替换 —— W6-T1 预处理 + MediaPipe ✅ · T2 阶段分割 + 15 特征 + 评分 + 诊断 ✅ · T3 骨骼可视化 + MinIO ✅ · T4 真实引擎接入 + stage 推进 + 错误码透传 ✅ · T5 Docker + CI 质量门 ✅ · T6 文档同步 + walkthrough ✅（详见 [W6 任务拆分](./docs/14-W6任务拆分.md) 与 [W6 真实引擎 walkthrough](./docs/release-notes/W6-real-engine-walkthrough.md)）
-- [ ] W7：商业化与社交（支付 + 邀请 + 训练）
+- [x] **W7**：商业化与社交 —— T1 支付订单 + 会员权益（mock-pay）✅ · T2 客户端会员中心 + 替换 7 处占位 ✅ · T3 训练计划 + 打卡 + streak ✅ · T4 邀请裂变（绑定/结算/奖励）✅ · T5 分享报告 + 脱敏公开报告 + share_actions ✅ · T6 文档同步 + walkthrough ✅（详见 [W7 任务拆分](./docs/15-W7任务拆分.md) 与 [W7 商业化 walkthrough](./docs/release-notes/W7-commerce-walkthrough.md)）
 - [ ] W8：双端发布准备
 
 ---

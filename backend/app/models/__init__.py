@@ -8,6 +8,10 @@ from app.models.analysis import (
 )
 from app.models.base import Base
 from app.models.chat import ChatMessage, ChatQuota, ChatSession
+from app.models.invitation import Invitation
+from app.models.payment import Order, PaymentTransaction
+from app.models.share import ShareAction
+from app.models.training import Drill, PracticeLog, TrainingPlan, TrainingTask
 from app.models.user import User
 
 __all__ = [
@@ -18,6 +22,14 @@ __all__ = [
     "ChatMessage",
     "ChatQuota",
     "ChatSession",
+    "Drill",
+    "Invitation",
+    "Order",
+    "PaymentTransaction",
+    "PracticeLog",
+    "ShareAction",
     "SwingAnalysis",
+    "TrainingPlan",
+    "TrainingTask",
     "User",
 ]

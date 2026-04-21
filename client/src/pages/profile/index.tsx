@@ -39,8 +39,10 @@ const ProfilePage: FC = () => {
     Taro.navigateTo({ url: '/pages/profile/edit' })
   }
 
-  const isMember = user.membership_type !== 'free'
-  const membershipLabel = isMember ? '会员' : '免费用户'
+  const isMember = user.is_member
+  const membershipLabel = isMember
+    ? `${user.membership_type === 'yearly' ? '年度' : '月度'}会员 · ${user.membership_days_remaining}天`
+    : '免费用户'
 
   const levelText = user.golf_level ? LEVEL_LABEL[user.golf_level as GolfLevel] : '未设置'
   const goalsText = user.primary_goals.length > 0
@@ -131,8 +133,24 @@ const ProfilePage: FC = () => {
           </View>
           <View
             className='profile__menu-item'
+            onClick={() => Taro.navigateTo({ url: '/pages/profile/membership' })}
+          >
+            <Text className='profile__menu-icon'>👑</Text>
+            <Text className='profile__menu-label'>会员中心</Text>
+            <Text className='profile__menu-arrow'>›</Text>
+          </View>
+          <View
+            className='profile__menu-item'
+            onClick={() => Taro.navigateTo({ url: '/pages/profile/invitations' })}
+          >
+            <Text className='profile__menu-icon'>🎁</Text>
+            <Text className='profile__menu-label'>邀请好友</Text>
+            <Text className='profile__menu-arrow'>›</Text>
+          </View>
+          <View
+            className='profile__menu-item'
             onClick={() =>
-              Taro.showToast({ title: '对话历史 W7 再开放', icon: 'none' })
+              Taro.showToast({ title: '对话历史 W8 再开放', icon: 'none' })
             }
           >
             <Text className='profile__menu-icon'>🗂️</Text>

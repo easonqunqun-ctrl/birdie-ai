@@ -14,7 +14,15 @@ from app.schemas.user import (
     WechatLoginRequest,
     WechatLoginResponse,
 )
-from app.services import user_service
+from app.services import payment_service, user_service
+
+
+def _user_response(user: object) -> UserResponse:
+    """构造含会员派生字段的 UserResponse（auth 路径复用）."""
+    data = UserResponse.model_validate(user).model_dump()
+    data["is_member"] = payment_service.is_member(user)
+    data["membership_days_remaining"] = payment_service.days_remaining(user)
+    return UserResponse(**data)
 
 router = APIRouter()
 
@@ -52,7 +60,7 @@ async def wechat_login(
             token=token,
             expires_in=expires_in,
             is_new_user=is_new_user,
-            user=UserResponse.model_validate(user),
+            user=_user_response(user),
         )
     )
 

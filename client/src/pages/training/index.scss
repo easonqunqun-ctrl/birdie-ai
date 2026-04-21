@@ -1,0 +1,224 @@
+.training {
+  padding: 24px 32px 48px;
+  background: var(--color-bg-page);
+  min-height: 100vh;
+  box-sizing: border-box;
+
+  &--empty {
+    padding: 120px 48px;
+    text-align: center;
+    color: var(--color-text-muted);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  &__empty-icon {
+    font-size: 96px;
+  }
+  &__empty-title {
+    font-size: 32px;
+    color: var(--color-text-primary);
+    font-weight: 600;
+  }
+  &__empty-sub {
+    font-size: 26px;
+    line-height: 1.6;
+    color: var(--color-text-muted);
+  }
+  &__empty-cta {
+    margin-top: 32px;
+    min-width: 240px;
+  }
+
+  &__hero {
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-soft) 100%);
+    color: var(--color-on-primary);
+    border-radius: var(--radius-md);
+    padding: 32px 28px;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 24px;
+  }
+  &__hero-title {
+    font-size: 32px;
+    font-weight: 700;
+    display: block;
+  }
+  &__hero-sub {
+    font-size: 24px;
+    opacity: 0.85;
+    display: block;
+    margin-top: 4px;
+  }
+
+  &__progress {
+    margin-top: 24px;
+  }
+  &__progress-track {
+    height: 12px;
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  &__progress-bar {
+    height: 100%;
+    background: var(--color-on-primary, #fff);
+    border-radius: 6px;
+    transition: width 0.3s ease;
+  }
+  &__progress-label {
+    display: block;
+    font-size: 24px;
+    margin-top: 8px;
+    opacity: 0.85;
+  }
+
+  &__streak {
+    margin-top: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 24px;
+    padding: 8px 16px;
+    width: fit-content;
+  }
+  &__streak-icon {
+    font-size: 28px;
+  }
+  &__streak-text {
+    font-size: 24px;
+    font-weight: 600;
+  }
+
+  &__summary {
+    background: var(--color-bg-card);
+    border-radius: var(--radius-sm);
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-xs);
+  }
+  &__summary-title {
+    font-size: 26px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    display: block;
+    margin-bottom: 8px;
+  }
+  &__summary-body {
+    font-size: 24px;
+    line-height: 1.6;
+    color: var(--color-text-secondary);
+  }
+
+  &__day {
+    margin-bottom: 24px;
+  }
+  &__day-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 8px 4px 12px;
+  }
+  &__day-label {
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
+  &__day-count {
+    font-size: 22px;
+    color: var(--color-text-muted);
+  }
+
+  &__task {
+    background: var(--color-bg-card);
+    border-radius: var(--radius-sm);
+    margin-bottom: 16px;
+    box-shadow: var(--shadow-xs);
+    overflow: hidden;
+
+    &.is-done {
+      opacity: 0.7;
+    }
+  }
+  &__task-head {
+    display: flex;
+    align-items: center;
+    padding: 24px 28px;
+  }
+  &__task-head-main {
+    flex: 1;
+  }
+  &__task-name {
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    display: block;
+  }
+  &__task-meta {
+    font-size: 22px;
+    color: var(--color-text-muted);
+    margin-top: 6px;
+    display: block;
+  }
+  &__task-arrow {
+    font-size: 24px;
+    color: var(--color-primary);
+    padding-left: 16px;
+  }
+
+  &__task-body {
+    padding: 0 28px 24px;
+    border-top: 1px solid var(--color-divider, #eee);
+    padding-top: 20px;
+  }
+  &__task-desc {
+    font-size: 24px;
+    color: var(--color-text-secondary);
+    line-height: 1.6;
+    margin-bottom: 16px;
+    display: block;
+  }
+
+  &__steps {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  &__step {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+  &__step-index {
+    flex: 0 0 36px;
+    height: 36px;
+    line-height: 36px;
+    text-align: center;
+    background: var(--color-primary-soft, #eaf3ff);
+    color: var(--color-primary);
+    border-radius: 18px;
+    font-size: 22px;
+    font-weight: 600;
+  }
+  &__step-text {
+    flex: 1;
+    font-size: 24px;
+    color: var(--color-text-primary);
+    line-height: 1.6;
+    padding-top: 4px;
+  }
+
+  &__task-cta {
+    width: 100%;
+  }
+  &__task-completed-label {
+    display: block;
+    text-align: center;
+    font-size: 22px;
+    color: var(--color-text-muted);
+    padding: 12px 0;
+  }
+}

@@ -330,9 +330,12 @@ const CoachPage: FC = () => {
               Taro.showModal({
                 title: '今日对话已用完',
                 content: '升级会员即可享受不限次 AI 对话。',
-                confirmText: '了解会员',
-                success: () =>
-                  Taro.showToast({ title: '会员能力 W7 上线', icon: 'none' }),
+                confirmText: '开通会员',
+                success: ({ confirm }) => {
+                  if (confirm) {
+                    Taro.navigateTo({ url: '/pages/profile/membership' })
+                  }
+                },
               })
             }
           >
@@ -500,9 +503,12 @@ function toastSubmitError(err: SubmitMessageError | null) {
       Taro.showModal({
         title: '今日对话已用完',
         content: '升级会员即可享受不限次 AI 对话。',
-        confirmText: '了解会员',
-        success: () =>
-          Taro.showToast({ title: '会员能力 W7 上线', icon: 'none' }),
+        confirmText: '开通会员',
+        success: ({ confirm }) => {
+          if (confirm) {
+            Taro.navigateTo({ url: '/pages/profile/membership' })
+          }
+        },
       })
       break
     case 'rate_limit':

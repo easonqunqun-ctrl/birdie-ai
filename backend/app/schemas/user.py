@@ -51,6 +51,10 @@ class UserResponse(BaseModel):
     weekly_practice_frequency: WeeklyFreq | None
     membership_type: MembershipType
     membership_expires_at: datetime | None
+    # W7-T1：前端多处需要"是否会员 / 还剩几天"，派生自 membership_type +
+    # membership_expires_at；放到顶层避免客户端重复计算时区
+    is_member: bool = False
+    membership_days_remaining: int = 0
     onboarding_completed: bool
     stats: UserStats | None = None
     quota: UserQuota | None = None
