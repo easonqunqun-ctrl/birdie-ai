@@ -9,7 +9,7 @@
         deploy-check-env \
         deploy-test test-logs test-ps test-reset test-restart test-certs test-health \
         issue-le-cert sync-le-certs renew-le-cert verify-weapp-https \
-        deploy-cvm-up deploy-cvm-ps deploy-cvm-logs
+        deploy-cvm-up deploy-cvm-ps deploy-cvm-logs publish-backend-cvm
 
 # 默认目标：显示帮助
 help:
@@ -66,7 +66,8 @@ help:
 	@echo "  bash infra/deploy/cvm-rebuild-backend.sh   CVM：backend 绑定挂载 + .venv/uv sync + 重建（见文档）"
 	@echo "  make test-certs HOST=...  生成自签 HTTPS 证书（首次部署前）"
 	@echo "  make deploy-test          一键起测试栈（compose -f base -f test）"
-	@echo "  make deploy-cvm-up        CVM 推荐：同上 + docker-compose.cvm.yml（镜像内源码，不着陆 bind）"
+	@echo "  make deploy-cvm-up        CVM：+ docker-compose.cvm.yml；若有 docker-compose.wechat-pay-key.yml 则自动挂商户 PEM"
+	@echo "  make publish-backend-cvm   无 Git 时：scp 后端关键文件→默认 ubuntu@1.13.198.172 并 compose 重建 backend/celery（须在本地终端交互输 SSH 密码，见 infra/deploy/publish-backend-to-cvm.sh）"
 	@echo "  make test-logs            tail 测试栈所有服务日志"
 	@echo "  make test-ps              查看测试栈状态"
 	@echo "  make test-restart         重启测试栈"
@@ -252,7 +253,9 @@ ci: test ai-engine-smoke
 TEST_COMPOSE := docker compose -f docker-compose.yml -f docker-compose.test.yml --env-file .env.local
 
 # CVM 规范化：`docker-compose.cvm.yml` 用 Compose merge `!reset` 去掉 backend/celery/ai_engine 宿主 bind
-CVM_COMPOSE := docker compose -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.cvm.yml --env-file .env.local
+# 若在仓库根存在 `docker-compose.wechat-pay-key.yml`（从 docker-compose.wechat-pay-key.example.yml 复制并改 PEM 路径），自动叠加挂载私钥。
+CVM_PAY_KEY_FLAGS := $(if $(wildcard docker-compose.wechat-pay-key.yml),-f docker-compose.wechat-pay-key.yml,)
+CVM_COMPOSE := docker compose -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.cvm.yml $(CVM_PAY_KEY_FLAGS) --env-file .env.local
 
 deploy-cvm-up:
 	@if [ ! -f docker-compose.cvm.yml ]; then \
@@ -267,6 +270,10 @@ deploy-cvm-ps:
 
 deploy-cvm-logs:
 	$(CVM_COMPOSE) logs -f --tail=200
+
+# 从本 Mac 推到当前 CVM 默认 IP（infra/deploy/publish-backend-to-cvm.sh；密码登录须有 TTY）
+publish-backend-cvm:
+	bash infra/deploy/publish-backend-to-cvm.sh
 
 test-certs:
 	@if [ -z "$(HOST)" ]; then \
