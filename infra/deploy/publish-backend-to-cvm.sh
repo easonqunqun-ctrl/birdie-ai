@@ -73,7 +73,9 @@ scp "${SSH_OPTS[@]}" backend/app/config.py \
 scp "${SSH_OPTS[@]}" backend/app/integrations/llm.py \
   "${DEPLOY_HOST}:${DEPLOY_REPO}/backend/app/integrations/llm.py"
 
-REMOTE_RUN_DEFAULT="cd '${DEPLOY_REPO}' && docker compose -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.cvm.yml ${REMOTE_EXTRA_COMPOSE_FLAGS} --env-file .env.local up -d --build backend celery-worker"
+# 须用「仓库内」.env.local 的绝对路径 + --project-directory；否则部分 compose 版本会把
+# --env-file .env.local 解析成 $HOME/.env.local（出现 couldn't find env file: /home/ubuntu/.env.local）。
+REMOTE_RUN_DEFAULT="set -e; cd '${DEPLOY_REPO}' || { echo \"✗ 远端目录不存在: ${DEPLOY_REPO}\" >&2; exit 1; }; test -f '.env.local' || { echo \"✗ 缺少 ${DEPLOY_REPO}/.env.local — 请按 docs/release-notes/CVM-canonical-deploy.md 在服务器维护密钥文件（勿用本机误盖）\" >&2; exit 1; }; docker compose --project-directory '${DEPLOY_REPO}' -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.cvm.yml ${REMOTE_EXTRA_COMPOSE_FLAGS} --env-file '${DEPLOY_REPO}/.env.local' up -d --build backend celery-worker"
 
 if [[ -n "${REMOTE_BUILD_CMD}" ]]; then
   ssh "${SSH_OPTS[@]}" "${DEPLOY_HOST}" bash -lc "${REMOTE_BUILD_CMD}"

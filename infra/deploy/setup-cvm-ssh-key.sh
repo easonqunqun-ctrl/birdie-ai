@@ -14,6 +14,12 @@
 set -euo pipefail
 
 DEPLOY_HOST="${DEPLOY_HOST:-ubuntu@1.13.198.172}"
+# 从 IM/文档复制时偶发全角字符、CR、首尾空白 → ssh-copy-id 报「hostname contains invalid characters」
+DEPLOY_HOST="$(printf '%s' "${DEPLOY_HOST}" | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+if [[ ! "${DEPLOY_HOST}" =~ ^[A-Za-z0-9._-]+@[A-Za-z0-9.:_-]+$ ]]; then
+  echo "✗ DEPLOY_HOST 异常（勿含中文引号/换行）：${DEPLOY_HOST}" >&2
+  exit 1
+fi
 BIRDIE_CVM_KEY="${BIRDIE_CVM_KEY:-$HOME/.ssh/id_ed25519_birdie_golf}"
 
 mkdir -p "$(dirname "${BIRDIE_CVM_KEY}")"
