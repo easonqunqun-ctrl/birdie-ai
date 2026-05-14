@@ -9,7 +9,7 @@
         deploy-check-env \
         deploy-test test-logs test-ps test-reset test-restart test-certs test-health \
         issue-le-cert sync-le-certs renew-le-cert verify-weapp-https \
-        deploy-cvm-up deploy-cvm-ps deploy-cvm-logs publish-backend-cvm
+        deploy-cvm-up deploy-cvm-ps deploy-cvm-logs publish-backend-cvm setup-cvm-ssh-key
 
 # 默认目标：显示帮助
 help:
@@ -67,7 +67,8 @@ help:
 	@echo "  make test-certs HOST=...  生成自签 HTTPS 证书（首次部署前）"
 	@echo "  make deploy-test          一键起测试栈（compose -f base -f test）"
 	@echo "  make deploy-cvm-up        CVM：+ docker-compose.cvm.yml；若有 docker-compose.wechat-pay-key.yml 则自动挂商户 PEM"
-	@echo "  make publish-backend-cvm   无 Git 时：scp 后端关键文件→默认 ubuntu@1.13.198.172 并 compose 重建 backend/celery（须在本地终端交互输 SSH 密码，见 infra/deploy/publish-backend-to-cvm.sh）"
+	@echo "  make publish-backend-cvm   scp backend 关键→默认 ubuntu@1.13.198.172 并 compose rebuild（密钥免密前先 make setup-cvm-ssh-key）"
+	@echo "  make setup-cvm-ssh-key     路径 B：专用 ed25519 + ssh-copy-id（只一次输服务器密码）"
 	@echo "  make test-logs            tail 测试栈所有服务日志"
 	@echo "  make test-ps              查看测试栈状态"
 	@echo "  make test-restart         重启测试栈"
@@ -271,7 +272,11 @@ deploy-cvm-ps:
 deploy-cvm-logs:
 	$(CVM_COMPOSE) logs -f --tail=200
 
-# 从本 Mac 推到当前 CVM 默认 IP（infra/deploy/publish-backend-to-cvm.sh；密码登录须有 TTY）
+# 路径 B：公钥装进 CVM → 此后 publish-backend-cvm 无密码（首次须在本机终端跑，会提示一次服务器口令）
+setup-cvm-ssh-key:
+	bash infra/deploy/setup-cvm-ssh-key.sh
+
+# 从本 Mac 推到当前 CVM（优先使用 ~/.ssh/id_ed25519_birdie_golf）
 publish-backend-cvm:
 	bash infra/deploy/publish-backend-to-cvm.sh
 

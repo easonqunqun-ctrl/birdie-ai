@@ -103,7 +103,8 @@ bash infra/deploy/cvm-rebuild-backend.sh         # CVM：backend 绑定挂载 + 
 make issue-le-cert EMAIL=you@example.com DOMAIN=api.example.com
 make renew-le-cert DOMAIN=api.example.com
 make sync-le-certs DOMAIN=api.example.com
-make publish-backend-cvm                 # CVM：无 Git 时用 scp+ssh（默认 ubuntu@1.13.198.172；须在本地 Terminal 交互输 SSH 密码，见 infra/deploy/publish-backend-to-cvm.sh）
+make setup-cvm-ssh-key                 # 路径 B：一次 ssh-copy-id 后免密发布
+make publish-backend-cvm               # CVM：scp+compose（优先 ~/.ssh/id_ed25519_birdie_golf）
 # W8 从零搭机：docs/release-notes/W8-test-env-runbook.md；**规范化/Git+密钥+去 bind**：docs/release-notes/CVM-canonical-deploy.md
 
 # 后端

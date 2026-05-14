@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 # 在无 Git/CD 时用：本机拷贝后端关键源码 → CVM → docker compose rebuild（backend + celery）。
 #
-# 默认主机：ubuntu@1.13.198.172（可被环境变量覆盖）
-#   DEPLOY_HOST=ubuntu@别的IP DEPLOY_REPO=/home/ubuntu/别的目录 bash infra/deploy/publish-backend-to-cvm.sh
+# 【推荐先发】路径 B 免密：bash infra/deploy/setup-cvm-ssh-key.sh
+# （一次输入服务器密码后，本会话自动用 ~/.ssh/id_ed25519_birdie_golf）
 #
-# 若远端 compose 还须叠微信商户 PEM：
-#   REMOTE_EXTRA_COMPOSE_FLAGS="-f docker-compose.wechat-pay-key.yml" bash infra/deploy/publish-backend-to-cvm.sh
+# 默认主机 ubuntu@1.13.198.172；覆盖示例：
+#   DEPLOY_HOST=ubuntu@… DEPLOY_REPO=/home/ubuntu/xxx bash infra/deploy/publish-backend-to-cvm.sh
 #
-# 密码登录：必须在「你自己的终端」（有 TTY）；Agent 等非交互会话无法替你输入密码。
-# 配置免密后可在任意环境一键跑：ssh-copy-id "$DEPLOY_HOST"
+# compose 叠加商户 PEM：
+#   REMOTE_EXTRA_COMPOSE_FLAGS="-f docker-compose.wechat-pay-key.yml" …
 #
-# 若远端不是 CVM 三文件编排，可自行覆盖远端命令：
-#   REMOTE_BUILD_CMD='cd /home/ubuntu/foo && docker compose --env-file .env.local up -d --build backend' bash ...
+# 非交互 / CI：`SSH_BATCH_MODE=yes`（须已 ssh-copy-id 成功，否则会立刻失败）。
+#
+# REMOTE_BUILD_CMD 覆盖远端整段命令（非标编排）。
 set -euo pipefail
 
 REMOTE_BUILD_CMD="${REMOTE_BUILD_CMD:-}"
@@ -20,11 +21,28 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DEPLOY_HOST="${DEPLOY_HOST:-ubuntu@1.13.198.172}"
 DEPLOY_REPO="${DEPLOY_REPO:-/home/ubuntu/lingniao-golf}"
 REMOTE_EXTRA_COMPOSE_FLAGS="${REMOTE_EXTRA_COMPOSE_FLAGS:-}"
+BIRDIE_CVM_KEY="${BIRDIE_CVM_KEY:-$HOME/.ssh/id_ed25519_birdie_golf}"
+# 未显式设置时：有专用密钥则默认 BatchMode=yes（免密 / 非交互）；否则允许回退密码
+SSH_BATCH_MODE="${SSH_BATCH_MODE:-}"
+if [[ -z "${SSH_BATCH_MODE}" ]]; then
+  if [[ -f "${BIRDIE_CVM_KEY}" ]]; then
+    SSH_BATCH_MODE=yes
+  else
+    SSH_BATCH_MODE=no
+  fi
+fi
 
 SSH_OPTS=(
-  -o BatchMode=no
+  -o "BatchMode=${SSH_BATCH_MODE}"
   -o StrictHostKeyChecking=accept-new
 )
+
+if [[ -f "${BIRDIE_CVM_KEY}" ]]; then
+  SSH_OPTS+=(-i "${BIRDIE_CVM_KEY}" -o IdentitiesOnly=yes)
+elif [[ "${SSH_BATCH_MODE}" == yes ]]; then
+  echo "✗ 找不到 ${BIRDIE_CVM_KEY} 且 SSH_BATCH_MODE=yes — 请先跑 make setup-cvm-ssh-key" >&2
+  exit 1
+fi
 
 die() {
   echo "✗ $*" >&2
@@ -42,7 +60,11 @@ need_file backend/app/integrations/llm.py
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  远端: ${DEPLOY_HOST}"
 echo "  目录: ${DEPLOY_REPO}"
-echo "  ssh/scp 会提示输入服务器密码。"
+if [[ -f "${BIRDIE_CVM_KEY}" ]]; then
+  echo "  认证: ${BIRDIE_CVM_KEY} （BatchMode=${SSH_BATCH_MODE}）"
+else
+  echo "  认证: 未找到本项目密钥 → 可用密码；一次性免密请先：make setup-cvm-ssh-key"
+fi
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 scp "${SSH_OPTS[@]}" backend/app/config.py \
