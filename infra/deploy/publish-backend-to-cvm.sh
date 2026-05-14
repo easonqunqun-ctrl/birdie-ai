@@ -82,9 +82,10 @@ scp "${SSH_OPTS[@]}" backend/app/api/v1/chat.py \
 REMOTE_RUN_DEFAULT="set -e; cd '${DEPLOY_REPO}' || { echo \"✗ 远端目录不存在: ${DEPLOY_REPO}\" >&2; exit 1; }; test -f '.env.local' || { echo \"✗ 缺少 ${DEPLOY_REPO}/.env.local — 请按 docs/release-notes/CVM-canonical-deploy.md 在服务器维护密钥文件（勿用本机误盖）\" >&2; exit 1; }; docker compose --project-directory '${DEPLOY_REPO}' -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.cvm.yml ${REMOTE_EXTRA_COMPOSE_FLAGS} --env-file '${DEPLOY_REPO}/.env.local' up -d --build backend celery-worker"
 
 if [[ -n "${REMOTE_BUILD_CMD}" ]]; then
-  ssh "${SSH_OPTS[@]}" "${DEPLOY_HOST}" bash -lc "${REMOTE_BUILD_CMD}"
+  ssh "${SSH_OPTS[@]}" "${DEPLOY_HOST}" bash -c "${REMOTE_BUILD_CMD}"
 else
-  ssh "${SSH_OPTS[@]}" "${DEPLOY_HOST}" bash -lc "${REMOTE_RUN_DEFAULT}"
+  # 非 login shell，避免远端 .bashrc 在 TERM=dumb 下输出大段环境（误当故障）
+  ssh "${SSH_OPTS[@]}" "${DEPLOY_HOST}" bash -c "${REMOTE_RUN_DEFAULT}"
 fi
 
 echo ""
