@@ -56,6 +56,7 @@ need_file() {
 cd "${REPO_ROOT}"
 need_file backend/app/config.py
 need_file backend/app/integrations/llm.py
+need_file backend/app/api/v1/chat.py
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  远端: ${DEPLOY_HOST}"
@@ -72,6 +73,9 @@ scp "${SSH_OPTS[@]}" backend/app/config.py \
 
 scp "${SSH_OPTS[@]}" backend/app/integrations/llm.py \
   "${DEPLOY_HOST}:${DEPLOY_REPO}/backend/app/integrations/llm.py"
+
+scp "${SSH_OPTS[@]}" backend/app/api/v1/chat.py \
+  "${DEPLOY_HOST}:${DEPLOY_REPO}/backend/app/api/v1/chat.py"
 
 # 须用「仓库内」.env.local 的绝对路径 + --project-directory；否则部分 compose 版本会把
 # --env-file .env.local 解析成 $HOME/.env.local（出现 couldn't find env file: /home/ubuntu/.env.local）。
