@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     BACKEND_PORT: int = 8000
     BACKEND_WORKERS: int = 1
     BACKEND_CORS_ORIGINS: str = "http://localhost:3000,http://localhost:10086"
+    # 客户端访问 backend 的对外基址（含 scheme + host + port，不含 /v1）。
+    # 用于生成需要返回给客户端的"同源代理 URL"（如 keyframe 图片代理），
+    # 解决微信小程序真机 <Image> 对 MinIO 9000 端口 HTTP 资源的拒绝问题。
+    # W8 真机模式：http://192.168.130.37:8000；线上：https://api.xxx.com
+    API_PUBLIC_BASE_URL: str = "http://localhost:8000"
 
     # ==================== JWT ====================
     JWT_SECRET_KEY: str = "change-me-jwt"
@@ -59,10 +64,12 @@ class Settings(BaseSettings):
     MINIO_BUCKET: str = "xiaoniao-videos"
     MINIO_REGION: str = "us-east-1"
 
+    # 腾讯云 COS（S3 兼容，使用 MinIO Python 客户端对 cos.*.myqcloud.com 签名，需桶公共读/跨域在控制台配置）
     COS_SECRET_ID: str = ""
     COS_SECRET_KEY: str = ""
     COS_REGION: str = "ap-shanghai"
-    COS_BUCKET: str = ""
+    COS_BUCKET: str = ""  # 形如 mybucket-1250000000
+    COS_PUBLIC_BASE: str = ""  # 可选；默认 https://{bucket}.cos.{region}.myqcloud.com
 
     # ==================== 微信小程序 ====================
     WECHAT_MINIPROGRAM_APPID: str = "wx_placeholder_appid"
@@ -74,15 +81,20 @@ class Settings(BaseSettings):
     WECHAT_OPEN_SECRET: str = ""
 
     # ==================== 微信支付 ====================
-    # W7-T1：MVP 阶段默认 mock 模式。真实上线需：
-    #   1. 商户号（需 ICP 备案）+ 商户证书
-    #   2. `WECHAT_PAY_NOTIFY_URL` 指向公网可达回调地址 + 签名校验
-    #   3. 把 `WECHAT_PAY_MOCK_MODE` 切回 False，启用 `services/payment_service.py`
-    #      的真实分支（目前为 NotImplementedError）
+    # W7-T1 默认 mock。正式版：WECHAT_PAY_MOCK_MODE=false 并填全商户、证书、APIv3 密钥与公网 notify_url
     WECHAT_PAY_MOCK_MODE: bool = True
     WECHAT_PAY_MCH_ID: str = ""
+    # APIv3 密钥 32 字符（与商户平台「API 安全>APIv3 密钥」一致）
+    WECHAT_PAY_API_V3_KEY: str = ""
+    # 兼容历史命名：与 WECHAT_PAY_API_V3_KEY 二选一
     WECHAT_PAY_API_KEY: str = ""
+    # 商户 API 私钥 PEM 路径（apiclient_key.pem）
     WECHAT_PAY_CERT_PATH: str = ""
+    # 或直接把 PEM 内容放此字段（K8s Secret 注入时），有值则优先生效于 `WECHAT_PAY_CERT_PATH`
+    WECHAT_PAY_PRIVATE_KEY_PEM: str = ""
+    # 商户 API 证书「序列号」（用于 Authorization: serial_no）
+    WECHAT_PAY_MCH_SERIAL: str = ""
+    # 小程序支付成功异步通知，须 HTTPS 公网，路径示例 /v1/payments/wechat/notify
     WECHAT_PAY_NOTIFY_URL: str = ""
 
     # ==================== 苹果内购 ====================
@@ -97,7 +109,11 @@ class Settings(BaseSettings):
     LLM_MODEL: str = "deepseek-chat"
     LLM_TEMPERATURE: float = 0.7
     LLM_MAX_TOKENS: int = 2000
-    LLM_TIMEOUT_SECONDS: int = 60
+    # 流式读：控制在「相邻两次 chunk 间隔」阈值；首轮排队长 + 文末 token 慢的模型需要 ≥90s。
+    LLM_TIMEOUT_SECONDS: int = 120
+    # 连接层抖动 / 服务商 429·502·503·504：整流重来（首张 token 未到前且不破坏已输出片段）。
+    LLM_HTTP_MAX_RETRIES: int = 2
+    LLM_HTTP_RETRY_BACKOFF_BASE: float = 0.75
     LLM_MOCK_MODE: bool = False  # True 强制 FakeLLM；False 且 API_KEY 为空时也自动回退 Fake
 
     # ==================== AI Engine ====================
@@ -116,6 +132,13 @@ class Settings(BaseSettings):
     MAX_VIDEO_DURATION_SECONDS: int = 30
     MIN_VIDEO_DURATION_SECONDS: int = 3
     MAX_VIDEO_SIZE_BYTES: int = 100 * 1024 * 1024  # 100MB
+
+    # ==================== W8-T3：测试期配额放宽 ====================
+    # `strict`：按 FREE_USER_* 严格扣减（生产 / 默认）
+    # `unlimited`：所有 consume_* 直接放行，所有 get_* 返回 -1（无限）；
+    #              专用于 W8 内测环境，避免内测团队被 3 次 / 5 次卡死
+    # 切换不影响付费会员（会员本来就 -1），只影响免费用户
+    QUOTA_MODE: Literal["strict", "unlimited"] = "strict"
 
     @property
     def database_url(self) -> str:
@@ -153,6 +176,65 @@ class Settings(BaseSettings):
     @property
     def is_prod(self) -> bool:
         return self.APP_ENV == "prod"
+
+    @staticmethod
+    def _is_placeholder_minio_public(endpoint: str) -> bool:
+        """仍为 Docker/本地默认时，签发 upload_url 会踩微信小程序合法域名校验。"""
+        e = endpoint.strip().rstrip('/').lower()
+        return e in (
+            "",
+            'http://localhost:9000',
+            'http://127.0.0.1:9000',
+            'http://minio:9000',
+        )
+
+    @property
+    def effective_minio_public_endpoint(self) -> str:
+        """发给客户端（wx.uploadFile）的 MinIO/S3 POST 基准地址（不含路径时由后端拼 bucket）。
+
+        staging/prod 常见疏漏：`API_PUBLIC_BASE_URL` 已是 `https://api.xxx`，
+        `MINIO_PUBLIC_ENDPOINT` 却留在默认 `localhost:9000`，导致小程序仍向未登记域名直传。
+        此时按网关反代惯例回退到 `{API_PUBLIC_BASE_URL}/minio`。
+        （须与 nginx/COS 反代路由一致；仅当 `MINIO_PUBLIC_ENDPOINT` 仍为占位值时启用。）
+
+        COS 或其它显式非公网占位配置：仍使用 `MINIO_PUBLIC_ENDPOINT` 原值。"""
+        raw = self.MINIO_PUBLIC_ENDPOINT.strip()
+        if self.STORAGE_PROVIDER != "minio":
+            return raw
+        if self.APP_ENV not in {"staging", "prod"}:
+            return raw
+        if not self._is_placeholder_minio_public(raw):
+            return raw
+        api = self.API_PUBLIC_BASE_URL.strip().rstrip('/')
+        if not api.lower().startswith("https://"):
+            return raw
+        if 'localhost' in api.lower() or '127.0.0.1' in api:
+            return raw
+        return f"{api}/minio"
+
+    @property
+    def effective_api_public_base_url(self) -> str:
+        """后端对客户端可见的根地址（scheme+host[+port]，无尾 slash）。
+
+        `/v1` 前缀由客户端拼接；`/v1/assets/image` 图片代理与它同源，
+        「request / downloadFile（走 API）」的合法域名必须与这里的主机一致。
+        """
+        return self.API_PUBLIC_BASE_URL.strip().rstrip("/")
+
+    @property
+    def storage_presign_origin_base(self) -> str:
+        """直传视频的 presigned POST 基准（与 integrations/minio 内分支逻辑保持一致）。
+
+        - MinIO：`effective_minio_public_endpoint`
+        - COS：`COS_PUBLIC_BASE` 缺省则为 `https://cos.<region>.myqcloud.com`
+
+        「uploadFile 合法域名」须覆盖此处解析出的 **https 主机**（若与 API 不同须分别登记）。
+        """
+        if self.STORAGE_PROVIDER == "cos":
+            internal = f"https://cos.{self.COS_REGION}.myqcloud.com"
+            base = self.COS_PUBLIC_BASE.strip().rstrip("/") if self.COS_PUBLIC_BASE else ""
+            return base or internal
+        return self.effective_minio_public_endpoint.strip().rstrip("/")
 
 
 @lru_cache(maxsize=1)

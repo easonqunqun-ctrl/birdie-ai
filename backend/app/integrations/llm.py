@@ -71,6 +71,16 @@ class AbstractLLMClient(ABC):
 
 
 # ==================== 真实 LLM（OpenAI 兼容） ====================
+def _httpx_timeout(read_seconds: float) -> httpx.Timeout:
+    """流式：`read` 限相邻 chunk 空闲；`write` / `pool` / `connect` 单独收紧。"""
+    r = max(read_seconds, 30.0)
+    return httpx.Timeout(connect=20.0, read=r, write=max(120.0, r), pool=30.0)
+
+
+def _retryable_http_status(code: int) -> bool:
+    return code in (408, 409, 425, 429, 502, 503, 504)
+
+
 class OpenAICompatibleClient(AbstractLLMClient):
     """打 OpenAI 兼容的 /chat/completions 接口."""
 
@@ -81,11 +91,24 @@ class OpenAICompatibleClient(AbstractLLMClient):
         api_key: str | None = None,
         model: str | None = None,
         timeout_seconds: float | None = None,
+        max_retries: int | None = None,
+        retry_backoff_base: float | None = None,
     ) -> None:
         self.base_url = (base_url or settings.LLM_BASE_URL).rstrip("/")
         self.api_key = api_key or settings.LLM_API_KEY
         self.model = model or settings.LLM_MODEL
-        self.timeout = timeout_seconds if timeout_seconds is not None else float(settings.LLM_TIMEOUT_SECONDS)
+        self.read_timeout = (
+            float(timeout_seconds) if timeout_seconds is not None else float(settings.LLM_TIMEOUT_SECONDS)
+        )
+        self.http_timeout = _httpx_timeout(self.read_timeout)
+        self.http_max_retries = (
+            max_retries if max_retries is not None else max(0, int(settings.LLM_HTTP_MAX_RETRIES))
+        )
+        self.retry_backoff_base = (
+            float(retry_backoff_base)
+            if retry_backoff_base is not None
+            else float(settings.LLM_HTTP_RETRY_BACKOFF_BASE)
+        )
 
     async def stream_chat(
         self,
@@ -107,25 +130,86 @@ class OpenAICompatibleClient(AbstractLLMClient):
             "Accept": "text/event-stream",
         }
         url = f"{self.base_url}/chat/completions"
-        log.info("llm_call_start", model=self.model, msg_count=len(messages))
+        backoff = max(0.05, self.retry_backoff_base)
 
-        try:
-            async with (
-                httpx.AsyncClient(timeout=self.timeout) as http_client,
-                http_client.stream("POST", url, json=payload, headers=headers) as resp,
-            ):
-                resp.raise_for_status()
-                async for chunk in self._iter_openai_sse(resp):
-                    yield chunk
-        except httpx.TimeoutException as exc:
-            log.warning("llm_call_timeout", model=self.model, error=str(exc))
-            yield LLMChunk(type="error", error=f"LLM 超时: {exc}")
-        except httpx.HTTPStatusError as exc:
-            log.warning("llm_call_http_error", model=self.model, status=exc.response.status_code)
-            yield LLMChunk(type="error", error=f"LLM HTTP {exc.response.status_code}")
-        except Exception as exc:
-            log.exception("llm_call_failed", model=self.model)
-            yield LLMChunk(type="error", error=f"LLM 调用失败: {exc}")
+        for attempt in range(self.http_max_retries + 1):
+            saw_provider_content = False
+            terminal_error_msg: str | None = None
+            try:
+                log.info(
+                    "llm_call_start",
+                    model=self.model,
+                    msg_count=len(messages),
+                    attempt=attempt,
+                    read_timeout_sec=self.read_timeout,
+                )
+                async with (
+                    httpx.AsyncClient(timeout=self.http_timeout) as http_client,
+                    http_client.stream("POST", url, json=payload, headers=headers) as resp,
+                ):
+                    try:
+                        resp.raise_for_status()
+                    except httpx.HTTPStatusError as exc:
+                        st = exc.response.status_code
+                        log.warning(
+                            "llm_call_http_status",
+                            model=self.model,
+                            status=st,
+                            attempt=attempt,
+                        )
+                        terminal_error_msg = f"LLM HTTP {st}"
+                        if (
+                            saw_provider_content
+                            or attempt >= self.http_max_retries
+                            or not _retryable_http_status(st)
+                        ):
+                            yield LLMChunk(type="error", error=terminal_error_msg)
+                            return
+                        await asyncio.sleep(backoff * (2**attempt))
+                        continue
+
+                    async for chunk in self._iter_openai_sse(resp):
+                        if chunk.type == "content" and chunk.delta:
+                            saw_provider_content = True
+                        if chunk.type == "error":
+                            yield chunk
+                            return
+                        yield chunk
+
+                return
+
+            except httpx.TimeoutException as exc:
+                log.warning(
+                    "llm_call_timeout",
+                    model=self.model,
+                    error=str(exc),
+                    attempt=attempt,
+                    saw_content=saw_provider_content,
+                )
+                terminal_error_msg = f"LLM 超时: {exc}"
+                if saw_provider_content or attempt >= self.http_max_retries:
+                    yield LLMChunk(type="error", error=terminal_error_msg)
+                    return
+                await asyncio.sleep(backoff * (2**attempt))
+
+            except httpx.RequestError as exc:
+                log.warning(
+                    "llm_call_transport",
+                    model=self.model,
+                    error=str(exc),
+                    attempt=attempt,
+                    saw_content=saw_provider_content,
+                )
+                terminal_error_msg = f"LLM 网络异常: {exc}"
+                if saw_provider_content or attempt >= self.http_max_retries:
+                    yield LLMChunk(type="error", error=terminal_error_msg)
+                    return
+                await asyncio.sleep(backoff * (2**attempt))
+
+            except Exception as exc:
+                log.exception("llm_call_failed", model=self.model, attempt=attempt)
+                yield LLMChunk(type="error", error=f"LLM 调用失败: {exc}")
+                return
 
     async def _iter_openai_sse(
         self, resp: httpx.Response
@@ -142,6 +226,15 @@ class OpenAICompatibleClient(AbstractLLMClient):
                 data = json.loads(data_str)
             except json.JSONDecodeError:
                 continue
+            if isinstance(data, dict) and data.get("error"):
+                blob = data["error"]
+                if isinstance(blob, dict):
+                    em = blob.get("message") or blob.get("type") or "provider_error"
+                    msg = f"LLM 供应商错误: {em}"
+                else:
+                    msg = f"LLM 供应商错误: {blob}"
+                yield LLMChunk(type="error", error=msg)
+                return
             # choices[0].delta.content 可能是 None / 空 / 文本
             delta = (
                 data.get("choices", [{}])[0]
@@ -248,7 +341,7 @@ def _is_placeholder_key(key: str) -> bool:
     lowered = key.lower()
     return any(
         marker in lowered
-        for marker in ("placeholder", "change-me", "your-key", "xxx", "todo")
+        for marker in ("placeholder", "change-me", "your-key", "xxx", "todo", "replace_me", "replace-with")
     )
 
 
