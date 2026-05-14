@@ -3,8 +3,13 @@
         backend-celery-logs backend-celery-shell \
         ai-shell ai-logs ai-engine-test ai-engine-test-local ai-engine-lint ai-engine-smoke \
         ai-engine-synth-fixtures \
-        client-install client-dev-weapp client-dev-rn-ios client-dev-rn-android client-build-weapp client-tsc \
-        check test ci
+        client-install client-bootstrap-rn-shell client-dev-weapp client-dev-rn-ios client-dev-rn-android \
+        client-build-weapp client-build-weapp-prod client-build-rn client-tsc client-check-rn \
+        check test ci \
+        deploy-check-env \
+        deploy-test test-logs test-ps test-reset test-restart test-certs test-health \
+        issue-le-cert sync-le-certs renew-le-cert verify-weapp-https \
+        deploy-cvm-up deploy-cvm-ps deploy-cvm-logs
 
 # 默认目标：显示帮助
 help:
@@ -40,17 +45,37 @@ help:
 	@echo ""
 	@echo "  ===== 客户端（Taro 双端） ====="
 	@echo "  make client-install         安装客户端依赖"
+	@echo "  make client-bootstrap-rn-shell 克隆 taro-native-shell 到 client/rn-shell（幂等）"
 	@echo "  make client-dev-weapp       开发：编译微信小程序（用 微信开发者工具 打开 client/dist）"
 	@echo "  make client-dev-rn-ios      开发：iOS App"
 	@echo "  make client-dev-rn-android  开发：Android App"
-	@echo "  make client-build-weapp     生产：微信小程序构建"
+	@echo "  make client-build-weapp     微信小程序构建（默认 dev 变量）"
+	@echo "  make client-build-weapp-prod  正式小程序包（校验 .env.production 后 production 构建）"
+	@echo "  make client-build-rn        RN：taro build + 日志门禁（reject error src / Unable）"
+	@echo "  make client-check-rn        RN bundle 门禁 + client type-check（已并入 make test）"
 	@echo ""
 	@echo "  ===== 健康检查 ====="
 	@echo "  make check             检查后端 /v1/health"
 	@echo ""
 	@echo "  ===== 质量门（T5） ====="
-	@echo "  make test              rollup：后端 + AI 引擎 + 客户端 tsc"
+	@echo "  make test              rollup：后端 + AI 引擎 + 客户端（RN bundle + tsc）"
 	@echo "  make ci                test + 真实引擎 smoke（bouncing_box → 50103）"
+	@echo ""
+	@echo "  ===== W8-T4 测试环境（CVM + nginx HTTPS；小程序须可信 CA） ====="
+	@echo "  make deploy-check-env     自检 .env.local 尖括号/穿透占位（可加 ENV_FILE=路径）"
+	@echo "  bash infra/deploy/cvm-rebuild-backend.sh   CVM：backend 绑定挂载 + .venv/uv sync + 重建（见文档）"
+	@echo "  make test-certs HOST=...  生成自签 HTTPS 证书（首次部署前）"
+	@echo "  make deploy-test          一键起测试栈（compose -f base -f test）"
+	@echo "  make deploy-cvm-up        CVM 推荐：同上 + docker-compose.cvm.yml（镜像内源码，不着陆 bind）"
+	@echo "  make test-logs            tail 测试栈所有服务日志"
+	@echo "  make test-ps              查看测试栈状态"
+	@echo "  make test-restart         重启测试栈"
+	@echo "  make test-health          curl https 自签证书走一遍 /v1/health"
+	@echo "  make issue-le-cert EMAIL=you@domain DOMAIN=api.birdieai.cn   Let's Encrypt（栈须已起）"
+	@echo "  make renew-le-cert DOMAIN=api.birdieai.cn                   Let's Encrypt 续约（Docker certbot）"
+	@echo "  make sync-le-certs DOMAIN=api.birdieai.cn                    同步 LE 证书进 infra/test/certs 并重载 nginx"
+	@echo "  make verify-weapp-https DOMAIN=api.birdieai.cn               外网 TLS + /v1/health + ACME 路径自检（不需登录微信后台）"
+	@echo "  make test-reset           ⚠️ 销毁全部容器+卷（含 PG/Minio 数据）"
 
 # ==================== 一键操作 ====================
 init:
@@ -165,6 +190,9 @@ ai-engine-smoke:
 client-install:
 	cd client && pnpm install
 
+client-bootstrap-rn-shell:
+	cd client && bash scripts/bootstrap-rn-shell.sh
+
 client-dev-weapp:
 	cd client && pnpm dev:weapp
 
@@ -177,9 +205,27 @@ client-dev-rn-android:
 client-build-weapp:
 	cd client && pnpm build:weapp
 
+# 正式上线：校验 https API 占位 → dist/（详见 docs/release-notes/go-live-weapp-fool-checklist.md）
+client-build-weapp-prod:
+	cd client && pnpm build:weapp:prod:check
+
+# RN：Metro/taro-css 报错时 CLI 偶尔仍 exit 0，故对 rn-build.log 做强校验。
+client-build-rn:
+	cd client && bash -c '\
+		set -o pipefail; \
+		pnpm build:rn 2>&1 | tee rn-build.log; \
+		ev=$$?; \
+		if grep -Eq "^error src/|^error Unable" rn-build.log 2>/dev/null; then \
+			echo ""; echo "✗ RN 构建日志含硬错误（见 client/rn-build.log）"; exit 1; \
+		fi; \
+		exit $$ev'
+
 # W6-T5：客户端 TS 类型检查（不出 bundle，单纯类型门）
 client-tsc:
-	cd client && npx tsc --noEmit
+	cd client && pnpm type-check
+
+# RN bundle + 类型（已并入 make test）
+client-check-rn: client-build-rn client-tsc
 
 # ==================== 健康检查 ====================
 check:
@@ -188,10 +234,115 @@ check:
 # ==================== 质量门 rollup（W6-T5） ====================
 # make test：常规 PR/commit 前的全量单测 + lint + tsc
 # make ci：在 test 基础上再跑 smoke（需 make up 已起真实 ai_engine）
-test: backend-lint backend-test ai-engine-lint ai-engine-test client-tsc
+test: backend-lint backend-test ai-engine-lint ai-engine-test client-check-rn
 	@echo ""
-	@echo "✓ backend + ai_engine + client 全部绿"
+	@echo "✓ backend + ai_engine + client（含 RN/tsc）全部绿"
 
 ci: test ai-engine-smoke
 	@echo ""
 	@echo "✓ CI gate 全绿（含真实引擎 smoke）"
+
+# ==================== W8-T4：测试环境部署 ====================
+# 设计取舍：
+#   - 复用同一份 .env.local；测试环境部署时 cp .env.test → .env.local 后改占位值
+#   - 用 -f docker-compose.yml -f docker-compose.test.yml 叠加，避免维护重复 base
+#   - 所有目标都接受 HOST 参数（生成证书 + 健康检查需要）
+
+# 复用变量，省去每条命令都写一次
+TEST_COMPOSE := docker compose -f docker-compose.yml -f docker-compose.test.yml --env-file .env.local
+
+# CVM 规范化：`docker-compose.cvm.yml` 用 Compose merge `!reset` 去掉 backend/celery/ai_engine 宿主 bind
+CVM_COMPOSE := docker compose -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.cvm.yml --env-file .env.local
+
+deploy-cvm-up:
+	@if [ ! -f docker-compose.cvm.yml ]; then \
+		echo "✗ 未找到 docker-compose.cvm.yml"; exit 1; \
+	fi
+	$(CVM_COMPOSE) up -d --build
+	@echo ""
+	@echo "✓ CVM 栈已更新（镜像内后端/引擎；详见 docs/release-notes/CVM-canonical-deploy.md）"
+
+deploy-cvm-ps:
+	$(CVM_COMPOSE) ps
+
+deploy-cvm-logs:
+	$(CVM_COMPOSE) logs -f --tail=200
+
+test-certs:
+	@if [ -z "$(HOST)" ]; then \
+		echo "用法：make test-certs HOST=测试主机或IP"; \
+		echo "  例：make test-certs HOST=test.birdieai.example.com"; \
+		echo "  例：make test-certs HOST=123.45.67.89"; \
+		exit 1; \
+	fi
+	bash infra/test/gen-certs.sh $(HOST)
+
+# 自检 .env.local 是否还带尖括号/穿透占位（在仓库根或 CVM compose 目录执行）
+deploy-check-env:
+	bash infra/deploy/quick-check-env-local.sh "$(or $(ENV_FILE),.env.local)"
+
+deploy-test:
+	@if [ ! -f infra/test/certs/fullchain.pem ] || [ ! -f infra/test/certs/privkey.pem ]; then \
+		echo "✗ 未找到 infra/test/certs/fullchain.pem / privkey.pem"; \
+		echo "  先执行：make test-certs HOST=你的测试域名或IP（自签）"; \
+		echo "  或：Let's Encrypt → infra/deploy/README.md"; \
+		exit 1; \
+	fi
+	@if [ ! -f .env.local ]; then \
+		echo "✗ 未找到 .env.local"; \
+		echo "  先执行：cp .env.test .env.local && 编辑填入真实密钥"; \
+		exit 1; \
+	fi
+	$(TEST_COMPOSE) up -d --build
+	@echo ""
+	@echo "✓ 测试栈已起："
+	@echo "  • HTTPS 入口（把证书的 HOST 代入）： https://YOUR_PUBLIC_HOST/v1/health"
+	@echo "  • 微信小程序体验版须可信证书：make issue-le-cert EMAIL=…（见 infra/deploy/README.md）"
+	@echo "  • MinIO 控制台（仅本机）：http://127.0.0.1:9002（测试栈 compose.test 映射；SSH 隧道见 docker-compose.test.yml）"
+	@echo "  • 查日志：make test-logs"
+
+issue-le-cert:
+	@if [ -z "$(EMAIL)" ]; then \
+		echo "用法：make issue-le-cert EMAIL=you@example.com DOMAIN=api.birdieai.cn"; \
+		echo "  前置：栈已启动（nginx 监听 80，且挂载 infra/test/acme-webroot）"; \
+		exit 1; \
+	fi
+	bash infra/deploy/issue-le-cert-webroot.sh "$(EMAIL)" "$(or $(DOMAIN),api.birdieai.cn)"
+
+sync-le-certs:
+	bash infra/deploy/sync-le-certs-from-letsencrypt.sh "$(or $(DOMAIN),api.birdieai.cn)"
+
+renew-le-cert:
+	bash infra/deploy/renew-le-cert-docker.sh "$(or $(DOMAIN),api.birdieai.cn)"
+
+verify-weapp-https:
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "用法：make verify-weapp-https DOMAIN=api.example.com"; \
+		echo "  可选：STRICT_HEALTH=1 make verify-weapp-https DOMAIN=…   （要求 /v1/health 必须 2xx）"; \
+		exit 1; \
+	fi
+	bash infra/deploy/verify-weapp-https-readiness.sh "$(DOMAIN)"
+
+test-logs:
+	$(TEST_COMPOSE) logs -f --tail=200
+
+test-ps:
+	$(TEST_COMPOSE) ps
+
+test-restart:
+	$(TEST_COMPOSE) restart
+
+test-health:
+	@if [ -z "$(HOST)" ]; then \
+		echo "用法：make test-health HOST=<test-host-or-ip>"; \
+		exit 1; \
+	fi
+	@curl -fk -m 5 https://$(HOST)/v1/health \
+		&& echo "" && echo "✓ /v1/health 返回 200" \
+		|| (echo "✗ /v1/health 检查失败"; exit 1)
+
+test-reset:
+	@echo "⚠️  这会删除测试环境所有容器和数据卷（PG/Redis/MinIO）。"
+	@read -p "继续？(y/N) " yn; [ "$$yn" = "y" ] || (echo "取消"; exit 1)
+	$(TEST_COMPOSE) down -v --remove-orphans
+	@echo "✓ 测试栈已彻底清理"

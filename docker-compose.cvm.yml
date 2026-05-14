@@ -1,0 +1,24 @@
+# =====================================================
+# CVM / 准生产：取消源码绑定挂载（与 base + docker-compose.test 叠加使用）
+# =====================================================
+# 用法（仓库根、与 `.env.local` 同级）：
+#   docker compose -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.cvm.yml --env-file .env.local up -d --build
+# 或：make deploy-cvm-up
+#
+# 含义：
+# - backend / celery-worker / ai_engine 不再挂载 ./backend、./ai_engine 到容器 /app，
+#   仅以镜像内 Dockerfile `COPY`/构建结果为准。
+# - 云上更新代码：**git pull → build 对应服务**，勿再依赖宿主目录「补 alembic / uv sync」。
+#
+# Compose 合并规则：`volumes: !reset []` 清空基类里对上述服务的 bind（见 Compose merge 文档）。
+# =====================================================
+
+services:
+  backend:
+    volumes: !reset []
+
+  celery-worker:
+    volumes: !reset []
+
+  ai_engine:
+    volumes: !reset []

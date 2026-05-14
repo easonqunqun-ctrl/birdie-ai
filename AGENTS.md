@@ -7,7 +7,7 @@
 
 ## 0. 产品一句话
 
-**小鸟 AI** 是面向中国球友的 **AI 高尔夫私教**：拍一段挥杆视频 → AI 出报告 → 给训练建议 → AI 对话答疑 → 打卡闭环。载体以微信小程序为主，App（RN）为辅。
+**领翼golf** 是面向中国球友的 **AI 高尔夫私教**：拍一段挥杆视频 → AI 出报告 → 给训练建议 → AI 对话答疑 → 打卡闭环。载体以微信小程序为主，App（RN）为辅。
 
 ---
 
@@ -93,6 +93,18 @@ make init && make up && make check
 # 客户端
 cd client && pnpm install && pnpm dev:weapp
 cd client && pnpm type-check && pnpm lint
+make client-bootstrap-rn-shell       # RN：首次克隆 taro-native-shell 至 client/rn-shell（幂等）
+make client-check-rn                  # RN：bundle 门禁 + type-check（已并入 make test；CI：.github/workflows/client-rn-check.yml）
+make client-build-weapp-prod          # 微信小程序正式包：先填 client/.env.production，见 docs/release-notes/go-live-weapp-fool-checklist.md
+
+# CVM / HTTPS（微信小程序真机须可信 CA；详见 infra/deploy/README.md）
+make deploy-check-env                              # 自检 .env.local 占位符等（ENV_FILE= 可改路径）
+bash infra/deploy/cvm-rebuild-backend.sh         # CVM：backend 绑定挂载 + .venv / uv sync / 重建
+make issue-le-cert EMAIL=you@example.com DOMAIN=api.example.com
+make renew-le-cert DOMAIN=api.example.com
+make sync-le-certs DOMAIN=api.example.com
+make verify-weapp-https DOMAIN=api.example.com   # 外网 TLS/健康检查（不需登录微信后台）
+# W8 从零搭机：docs/release-notes/W8-test-env-runbook.md；**规范化/Git+密钥+去 bind**：docs/release-notes/CVM-canonical-deploy.md
 
 # 后端
 make backend-lint     # ruff
