@@ -4,6 +4,8 @@ M3-T2 增量：
 - POST /v1/chat/sessions/{id}/messages 默认走 **SSE**（`text/event-stream`）
 - `Accept: application/json` 或 `?stream=false` 时降级到 T1 的非流式 JSON
 - 速率限制：每用户每分钟 20 次（40009）
+- SSE 在长等待期间会周期性下发 **SSE 注释行** `: sse-ping`（受 `SSE_IDLE_PING_SECONDS` 控制，
+  默认约 22s），减轻小程序链路「长时间无任何下行字节」误判；前端解析器会忽略该类帧。
 
 SSE 事件格式
 -------------
@@ -24,7 +26,9 @@ SSE 事件格式
 
 from __future__ import annotations
 
+import asyncio
 import json
+import os
 from collections.abc import AsyncIterator
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -143,6 +147,47 @@ def _wants_sse(request: Request, stream_query: bool | None) -> bool:
     return "text/event-stream" in accept
 
 
+async def _with_idle_ping(
+    inner: AsyncIterator[dict], *, ping_seconds: float
+) -> AsyncIterator[dict]:
+    """在等待下一条 LLM_SSE 事件时周期性 yield 哨兵，外层编码为 SSE 注释 `: sse-ping`.
+
+    - 微信小程序 + 网关对「很长时间没有任何下行流量」常与断流/误判超时相关，
+      周期性注释帧可占位（解析器无副作用）。
+    - `ping_seconds<=0` 等价于直通。
+    - 需在 `_sse_event_stream` 中将 `{"type":"__sse_ping__"}` 转成 `: …\\n\\n` 字节帧。
+    """
+    if ping_seconds <= 0:
+        async for ev in inner:
+            yield ev
+        return
+
+    it = inner.__aiter__()
+    pending = asyncio.create_task(it.__anext__())
+    try:
+        while True:
+            sleeper = asyncio.create_task(asyncio.sleep(ping_seconds))
+            done, _ = await asyncio.wait(
+                {pending, sleeper}, return_when=asyncio.FIRST_COMPLETED
+            )
+            if sleeper in done and not pending.done():
+                yield {"type": "__sse_ping__"}
+                continue
+            sleeper.cancel()
+
+            try:
+                event = await pending
+            except StopAsyncIteration:
+                break
+
+            yield event
+            pending = asyncio.create_task(it.__anext__())
+    finally:
+        if not pending.done():
+            pending.cancel()
+            await asyncio.sleep(0)
+
+
 async def _sse_event_stream(
     gen: AsyncIterator[dict], db: AsyncSession
 ) -> AsyncIterator[bytes]:
@@ -155,8 +200,20 @@ async def _sse_event_stream(
     - 生成器内部如果抛异常（不是 LLM error chunk，而是真 Python 异常），我们 rollback；
       否则 commit。
     """
+    # SSE 节流：默认每帧之间插一个极小的 await（便于上游网关/代理把流分多次下发，
+    # 避免 cloudflare quick tunnel 之类把 < 4KB 的整流响应一次性 buffer 后下发，
+    # 进而触发微信小程序 onChunkReceived 不回调的边界 case）。
+    # 通过 SSE_FRAME_THROTTLE_MS=0 可关闭（单测用）。
+    throttle_ms = float(os.getenv("SSE_FRAME_THROTTLE_MS", "15"))
+    throttle_seconds = max(0.0, throttle_ms / 1000.0)
     try:
         async for event in gen:
+            if event.get("type") == "__sse_ping__":
+                yield ": sse-ping\n\n".encode("utf-8")
+                if throttle_seconds > 0:
+                    await asyncio.sleep(throttle_seconds)
+                continue
+
             event_type = event.get("type", "message")
             payload = {k: v for k, v in event.items() if k != "type"}
             frame = (
@@ -164,6 +221,8 @@ async def _sse_event_stream(
                 f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
             )
             yield frame.encode("utf-8")
+            if throttle_seconds > 0:
+                await asyncio.sleep(throttle_seconds)
         await db.commit()
     except Exception:
         await db.rollback()
@@ -204,6 +263,9 @@ async def send_message(
         llm_messages=llm_messages,
         db=db,
     )
+    ping_sec = float(os.getenv("SSE_IDLE_PING_SECONDS", "22"))
+    if ping_sec > 0:
+        gen = _with_idle_ping(gen, ping_seconds=ping_sec)
     return StreamingResponse(
         _sse_event_stream(gen, db),
         media_type="text/event-stream",

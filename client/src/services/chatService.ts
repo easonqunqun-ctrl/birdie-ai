@@ -123,7 +123,8 @@ export const chatService = {
    * 关键点：
    * - `Accept: application/json` 强制走 JSON 分支
    * - 加 `?stream=false` 双保险，后端即使未来改默认值也不会误走 SSE
-   * - timeout=155s：须大于后端 LLM `read` 超时（默认 120）+余量，避免服务端仍生成时小程序已报错
+   * - timeout=185s：与 app.config.ts networkTimeout.request + 服务端 LLM 窗对齐；
+   *   单靠调大仍会受微信客户端策略影响，SSE 链路已配合服务端 sse-ping 保活帧。
    * - silent=true：业务错误码（40007 配额耗尽、40009 速率限制、50106 LLM 失败）
    *   交给 UI 层自己 toast / 做兜底 UI，避免重复弹"请求失败"
    */
@@ -131,7 +132,7 @@ export const chatService = {
     return http.post<SendMessageResponse>(
       `/chat/sessions/${sessionId}/messages?stream=false`,
       payload,
-      { header: ACCEPT_JSON, timeout: 155000, silent: true },
+      { header: ACCEPT_JSON, timeout: 185000, silent: true },
     )
   },
 
@@ -155,7 +156,7 @@ export const chatService = {
         method: 'POST',
         body: payload,
         // 须 ≥ 后端 LLM_STREAM read 超时 + 网络余量（默认服务端 120s）
-        timeoutMs: 145000,
+        timeoutMs: 180000,
       },
       {
         onEvent: (evt) => {
