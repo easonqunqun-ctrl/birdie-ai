@@ -9,6 +9,8 @@ from app import __version__
 from app.api.v1.router import api_router
 from app.config import settings
 from app.core.logging import get_logger, setup_logging
+from app.core.production_guard import startup_production_guards
+from app.core.wechat_deploy_hints import log_wechat_miniprogram_domain_hints
 from app.core.middleware import RequestContextMiddleware, register_exception_handlers
 from app.core.redis import close_redis, get_redis
 
@@ -33,6 +35,9 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("redis_connect_failed", error=str(e))
 
+    startup_production_guards(logger, settings)
+    log_wechat_miniprogram_domain_hints(logger, settings)
+
     yield
 
     logger.info("app_stopping")
@@ -40,7 +45,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="小鸟 AI · API",
+    title="领翼golf · API",
     description="中国首款 AI 高尔夫智能教练 - 后端 API",
     version=__version__,
     debug=settings.APP_DEBUG,
@@ -54,7 +59,7 @@ app = FastAPI(
 app.add_middleware(RequestContextMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins_list or ["*"],
+    allow_origins=settings.cors_allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

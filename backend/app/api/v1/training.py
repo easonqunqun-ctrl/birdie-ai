@@ -61,6 +61,48 @@ async def get_current_plan(
     return ok(detail)
 
 
+# ==================== /training-plan/from-analysis/{analysis_id} ====================
+@router.post(
+    "/from-analysis/{analysis_id}",
+    summary="把一份分析报告的问题加入当周训练计划（幂等）",
+    description=(
+        "对同一 analysis 多次调用是幂等的：相同 drill 不重复加任务。\n"
+        "已成立的当周计划会被 **追加** 新任务，旧任务保留打卡状态。\n"
+        "对 `sample` 等示例 ID 直接 400。"
+    ),
+    response_model=APIResponse[TrainingPlanDetail],
+)
+async def add_to_plan_from_analysis(
+    analysis_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> APIResponse[TrainingPlanDetail]:
+    from app.core.exceptions import BadRequestError
+
+    if analysis_id == "sample" or not analysis_id:
+        raise BadRequestError(code=40015, message="示例报告无法加入训练计划")
+
+    plan = await training_service.add_analysis_to_weekly_plan(
+        db, analysis_id=analysis_id, user=user
+    )
+    await db.commit()
+    # plan.tasks 已经在 service 内 selectinload，无需再 refresh
+    tasks = sorted(plan.tasks, key=lambda t: (t.scheduled_date, t.sort_order))
+    detail = TrainingPlanDetail(
+        id=plan.id,
+        user_id=plan.user_id,
+        week_start=plan.week_start,
+        week_end=plan.week_end,
+        source_analysis_id=plan.source_analysis_id,
+        ai_summary=plan.ai_summary,
+        total_tasks=plan.total_tasks,
+        completed_tasks=plan.completed_tasks,
+        tasks=[TrainingTaskItem.model_validate(t) for t in tasks],
+        created_at=plan.created_at,
+    )
+    return ok(detail)
+
+
 # ==================== /training-plan/tasks/{task_id}/complete ====================
 @router.post(
     "/tasks/{task_id}/complete",

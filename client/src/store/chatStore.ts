@@ -14,6 +14,7 @@
  */
 
 import { create } from 'zustand'
+import { isRequestError } from '@/services/request'
 import { chatService } from '@/services/chatService'
 import type { StreamCancel } from '@/utils/sseClient'
 import type {
@@ -26,6 +27,8 @@ import type { UserQuota } from '@/types/api'
 /** 业务错误码（对齐 docs/02） */
 const ERR_CHAT_QUOTA_EXHAUSTED = 40007
 const ERR_RATE_LIMIT = 40009
+// P1-C1：用户消息被微信内容安全 (msg_sec_check) 判定为违规
+const ERR_CONTENT_VIOLATION = 40017
 const ERR_CHAT_SERVICE = 50106
 
 export type ChatQuotaSnapshot = {
@@ -37,6 +40,7 @@ export type ChatQuotaSnapshot = {
 export type SubmitMessageError =
   | { kind: 'quota_exhausted' }
   | { kind: 'rate_limit' }
+  | { kind: 'content_violation'; message: string }
   | { kind: 'service_error'; message: string }
   | { kind: 'network'; message: string }
 
@@ -57,6 +61,11 @@ interface ChatState {
 
   /* ---------- Actions ---------- */
   bootstrapSession(contextAnalysisId?: string | null): Promise<void>
+  /** 从对话历史进入：加载已有 session 与消息 */
+  bootstrapExistingSession(
+    sessionId: string,
+    contextAnalysisId?: string | null,
+  ): Promise<void>
   /** T4 默认：流式发送 */
   submitMessage(content: string): Promise<void>
   /** 兜底：非流式 JSON 版本（保留给 E2E 测试 / 微信极老版本） */
@@ -120,29 +129,87 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  /* ============================== 流式发送 ============================== */
+  async bootstrapExistingSession(sessionId, contextAnalysisId) {
+    set({ loading: true, bootstrapError: null })
+    try {
+      const [quickResp, msgResp] = await Promise.all([
+        chatService.getQuickQuestions(),
+        chatService.getMessages(sessionId, { page: 1, page_size: 100 }),
+      ])
+      const items = (msgResp.items || []).map((m) => ({
+        ...m,
+        attachments: m.attachments || [],
+      })) as DisplayChatMessage[]
+      set({
+        currentSessionId: sessionId,
+        contextAnalysisId: contextAnalysisId ?? null,
+        messages: items,
+        quickQuestions: quickResp.questions,
+        loading: false,
+      })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '加载对话失败'
+      set({ loading: false, bootstrapError: msg })
+      throw err
+    }
+  },
+
+  /* ============================== 发送（默认非流式，可切回 SSE） ==============================
+   *
+   * 默认走 sync 而不是 SSE 的原因：
+   *   - 微信小程序真机环境下 `wx.request({enableChunked:true})` 与多种中间网关
+   *     （Cloudflare quick tunnel / 部分国内运营商劫持）兼容性极差，
+   *     表现为 60s 内既不触发 onChunkReceived 也不触发 success/fail，
+   *     直接 `Error: timeout`，对话假死。
+   *   - 当前 LLM 是 mock，回复瞬时返回，sync 完全够用且最稳。
+   *   - 接通真实 LLM 后，在 `.env.test.local` / `.env.production.local` 设
+   *     `TARO_APP_CHAT_USE_SSE=true` 即可切回 SSE 享受打字效果。
+   */
   submitMessage(content) {
+    const useSSE =
+      typeof process !== 'undefined' &&
+      process.env?.TARO_APP_CHAT_USE_SSE === 'true'
+    if (!useSSE) {
+      return get().submitMessageSync(content)
+    }
+    return submitMessageStreamImpl(get, set, content)
+  },
+
+  /* ============================== 非流式（默认路径） ============================== */
+  async submitMessageSync(content) {
     const text = content.trim()
-    if (!text) return Promise.resolve()
-    if (text.length > 500) return Promise.reject(new Error('单条消息最多 500 字'))
+    if (!text) {
+      console.log('[chat] submitMessageSync: empty text, skip')
+      return
+    }
+    if (text.length > 500) throw new Error('单条消息最多 500 字')
     const { currentSessionId, sending } = get()
-    if (!currentSessionId) return Promise.reject(new Error('会话未就绪，请稍后再试'))
-    if (sending) return Promise.resolve()
+    console.log('[chat] submitMessageSync ENTER', {
+      len: text.length,
+      sessionId: currentSessionId,
+      sending,
+    })
+    if (!currentSessionId) throw new Error('会话未就绪，请稍后再试')
+    if (sending) {
+      console.warn('[chat] sending=true 已经有请求在飞，本次跳过')
+      return
+    }
 
-    const userLocalId = localId('msg-user')
-    const assistantLocalId = localId('msg-ai')
+    const userPendingId = localId('msg-user')
+    const assistantPendingId = localId('msg-ai')
     const now = new Date().toISOString()
-
     const pendingUser: DisplayChatMessage = {
-      id: userLocalId,
+      id: userPendingId,
       role: 'user',
       content: text,
       attachments: [],
       created_at: now,
       pending: true,
     }
+    // 乐观插入"AI 正在思考"占位（content='' + streaming=true）
+    // 让 page 的"三点跳动"提示能正常显示。
     const pendingAssistant: DisplayChatMessage = {
-      id: assistantLocalId,
+      id: assistantPendingId,
       role: 'assistant',
       content: '',
       attachments: [],
@@ -150,186 +217,40 @@ export const useChatStore = create<ChatState>((set, get) => ({
       streaming: true,
       pending: true,
     }
-
     set({
       sending: true,
       messages: [...get().messages, pendingUser, pendingAssistant],
     })
 
-    return new Promise<void>((resolve, reject) => {
-      let settled = false
-      const finish = (err?: Error) => {
-        if (settled) return
-        settled = true
-        set({ sending: false, activeStream: null })
-        err ? reject(err) : resolve()
-      }
-
-      const cancel = chatService.streamMessage(
-        currentSessionId,
-        { content: text },
-        {
-          onStart: (evt) => {
-            // 用服务端 id 替换占位，content 暂时还是 user 的原文（后端也返回了）
-            set((state) => ({
-              messages: state.messages.map((m) => {
-                if (m.id === userLocalId) {
-                  return {
-                    ...(evt.user_message as DisplayChatMessage),
-                    pending: false,
-                  }
-                }
-                if (m.id === assistantLocalId) {
-                  return {
-                    ...m,
-                    id: evt.assistant_message_id,
-                    pending: false,
-                  }
-                }
-                return m
-              }),
-            }))
-          },
-
-          onDelta: (evt) => {
-            set((state) => ({
-              messages: state.messages.map((m, idx) =>
-                idx === state.messages.length - 1 && m.role === 'assistant'
-                  ? { ...m, content: m.content + evt.delta }
-                  : m,
-              ),
-            }))
-          },
-
-          onAttachment: (evt) => {
-            set((state) => ({
-              messages: state.messages.map((m, idx) =>
-                idx === state.messages.length - 1 && m.role === 'assistant'
-                  ? {
-                      ...m,
-                      attachments: [
-                        ...m.attachments,
-                        evt.attachment as MessageAttachment,
-                      ],
-                    }
-                  : m,
-              ),
-            }))
-          },
-
-          onEnd: (evt) => {
-            set((state) => ({
-              quota: { ...state.quota, remaining: evt.quota_remaining },
-              messages: state.messages.map((m, idx) => {
-                if (idx !== state.messages.length - 1) return m
-                if (m.role !== 'assistant') return m
-                return {
-                  ...m,
-                  id: evt.assistant_message_id,
-                  content: evt.content || m.content,
-                  attachments: evt.attachments?.length
-                    ? (evt.attachments as MessageAttachment[])
-                    : m.attachments,
-                  streaming: false,
-                }
-              }),
-            }))
-          },
-
-          onBusinessError: (evt) => {
-            // 后端已退配额；assistant 气泡保留（若有部分内容）但标记 errored
-            const submitError: SubmitMessageError =
-              evt.code === ERR_CHAT_SERVICE
-                ? { kind: 'service_error', message: evt.message }
-                : evt.code === ERR_CHAT_QUOTA_EXHAUSTED
-                  ? { kind: 'quota_exhausted' }
-                  : evt.code === ERR_RATE_LIMIT
-                    ? { kind: 'rate_limit' }
-                    : { kind: 'service_error', message: evt.message }
-
-            set((state) => ({
-              messages: state.messages.map((m, idx) => {
-                if (idx !== state.messages.length - 1) return m
-                if (m.role !== 'assistant') return m
-                return {
-                  ...m,
-                  content: m.content || '生成中断，请重试',
-                  streaming: false,
-                  errored: true,
-                }
-              }),
-            }))
-            finish(wrapError(evt.message, submitError))
-          },
-
-          onTransportError: (err, meta) => {
-            // 传输层：无法确定后端是否落库/退配额。保守做法：
-            //  - 保留用户消息（用户总觉得自己"发出去了"，如果后端没落，下轮 bootstrap 会对齐）
-            //  - assistant 占位改为 errored（显示"点击重试"）
-            set((state) => ({
-              messages: state.messages.map((m, idx) => {
-                if (idx !== state.messages.length - 1) return m
-                if (m.role !== 'assistant') return m
-                return {
-                  ...m,
-                  content: m.content || (meta.aborted ? '已中断' : '网络中断'),
-                  streaming: false,
-                  errored: true,
-                }
-              }),
-            }))
-            finish(wrapError(err.message, {
-              kind: 'network',
-              message: err.message,
-            }))
-          },
-
-          onClose: () => {
-            finish()
-          },
-        },
-      )
-
-      set({ activeStream: cancel })
-    })
-  },
-
-  /* ============================== 非流式（兜底 / 测试） ============================== */
-  async submitMessageSync(content) {
-    const text = content.trim()
-    if (!text) return
-    const { currentSessionId, sending } = get()
-    if (!currentSessionId) throw new Error('会话未就绪，请稍后再试')
-    if (sending) return
-
-    set({ sending: true })
-    const pendingId = localId('msg-user')
-    const pending: DisplayChatMessage = {
-      id: pendingId,
-      role: 'user',
-      content: text,
-      attachments: [],
-      created_at: new Date().toISOString(),
-      pending: true,
-    }
-    set({ messages: [...get().messages, pending] })
-
     try {
+      console.log('[chat] HTTP POST start')
       const resp = await chatService.sendMessage(currentSessionId, {
         content: text,
       })
+      console.log('[chat] HTTP POST OK', {
+        user_message_id: resp?.user_message?.id,
+        assistant_message_id: resp?.assistant_message?.id,
+        assistant_preview: (resp?.assistant_message?.content || '').slice(0, 40),
+        quota_remaining: resp?.quota_remaining,
+      })
       set((state) => ({
         messages: [
-          ...state.messages.filter((m) => m.id !== pendingId),
+          ...state.messages.filter(
+            (m) => m.id !== userPendingId && m.id !== assistantPendingId,
+          ),
           resp.user_message as DisplayChatMessage,
           resp.assistant_message as DisplayChatMessage,
         ],
         quota: { ...state.quota, remaining: resp.quota_remaining },
         sending: false,
       }))
+      console.log('[chat] state updated, total messages =', get().messages.length)
     } catch (err) {
+      console.error('[chat] HTTP POST FAILED', err)
       set((state) => ({
-        messages: state.messages.filter((m) => m.id !== pendingId),
+        messages: state.messages.filter(
+          (m) => m.id !== userPendingId && m.id !== assistantPendingId,
+        ),
         sending: false,
       }))
       throw mapSubmitError(err)
@@ -384,12 +305,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
 /* ==================== 错误映射 ==================== */
 function mapSubmitError(err: unknown): Error & { submitError: SubmitMessageError } {
   const message = err instanceof Error ? err.message : '网络异常'
-  const code = (err as { code?: number }).code
+  const code = isRequestError(err) ? err.code : undefined
   let submitError: SubmitMessageError
   if (code === ERR_CHAT_QUOTA_EXHAUSTED) {
     submitError = { kind: 'quota_exhausted' }
   } else if (code === ERR_RATE_LIMIT) {
     submitError = { kind: 'rate_limit' }
+  } else if (code === ERR_CONTENT_VIOLATION) {
+    submitError = { kind: 'content_violation', message }
   } else if (code === ERR_CHAT_SERVICE) {
     submitError = { kind: 'service_error', message }
   } else {
@@ -417,5 +340,243 @@ export function getSubmitError(err: unknown): SubmitMessageError | null {
 export const CHAT_ERROR_CODES = {
   QUOTA_EXHAUSTED: ERR_CHAT_QUOTA_EXHAUSTED,
   RATE_LIMIT: ERR_RATE_LIMIT,
+  CONTENT_VIOLATION: ERR_CONTENT_VIOLATION,
   SERVICE_ERROR: ERR_CHAT_SERVICE,
 } as const
+
+/* ==================== 流式实现（仅在 TARO_APP_CHAT_USE_SSE=true 时启用） ==================== */
+type GetState = () => ChatState
+type SetState = (
+  partial:
+    | Partial<ChatState>
+    | ((state: ChatState) => Partial<ChatState>),
+) => void
+
+function submitMessageStreamImpl(
+  get: GetState,
+  set: SetState,
+  content: string,
+): Promise<void> {
+  const text = content.trim()
+  if (!text) return Promise.resolve()
+  if (text.length > 500) return Promise.reject(new Error('单条消息最多 500 字'))
+  const { currentSessionId, sending } = get()
+  if (!currentSessionId) return Promise.reject(new Error('会话未就绪，请稍后再试'))
+  if (sending) return Promise.resolve()
+
+  const userLocalId = localId('msg-user')
+  const assistantLocalId = localId('msg-ai')
+  const now = new Date().toISOString()
+
+  const pendingUser: DisplayChatMessage = {
+    id: userLocalId,
+    role: 'user',
+    content: text,
+    attachments: [],
+    created_at: now,
+    pending: true,
+  }
+  const pendingAssistant: DisplayChatMessage = {
+    id: assistantLocalId,
+    role: 'assistant',
+    content: '',
+    attachments: [],
+    created_at: now,
+    streaming: true,
+    pending: true,
+  }
+
+  set({
+    sending: true,
+    messages: [...get().messages, pendingUser, pendingAssistant],
+  })
+
+  return new Promise<void>((resolve, reject) => {
+    let settled = false
+    let sawAnyEvent = false
+
+    const recoverFromHistory = async (): Promise<boolean> => {
+      try {
+        const resp = await chatService.getMessages(currentSessionId, {
+          page: 1,
+          page_size: 20,
+        })
+        const items = resp.items || []
+        const lastAssistant = [...items]
+          .reverse()
+          .find((m) => m.role === 'assistant')
+        if (!lastAssistant) return false
+        set((state) => ({
+          messages: state.messages.map((m, idx) => {
+            if (idx !== state.messages.length - 1) return m
+            if (m.role !== 'assistant') return m
+            return {
+              ...m,
+              id: lastAssistant.id,
+              content: lastAssistant.content,
+              attachments: (lastAssistant.attachments ||
+                []) as MessageAttachment[],
+              streaming: false,
+              pending: false,
+            }
+          }),
+        }))
+        return true
+      } catch (_err) {
+        return false
+      }
+    }
+
+    const markStreamingBubbleErrored = (fallbackText: string) => {
+      set((state) => ({
+        messages: state.messages.map((m, idx) => {
+          if (idx !== state.messages.length - 1) return m
+          if (m.role !== 'assistant') return m
+          return {
+            ...m,
+            content: m.content || fallbackText,
+            streaming: false,
+            errored: true,
+          }
+        }),
+      }))
+    }
+
+    const finish = (err?: Error) => {
+      if (settled) return
+      settled = true
+      set({ sending: false, activeStream: null })
+      err ? reject(err) : resolve()
+    }
+
+    const cancel = chatService.streamMessage(
+      currentSessionId,
+      { content: text },
+      {
+        onStart: (evt) => {
+          sawAnyEvent = true
+          set((state) => ({
+            messages: state.messages.map((m) => {
+              if (m.id === userLocalId) {
+                return {
+                  ...(evt.user_message as DisplayChatMessage),
+                  pending: false,
+                }
+              }
+              if (m.id === assistantLocalId) {
+                return {
+                  ...m,
+                  id: evt.assistant_message_id,
+                  pending: false,
+                }
+              }
+              return m
+            }),
+          }))
+        },
+
+        onDelta: (evt) => {
+          sawAnyEvent = true
+          set((state) => ({
+            messages: state.messages.map((m, idx) =>
+              idx === state.messages.length - 1 && m.role === 'assistant'
+                ? { ...m, content: m.content + evt.delta }
+                : m,
+            ),
+          }))
+        },
+
+        onAttachment: (evt) => {
+          sawAnyEvent = true
+          set((state) => ({
+            messages: state.messages.map((m, idx) =>
+              idx === state.messages.length - 1 && m.role === 'assistant'
+                ? {
+                    ...m,
+                    attachments: [
+                      ...m.attachments,
+                      evt.attachment as MessageAttachment,
+                    ],
+                  }
+                : m,
+            ),
+          }))
+        },
+
+        onEnd: (evt) => {
+          sawAnyEvent = true
+          set((state) => ({
+            quota: { ...state.quota, remaining: evt.quota_remaining },
+            messages: state.messages.map((m, idx) => {
+              if (idx !== state.messages.length - 1) return m
+              if (m.role !== 'assistant') return m
+              return {
+                ...m,
+                id: evt.assistant_message_id,
+                content: evt.content || m.content,
+                attachments: evt.attachments?.length
+                  ? (evt.attachments as MessageAttachment[])
+                  : m.attachments,
+                streaming: false,
+              }
+            }),
+          }))
+        },
+
+        onBusinessError: (evt) => {
+          const submitError: SubmitMessageError =
+            evt.code === ERR_CHAT_SERVICE
+              ? { kind: 'service_error', message: evt.message }
+              : evt.code === ERR_CHAT_QUOTA_EXHAUSTED
+                ? { kind: 'quota_exhausted' }
+                : evt.code === ERR_RATE_LIMIT
+                  ? { kind: 'rate_limit' }
+                  : evt.code === ERR_CONTENT_VIOLATION
+                    ? { kind: 'content_violation', message: evt.message }
+                    : { kind: 'service_error', message: evt.message }
+          // 内容违规走"未消耗"路径：bubble 已被回滚（finish 自身或 page 处理）
+          if (submitError.kind !== 'content_violation') {
+            markStreamingBubbleErrored('生成中断，请重试')
+          }
+          finish(wrapError(evt.message, submitError))
+        },
+
+        onTransportError: (err, meta) => {
+          if (meta.aborted) {
+            markStreamingBubbleErrored('已中断')
+            finish(
+              wrapError(err.message, { kind: 'network', message: err.message }),
+            )
+            return
+          }
+          recoverFromHistory().then((recovered) => {
+            if (recovered) {
+              finish()
+            } else {
+              markStreamingBubbleErrored('网络中断')
+              finish(
+                wrapError(err.message, {
+                  kind: 'network',
+                  message: err.message,
+                }),
+              )
+            }
+          })
+        },
+
+        onClose: () => {
+          if (!sawAnyEvent) {
+            recoverFromHistory().then((recovered) => {
+              if (!recovered) markStreamingBubbleErrored('生成中断，请重试')
+              finish()
+            })
+            return
+          }
+          finish()
+        },
+      },
+    )
+
+    set({ activeStream: cancel })
+  })
+}

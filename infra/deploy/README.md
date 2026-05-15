@@ -4,6 +4,8 @@
 
 **Git / 密钥单侧真源 / CVM 推荐 `make deploy-cvm-up`**：统一见 [**`docs/release-notes/CVM-canonical-deploy.md`**](../docs/release-notes/CVM-canonical-deploy.md)。
 
+**已在 CVM shell 里登录（控制台 / SSH）要一键发版**：在仓库根执行 **`bash infra/deploy/release-cvm-on-server.sh`**（`git pull` + 全栈 compose build + `alembic upgrade head` + `nginx` 重启）；可选 **`USE_WECHAT_PAY_COMPOSE=1`** 叠加商户 PEM compose。
+
 ## 微信公众平台域名怎么填
 
 微信开放平台 **`modify_domain` 接口示例**里，`requestdomain` / `uploaddomain` 等为 **`https://` 开头的完整项**，例如 `https://api.birdieai.cn`（见 [官方文档](https://developers.weixin.qq.com/doc/oplatform/openApi/OpenApiDoc/miniprogram-management/domain-management/modifyServerDomain.html)）。

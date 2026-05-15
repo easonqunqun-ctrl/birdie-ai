@@ -67,6 +67,8 @@ export interface User {
   stats?: UserStats
   quota?: UserQuota
   created_at: string
+  /** 非空：账号将于该时间（ISO）后永久删除，可调用取消接口 */
+  account_deletion_scheduled_at?: string | null
 }
 
 export interface WechatLoginRequest {

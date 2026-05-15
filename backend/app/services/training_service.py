@@ -27,8 +27,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.exceptions import BadRequestError, ConflictError, NotFoundError
+from app.core.exceptions import BadRequestError, ConflictError, ForbiddenError, NotFoundError
 from app.core.security import new_id
+from app.models.analysis import AnalysisIssue, SwingAnalysis
 from app.models.training import Drill, PracticeLog, TrainingPlan, TrainingTask
 from app.models.user import User
 
@@ -270,6 +271,77 @@ async def get_current_week_plan(db: AsyncSession, user: User) -> TrainingPlan | 
         )
     )
     return (await db.execute(stmt)).scalar_one_or_none()
+
+
+async def add_analysis_to_weekly_plan(
+    db: AsyncSession,
+    *,
+    analysis_id: str,
+    user: User,
+) -> TrainingPlan:
+    """报告页 / 教练页「加入训练计划」后端入口（W8 闭环补齐）。
+
+    把指定分析的 issues 同步生成/更新到当周训练计划，复用
+    `generate_or_update_weekly` 的 upsert 语义：
+      - 同一周内多次调用幂等（同 drill 不重复加任务）。
+      - 旧分析、本周已存在 plan 的场景下，新增任务追加到现有 plan 上。
+
+    错误：
+      - analysis 不存在 → NotFoundError(40402)
+      - 不是当前用户的分析 → ForbiddenError(40302)
+      - 分析未完成（无 issues）→ BadRequestError(40015)
+      - issues 全部无对应 drill → BadRequestError(40016)（应该极少发生）
+
+    返回最新 plan（含 tasks），由 API 层包成 TrainingPlanDetail。
+    `sample` 这种伪 ID 由 API 层挡掉，本函数不处理。
+    """
+    analysis = await db.get(SwingAnalysis, analysis_id)
+    if analysis is None:
+        raise NotFoundError(code=40402, message="分析报告不存在")
+    if analysis.deleted_at is not None:
+        raise NotFoundError(code=40402, message="分析报告不存在")
+    if analysis.user_id != user.id:
+        raise ForbiddenError(code=40302, message="无权操作此分析")
+    if analysis.status != "completed":
+        raise BadRequestError(
+            code=40015, message="分析尚未完成，暂时无法生成训练计划"
+        )
+
+    # 把 AnalysisIssue ORM 对象转成 generate_or_update_weekly 期望的 dict 列表
+    issues_stmt = (
+        select(AnalysisIssue)
+        .where(AnalysisIssue.analysis_id == analysis.id)
+        .order_by(AnalysisIssue.sort_order)
+    )
+    issue_rows = list((await db.execute(issues_stmt)).scalars().all())
+    issues_dicts = [
+        {"type": it.issue_type, "severity": it.severity}
+        for it in issue_rows
+    ]
+    if not issues_dicts:
+        # 一次"完美"挥杆的兜底：没有 issue → 没有要练的动作；前端按 NOOP 处理
+        raise BadRequestError(
+            code=40015, message="本次分析没有需要重点练习的问题"
+        )
+
+    plan = await generate_or_update_weekly(
+        db, user.id, analysis.id, issues_dicts
+    )
+    if plan is None:
+        # 极少：所有 issue 都无匹配 drill（drills seed 缺失等）
+        raise BadRequestError(
+            code=40016, message="暂无对应训练动作，请稍后重试"
+        )
+
+    # 重新拉一次带 tasks 的 plan，确保 selectinload 生效（generate_or_update_weekly
+    # 内部 add 后没有 refresh tasks 关系）
+    refreshed_stmt = (
+        select(TrainingPlan)
+        .options(selectinload(TrainingPlan.tasks))
+        .where(TrainingPlan.id == plan.id)
+    )
+    refreshed = (await db.execute(refreshed_stmt)).scalar_one()
+    return refreshed
 
 
 async def list_practice_logs_for_month(

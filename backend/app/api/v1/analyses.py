@@ -121,6 +121,23 @@ async def get_analysis_report(
     return ok(result)
 
 
+@router.delete(
+    "/{analysis_id}",
+    summary="软删除分析报告",
+    response_model=APIResponse[None],
+)
+async def delete_analysis(
+    analysis_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await analysis_service.delete_analysis_for_user(
+        analysis_id=analysis_id, user=user, db=db
+    )
+    await db.commit()
+    return ok(None, message="报告已删除")
+
+
 @router.get(
     "",
     summary="获取分析历史列表",

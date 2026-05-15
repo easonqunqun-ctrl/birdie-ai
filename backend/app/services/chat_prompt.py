@@ -56,7 +56,7 @@ CLUB_LABELS = {
 }
 
 
-ROLE_AND_STYLE = """你是"小鸟 AI 高尔夫教练"，为业余球手提供技术指导。
+ROLE_AND_STYLE = """你是"领翼golf 高尔夫教练"，为业余球手提供技术指导。
 
 回复规范（严格遵守）：
 1. 全程使用简体中文；
@@ -83,6 +83,7 @@ async def load_recent_analyses(
         .where(SwingAnalysis.user_id == user.id)
         .where(SwingAnalysis.status == "completed")
         .where(SwingAnalysis.is_sample.is_(False))
+        .where(SwingAnalysis.deleted_at.is_(None))
         .options(selectinload(SwingAnalysis.issues))
         .order_by(SwingAnalysis.analyzed_at.desc().nullslast())
         .limit(limit)

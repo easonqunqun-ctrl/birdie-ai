@@ -3,7 +3,9 @@
 设计目标：
 - 对业务层暴露 **3 个方法**：`presign_post_policy` / `head_object` / `get_object_url`。
 - 后端容器访问 MinIO 走 `MINIO_ENDPOINT`（内网，如 `http://minio:9000`）；
-  但签发给客户端的直传 URL 必须用 `MINIO_PUBLIC_ENDPOINT`（公网/宿主机，如 `http://localhost:9000`），
+  签发给小程序/浏览器的 POST 基准地址取自 `effective_minio_public_endpoint`
+  （通常为 `MINIO_PUBLIC_ENDPOINT`；staging/prod 且仍为 localhost 占位时回落至
+  `{API_PUBLIC_BASE_URL}/minio`，与 nginx 反代及微信合法域名对齐），
   因为客户端（微信小程序 / 浏览器）解析不了 Docker 内部域名。
   为此内部用两个 Minio 实例，签名时用 public 这个。
 - T1 不依赖外部网络；单元测试通过依赖注入替换 `MinioStorageClient`。
@@ -44,7 +46,7 @@ class MinioStorageClient:
         region: str | None = None,
     ) -> None:
         self._internal_endpoint = internal_endpoint or settings.MINIO_ENDPOINT
-        self._public_endpoint = public_endpoint or settings.MINIO_PUBLIC_ENDPOINT
+        self._public_endpoint = public_endpoint or settings.effective_minio_public_endpoint
         self.bucket = bucket or settings.MINIO_BUCKET
         self.region = region or settings.MINIO_REGION
         ak = access_key or settings.MINIO_ACCESS_KEY
@@ -135,10 +137,30 @@ _default_client: MinioStorageClient | None = None
 
 
 def get_minio_storage() -> MinioStorageClient:
-    """FastAPI `Depends` 用。测试中通过 `app.dependency_overrides` 替换为 fake 实现。"""
+    """FastAPI `Depends` 用。测试中通过 `app.dependency_overrides` 替换为 fake 实现.
+
+    `STORAGE_PROVIDER=cos` 时走腾讯云 COS 的 S3 兼容端点（`cos.<region>.myqcloud.com`）。"""
     global _default_client
     if _default_client is None:
-        _default_client = MinioStorageClient()
+        from app.config import settings
+
+        if settings.STORAGE_PROVIDER == "cos":
+            if not (settings.COS_SECRET_ID and settings.COS_SECRET_KEY and settings.COS_BUCKET):
+                raise RuntimeError("COS_SECRET_ID / COS_SECRET_KEY / COS_BUCKET 未配置")
+            # 与 S3 path-style 一致：endpoint 不含 bucket 名，签名 URL 形如
+            # `https://cos.<region>.myqcloud.com/<bucket>`（见 `presign_post_policy` 内 `url` 拼接）
+            internal = f"https://cos.{settings.COS_REGION}.myqcloud.com"
+            public = (settings.COS_PUBLIC_BASE or "").rstrip() or internal
+            _default_client = MinioStorageClient(
+                internal_endpoint=internal,
+                public_endpoint=public,
+                access_key=settings.COS_SECRET_ID,
+                secret_key=settings.COS_SECRET_KEY,
+                bucket=settings.COS_BUCKET,
+                region=settings.COS_REGION,
+            )
+        else:
+            _default_client = MinioStorageClient()
     return _default_client
 
 

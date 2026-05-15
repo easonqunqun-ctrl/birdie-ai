@@ -1,26 +1,44 @@
 {
-  "miniprogramRoot": "dist/weapp/",
+  "miniprogramRoot": "dist/",
   "projectname": "xiaoniao-ai",
-  "description": "小鸟 AI 高尔夫智能教练",
-  "appid": "wx_placeholder_appid",
+  "description": "领翼golf 高尔夫智能教练",
+  "appid": "wx045feb5e244fffae",
   "setting": {
     "urlCheck": false,
-    "es6": false,
-    "enhance": false,
+    "es6": true,
+    "enhance": true,
     "postcss": false,
-    "minified": false,
+    "minified": true,
     "newFeature": true,
     "uglifyFileName": false,
-    "useIsolateContext": true,
+    "useIsolateContext": false,
     "useCompilerModule": true,
     "userConfirmedUseCompilerModuleSwitch": false,
     "babelSetting": {
       "ignore": [],
       "disablePlugins": [],
       "outputPath": ""
-    }
+    },
+    "compileWorklet": false,
+    "uploadWithSourceMap": true,
+    "packNpmManually": false,
+    "packNpmRelationList": [],
+    "minifyWXSS": true,
+    "minifyWXML": true,
+    "localPlugins": false,
+    "disableUseStrict": false,
+    "useCompilerPlugins": false,
+    "condition": false,
+    "swc": false,
+    "disableSWC": true
   },
   "compileType": "miniprogram",
-  "libVersion": "2.25.0",
-  "condition": {}
+  "libVersion": "3.15.2",
+  "condition": {},
+  "simulatorPluginLibVersion": {},
+  "packOptions": {
+    "ignore": [],
+    "include": []
+  },
+  "editorSetting": {}
 }

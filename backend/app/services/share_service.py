@@ -25,6 +25,7 @@ from app.models.share import ShareAction
 from app.models.user import User
 from app.schemas.analysis import score_level
 from app.schemas.share import PublicReport, PublicReportIssue, ShareLogRequest
+from app.services.analysis_service import to_proxy_image_url
 from app.services.invitation_service import mask_nickname
 
 
@@ -59,13 +60,14 @@ async def get_public_report(
     1. 分析存在（否则 404）
     2. 状态 completed（进行中 / 失败的分享没意义 → 404）
     3. 不是 sample（sample 有自己的 /sample 端点，不走分享）
-
-    注：SwingAnalysis 没有 SoftDeleteMixin，不需要 deleted_at 防御。
     """
     stmt = (
         select(SwingAnalysis)
         .options(selectinload(SwingAnalysis.issues))
-        .where(SwingAnalysis.id == analysis_id)
+        .where(
+            SwingAnalysis.id == analysis_id,
+            SwingAnalysis.deleted_at.is_(None),
+        )
     )
     analysis = (await db.execute(stmt)).scalar_one_or_none()
     if analysis is None:
@@ -91,7 +93,7 @@ async def get_public_report(
         id=analysis.id,
         overall_score=analysis.overall_score,
         score_level=score_level(analysis.overall_score),
-        thumbnail_url=analysis.thumbnail_url,
+        thumbnail_url=to_proxy_image_url(analysis.thumbnail_url),
         camera_angle=analysis.camera_angle,
         club_type=analysis.club_type,
         issues=public_issues,

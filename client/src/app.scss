@@ -1,57 +1,164 @@
 /* ==================== 全局样式（Design Token） ====================
- * 视觉规范：深绿 + 白 + 金（见《产品设计白皮书》§7.2）
+ * 视觉规范：对齐 `UI/birdie_ai_light_all_pages.html` 浅色稿
+ *   靛蓝主色 #1A237E + 白卡 + 浅灰底 #F4F6FC + 点缀绿 #00D084 / #00A066
  *
  * 使用约定：
- *   - 业务页面只使用 var(--color-xxx) 引用 Token，严禁硬编码 HEX。
- *   - 品牌装饰以深绿 + 白 + 金为准；状态语义色（success/warning/error）
- *     可沿用行业惯例，仅用于提示/图表等语义场景，不覆盖品牌主色。
+ *   - 业务页面优先使用 var(--color-xxx)，避免硬编码 HEX（第三方组件、Canvas 除外）。
  */
 
-:root {
-  /* --------- 品牌三色（主） --------- */
-  --color-primary: #0f3d2e;          /* 深绿·主色：主按钮、导航压色、Hero 定调 */
-  --color-primary-dark: #0a2a20;     /* 深绿·更深：按钮按压、深色描边 */
-  --color-primary-soft: #1a4d3d;     /* 深绿·渐变终点，与 primary 搭配线性渐变 */
-  --color-primary-tint: #e8efeb;     /* 深绿·极浅底：选中项背景、区块分隔 */
+/**
+ * 微信小程序里 `:root` 选择器**不会被解析**，必须用 `page`（小程序根）。
+ * 同时给 `page, view` 双挂一份，保证：
+ *   1. page 上的 var 能被自定义 component（比如某些 builtin Text）继承到；
+ *   2. H5 / RN / Storybook 等 Web 环境也能解析（view 在 web 是 div）。
+ *
+ * ⚠️ 历史教训：原来写成 `:root` 时整个项目所有 `var(--color-xxx)` 在小程序
+ * 端全部 fallback 到 transparent / inherit，导致用户气泡蓝色背景出不来等问题。
+ */
+page,
+view {
+  /* --------- 品牌主色（靛蓝） --------- */
+  --color-primary: #1a237e;
+  --color-primary-dark: #121a5c;
+  --color-primary-soft: #0d3b8e;
+  --color-primary-tint: #e8ebf8;
+  --color-on-primary: #ffffff;
 
-  --color-on-primary: #ffffff;       /* 深绿底上的文字/图标 */
+  /* 与主色搭配的渐变/点缀（稿中视频区、进度条、高亮趋势） */
+  --color-accent-mint: #00d084;
+  --color-accent-mint-dim: #e8f5ee;
 
-  --color-gold: #c9a227;             /* 金色·强调：会员、出色等级、关键数据 */
-  --color-gold-dark: #8a7020;        /* 金色·暗：金色在浅底上的文字/描边 */
-  --color-gold-soft: #f4ead0;        /* 金色·极浅底：会员卡背景等小面积托底 */
+  /* --------- 强调金（评分「专业水准」等，与靛蓝并存） --------- */
+  --color-gold: #c9a227;
+  --color-gold-dark: #7a5f10;
+  --color-gold-soft: #fff4d6;
 
-  /* --------- 语义辅色（仅用于状态/图表） --------- */
-  --color-success: #2f8f5d;          /* 与深绿同色系，偏亮以区别 */
-  --color-warning: #f59e0b;
+  /* --------- 语义色 --------- */
+  --color-success: #00a066;
+  --color-warning: #f4a923;
+  /* 稿中 amber 标签、次要警示（与 success 区分） */
+  --color-amber: #c47a00;
+  --color-amber-bg: #fff4e0;
   --color-error: #ef4444;
   --color-info: #3b82f6;
 
-  /* --------- 文字 --------- */
-  --color-text-primary: #111827;
+  /* --------- 文字（稿中次级多用 #888 / #aaa） --------- */
+  --color-text-primary: #1f2937;
   --color-text-secondary: #6b7280;
   --color-text-tertiary: #9ca3af;
+  --color-text-muted: #888888;
   --color-text-inverse: #ffffff;
+  /* 主色底上的次强调文案（如用户气泡内字色） */
+  --color-on-primary-muted: #c5ccf5;
 
   /* --------- 背景 / 描边 --------- */
-  --color-bg-page: #f6f5f0;          /* 暖浅灰白，和金色协调 */
+  --color-bg-page: #f4f6fc;
   --color-bg-card: #ffffff;
-  --color-border: #e5e7eb;
+  --color-bg-subtle: #f0f2f5;
+  --color-border: #eaebef;
+  --color-border-muted: #e0e3f0;
+  --color-divider: #eaebef;
+  /* AI 教练·上下文条（ctx-banner） */
+  --color-context-border: #c8ceec;
+  --color-context-sub: #8890c0;
+  /* 训练任务完成态 */
+  --color-task-done-bg: #f8fdf9;
+  --color-task-done-border: #c8ead8;
 
-  /* --------- 圆角 --------- */
+  /* --------- 圆角（与稿一致：卡片 16px、按钮 12px 档） --------- */
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-xl: 24px;
 
+  /* --------- 复合渐变（首页 Hero、会员顶卡等，对齐稿中 multi-stop） --------- */
+  --gradient-hero: linear-gradient(
+    135deg,
+    var(--color-primary) 0%,
+    var(--color-primary-soft) 52%,
+    #094a30 100%
+  );
+  --gradient-streak: linear-gradient(135deg, #1a237e 0%, #0a3a6e 100%);
+  /* 训练页周进度条（稿 .prog-fill） */
+  --gradient-progress: linear-gradient(
+    90deg,
+    var(--color-primary) 0%,
+    var(--color-accent-mint) 100%
+  );
+
   /* --------- 阴影 --------- */
-  --shadow-sm: 0 2px 4px rgba(15, 61, 46, 0.06);
-  --shadow-md: 0 4px 12px rgba(15, 61, 46, 0.10);
+  --shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 12px rgba(26, 35, 126, 0.08);
+
+  /* --------- 字号 token（W8 全局升档 → W8.1 keep-layout 再升一档） ---------
+   *
+   * 设计原则
+   * --------
+   * - 微信小程序 1rpx ≈ 0.5px @iPhone（750rpx = 屏宽）。
+   *   Apple HIG 推荐正文 17px ≈ 34rpx，微信本体 / 支付宝 / 抖音正文落在 15-17px。
+   *
+   * W8.2（本轮）：在 W8.1 基础上全局再升一档（+2rpx），提升小程序可读性；
+   * 「首页 Hero · 最新综合得分」大号粗体数字冻结不上调（见 index.scss）。
+   *
+   *     xs      24 → 26rpx
+   *     sm      28 → 30rpx
+   *     base    30 → 32rpx
+   *     md      32 → 34rpx
+   *     lg      34 → 36rpx
+   *     xl      36 → 38rpx
+   *     2xl     44 → 46rpx
+   *     3xl     56 → 58rpx
+   *     display 96 → 98rpx（特大 KPI；首页 Hero 得分单独硬编码不参与 token）
+   */
+  --font-size-xs: 26rpx;       /* 13px */
+  --font-size-sm: 30rpx;       /* 15px */
+  --font-size-base: 32rpx;     /* 16px */
+  --font-size-md: 34rpx;       /* 17px */
+  --font-size-lg: 36rpx;       /* 18px */
+  --font-size-xl: 38rpx;       /* 19px */
+  --font-size-2xl: 46rpx;      /* 23px */
+  --font-size-3xl: 58rpx;      /* 29px */
+  --font-size-display: 98rpx;  /* 49px */
+
+  /* 行高 token（按字号区间映射） */
+  --line-height-tight: 1.3;    /* 标题、KPI */
+  --line-height-base: 1.55;    /* 正文 */
+  --line-height-loose: 1.7;    /* 长说明、法律文档 */
 }
 
 page {
   background-color: var(--color-bg-page);
   color: var(--color-text-primary);
-  font-family: -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
-  font-size: 28px;
-  line-height: 1.5;
+  font-family: -apple-system, 'PingFang SC', 'Noto Sans SC', 'Helvetica Neue', sans-serif;
+  /* page 默认正文字号；与 --font-size-base（32rpx ≈ 16px）对齐 */
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+}
+
+/* ====================================================================
+ * P2-A1：底部安全区工具类
+ *   iPhone X 之后的「home indicator 横条」会吃掉底部约 34px。
+ *   用法（按需挑一个）：
+ *     - .safe-area-pb       // 直接给一个仅 home-indicator 的 padding-bottom
+ *     - .safe-area-pb-md    // 在已有内容 padding 之上额外加 home-indicator
+ *     - 或 SCSS 内手写 `padding-bottom: calc(<原值> + env(safe-area-inset-bottom));`
+ *
+ *   微信小程序 tabBar 由系统接管 home-indicator，**tabBar 页本身不要再加**，
+ *   只在「非 tabBar 页 + 贴底固定按钮 / 输入栏」上用。
+ * ==================================================================== */
+.safe-area-pb {
+  padding-bottom: 34px;
+}
+
+.safe-area-pb-sm {
+  padding-bottom: 50px;
+}
+
+.safe-area-pb-md {
+  padding-bottom: 66px;
+}
+
+.safe-area-pb-lg {
+  padding-bottom: 98px;
 }

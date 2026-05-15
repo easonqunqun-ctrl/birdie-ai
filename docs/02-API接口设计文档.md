@@ -112,6 +112,8 @@ Authorization: Bearer <jwt_token>
 | 40010 | 字段不允许修改 | 业务语义禁止（如 `onboarding_completed` 反向置 false） |
 | 40011 | 上传凭证无效 | `upload_id` 不存在、已过期或不属于当前用户（M2-T1） |
 | 40012 | 视频对象不存在 | 前端拿了凭证但未完成 POST 直传即调 `/analyses`（M2-T1） |
+| 40092 | 分析进行中不可删除 | `pending` / `processing` 时调用 `DELETE /v1/analyses/{id}` |
+| 40093 | 示例类型分析报告不可删除 | `swing_analyses.is_sample=true` 的记录 |
 | 40101 | Token 缺失 | 未携带 Authorization 头 |
 | 40102 | Token 无效 | Token 解析失败 |
 | 40103 | Token 过期 | Token 已过期 |
@@ -688,6 +690,26 @@ GET /v1/analyses/{analysis_id}
   }
 }
 ```
+
+---
+
+### 3.4a 软删除分析报告
+
+```
+DELETE /v1/analyses/{analysis_id}
+```
+
+**需认证**（仅删除本人记录）
+
+**语义**：
+
+- 默认 **软删除**：写入 `swing_analyses.deleted_at`，**不**物理删对象存储。
+- `pending` / `processing`：**不允许删除**，返回 **40092**。
+- `is_sample=true`（若存在入库样本记录）：**不允许删除**，返回 **40093**。
+- 重复删除：**幂等**，返回成功。
+- 删除后：`GET /v1/analyses` 列表、`GET /v1/analyses/{id}` 详情、`GET /v1/analyses/{id}/public` 公开报告均视为不存在（列表不出现，详情与公开接口 **404**，错误码 **40402**）；用户当周训练计划中若 `source_analysis_id` / 任务的 `verification_analysis_id` 指向该分析，会在服务端清空对应外键。
+
+**成功响应**：`code=0`，`data=null`。
 
 ---
 
@@ -1807,6 +1829,7 @@ POST /v1/events
 | 10 | POST | /v1/analyses | 是 | 创建分析任务 |
 | 11 | GET | /v1/analyses/{id}/status | 是 | 查询分析状态 |
 | 12 | GET | /v1/analyses/{id} | 是 | 获取分析报告 |
+| 12a | DELETE | /v1/analyses/{id} | 是 | 软删除分析报告（进行中/示例不可删） |
 | 13 | GET | /v1/analyses | 是 | 分析历史列表 |
 | 14 | GET | /v1/analyses/sample | 否 | 获取示例分析报告（免登体验，固定数据） |
 | 15 | POST | /v1/analyses/{id}/share-card | 是 | 生成分享卡片 |

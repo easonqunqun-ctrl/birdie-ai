@@ -77,15 +77,37 @@ scp "${SSH_OPTS[@]}" backend/app/integrations/llm.py \
 scp "${SSH_OPTS[@]}" backend/app/api/v1/chat.py \
   "${DEPLOY_HOST}:${DEPLOY_REPO}/backend/app/api/v1/chat.py"
 
-# 须用「仓库内」.env.local 的绝对路径 + --project-directory；否则部分 compose 版本会把
-# --env-file .env.local 解析成 $HOME/.env.local（出现 couldn't find env file: /home/ubuntu/.env.local）。
-REMOTE_RUN_DEFAULT="set -e; cd '${DEPLOY_REPO}' || { echo \"✗ 远端目录不存在: ${DEPLOY_REPO}\" >&2; exit 1; }; test -f '.env.local' || { echo \"✗ 缺少 ${DEPLOY_REPO}/.env.local — 请按 docs/release-notes/CVM-canonical-deploy.md 在服务器维护密钥文件（勿用本机误盖）\" >&2; exit 1; }; docker compose --project-directory '${DEPLOY_REPO}' -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.cvm.yml ${REMOTE_EXTRA_COMPOSE_FLAGS} --env-file '${DEPLOY_REPO}/.env.local' up -d --build backend celery-worker"
+# 支付 / 统一异常：与仓库最新实现对齐（避免仍只靠散装 chat/config/llm 三门文件）
+scp "${SSH_OPTS[@]}" backend/app/core/middleware.py \
+  "${DEPLOY_HOST}:${DEPLOY_REPO}/backend/app/core/middleware.py"
+
+scp "${SSH_OPTS[@]}" backend/app/api/v1/payments.py \
+  "${DEPLOY_HOST}:${DEPLOY_REPO}/backend/app/api/v1/payments.py"
+
+scp "${SSH_OPTS[@]}" backend/app/services/payment_service.py \
+  "${DEPLOY_HOST}:${DEPLOY_REPO}/backend/app/services/payment_service.py"
+
+scp "${SSH_OPTS[@]}" backend/app/schemas/payment.py \
+  "${DEPLOY_HOST}:${DEPLOY_REPO}/backend/app/schemas/payment.py"
+
+if [[ -f backend/app/integrations/wechat_pay_v3.py ]]; then
+  scp "${SSH_OPTS[@]}" backend/app/integrations/wechat_pay_v3.py \
+    "${DEPLOY_HOST}:${DEPLOY_REPO}/backend/app/integrations/wechat_pay_v3.py"
+fi
 
 if [[ -n "${REMOTE_BUILD_CMD}" ]]; then
-  ssh "${SSH_OPTS[@]}" "${DEPLOY_HOST}" bash -c "${REMOTE_BUILD_CMD}"
+  ssh "${SSH_OPTS[@]}" "${DEPLOY_HOST}" bash --norc --noprofile -c "${REMOTE_BUILD_CMD}"
 else
-  # 非 login shell，避免远端 .bashrc 在 TERM=dumb 下输出大段环境（误当故障）
-  ssh "${SSH_OPTS[@]}" "${DEPLOY_HOST}" bash -c "${REMOTE_RUN_DEFAULT}"
+  # 使用 heredoc：避免 bash -c \"...\" 时，命令串里的 \$VAR 在本机二次展开。
+  ssh "${SSH_OPTS[@]}" "${DEPLOY_HOST}" bash --norc --noprofile <<EOF
+set -e
+cd '${DEPLOY_REPO}' || { echo "✗ 远端目录不存在: ${DEPLOY_REPO}" >&2; exit 1; }
+test -f '.env.local' || { echo "✗ 缺少 ${DEPLOY_REPO}/.env.local — 请按 docs/release-notes/CVM-canonical-deploy.md 在服务器维护密钥文件（勿用本机误盖）" >&2; exit 1; }
+PAY_KEY_FLAGS=""
+if test -f docker-compose.wechat-pay-key.yml; then PAY_KEY_FLAGS="-f docker-compose.wechat-pay-key.yml"; fi
+docker compose --project-directory '${DEPLOY_REPO}' -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.cvm.yml \$PAY_KEY_FLAGS ${REMOTE_EXTRA_COMPOSE_FLAGS} --env-file '${DEPLOY_REPO}/.env.local' up -d --build backend celery-worker
+docker restart xiaoniao-nginx 2>/dev/null || true
+EOF
 fi
 
 echo ""

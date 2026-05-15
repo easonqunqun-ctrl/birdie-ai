@@ -14,6 +14,7 @@
 import { FC, useEffect, useState } from 'react'
 import { View, Text, Button } from '@tarojs/components'
 import Taro from '@tarojs/taro'
+import { chooseVideo } from '@/adapters/media'
 import { storage } from '@/utils/storage'
 import { VIDEO_CONSTRAINTS } from '@/types/analysis'
 import './capture.scss'
@@ -24,6 +25,8 @@ interface ChosenVideo {
   tempFilePath: string
   size: number
   duration: number
+  /** 视频首帧缩略图路径（weapp 原生字段；W8-T5 用于合规预检） */
+  thumbTempFilePath?: string
 }
 
 /**
@@ -57,25 +60,18 @@ const CaptureAnalysisPage: FC = () => {
 
   const handleChoose = async (source: MediaSource) => {
     try {
-      const res = await Taro.chooseMedia({
-        count: 1,
-        mediaType: ['video'],
-        sourceType: [source],
-        maxDuration: VIDEO_CONSTRAINTS.MAX_DURATION_SECONDS,
-        sizeType: ['compressed'],
-        camera: 'back',
+      // weapp：`chooseVideo` → Taro.chooseMedia + 隐私授权；RN：`react-native-image-picker`
+      const raw = await chooseVideo({
+        source,
+        maxDurationSeconds: VIDEO_CONSTRAINTS.MAX_DURATION_SECONDS,
       })
-      const file = res.tempFiles?.[0]
-      if (!file) {
-        Taro.showToast({ title: '未选择视频', icon: 'none' })
-        return
-      }
       const picked: ChosenVideo = {
-        tempFilePath: file.tempFilePath,
-        size: file.size ?? 0,
-        duration: file.duration ?? 0,
+        tempFilePath: raw.filePath,
+        size: raw.size,
+        duration: raw.duration,
+        thumbTempFilePath: raw.thumbTempFilePath,
       }
-      const err = validateVideo(picked, file.tempFilePath)
+      const err = validateVideo(picked, raw.filePath)
       if (err) {
         Taro.showToast({ title: err, icon: 'none', duration: 2500 })
         return
@@ -84,17 +80,23 @@ const CaptureAnalysisPage: FC = () => {
       storage.markAnalysisGuideSeen()
 
       // 通过 URL 传参；tempFilePath 一般很短，但稳妥起见做 encode
+      // W8-T5：thumbTempFilePath 可为空（RN / 部分机型）；下一页按存在与否决定是否做合规预检
+      const thumbParam = picked.thumbTempFilePath
+        ? `&thumbTempFilePath=${encodeURIComponent(picked.thumbTempFilePath)}`
+        : ''
       Taro.navigateTo({
         url:
           `/pages/analysis/params?tempFilePath=${encodeURIComponent(picked.tempFilePath)}` +
           `&size=${picked.size}` +
           `&duration=${picked.duration.toFixed(2)}` +
-          `&source=${source}`,
+          `&source=${source}` +
+          thumbParam,
       })
     } catch (e) {
-      const err = e as { errMsg?: string }
-      if (err.errMsg && /cancel/i.test(err.errMsg)) return
-      Taro.showToast({ title: '选择视频失败', icon: 'none' })
+      const err = e as { errMsg?: string; message?: string }
+      const msg = err.errMsg || err.message || ''
+      if (/cancel/i.test(msg) || /已取消/i.test(msg)) return
+      Taro.showToast({ title: msg || '选择视频失败', icon: 'none' })
     }
   }
 

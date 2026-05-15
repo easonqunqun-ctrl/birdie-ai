@@ -12,20 +12,26 @@
 import { FC, useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, ScrollView, Text, View } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
+import EnvBadge from '@/components/EnvBadge'
 import { trainingService } from '@/services/trainingService'
+import { userService } from '@/services/userService'
 import { useUserStore } from '@/store/userStore'
 import { getDrillDetail } from '@/constants/drillLibrary'
 import type { TrainingPlanDetail, TrainingTaskItem } from '@/types/training'
 import './index.scss'
 
 const TrainingPage: FC = () => {
-  const { user, fetchMe } = useUserStore()
+  const { user, token, initialized, bootstrap, fetchMe } = useUserStore()
   const [plan, setPlan] = useState<TrainingPlanDetail | null>(null)
   const [loading, setLoading] = useState(false)
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)
   const [submittingTaskId, setSubmittingTaskId] = useState<string | null>(null)
+  const [progressPoints, setProgressPoints] = useState<
+    { analysis_id: string; analyzed_at: string; overall_score: number }[]
+  >([])
 
   const load = useCallback(async () => {
+    if (!token) return
     setLoading(true)
     try {
       const res = await trainingService.getCurrentPlan()
@@ -35,16 +41,39 @@ const TrainingPage: FC = () => {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [token])
+
+  const loadProgress = useCallback(async () => {
+    if (!token) return
+    try {
+      const res = await userService.getAnalysisProgress()
+      setProgressPoints(res.points ?? [])
+    } catch {
+      setProgressPoints([])
+    }
+  }, [token])
 
   useEffect(() => {
-    load()
-  }, [load])
+    if (!initialized) {
+      void bootstrap()
+    }
+  }, [initialized, bootstrap])
+
+  useEffect(() => {
+    if (token) {
+      void load()
+    } else {
+      setPlan(null)
+      setLoading(false)
+      setProgressPoints([])
+    }
+  }, [token, load])
 
   useDidShow(() => {
-    // 分析完成后回到这页时，拉最新 plan + streak
+    if (!token) return
     load()
     fetchMe().catch(() => undefined)
+    void loadProgress()
   })
 
   const grouped = useMemo(() => groupByDate(plan?.tasks ?? []), [plan])
@@ -52,6 +81,35 @@ const TrainingPage: FC = () => {
     if (!plan || plan.total_tasks === 0) return 0
     return Math.round((plan.completed_tasks / plan.total_tasks) * 100)
   }, [plan])
+
+  const shortAt = (iso: string) => {
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return iso.slice(0, 10)
+    return `${d.getMonth() + 1}/${d.getDate()}`
+  }
+
+  const progressTrendBlock =
+    progressPoints.length > 0 ? (
+      <View className='training__trend'>
+        <Text className='training__trend-title'>进步趋势</Text>
+        <Text className='training__trend-hint'>完成分析的综合分（按时间从早到晚）</Text>
+        <ScrollView
+          scrollX
+          className='training__trend-scroll'
+          showScrollbar={false}
+          enableFlex
+        >
+          <View className='training__trend-row'>
+            {progressPoints.map((p) => (
+              <View key={p.analysis_id} className='training__trend-chip'>
+                <Text className='training__trend-score'>{p.overall_score}</Text>
+                <Text className='training__trend-date'>{shortAt(p.analyzed_at)}</Text>
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+      </View>
+    ) : null
 
   async function handleComplete(taskId: string) {
     if (submittingTaskId) return
@@ -85,6 +143,32 @@ const TrainingPage: FC = () => {
     }
   }
 
+  if (!initialized) {
+    return (
+      <View className='training training--empty'>
+        <Text className='training__empty-icon'>⏳</Text>
+        <Text>加载中...</Text>
+      </View>
+    )
+  }
+
+  if (!token) {
+    const goLogin = () => Taro.navigateTo({ url: '/pages/login/index' })
+    return (
+      <View className='training training--empty training--guest'>
+        <EnvBadge />
+        <Text className='training__empty-icon'>🏋️</Text>
+        <Text className='training__empty-title'>训练计划</Text>
+        <Text className='training__empty-sub'>
+          登录并完成挥杆分析后，系统会根据报告为你生成本周训练任务与打卡提醒。
+        </Text>
+        <Button className='training__empty-cta' type='primary' onClick={goLogin}>
+          登录后查看训练计划
+        </Button>
+      </View>
+    )
+  }
+
   if (loading && !plan) {
     return (
       <View className='training training--empty'>
@@ -97,6 +181,8 @@ const TrainingPage: FC = () => {
   if (!plan) {
     return (
       <View className='training training--empty'>
+        <EnvBadge />
+        {progressTrendBlock}
         <Text className='training__empty-icon'>🏋️</Text>
         <Text className='training__empty-title'>还没有训练计划</Text>
         <Text className='training__empty-sub'>
@@ -115,6 +201,9 @@ const TrainingPage: FC = () => {
 
   return (
     <ScrollView scrollY className='training'>
+      <View className='training__scroll-inner'>
+      <EnvBadge />
+      {progressTrendBlock}
       <View className='training__hero'>
         <Text className='training__hero-title'>本周训练</Text>
         <Text className='training__hero-sub'>
@@ -222,6 +311,7 @@ const TrainingPage: FC = () => {
           })}
         </View>
       ))}
+      </View>
     </ScrollView>
   )
 }

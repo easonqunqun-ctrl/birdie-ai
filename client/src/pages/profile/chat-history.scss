@@ -1,0 +1,61 @@
+.chat-hist {
+  /**
+   * P1-A1：根容器是 <ScrollView>，必须用 height + overflow:hidden，
+   * 不能用 min-height —— 否则真机 iOS 上某些版本会把 ScrollView 算到 0
+   * 高度（之前在 tsx 里临时加 `style={{maxHeight:'100vh'}}` 兜底，已删除）。
+   */
+  height: 100vh;
+  overflow: hidden;
+  background: var(--color-bg-page);
+  /* P2-A1：RN 不写 calc/env */
+  padding-top: 24px;
+  padding-left: 32px;
+  padding-right: 32px;
+  padding-bottom: 48px;
+  box-sizing: border-box;
+
+  &--loading,
+  &--empty,
+  &--error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 120px 48px;
+    text-align: center;
+    color: var(--color-text-muted);
+  }
+
+  &__error-msg {
+    margin: 16px 0 32px;
+    font-size: 32rpx;
+  }
+
+  &__item {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 24px 28px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  &__preview {
+    font-size: 34rpx;
+    color: var(--color-primary);
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  &__meta {
+    margin-top: 12px;
+    font-size: 30rpx;
+    color: var(--color-text-tertiary);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+}

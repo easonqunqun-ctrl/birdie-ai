@@ -23,7 +23,7 @@ npm install -g pnpm
 ## 步骤 1：初始化环境变量
 
 ```bash
-cd /Users/chenyiqun/Documents/小鸟AI高尔夫
+cd <仓库根目录>   # 本机克隆路径，例如 ~/Documents/灵鸟golf
 make init
 ```
 
@@ -107,14 +107,27 @@ pnpm install                     # 第一次需要装依赖（约 2-3 分钟）
 pnpm build:weapp                 # 或 pnpm dev:weapp（监听模式）
 ```
 
-输出在 `client/dist/weapp/`。
+正式发布（生产 API、合法域名已就绪）时用 **`make client-build-weapp-prod`**，步骤见 **`docs/release-notes/go-live-weapp-fool-checklist.md`**。
+
+输出在 `client/dist/`（`app.json` 等同目录）。
 
 打开**微信开发者工具**：
-1. 导入项目 → 选择 `/Users/chenyiqun/Documents/小鸟AI高尔夫/client/dist/weapp` 目录
+1. 导入项目 → 选择 **`client` 目录**（与 `project.config.json` 同级；`miniprogramRoot` 指向 `dist/`）
 2. AppID 选"测试号"或填你自己的
 3. 应该能看到登录页 → 点"微信一键登录"→ 进入引导流程 → 进入首页
 
 > ⚠️ **注意**：本地开发时小程序需要访问 `localhost:8000`，需要在微信开发者工具的"详情 → 本地设置"里勾选"不校验合法域名"。
+
+### React Native（可选自检）
+
+在仓库根目录执行：
+
+```bash
+make client-bootstrap-rn-shell   # 首次：克隆 taro-native-shell 至 client/rn-shell
+make client-check-rn              # RN bundle + 日志门禁 + type-check（不启动模拟器）
+```
+
+真机与 Pods 详见 [`client/RN_SHELL.md`](client/RN_SHELL.md)。
 
 ## 步骤 6（可选）：跑后端测试
 

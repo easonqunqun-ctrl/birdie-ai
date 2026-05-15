@@ -1,224 +1,423 @@
+/**
+ * 训练页样式（W9 视觉对齐 UI/birdie_ai_light_all_pages.html · 训练区）
+ *
+ * 设计要点：
+ *  - hero 改为浅色卡（白底）+ 大标题 + 周日期范围 + 进度条
+ *  - 进度条用品牌→mint 渐变（gradient-progress）
+ *  - streak 单独"火苗"卡：橙黄渐变 + 🔥 + 大数字（稿底部 streak 元素）
+ *  - 进步趋势横滑：每张白卡 + 大分数 + 日期
+ *  - 任务卡：白底 + 圆角 + 阴影；done 状态浅绿底 + 左 mint 边
+ *  - 步骤号：渐变圆点（与 report 页对齐）
+ *  - 单位统一改 rpx，视觉密度更接近稿
+ */
+
 .training {
-  padding: 24px 32px 48px;
+  /**
+   * tabBar 页：根为 ScrollView 时不要用 min-height:100vh 撑穿可视高度。
+   * webview 渲染模式下 scroll-view 不支持 padding，水平内边距见 &__scroll-inner。
+   */
   background: var(--color-bg-page);
-  min-height: 100vh;
+  min-height: 100%;
   box-sizing: border-box;
 
+  &__scroll-inner {
+    padding: 16rpx 24rpx 32rpx;
+    box-sizing: border-box;
+  }
+
+  /* ================= 空态 ================= */
   &--empty {
-    padding: 120px 48px;
+    padding: 120rpx 48rpx;
     text-align: center;
-    color: var(--color-text-muted);
+    color: var(--color-text-secondary);
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 16px;
+    gap: 16rpx;
+
+    .training__trend {
+      width: 100%;
+      max-width: 100%;
+    }
   }
 
   &__empty-icon {
-    font-size: 96px;
-  }
-  &__empty-title {
-    font-size: 32px;
-    color: var(--color-text-primary);
-    font-weight: 600;
-  }
-  &__empty-sub {
-    font-size: 26px;
-    line-height: 1.6;
-    color: var(--color-text-muted);
-  }
-  &__empty-cta {
-    margin-top: 32px;
-    min-width: 240px;
+    font-size: 98rpx;
+    line-height: 1;
   }
 
-  &__hero {
-    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-soft) 100%);
-    color: var(--color-on-primary);
-    border-radius: var(--radius-md);
-    padding: 32px 28px;
-    box-shadow: var(--shadow-sm);
-    margin-bottom: 24px;
-  }
-  &__hero-title {
-    font-size: 32px;
+  &__empty-title {
+    font-size: 34rpx;
+    color: var(--color-primary);
     font-weight: 700;
+    letter-spacing: -0.3rpx;
+  }
+
+  &__empty-sub {
+    font-size: 30rpx;
+    line-height: 1.6;
+    color: var(--color-text-tertiary);
+    max-width: 520rpx;
+  }
+
+  &__empty-cta {
+    margin-top: 24rpx !important;
+    min-width: 280rpx;
+    background: var(--color-primary) !important;
+    color: var(--color-on-primary) !important;
+    border-radius: 20rpx !important;
+    height: 88rpx !important;
+    line-height: 88rpx !important;
+    font-size: 30rpx !important;
+    font-weight: 700 !important;
+    padding: 0 40rpx !important;
+    box-shadow: 0 6rpx 18rpx rgba(26, 35, 126, 0.28);
+
+    &::after {
+      border: none !important;
+    }
+  }
+
+  /* ================= 进步趋势（横滑） ================= */
+  &__trend {
+    width: 100%;
+    margin-bottom: 16rpx;
+    padding: 24rpx 24rpx 18rpx;
+    background: var(--color-bg-card);
+    border: 1rpx solid var(--color-border);
+    border-radius: 20rpx;
+    box-shadow: var(--shadow-xs);
+  }
+
+  &__trend-title {
+    font-size: 30rpx;
+    font-weight: 700;
+    color: var(--color-primary);
     display: block;
   }
-  &__hero-sub {
-    font-size: 24px;
-    opacity: 0.85;
+
+  &__trend-hint {
+    font-size: 28rpx;
+    color: var(--color-text-tertiary);
     display: block;
-    margin-top: 4px;
+    margin-top: 6rpx;
+    margin-bottom: 16rpx;
+  }
+
+  &__trend-scroll {
+    width: 100%;
+  }
+
+  &__trend-row {
+    display: flex;
+    flex-direction: row;
+    gap: 12rpx;
+    padding-bottom: 4rpx;
+  }
+
+  &__trend-chip {
+    flex-shrink: 0;
+    min-width: 110rpx;
+    background: var(--color-bg-subtle);
+    border-radius: 16rpx;
+    padding: 18rpx 18rpx 14rpx;
+    text-align: center;
+  }
+
+  &__trend-score {
+    font-size: 38rpx;
+    font-weight: 800;
+    color: var(--color-primary);
+    display: block;
+    letter-spacing: -1rpx;
+    line-height: 1;
+  }
+
+  &__trend-date {
+    font-size: 28rpx;
+    color: var(--color-text-tertiary);
+    display: block;
+    margin-top: 8rpx;
+  }
+
+  /* ================= hero（本周训练 + 进度 + 连续天数）================= */
+  &__hero {
+    background: var(--color-bg-card);
+    border: 1rpx solid var(--color-border);
+    border-radius: 24rpx;
+    padding: 28rpx 28rpx 24rpx;
+    box-shadow: var(--shadow-xs);
+    margin-bottom: 16rpx;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* 顶部装饰条（品牌 → mint 渐变细边） */
+  &__hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 6rpx;
+    background: var(--gradient-progress);
+  }
+
+  &__hero-title {
+    font-size: 34rpx;
+    font-weight: 800;
+    color: var(--color-primary);
+    display: block;
+    letter-spacing: -0.3rpx;
+  }
+
+  &__hero-sub {
+    font-size: 30rpx;
+    color: var(--color-text-tertiary);
+    display: block;
+    margin-top: 6rpx;
+    letter-spacing: 0.5rpx;
   }
 
   &__progress {
-    margin-top: 24px;
+    margin-top: 24rpx;
   }
+
   &__progress-track {
-    height: 12px;
-    background: rgba(255, 255, 255, 0.25);
-    border-radius: 6px;
+    height: 16rpx;
+    background: var(--color-bg-subtle);
+    border-radius: 999rpx;
     overflow: hidden;
   }
+
   &__progress-bar {
     height: 100%;
-    background: var(--color-on-primary, #fff);
-    border-radius: 6px;
-    transition: width 0.3s ease;
+    background: var(--gradient-progress);
+    border-radius: 999rpx;
+    transition: width 0.4s ease;
+    box-shadow: 0 0 8rpx rgba(0, 208, 132, 0.3);
   }
+
   &__progress-label {
     display: block;
-    font-size: 24px;
-    margin-top: 8px;
-    opacity: 0.85;
+    font-size: 30rpx;
+    margin-top: 12rpx;
+    color: var(--color-text-secondary);
+    font-weight: 500;
   }
 
+  /* streak：橙黄渐变 + 🔥 大数字（稿底部 streak） */
   &__streak {
-    margin-top: 20px;
+    margin-top: 20rpx;
     display: flex;
     align-items: center;
-    gap: 8px;
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 24px;
-    padding: 8px 16px;
-    width: fit-content;
+    gap: 16rpx;
+    background: linear-gradient(135deg, #ff9a3c 0%, #ff6b3c 100%);
+    border-radius: 16rpx;
+    padding: 18rpx 24rpx;
+    width: 100%;
+    box-sizing: border-box;
+    box-shadow: 0 4rpx 16rpx rgba(255, 107, 60, 0.22);
   }
+
   &__streak-icon {
-    font-size: 28px;
+    font-size: 38rpx;
+    line-height: 1;
   }
+
   &__streak-text {
-    font-size: 24px;
-    font-weight: 600;
+    font-size: 30rpx;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.5rpx;
   }
 
+  /* ================= AI 教练本周提示 ================= */
   &__summary {
-    background: var(--color-bg-card);
-    border-radius: var(--radius-sm);
-    padding: 20px 24px;
-    margin-bottom: 24px;
-    box-shadow: var(--shadow-xs);
-  }
-  &__summary-title {
-    font-size: 26px;
-    font-weight: 600;
-    color: var(--color-text-primary);
-    display: block;
-    margin-bottom: 8px;
-  }
-  &__summary-body {
-    font-size: 24px;
-    line-height: 1.6;
-    color: var(--color-text-secondary);
+    background: var(--color-primary-tint);
+    border-left: 6rpx solid var(--color-primary);
+    border-radius: 16rpx;
+    padding: 18rpx 22rpx;
+    margin-bottom: 20rpx;
   }
 
-  &__day {
-    margin-bottom: 24px;
+  &__summary-title {
+    font-size: 30rpx;
+    font-weight: 700;
+    color: var(--color-primary);
+    display: block;
+    margin-bottom: 6rpx;
+    letter-spacing: 1rpx;
   }
+
+  &__summary-body {
+    font-size: 30rpx;
+    line-height: 1.6;
+    color: var(--color-primary);
+  }
+
+  /* ================= 按日分组 ================= */
+  &__day {
+    margin-bottom: 20rpx;
+  }
+
   &__day-header {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    padding: 8px 4px 12px;
-  }
-  &__day-label {
-    font-size: 28px;
-    font-weight: 600;
-    color: var(--color-text-primary);
-  }
-  &__day-count {
-    font-size: 22px;
-    color: var(--color-text-muted);
+    padding: 8rpx 4rpx 12rpx;
   }
 
+  &__day-label {
+    font-size: 30rpx;
+    font-weight: 700;
+    color: var(--color-primary);
+    letter-spacing: -0.3rpx;
+  }
+
+  &__day-count {
+    font-size: 28rpx;
+    color: var(--color-text-tertiary);
+  }
+
+  /* ================= 任务卡 ================= */
   &__task {
     background: var(--color-bg-card);
-    border-radius: var(--radius-sm);
-    margin-bottom: 16px;
+    border: 1rpx solid var(--color-border);
+    border-radius: 18rpx;
+    margin-bottom: 12rpx;
     box-shadow: var(--shadow-xs);
     overflow: hidden;
+    border-left: 4rpx solid transparent;
+    transition: all 0.18s ease;
 
     &.is-done {
-      opacity: 0.7;
+      background: var(--color-task-done-bg);
+      border-color: var(--color-task-done-border);
+      border-left-color: var(--color-accent-mint);
     }
   }
+
   &__task-head {
     display: flex;
     align-items: center;
-    padding: 24px 28px;
+    padding: 22rpx 24rpx;
+
+    &:active {
+      opacity: 0.85;
+    }
   }
+
   &__task-head-main {
     flex: 1;
+    min-width: 0;
   }
+
   &__task-name {
-    font-size: 28px;
-    font-weight: 600;
-    color: var(--color-text-primary);
-    display: block;
-  }
-  &__task-meta {
-    font-size: 22px;
-    color: var(--color-text-muted);
-    margin-top: 6px;
-    display: block;
-  }
-  &__task-arrow {
-    font-size: 24px;
+    font-size: 30rpx;
+    font-weight: 700;
     color: var(--color-primary);
-    padding-left: 16px;
+    display: block;
+    letter-spacing: -0.3rpx;
+  }
+
+  &__task.is-done &__task-name {
+    color: var(--color-success);
+    text-decoration: line-through;
+    text-decoration-color: rgba(0, 160, 102, 0.4);
+    font-weight: 600;
+  }
+
+  &__task-meta {
+    font-size: 28rpx;
+    color: var(--color-text-tertiary);
+    margin-top: 6rpx;
+    display: block;
+  }
+
+  &__task-arrow {
+    font-size: 30rpx;
+    color: var(--color-text-tertiary);
+    padding-left: 16rpx;
+    flex-shrink: 0;
+    font-weight: 500;
   }
 
   &__task-body {
-    padding: 0 28px 24px;
-    border-top: 1px solid var(--color-divider, #eee);
-    padding-top: 20px;
+    padding: 0 24rpx 22rpx;
+    border-top: 1rpx solid var(--color-border);
+    padding-top: 18rpx;
   }
+
   &__task-desc {
-    font-size: 24px;
+    font-size: 30rpx;
     color: var(--color-text-secondary);
     line-height: 1.6;
-    margin-bottom: 16px;
+    margin-bottom: 14rpx;
     display: block;
   }
 
   &__steps {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    margin-bottom: 20px;
+    gap: 10rpx;
+    margin-bottom: 18rpx;
+    background: var(--color-bg-subtle);
+    border-radius: 14rpx;
+    padding: 16rpx 18rpx;
   }
+
   &__step {
     display: flex;
-    gap: 14px;
+    gap: 14rpx;
     align-items: flex-start;
   }
+
   &__step-index {
-    flex: 0 0 36px;
-    height: 36px;
-    line-height: 36px;
+    flex: 0 0 36rpx;
+    height: 36rpx;
+    line-height: 36rpx;
     text-align: center;
-    background: var(--color-primary-soft, #eaf3ff);
-    color: var(--color-primary);
-    border-radius: 18px;
-    font-size: 22px;
-    font-weight: 600;
+    background: linear-gradient(135deg, var(--color-primary), var(--color-accent-mint));
+    color: #fff;
+    border-radius: 50%;
+    font-size: 28rpx;
+    font-weight: 800;
+    box-shadow: 0 2rpx 6rpx rgba(26, 35, 126, 0.18);
   }
+
   &__step-text {
     flex: 1;
-    font-size: 24px;
+    font-size: 30rpx;
     color: var(--color-text-primary);
     line-height: 1.6;
-    padding-top: 4px;
+    padding-top: 6rpx;
   }
 
   &__task-cta {
     width: 100%;
+    background: var(--color-primary) !important;
+    color: var(--color-on-primary) !important;
+    border-radius: 16rpx !important;
+    height: 80rpx !important;
+    line-height: 80rpx !important;
+    font-size: 30rpx !important;
+    font-weight: 700 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: 0 4rpx 12rpx rgba(26, 35, 126, 0.22);
+
+    &::after {
+      border: none !important;
+    }
   }
+
   &__task-completed-label {
     display: block;
     text-align: center;
-    font-size: 22px;
-    color: var(--color-text-muted);
-    padding: 12px 0;
+    font-size: 28rpx;
+    color: var(--color-success);
+    padding: 12rpx 0;
+    font-weight: 600;
   }
 }

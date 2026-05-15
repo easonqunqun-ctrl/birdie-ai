@@ -1,134 +1,255 @@
+/**
+ * 我的页样式（W9 视觉对齐）
+ *
+ * 设计要点：
+ *  - 顶部用户卡：品牌渐变背景 + 圆头像 + 昵称 + 会员胶囊 + 编辑链接
+ *  - 三联统计：白卡 + 大数字（与首页一致）
+ *  - 高尔夫档案：白卡 + label-value 列表
+ *  - 菜单：emoji icon 圆形彩色底 + 标签 + 箭头（每行有微妙背景区分）
+ *  - 退出登录：底部幽灵按钮
+ *  - 单位统一 rpx
+ */
+
 .profile {
-  padding: 32px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  /* tabBar 页可视高度由客户端裁剪；勿 min-height:100vh + margin-top:auto，会把退出按钮撑到巨型留白下方 */
+  min-height: 100%;
+  padding: 0 0 24rpx;
+  background: var(--color-bg-page);
 
   &--empty {
     text-align: center;
     color: var(--color-text-tertiary);
-    padding-top: 200px;
+    padding-top: 200rpx;
+    font-size: 32rpx;
   }
 
+  &__guest-hint {
+    display: block;
+    padding: 0 48rpx 32rpx;
+    line-height: 1.6;
+    color: var(--color-text-secondary);
+    font-size: 32rpx;
+  }
+
+  &__guest-login {
+    min-width: 320rpx !important;
+    margin: 0 auto !important;
+    background: var(--color-primary) !important;
+    color: var(--color-on-primary) !important;
+    border-radius: 20rpx !important;
+    font-weight: 700 !important;
+
+    &::after {
+      border: none !important;
+    }
+  }
+
+  /* ================= 注销 banner ================= */
+  &__del-banner {
+    margin: 16rpx 24rpx;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1rpx solid rgba(239, 68, 68, 0.25);
+    border-left: 6rpx solid var(--color-error);
+    border-radius: 16rpx;
+    padding: 18rpx 22rpx;
+
+    &:active {
+      opacity: 0.85;
+    }
+  }
+
+  &__del-banner-text {
+    font-size: 32rpx;
+    color: #b91c1c;
+    font-weight: 600;
+  }
+
+  /* ================= 顶部用户卡（hero）================= */
   &__card {
-    background: var(--color-bg-card);
-    border-radius: var(--radius-md);
-    padding: 32px;
+    position: relative;
+    overflow: hidden;
+    margin: 24rpx 24rpx 0;
+    background: var(--gradient-hero);
+    color: var(--color-on-primary);
+    border-radius: 28rpx;
+    padding: 32rpx 28rpx;
     display: flex;
     align-items: center;
-    box-shadow: var(--shadow-sm);
-    margin-bottom: 24px;
+    gap: 22rpx;
+    box-shadow: 0 12rpx 32rpx rgba(13, 59, 142, 0.22);
+  }
+
+  /* 右上装饰圆 */
+  &__card::before {
+    content: '';
+    position: absolute;
+    top: -60rpx;
+    right: -60rpx;
+    width: 220rpx;
+    height: 220rpx;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle at 30% 30%,
+      rgba(0, 208, 132, 0.18),
+      rgba(0, 208, 132, 0) 70%
+    );
+    pointer-events: none;
   }
 
   &__avatar {
-    width: 96px;
-    height: 96px;
+    width: 110rpx;
+    height: 110rpx;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-soft) 100%);
-    color: var(--color-on-primary);
-    font-size: 48px;
-    font-weight: 700;
+    background: linear-gradient(135deg, #ffffff 0%, rgba(255, 255, 255, 0.6) 100%);
+    color: var(--color-primary);
+    font-size: 46rpx;
+    font-weight: 800;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-right: 24px;
+    flex-shrink: 0;
+    box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.18);
   }
 
   &__card-info {
     flex: 1;
+    min-width: 0;
+    z-index: 1;
   }
 
   &__nickname {
-    font-size: 32px;
-    font-weight: 600;
+    font-size: 38rpx;
+    font-weight: 800;
     display: block;
+    color: var(--color-on-primary);
+    letter-spacing: -0.3rpx;
+    margin-bottom: 10rpx;
   }
 
   &__badge {
-    font-size: 22px;
-    margin-top: 8px;
+    font-size: 32rpx;
     display: inline-block;
-    padding: 4px 12px;
-    border-radius: 12px;
+    padding: 4rpx 14rpx;
+    border-radius: 999rpx;
+    font-weight: 700;
+    letter-spacing: 0.5rpx;
 
     &--member {
-      color: var(--color-gold-dark);
-      background: var(--color-gold-soft);
+      color: var(--color-primary-dark);
+      background: var(--color-gold);
+      box-shadow: 0 2rpx 8rpx rgba(201, 162, 39, 0.3);
     }
 
     &--free {
-      color: var(--color-text-secondary);
-      background: var(--color-primary-tint);
+      color: var(--color-on-primary);
+      background: rgba(255, 255, 255, 0.18);
     }
   }
 
   &__edit {
-    font-size: 26px;
-    color: var(--color-primary);
-    padding: 8px 12px;
+    font-size: 32rpx;
+    color: var(--color-on-primary);
+    padding: 8rpx 18rpx;
+    border-radius: 999rpx;
+    background: rgba(255, 255, 255, 0.16);
+    flex-shrink: 0;
+    z-index: 1;
+    font-weight: 500;
+
+    &:active {
+      opacity: 0.8;
+    }
   }
 
+  /* ================= 三联统计 ================= */
   &__stats {
-    background: var(--color-bg-card);
-    border-radius: var(--radius-md);
-    padding: 32px 16px;
     display: flex;
-    box-shadow: var(--shadow-sm);
-    margin-bottom: 32px;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 12rpx;
+    margin: 16rpx 24rpx 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
   }
 
   &__stat {
     flex: 1;
+    min-width: 0;
+    background: var(--color-bg-card);
+    border: 1rpx solid var(--color-border);
+    border-radius: 18rpx;
+    padding: 22rpx 12rpx 16rpx;
     text-align: center;
+    box-shadow: var(--shadow-xs);
   }
 
   &__stat-value {
-    font-size: 40px;
-    font-weight: 700;
+    font-size: 42rpx;
+    font-weight: 800;
     color: var(--color-primary);
     display: block;
+    line-height: 1;
+    letter-spacing: -1rpx;
   }
 
   &__stat-label {
-    font-size: 22px;
-    color: var(--color-text-secondary);
+    font-size: 32rpx;
+    color: var(--color-text-tertiary);
     display: block;
-    margin-top: 4px;
+    margin-top: 8rpx;
   }
 
+  /* ================= 通用 section ================= */
   &__section {
     background: var(--color-bg-card);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-sm);
-    margin-bottom: 32px;
-    padding: 24px 32px;
+    border: 1rpx solid var(--color-border);
+    border-radius: 20rpx;
+    box-shadow: var(--shadow-xs);
+    margin: 16rpx 24rpx 0;
+    padding: 22rpx 26rpx;
   }
 
   &__section-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
+    align-items: baseline;
+    margin-bottom: 14rpx;
   }
 
   &__section-title {
-    font-size: 28px;
-    font-weight: 600;
+    font-size: 36rpx;
+    font-weight: 700;
+    color: var(--color-primary);
+    letter-spacing: -0.3rpx;
   }
 
   &__section-action {
-    font-size: 26px;
-    color: var(--color-primary);
+    font-size: 34rpx;
+    color: var(--color-accent-mint);
+    font-weight: 600;
+
+    &:active {
+      opacity: 0.7;
+    }
   }
 
+  /* ================= 档案 row ================= */
   &__rows {
     display: flex;
     flex-direction: column;
-    gap: 12px;
   }
 
   &__row {
     display: flex;
     justify-content: space-between;
-    padding: 12px 0;
-    border-bottom: 1px solid var(--color-border);
+    align-items: center;
+    padding: 16rpx 0;
+    border-bottom: 1rpx solid var(--color-border);
 
     &:last-child {
       border-bottom: none;
@@ -136,17 +257,19 @@
   }
 
   &__row-label {
-    font-size: 26px;
-    color: var(--color-text-secondary);
+    font-size: 32rpx;
+    color: var(--color-text-tertiary);
   }
 
   &__row-value {
-    font-size: 26px;
-    color: var(--color-text-primary);
+    font-size: 32rpx;
+    color: var(--color-primary);
     max-width: 60%;
     text-align: right;
+    font-weight: 600;
   }
 
+  /* ================= 菜单 ================= */
   &__menu {
     display: flex;
     flex-direction: column;
@@ -155,44 +278,73 @@
   &__menu-item {
     display: flex;
     align-items: center;
-    padding: 16px 0;
-    border-bottom: 1px solid var(--color-border);
+    gap: 18rpx;
+    padding: 18rpx 4rpx;
+    border-bottom: 1rpx solid var(--color-border);
 
     &:last-child {
       border-bottom: none;
     }
+
+    &:active {
+      opacity: 0.85;
+    }
   }
 
+  /* 把 emoji 包装成圆形彩底 icon */
   &__menu-icon {
-    font-size: 36px;
-    margin-right: 20px;
+    width: 56rpx;
+    height: 56rpx;
+    border-radius: 16rpx;
+    background: var(--color-primary-tint);
+    color: var(--color-primary);
+    font-size: 32rpx;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    line-height: 1;
   }
 
   &__menu-label {
     flex: 1;
-    font-size: 28px;
+    font-size: 32rpx;
     color: var(--color-text-primary);
+    font-weight: 500;
   }
 
   &__menu-arrow {
-    font-size: 32px;
+    font-size: 32rpx;
     color: var(--color-text-tertiary);
+    font-weight: 300;
+    line-height: 1;
   }
 
+  /* ================= 底部退出按钮 ================= */
   &__actions {
-    margin-top: 48px;
+    margin: 28rpx 24rpx 0;
+    flex-shrink: 0;
+    padding-bottom: 8rpx;
   }
 
   &__btn {
-    border-radius: var(--radius-xl) !important;
-    height: 88px !important;
-    line-height: 88px !important;
-    font-size: 30px !important;
+    border-radius: 20rpx !important;
+    height: 88rpx !important;
+    line-height: 88rpx !important;
+    font-size: 34rpx !important;
+    font-weight: 600 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+
+    &::after {
+      border: none !important;
+    }
 
     &--ghost {
       background: var(--color-bg-card) !important;
       color: var(--color-error) !important;
-      border: 1px solid var(--color-border) !important;
+      border: 1rpx solid var(--color-border) !important;
+      box-shadow: var(--shadow-xs);
     }
   }
 }

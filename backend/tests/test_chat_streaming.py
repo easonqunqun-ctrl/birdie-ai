@@ -273,7 +273,7 @@ async def test_system_prompt_contains_recent_analyses(
     assert "72" in sys_prompt
     assert "抛杆" in sys_prompt
     # 角色设定也在
-    assert "小鸟 AI 高尔夫教练" in sys_prompt
+    assert "领翼golf 高尔夫教练" in sys_prompt
 
 
 # ==================== 8. JSON 降级路径失败抛 50106 ====================

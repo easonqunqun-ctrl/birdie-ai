@@ -367,3 +367,164 @@ async def test_practice_logs_by_month(
         "/v1/users/me/practice-logs?month=2020/01", headers=auth_headers
     )
     assert bad.status_code == 400
+
+
+# ====================================================================
+# P0-2 覆盖：报告页「加入训练计划」幂等接口
+# POST /v1/training-plan/from-analysis/{analysis_id}
+# ====================================================================
+@pytest.mark.asyncio
+async def test_add_to_plan_from_analysis_creates_plan(
+    client: AsyncClient, auth_headers: dict[str, str]
+):
+    """主路径：分析存在且有 issues → 当周计划被创建/追加，返回完整 plan."""
+    from app.models.analysis import AnalysisIssue
+
+    user_id = await _get_user_id(client, auth_headers)
+    async with AsyncSessionLocal() as db:
+        analysis_id = new_id("swa")
+        db.add(
+            SwingAnalysis(
+                id=analysis_id, user_id=user_id, video_url="s3://x",
+                video_file_size=1, camera_angle="face_on", club_type="driver",
+                status="completed",
+            )
+        )
+        # 注意：此接口从 AnalysisIssue 表里读 issues，而不是接受参数
+        for it_type, sev in [("casting", "high"), ("over_the_top", "medium")]:
+            db.add(
+                AnalysisIssue(
+                    id=new_id("ai"), analysis_id=analysis_id, issue_type=it_type,
+                    name=it_type, severity=sev, description="...",
+                )
+            )
+        await db.commit()
+
+    resp = await client.post(
+        f"/v1/training-plan/from-analysis/{analysis_id}",
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    plan = resp.json()["data"]
+    assert plan["total_tasks"] == 2
+    assert plan["completed_tasks"] == 0
+    assert len(plan["tasks"]) == 2
+    assert plan["source_analysis_id"] == analysis_id
+
+
+@pytest.mark.asyncio
+async def test_add_to_plan_from_analysis_idempotent(
+    client: AsyncClient, auth_headers: dict[str, str]
+):
+    """对同一 analysis 重复调用应是幂等的（不重复加任务）."""
+    from app.models.analysis import AnalysisIssue
+
+    user_id = await _get_user_id(client, auth_headers)
+    async with AsyncSessionLocal() as db:
+        aid = new_id("swa")
+        db.add(
+            SwingAnalysis(
+                id=aid, user_id=user_id, video_url="s3://x", video_file_size=1,
+                camera_angle="face_on", club_type="driver", status="completed",
+            )
+        )
+        db.add(
+            AnalysisIssue(
+                id=new_id("ai"), analysis_id=aid, issue_type="casting",
+                name="抛杆", severity="high", description="...",
+            )
+        )
+        await db.commit()
+
+    r1 = await client.post(
+        f"/v1/training-plan/from-analysis/{aid}", headers=auth_headers
+    )
+    r2 = await client.post(
+        f"/v1/training-plan/from-analysis/{aid}", headers=auth_headers
+    )
+    assert r1.status_code == r2.status_code == 200
+    assert r1.json()["data"]["total_tasks"] == r2.json()["data"]["total_tasks"] == 1
+
+
+@pytest.mark.asyncio
+async def test_add_to_plan_from_analysis_rejects_sample(
+    client: AsyncClient, auth_headers: dict[str, str]
+):
+    """sample 报告应被拒（40015）."""
+    resp = await client.post(
+        "/v1/training-plan/from-analysis/sample", headers=auth_headers
+    )
+    assert resp.status_code == 400
+    assert resp.json()["code"] == 40015
+
+
+@pytest.mark.asyncio
+async def test_add_to_plan_from_analysis_404(
+    client: AsyncClient, auth_headers: dict[str, str]
+):
+    """分析不存在 → 40402."""
+    resp = await client.post(
+        "/v1/training-plan/from-analysis/swa_doesnotexist", headers=auth_headers
+    )
+    assert resp.status_code == 404
+    assert resp.json()["code"] == 40402
+
+
+@pytest.mark.asyncio
+async def test_add_to_plan_from_analysis_no_issues(
+    client: AsyncClient, auth_headers: dict[str, str]
+):
+    """分析没有 issue → 40015 不创建空 plan."""
+    user_id = await _get_user_id(client, auth_headers)
+    async with AsyncSessionLocal() as db:
+        aid = new_id("swa")
+        db.add(
+            SwingAnalysis(
+                id=aid, user_id=user_id, video_url="s3://x", video_file_size=1,
+                camera_angle="face_on", club_type="driver", status="completed",
+            )
+        )
+        await db.commit()
+
+    resp = await client.post(
+        f"/v1/training-plan/from-analysis/{aid}", headers=auth_headers
+    )
+    assert resp.status_code == 400
+    assert resp.json()["code"] == 40015
+
+
+@pytest.mark.asyncio
+async def test_add_to_plan_from_analysis_forbidden(
+    client: AsyncClient, auth_headers: dict[str, str]
+):
+    """别人的分析 → 40302."""
+    from uuid import uuid4
+
+    from app.models.analysis import AnalysisIssue
+
+    user_a_id = await _get_user_id(client, auth_headers)
+    async with AsyncSessionLocal() as db:
+        aid = new_id("swa")
+        db.add(
+            SwingAnalysis(
+                id=aid, user_id=user_a_id, video_url="s3://x", video_file_size=1,
+                camera_angle="face_on", club_type="driver", status="completed",
+            )
+        )
+        db.add(
+            AnalysisIssue(
+                id=new_id("ai"), analysis_id=aid, issue_type="casting",
+                name="抛杆", severity="high", description="...",
+            )
+        )
+        await db.commit()
+
+    login_b = await client.post(
+        "/v1/auth/wechat-login", json={"code": f"pytest_{uuid4().hex}"}
+    )
+    headers_b = {"Authorization": f"Bearer {login_b.json()['data']['token']}"}
+    resp = await client.post(
+        f"/v1/training-plan/from-analysis/{aid}", headers=headers_b
+    )
+    assert resp.status_code == 403
+    assert resp.json()["code"] == 40302

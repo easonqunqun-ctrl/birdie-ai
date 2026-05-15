@@ -14,8 +14,10 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True)  # usr_<nanoid>
 
-    # 微信身份
-    wechat_openid: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    # 微信身份（小程序与 App OpenID 不同；至少填其一）
+    # 唯一性：非空时在 DB 上以部分 UNIQUE 索引保证（Alembic 0009）。
+    wechat_openid: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    wechat_app_openid: Mapped[str | None] = mapped_column(String(64), nullable=True)
     wechat_unionid: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     # 资料
@@ -52,6 +54,12 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
 
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # 账号注销（MVP §3.4）：非空且 <= now 时由 `get_user_by_id` 触发硬删
+    account_deletion_scheduled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
     # 关系（按需启用 lazy="selectin"）
     analyses: Mapped[list["SwingAnalysis"]] = relationship(  # noqa: F821
         back_populates="user",
@@ -85,4 +93,12 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
     )
 
     def __repr__(self) -> str:
-        return f"<User {self.id} {self.nickname or self.wechat_openid}>"
+        oid = self.nickname or self.wechat_openid or self.wechat_app_openid
+        return f"<User {self.id} {oid}>"
+
+    def wechat_subject_for_jwt(self) -> str:
+        """JWT `openid` 声明：小程序 openid 优先，否则回落到 App openid."""
+        oid = self.wechat_openid or self.wechat_app_openid
+        if not oid:
+            raise RuntimeError("user identity missing both wechat identifiers")
+        return oid

@@ -1,0 +1,27 @@
+# 不跑 pytest（依赖本机/compose 的 Postgres+Redis）；与 `make backend-lint` / `make ai-engine-lint` 对齐的静态检查。
+name: python-ruff
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  ruff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Backend ruff
+        working-directory: backend
+        run: |
+          uv sync --frozen --group dev
+          uv run ruff check app/
+
+      - name: AI engine ruff
+        working-directory: ai_engine
+        run: |
+          uv sync --frozen --group dev
+          uv run ruff check app/

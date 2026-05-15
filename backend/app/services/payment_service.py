@@ -12,17 +12,21 @@ W7-T1 设计要点：
 
 from datetime import UTC, datetime, timedelta
 
+import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.core.exceptions import AppException, BadRequestError, ConflictError, NotFoundError
+from app.core.exceptions import AppException, BadRequestError, ConflictError, NotFoundError, ThirdPartyError
 from app.core.security import new_id
+from app.integrations import wechat_pay_v3
 from app.models.analysis import AnalysisQuota
 from app.models.chat import ChatQuota
 from app.models.payment import Order, PaymentTransaction
 from app.models.user import User
 from app.schemas.payment import PlanOption, PrepayParams
+
+logger = structlog.get_logger("payment_service")
 
 # ==================== 套餐价格表 ====================
 # 分（cents）；与 docs/01 §8.1 对齐
@@ -78,26 +82,70 @@ async def create_order(db: AsyncSession, user: User, plan_type: str) -> tuple[Or
     )
     db.add(order)
     await db.flush()
+    # 拉齐 server_default（created_at 等），避免长时间微信请求后 ORM 上仍是 None →
+    # ``OrderResponse`` 校验失败触发 ``ResponseValidationError``（易被 broad Exception 兜底成 500）。
+    await db.refresh(order)
 
     if settings.WECHAT_PAY_MOCK_MODE:
         prepay = PrepayParams(mock=True)
     else:
-        prepay = await _create_wechat_prepay(order, user)
+        prepay = await _create_wechat_prepay(db, order, user)
 
     return order, prepay
 
 
-async def _create_wechat_prepay(order: Order, user: User) -> PrepayParams:
-    """真实微信支付下单（W8 接入）.
+async def _create_wechat_prepay(db: AsyncSession, order: Order, user: User) -> PrepayParams:
+    """真实微信 JSAPI 下单 + 返回小程序 `wx.requestPayment` 参数."""
+    if not (user.wechat_openid and user.wechat_openid.strip()):
+        raise BadRequestError(
+            code=40014,
+            message="需在微信内使用小程序完成支付，无法获取 openid",
+        )
+    try:
+        ctx = wechat_pay_v3.get_wechat_pay_v3()
+    except (RuntimeError, ValueError, OSError) as e:
+        raise ThirdPartyError(message=f"支付配置错误：{e!s}", detail=str(e)) from e
 
-    TODO W8：
-    - 调 WechatPayV3 SDK `/v3/pay/transactions/jsapi` 下单
-    - 保存 `order.wechat_prepay_id = resp["prepay_id"]`
-    - 用商户私钥签名生成 `paySign`，构造 `PrepayParams(time_stamp, nonce_str, package, sign_type, pay_sign)`
-    """
-    raise NotImplementedError(
-        "真实微信支付未接入；W7 期间请保持 WECHAT_PAY_MOCK_MODE=True"
-    )
+    pricing = PLAN_PRICING[order.plan_type]
+    prepay_id = ""
+    try:
+        prepay_id = await ctx.create_jsapi_order(
+            out_trade_no=order.id,
+            openid=user.wechat_openid,
+            amount_cents=order.amount,
+            description=str(pricing["name"]),
+        )
+    except wechat_pay_v3.WechatPayRequestError as e:
+        raise ThirdPartyError(message="微信支付下单失败", detail=str(e)) from e
+    except Exception as e:
+        # 签名 / 商户私钥损坏 / cryptography 等非 HTTP 错误若不放行，会变成全局 500「服务内部错误」
+        logger.exception(
+            "wechat_jsapi_prepay_unexpected",
+            error=str(e),
+            order_id=order.id,
+        )
+        raise ThirdPartyError(
+            message="发起支付失败：请核对商户 API 证书、序列号与私钥是否匹配",
+            detail=str(e),
+        ) from e
+
+    if not prepay_id:
+        raise ThirdPartyError(message="微信支付未返回 prepay_id")
+
+    order.wechat_prepay_id = prepay_id
+    await db.flush()
+    try:
+        return ctx.build_miniprogram_prepay(prepay_id)
+    except Exception as e:
+        logger.exception(
+            "wechat_build_miniprogram_prepay_failed",
+            error=str(e),
+            order_id=order.id,
+        )
+        raise ThirdPartyError(
+            message="生成支付签名失败：请核对商户 API 证书与 WECHAT_PAY_MCH_SERIAL",
+            detail=str(e),
+        ) from e
 
 
 # ==================== mock-confirm ====================
@@ -283,3 +331,122 @@ async def list_user_orders(db: AsyncSession, user: User, limit: int = 20) -> lis
         .limit(limit)
     )
     return list((await db.execute(stmt)).scalars().all())
+
+
+# ==================== 微信支付回调 ====================
+async def process_wechat_payment_notify(
+    db: AsyncSession,
+    notify_data: dict,
+) -> tuple[bool, str]:
+    """处理微信 `transaction` 解密后的通知。返回 (ok, message)。"""
+    if settings.WECHAT_PAY_MOCK_MODE:
+        return False, "mock 模式不应收到真实回调"
+
+    if notify_data.get("trade_state") != "SUCCESS":
+        return True, "非成功态，略过"
+
+    out_no = notify_data.get("out_trade_no")
+    txn_id = notify_data.get("transaction_id") or ""
+    if not out_no:
+        return False, "缺少 out_trade_no"
+
+    order = await db.get(Order, out_no)
+    if order is None:
+        return False, "订单不存在"
+
+    amt = notify_data.get("amount")
+    if (
+        isinstance(amt, dict)
+        and amt.get("total") is not None
+        and int(amt["total"]) != order.amount
+    ):
+        return False, "订单金额与通知不一致"
+
+    if order.status == "paid":
+        return True, "已支付，幂等"
+
+    user = await db.get(User, order.user_id)
+    if user is None:
+        return False, "用户不存在"
+
+    await _mark_paid(
+        db,
+        order,
+        user,
+        transaction_id=txn_id,
+        notify_data=notify_data,
+    )
+    return True, "ok"
+
+
+async def sync_pending_order_from_wechat(
+    db: AsyncSession,
+    order_id: str,
+    user: User,
+) -> tuple[bool, Order, str]:
+    """对已登录用户名下的 pending 订单，调用微信「查单」若 SUCCESS 则执行与回调相同的到账逻辑。
+
+    返回 (是否在**本次调用**中新完成到账, order, detail).
+    mock 模式下不可用；已 paid 幂等返回 synced=False。
+    """
+    order = await get_order(db, order_id, user)
+    if settings.WECHAT_PAY_MOCK_MODE:
+        raise BadRequestError(code=40090, message="mock 模式下请使用 mock-confirm")
+
+    if order.status == "paid":
+        await db.refresh(order)
+        return False, order, "already_paid"
+
+    if order.status != "pending":
+        raise PaymentNotAllowedError(message=f"仅待支付订单可同步，当前 {order.status}")
+
+    try:
+        ctx = wechat_pay_v3.get_wechat_pay_v3()
+    except (RuntimeError, ValueError, OSError) as e:
+        raise ThirdPartyError(message=f"支付配置错误：{e!s}", detail=str(e)) from e
+
+    try:
+        data = await ctx.query_transaction_by_out_trade_no(order.id)
+    except wechat_pay_v3.WechatPayRequestError as e:
+        raise ThirdPartyError(message="微信查单失败", detail=str(e)) from e
+    except Exception as e:
+        logger.exception(
+            "wechat_query_transaction_unexpected",
+            error=str(e),
+            order_id=order.id,
+        )
+        raise ThirdPartyError(
+            message="微信查单失败：签名或商户证书配置异常",
+            detail=str(e),
+        ) from e
+
+    trade_state = (data.get("trade_state") or "").upper()
+    if trade_state != "SUCCESS":
+        return False, order, f"wechat_trade_state={trade_state or 'UNKNOWN'}"
+
+    txn_id = str(data.get("transaction_id") or "")
+    amt = data.get("amount")
+    if (
+        isinstance(amt, dict)
+        and amt.get("total") is not None
+        and int(amt["total"]) != order.amount
+    ):
+        raise BadRequestError(code=40091, message="微信订单金额与本系统订单不一致，已拒绝入账")
+
+    await db.refresh(order)
+    if order.status == "paid":
+        return False, order, "already_paid"
+
+    u = await db.get(User, order.user_id)
+    if u is None:
+        raise NotFoundError(code=40402, message="用户不存在")
+
+    await _mark_paid(
+        db,
+        order,
+        u,
+        transaction_id=txn_id or "wechat_sync",
+        notify_data={"source": "query_out_trade_no", "raw_keys": list(data.keys())[:20]},
+    )
+    await db.refresh(order)
+    return True, order, "synced_from_wechat"

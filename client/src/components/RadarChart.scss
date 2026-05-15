@@ -1,14 +1,24 @@
 .radar {
   position: relative;
   width: 100%;
-  /* 保持正方形 */
-  aspect-ratio: 1 / 1;
-  max-width: 640rpx;
+  /**
+   * 保持正方形：用 padding-top: 100% 经典 trick 而非 aspect-ratio。
+   * 微信基础库 < 2.10 不支持 aspect-ratio，会让 .radar height = 0、
+   * Canvas createSelectorQuery 拿到的 size 也是 0，整个雷达图静默失绘。
+   * padding-top 100% 在所有基础库都稳定生效。
+   */
+  height: 0;
+  padding-top: 100%;
+  max-width: 100%;
   margin: 0 auto;
 
   &__canvas {
+    /* 用 absolute 让 canvas 撑满 padding 撑出来的方形区域 */
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
     display: block;
-    margin: 0 auto;
   }
 
   &__label {
@@ -20,19 +30,19 @@
     padding: 6rpx 12rpx;
     border-radius: var(--radius-sm);
     background: rgba(255, 255, 255, 0.92);
-    box-shadow: 0 2rpx 8rpx rgba(26, 74, 59, 0.1);
+    box-shadow: 0 2rpx 8rpx rgba(26, 35, 126, 0.1);
   }
 
   &__label-name {
     display: block;
-    font-size: 22rpx;
+    font-size: 30rpx;
     color: var(--color-text-secondary);
     line-height: 1.2;
   }
 
   &__label-score {
     display: block;
-    font-size: 28rpx;
+    font-size: 34rpx;
     font-weight: 700;
     color: var(--color-primary);
     line-height: 1.2;

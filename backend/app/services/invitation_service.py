@@ -127,6 +127,7 @@ async def settle_on_first_analysis(
     count_stmt = select(func.count()).where(
         SwingAnalysis.user_id == user_id,
         SwingAnalysis.status == "completed",
+        SwingAnalysis.deleted_at.is_(None),
         SwingAnalysis.id != analysis_id,
     )
     prev_completed = (await db.execute(count_stmt)).scalar_one()

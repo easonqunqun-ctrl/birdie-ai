@@ -6,6 +6,7 @@ import {
   type InvitationItem,
   type InviteInfo
 } from '@/services/invitationService'
+import { BRAND_SHARE_COVER } from '@/constants/brandAssets'
 import './invitations.scss'
 
 /**
@@ -48,9 +49,12 @@ const InvitationsPage: FC = () => {
   useShareAppMessage(() => {
     const code = info?.invite_code ?? ''
     return {
-      title: '用小鸟 AI 看你挥杆哪里不对，我们一起进步',
+      title: '用领翼golf 看你挥杆哪里不对，我们一起进步',
       path: `/pages/login/index?invite_code=${code}`,
-      imageUrl: ''
+      // P2-B2：用品牌图替代页面截屏，避免：
+      //   1) 截屏被分享时把"我的邀请码 / 已邀请列表"完整暴露
+      //   2) 截屏在 loading / 滚动到一半时被采到，画面糟糕
+      imageUrl: BRAND_SHARE_COVER
     }
   })
 

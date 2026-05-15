@@ -61,6 +61,14 @@ class CreateOrderResponse(BaseModel):
     )
 
 
+class SyncOrderFromWechatResponse(BaseModel):
+    """前端在 wx.requestPayment 成功后调用：主动拉微信订单态以补异步回调缺口。"""
+
+    order: OrderResponse
+    synced: bool = Field(description="本次请求是否刚从微信侧确认为 SUCCESS 并完成本地到账")
+    detail: str = Field(description="人可读说明，如 already_paid、微信侧 trade_state")
+
+
 class MembershipInfo(BaseModel):
     """当前会员状态（嵌入 UserResponse 的派生视图）."""
 

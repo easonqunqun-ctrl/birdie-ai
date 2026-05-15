@@ -1,7 +1,12 @@
 .invitations {
-  padding: 32px;
+  /* P2-A1：RN 不写 calc/env */
+  padding-top: 32px;
+  padding-left: 32px;
+  padding-right: 32px;
+  padding-bottom: 32px;
   background: var(--color-bg);
-  min-height: 100vh;
+  min-height: 100%;
+  box-sizing: border-box;
 
   &--loading,
   &--error {
@@ -11,20 +16,24 @@
     justify-content: center;
     padding: 96px 32px;
     color: var(--color-text-secondary);
-    font-size: 28px;
+    font-size: 34rpx;
     gap: 24px;
   }
 
   &__retry {
     background: var(--color-primary) !important;
     color: var(--color-on-primary) !important;
-    font-size: 28px !important;
+    font-size: 34rpx !important;
     padding: 12px 48px !important;
     border-radius: var(--radius-md) !important;
   }
 
   &__hero {
-    background: linear-gradient(135deg, var(--color-primary) 0%, #1fa875 100%);
+      background: linear-gradient(
+        135deg,
+        var(--color-primary) 0%,
+        var(--color-accent-mint) 100%
+      );
     color: #fff;
     border-radius: var(--radius-lg);
     padding: 40px 32px;
@@ -33,14 +42,14 @@
   }
 
   &__hero-title {
-    font-size: 26px;
+    font-size: 32rpx;
     opacity: 0.85;
     display: block;
     margin-bottom: 16px;
   }
 
   &__code {
-    font-size: 64px;
+    font-size: 66rpx;
     font-weight: 700;
     letter-spacing: 8px;
     display: block;
@@ -54,7 +63,7 @@
 
   &__btn {
     flex: 1;
-    font-size: 28px !important;
+    font-size: 34rpx !important;
     height: 80px !important;
     line-height: 80px !important;
     border-radius: var(--radius-md) !important;
@@ -86,14 +95,14 @@
 
   &__progress-label {
     display: block;
-    font-size: 30px;
+    font-size: 36rpx;
     font-weight: 600;
     color: var(--color-text-primary);
     margin-bottom: 8px;
   }
 
   &__progress-hint {
-    font-size: 24px;
+    font-size: 32rpx;
     color: var(--color-text-secondary);
   }
 
@@ -107,13 +116,17 @@
 
   &__progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, var(--color-primary), #1fa875);
+    background: linear-gradient(
+      90deg,
+      var(--color-primary),
+      var(--color-accent-mint)
+    );
     border-radius: 999px;
     transition: width 0.3s ease;
   }
 
   &__progress-bonus {
-    font-size: 24px;
+    font-size: 32rpx;
     color: var(--color-text-secondary);
   }
 
@@ -127,7 +140,7 @@
 
   &__rules-title {
     display: block;
-    font-size: 30px;
+    font-size: 36rpx;
     font-weight: 600;
     color: var(--color-text-primary);
     margin-bottom: 16px;
@@ -135,7 +148,7 @@
 
   &__rules-item {
     display: block;
-    font-size: 26px;
+    font-size: 32rpx;
     color: var(--color-text-secondary);
     line-height: 1.7;
   }
@@ -150,7 +163,7 @@
 
   &__list-title {
     display: block;
-    font-size: 30px;
+    font-size: 36rpx;
     font-weight: 600;
     color: var(--color-text-primary);
     margin-bottom: 24px;
@@ -160,7 +173,7 @@
     padding: 48px 0;
     text-align: center;
     color: var(--color-text-secondary);
-    font-size: 26px;
+    font-size: 32rpx;
   }
 
   &__item {
@@ -182,12 +195,12 @@
   }
 
   &__item-name {
-    font-size: 28px;
+    font-size: 34rpx;
     color: var(--color-text-primary);
   }
 
   &__item-date {
-    font-size: 22px;
+    font-size: 30rpx;
     color: var(--color-text-secondary);
   }
 
@@ -198,7 +211,7 @@
   }
 
   &__badge {
-    font-size: 22px;
+    font-size: 30rpx;
     padding: 4px 16px;
     border-radius: 999px;
 

@@ -112,6 +112,11 @@ export const analysisService = {
     const qs = query.toString()
     return http.get<AnalysisListResponse>(`/analyses${qs ? `?${qs}` : ''}`)
   },
+
+  /** 用户侧软删除：进行中不可删；示例不入库无需调用 */
+  deleteAnalysis(analysisId: string) {
+    return http.del(`/analyses/${analysisId}`)
+  },
 }
 
 function truncate(s: unknown, max: number): string {

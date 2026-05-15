@@ -170,6 +170,25 @@ class Settings(BaseSettings):
         return [o.strip() for o in self.BACKEND_CORS_ORIGINS.split(",") if o.strip()]
 
     @property
+    def cors_allow_origins(self) -> list[str]:
+        """`CORSMiddleware.allow_origins` 用。
+
+        历史上 `cors_origins_list` 为空时曾退回 ``*``，浏览器任意 Origin 均可读 API。
+        生产且未显式配置时改为空列表（配合小程序主要走服务端、H5 管理台应显式填域）。
+        """
+        raw = self.cors_origins_list
+        if raw:
+            return raw
+        if self.is_prod:
+            return []
+        return [
+            "http://localhost:3000",
+            "http://localhost:10086",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:10086",
+        ]
+
+    @property
     def is_local(self) -> bool:
         return self.APP_ENV == "local"
 

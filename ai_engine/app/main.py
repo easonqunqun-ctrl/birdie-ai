@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="小鸟 AI · Engine",
+    title="领翼golf · Engine",
     description="挥杆视频分析 AI 引擎",
     version=__version__,
     debug=settings.APP_DEBUG,
@@ -65,7 +65,7 @@ async def health():
 async def analyze(req: AnalyzeRequest) -> AnalyzeResult:
     """分析单个视频。
 
-    - **mock 模式**：随机生成符合 schema 的报告（2-5 秒）
+    - **mock 模式**：随机生成符合 schema 的报告（约 1.2–2.8 秒）
     - **真实模式**：W6 接入 MediaPipe + 评分模型（待实现）
     """
     log.info("analyze_start", analysis_id=req.analysis_id, video_url=req.video_url)

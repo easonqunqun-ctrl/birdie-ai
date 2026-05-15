@@ -1,0 +1,74 @@
+.account-del {
+  min-height: 100%;
+  background: var(--color-bg-page);
+  /* P2-A1：RN 不写 calc/env */
+  padding-top: 32px;
+  padding-left: 32px;
+  padding-right: 32px;
+  padding-bottom: 32px;
+  box-sizing: border-box;
+
+  &__title {
+    font-size: 36rpx;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    display: block;
+  }
+
+  &__desc {
+    margin-top: 16px;
+    font-size: 32rpx;
+    line-height: 1.6;
+    color: var(--color-text-secondary);
+    display: block;
+  }
+
+  &__warn {
+    margin-top: 24px;
+    padding: 20px 24px;
+    background: rgba(220, 38, 38, 0.08);
+    border-radius: var(--radius-md);
+    font-size: 32rpx;
+    line-height: 1.5;
+    color: #b91c1c;
+  }
+
+  &__field-label {
+    margin-top: 32px;
+    font-size: 32rpx;
+    color: var(--color-text-primary);
+    display: block;
+  }
+
+  &__input {
+    margin-top: 12px;
+    padding: 20px 24px;
+    background: var(--color-bg-page);
+    border: 1px solid var(--color-border-muted);
+    border-radius: var(--radius-md);
+    font-size: 34rpx;
+  }
+
+  &__actions {
+    margin-top: 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  &__btn {
+    &--danger {
+      background: #dc2626;
+      color: #fff;
+    }
+  }
+
+  &__scheduled {
+    margin-top: 32px;
+    padding: 24px;
+    background: var(--color-bg-card);
+    border-radius: var(--radius-md);
+    font-size: 32rpx;
+    line-height: 1.5;
+  }
+}

@@ -46,9 +46,11 @@ from sqlalchemy.orm import selectinload
 
 from app.celery_app import celery_app
 from app.core.database import AsyncSessionLocal
+from app.core.database import engine as _shared_async_engine
 from app.core.security import new_id
 from app.integrations.ai_engine import get_ai_engine
 from app.models.analysis import AnalysisIssue, AnalysisRecommendation, SwingAnalysis
+from app.schemas.analysis import SWING_STAGE_TIMELINE as STAGE_PROGRESSION
 from app.services import invitation_service, quota_service, training_service
 
 log = structlog.get_logger("tasks.analysis")
@@ -56,26 +58,6 @@ log = structlog.get_logger("tasks.analysis")
 # AI Engine 可达性重试：首次失败后最多再尝试 2 次（共 3 次），指数退避 1s / 2s
 MAX_AI_ENGINE_RETRIES = 2
 RETRY_BACKOFF_BASE_SECONDS = 1
-
-# W6-T4：模拟阶段推进的时间表（秒）。
-# 因为 ai_engine 是单次 HTTP 调用，backend 拿不到真实 stage 进度；这里在 backend 侧
-# 用一个 fire-and-forget 的 asyncio task **按时间戳**推进 DB 里的 stage 字段，
-# docs/14 §T4 已注明这种"假推进"代价是"显示落后实际 0.5-2s"，用户无感。
-#
-# 总预算 30s（与 ai_engine CPU 预算一致）；最后一个阶段 generating 不在这里收尾，
-# 由主任务 `_mark_completed` 直接置 stage=None / status=completed。
-#
-# 数组顺序即推进顺序；累计时长 = 30s（generating 占位 3s 实际不会"睡完"，
-# 因为正常情况下 ai_engine 在 27-32s 内就会返回，stage_task 立刻被 cancel）。
-STAGE_PROGRESSION: list[tuple[str, int]] = [
-    ("preprocessing", 5),
-    ("pose_estimating", 10),
-    ("phase_segmenting", 4),
-    ("scoring", 4),
-    ("diagnosing", 4),
-    ("generating", 3),
-]
-
 
 # =====================================================================
 # Celery 入口
@@ -87,12 +69,31 @@ def run_swing_analysis(self, analysis_id: str) -> None:
 
 
 def _run_coro_in_thread(coro) -> Any:
+    """在独立线程里跑一个 async coro。
+
+    每次都用 `asyncio.run` 创建全新 event loop。
+    **关键**：用 wrapper 在 coro 执行前后调用 `engine.dispose()`：
+      - 进入前 dispose：清掉上次 task 残留在 pool 里的、绑定到旧 loop 的 connection；
+        否则下次 task 进来时第一次 acquire 会撞 "Future attached to a different loop"。
+      - 退出前 dispose：避免 worker idle 期间 pool 持有一堆 stale conn。
+    若不做这步，celery prefork worker 在第二次 task 起 100% 复现 asyncpg loop 错乱。
+    """
     result: list = []
     exc: list[BaseException] = []
 
+    async def _wrapped() -> Any:
+        # 让 pool 在当前 loop 重建（首次跑时 pool 还空，dispose 是 no-op，零代价）
+        await _shared_async_engine.dispose()
+        try:
+            return await coro
+        finally:
+            # 任务结束清空 pool；下次 task 拿到的依旧是属于当时 loop 的全新 conn
+            with contextlib.suppress(Exception):
+                await _shared_async_engine.dispose()
+
     def _target() -> None:
         try:
-            result.append(asyncio.run(coro))
+            result.append(asyncio.run(_wrapped()))
         except BaseException as e:
             exc.append(e)
 

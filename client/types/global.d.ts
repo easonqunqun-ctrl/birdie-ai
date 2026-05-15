@@ -15,6 +15,16 @@ declare const API_BASE_URL: string
 declare const APP_ENV: string
 /** W7-T2：支付 mock 开关；默认 true，W8 接真实商户号后设为 false */
 declare const PAYMENT_MOCK: boolean
+/**
+ * W8-T2 / T3：支付入口 UI 总开关。
+ *   false 时隐藏所有升级/会员入口；白名单账号仍可 curl 后端 mock-pay。
+ *   W9 正式上线前置为 true。
+ */
+declare const PAYMENT_ENABLED: boolean
+/** 逗号分隔的微信订阅消息模板 ID（编译期注入） */
+declare const SUBSCRIBE_TEMPLATES: string
+/** 微信开放平台移动 AppID（RN `registerApp`；小程序构建可为空字符串） */
+declare const WECHAT_OPEN_APPID: string
 
 /**
  * 微信小程序全局对象；Taro 类型定义默认不注入 `wx`（走 Taro.xxx 封装），
@@ -32,5 +42,6 @@ declare namespace NodeJS {
     TARO_APP_API_BASE_URL?: string
     TARO_APP_ENV?: string
     TARO_APP_PAYMENT_MOCK?: string
+    TARO_APP_PAYMENT_ENABLED?: string
   }
 }

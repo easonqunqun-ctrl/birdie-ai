@@ -12,11 +12,12 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from redis.asyncio import Redis
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.core.exceptions import (
+    BadRequestError,
     ForbiddenError,
     NotFoundError,
     UploadObjectMissingError,
@@ -24,11 +25,14 @@ from app.core.exceptions import (
 )
 from app.core.security import new_id
 from app.models.analysis import SwingAnalysis
+from app.models.training import TrainingPlan, TrainingTask
 from app.models.user import User
 from app.schemas.analysis import (
     STAGE_ETA_SECONDS,
     AnalysisListItem,
     AnalysisListQuery,
+    AnalysisProgressPoint,
+    AnalysisProgressResponse,
     AnalysisReportResponse,
     AnalysisStatusError,
     AnalysisStatusResponse,
@@ -37,6 +41,7 @@ from app.schemas.analysis import (
     IssueItem,
     PhaseScore,
     PhaseWindow,
+    estimate_swing_remaining_seconds,
     RecommendationItem,
     UploadTokenRequest,
     UploadTokenResponse,
@@ -50,6 +55,84 @@ if TYPE_CHECKING:
 
 UPLOAD_TOKEN_REDIS_KEY = "upload:token:{upload_id}"
 UPLOAD_TOKEN_TTL_SECONDS = 3600
+
+
+def to_proxy_image_url(url: str | None) -> str | None:
+    """把 MinIO 公网图片 URL 改写为 backend 同源代理 URL。
+
+    解决：微信小程序在真机调试模式下，`<Image>` 组件对 9000 端口（与 API 不同源）
+    的 HTTP 图片资源会静默拒绝（onError 触发但 errMsg 不明确），导致「问题诊断」
+    卡片下的关键帧图全部空白。
+
+    改写规则：
+        in:  http://192.168.130.37:9000/xiaoniao-videos/keyframes/ana_xxx/casting.jpg
+        out: http://192.168.130.37:8000/v1/assets/image/keyframes/ana_xxx/casting.jpg
+
+    仅改写白名单前缀（keyframes/, thumbnails/）—— 与 backend `/v1/assets/image`
+    路由的安全白名单一致。**视频**（uploads/, skeleton/）改写见 `to_proxy_video_url`。
+
+    幂等：如果 URL 已经是代理路径或非 MinIO URL（如 CDN、未来 COS 公开域），
+    原样返回；写库的旧值即使后端重启 API_PUBLIC_BASE_URL 变化也能正确改写。
+    """
+    if not url:
+        return url
+    public_endpoint = settings.effective_minio_public_endpoint.rstrip("/")
+    bucket = settings.MINIO_BUCKET
+    prefix = f"{public_endpoint}/{bucket}/"
+    if not url.startswith(prefix):
+        return url
+    key = url[len(prefix):]
+    if not (key.startswith("keyframes/") or key.startswith("thumbnails/")):
+        # 视频等其他对象走 to_proxy_video_url（见下文）
+        return url
+    api_base = settings.effective_api_public_base_url.rstrip("/")
+    return f"{api_base}/v1/assets/image/{key}"
+
+
+def to_proxy_video_url(url: str | None) -> str | None:
+    """把 MinIO 公网 / 容器内写入的 MP4 URL 改写为 backend 同源代理路径（支持 HTTP Range）。
+
+    背景：微信小程序真机上 `<Video src=\"https://api…/minio/桶/…\">`
+    常因「downloadFile / 视频播放入口」域名或路径策略与同源 API 不一致而黑屏（仅显示问号）。
+    走 `{API_PUBLIC_BASE_URL}/v1/assets/video/{key}` 与 request 域名一致。
+
+    兼容：AI 引擎写回的 `MINIO_PUBLIC_ENDPOINT` 若为 `http://minio:9000`（与 backend 回落后的
+    effective 公网不一致）时，`skeleton_video_url` 会以内网形态入库；若不二次改写，
+    报告页又因优先骨架视频而整块黑屏。**这里同时对 `MINIO_ENDPOINT`/`MINIO_PUBLIC_ENDPOINT`/`effective_*`
+    三套前缀剥离 bucket/key。**
+    """
+    if not url:
+        return url
+    trimmed = url.strip()
+    bucket = settings.MINIO_BUCKET
+
+    prefixes: list[str] = []
+    for base in (
+        settings.effective_minio_public_endpoint,
+        settings.MINIO_PUBLIC_ENDPOINT,
+        settings.MINIO_ENDPOINT,
+    ):
+        b = str(base).strip().rstrip("/")
+        if not b:
+            continue
+        prefixes.append(f"{b}/{bucket}/")
+
+    # 次序保留 + 去重（effective 常与 MINIO_PUBLIC 相同）
+    prefixes = list(dict.fromkeys(prefixes))
+
+    api_base = settings.effective_api_public_base_url.rstrip("/")
+    proxy_root = f"{api_base}/v1/assets/video/"
+    if trimmed.startswith(proxy_root):
+        return trimmed
+
+    for prefix in prefixes:
+        if trimmed.startswith(prefix):
+            key = trimmed[len(prefix) :]
+            if key.startswith(("uploads/", "skeleton/")):
+                return f"{proxy_root}{key}"
+            return trimmed
+
+    return trimmed
 
 
 def _dispatch_analysis_task(analysis_id: str) -> None:
@@ -224,7 +307,11 @@ async def create_analysis(
 # ==================================================================
 async def get_status(*, analysis_id: str, user: User, db: AsyncSession) -> AnalysisStatusResponse:
     analysis = await _load_owned(db, analysis_id, user)
-    eta = STAGE_ETA_SECONDS.get(analysis.stage or analysis.status, 0)
+    eta = estimate_swing_remaining_seconds(
+        status=analysis.status,
+        stage=analysis.stage,
+        stage_progress=analysis.stage_progress or 0,
+    )
     error: AnalysisStatusError | None = None
     if analysis.status == "failed":
         error = AnalysisStatusError(
@@ -274,7 +361,7 @@ async def get_report(*, analysis_id: str, user: User, db: AsyncSession) -> Analy
             name=it.name,
             severity=it.severity,  # type: ignore[arg-type]
             description=it.description,
-            key_frame_url=it.key_frame_url,
+            key_frame_url=to_proxy_image_url(it.key_frame_url),
             key_frame_timestamp=float(it.key_frame_timestamp)
             if it.key_frame_timestamp is not None
             else None,
@@ -296,11 +383,11 @@ async def get_report(*, analysis_id: str, user: User, db: AsyncSession) -> Analy
         status=analysis.status,  # type: ignore[arg-type]
         camera_angle=analysis.camera_angle,  # type: ignore[arg-type]
         club_type=analysis.club_type,  # type: ignore[arg-type]
-        video_url=analysis.video_url,
+        video_url=to_proxy_video_url(analysis.video_url) or "",
         video_duration=float(analysis.video_duration) if analysis.video_duration else None,
-        skeleton_video_url=analysis.skeleton_video_url,
+        skeleton_video_url=to_proxy_video_url(analysis.skeleton_video_url),
         skeleton_data_url=analysis.skeleton_data_url,
-        thumbnail_url=analysis.thumbnail_url,
+        thumbnail_url=to_proxy_image_url(analysis.thumbnail_url),
         overall_score=analysis.overall_score,
         score_change=analysis.score_change,
         score_level=score_level(analysis.overall_score),
@@ -308,7 +395,7 @@ async def get_report(*, analysis_id: str, user: User, db: AsyncSession) -> Analy
         phase_timestamps=phase_timestamps,
         issues=issues,
         recommendations=recs,
-        share_card_url=analysis.share_card_url,
+        share_card_url=to_proxy_image_url(analysis.share_card_url),
         analyzed_at=analysis.analyzed_at,
         created_at=analysis.created_at,
     )
@@ -323,6 +410,7 @@ async def list_analyses(
     conds = [
         SwingAnalysis.user_id == user.id,
         SwingAnalysis.is_sample.is_(False),
+        SwingAnalysis.deleted_at.is_(None),
     ]
     if query.club_type:
         conds.append(SwingAnalysis.club_type == query.club_type)
@@ -350,7 +438,7 @@ async def list_analyses(
             club_type=r.club_type,  # type: ignore[arg-type]
             overall_score=r.overall_score,
             score_change=r.score_change,
-            thumbnail_url=r.thumbnail_url,
+            thumbnail_url=to_proxy_image_url(r.thumbnail_url),
             status=r.status,  # type: ignore[arg-type]
             analyzed_at=r.analyzed_at,
             created_at=r.created_at,
@@ -358,6 +446,36 @@ async def list_analyses(
         for r in rows
     ]
     return items, total
+
+
+# ==================================================================
+# MVP 进步曲线数据（§6.1）
+# ==================================================================
+async def get_user_analysis_progress(
+    db: AsyncSession, user: User
+) -> AnalysisProgressResponse:
+    stmt = (
+        select(SwingAnalysis)
+        .where(
+            SwingAnalysis.user_id == user.id,
+            SwingAnalysis.is_sample.is_(False),
+            SwingAnalysis.deleted_at.is_(None),
+            SwingAnalysis.status == "completed",
+            SwingAnalysis.overall_score.isnot(None),
+        )
+        .order_by(SwingAnalysis.analyzed_at.asc().nulls_last(), SwingAnalysis.created_at.asc())
+        .limit(60)
+    )
+    rows = (await db.execute(stmt)).scalars().all()
+    pts: list[AnalysisProgressPoint] = [
+        AnalysisProgressPoint(
+            analysis_id=r.id,
+            analyzed_at=r.analyzed_at or r.created_at,
+            overall_score=int(r.overall_score or 0),
+        )
+        for r in rows
+    ]
+    return AnalysisProgressResponse(points=pts)
 
 
 # ==================================================================
@@ -384,4 +502,49 @@ async def _load_owned(
     if analysis.user_id != user.id:
         # 不区分 404/403，统一用 403（不泄露他人 id 的存在性）
         raise ForbiddenError(code=40301, message="无权访问该分析")
+    if analysis.deleted_at is not None:
+        raise NotFoundError(code=40402, message="分析记录不存在")
     return analysis
+
+
+async def _detach_training_analysis_refs(
+    db: AsyncSession, *, analysis_id: str, user_id: str
+) -> None:
+    """软删分析前，清空训练计划/任务上指向该分析的 FK（DB 为 ON DELETE SET NULL，此处显式更新以立即生效）。"""
+    await db.execute(
+        update(TrainingPlan)
+        .where(
+            TrainingPlan.user_id == user_id,
+            TrainingPlan.source_analysis_id == analysis_id,
+        )
+        .values(source_analysis_id=None)
+    )
+    await db.execute(
+        update(TrainingTask)
+        .where(
+            TrainingTask.user_id == user_id,
+            TrainingTask.verification_analysis_id == analysis_id,
+        )
+        .values(verification_analysis_id=None)
+    )
+
+
+async def delete_analysis_for_user(
+    *, analysis_id: str, user: User, db: AsyncSession
+) -> None:
+    """用户侧软删除：终态报告可删，队列中任务不可删；重复删除幂等。"""
+    analysis = await db.get(SwingAnalysis, analysis_id)
+    if analysis is None:
+        raise NotFoundError(code=40402, message="分析记录不存在")
+    if analysis.user_id != user.id:
+        raise ForbiddenError(code=40301, message="无权访问该分析")
+    if analysis.deleted_at is not None:
+        return
+    if analysis.is_sample:
+        raise BadRequestError(code=40093, message="示例类型分析报告不可删除")
+    if analysis.status in ("pending", "processing"):
+        raise BadRequestError(code=40092, message="分析进行中，完成后才可删除")
+
+    await _detach_training_analysis_refs(db, analysis_id=analysis_id, user_id=user.id)
+    analysis.deleted_at = datetime.now(UTC)
+    await db.flush()

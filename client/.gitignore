@@ -1,0 +1,21 @@
+# Windows
+[Dd]esktop.ini
+Thumbs.db
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+
+# Node.js
+node_modules/
+
+# taro-native-shell：bootstrap 克隆，内含独立 .git；主仓只跟踪占位 README（见下文 ! 规则）
+rn-shell/*
+!rn-shell/README.md
+
+# RN 构建日志（make client-build-rn 产生）
+rn-build.log

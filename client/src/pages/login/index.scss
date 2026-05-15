@@ -1,90 +1,133 @@
 .login {
+  /* 小程序 custom navigation：100vh 常大于可视内容区，勿用单一 flex + margin-top:auto 拉出过巨大留白 */
   min-height: 100vh;
+  height: 100%;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   background: linear-gradient(180deg, var(--color-primary-tint) 0%, var(--color-bg-card) 60%);
-  padding: 96px 48px 64px;
+  padding-top: calc(56rpx + env(safe-area-inset-top));
+  padding-left: 48rpx;
+  padding-right: 48rpx;
+  padding-bottom: calc(32rpx + env(safe-area-inset-bottom));
+
+  &__main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-height: 0;
+    padding-bottom: 28rpx;
+  }
 
   &__brand {
     text-align: center;
-    margin-bottom: 96px;
+    margin-bottom: 28rpx;
   }
 
+  /*
+   * 登录页主 LOGO：尺寸 200×200rpx，带白底卡片 + 浅描边 + 浮起阴影，
+   * 视觉语言与首页顶栏 brand-mark 同源，强化"主角感 / 饱满感"。
+   * 圆角 24rpx 比内容卡（20）大一档，符合"主视觉 LOGO 比常规卡片更圆润"的层级。
+   */
   &__logo {
-    font-size: 120px;
     display: block;
-    margin-bottom: 16px;
+    width: 200rpx;
+    height: 200rpx;
+    margin: 0 auto 16rpx;
+    border-radius: 24rpx;
+    overflow: hidden;
+    background: var(--color-bg-card);
+    border: 1rpx solid rgba(26, 35, 126, 0.08);
+    box-shadow: 0 12rpx 28rpx rgba(26, 35, 126, 0.18);
   }
 
   &__title {
-    font-size: 56px;
+    font-size: 54rpx;
     font-weight: 700;
     color: var(--color-primary);
     display: block;
-    margin-bottom: 16px;
+    margin-bottom: 8rpx;
   }
 
   &__slogan {
-    font-size: 28px;
+    font-size: 30rpx;
     color: var(--color-text-secondary);
     display: block;
   }
 
   &__features {
-    margin-bottom: 96px;
+    margin-bottom: 0;
   }
 
   &__feature {
     display: flex;
     align-items: center;
-    margin-bottom: 32px;
-    padding: 24px;
+    margin-bottom: 16rpx;
+    padding: 20rpx 24rpx;
     background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-sm);
+
+    &:last-child {
+      margin-bottom: 0;
+    }
   }
 
   &__feature-icon {
-    font-size: 48px;
-    margin-right: 24px;
+    font-size: 42rpx;
+    margin-right: 20rpx;
   }
 
   &__feature-text {
-    font-size: 28px;
+    font-size: 32rpx;
     color: var(--color-text-primary);
   }
 
   &__actions {
-    margin-top: auto;
+    flex-shrink: 0;
   }
 
   &__btn {
     background: var(--color-primary) !important;
     color: var(--color-on-primary) !important;
-    font-size: 32px !important;
+    font-size: 36rpx !important;
     font-weight: 600 !important;
     border-radius: var(--radius-xl) !important;
-    height: 96px !important;
-    line-height: 96px !important;
-    margin-bottom: 32px;
+    height: 88rpx !important;
+    line-height: 88rpx !important;
+    margin-bottom: 16rpx;
   }
 
   &__agreement {
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-wrap: wrap;
+    row-gap: 4rpx;
+    column-gap: 4rpx;
+    margin-bottom: 20rpx;
+    padding: 12rpx 8rpx;
+    border-radius: var(--radius-md);
+    background: var(--color-bg-card);
+    box-shadow: var(--shadow-sm);
   }
 
+  /* 自绘勾选：避免小程序原生 Checkbox 与 React 状态不同步 */
   &__checkbox {
-    width: 32px;
-    height: 32px;
-    border: 2px solid var(--color-border);
+    width: 44rpx;
+    height: 44rpx;
+    min-width: 44rpx;
+    border: 2px solid var(--color-primary-soft);
     border-radius: 50%;
-    margin-right: 12px;
+    margin-right: 12rpx;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--color-on-primary);
+    flex-shrink: 0;
+    box-sizing: border-box;
+    background: var(--color-bg-card);
 
     &--checked {
       background: var(--color-primary);
@@ -92,18 +135,31 @@
     }
   }
 
+  &__checkbox-mark {
+    font-size: 32rpx;
+    line-height: 1;
+    color: var(--color-on-primary);
+    font-weight: 700;
+  }
+
   &__agreement-text {
-    font-size: 24px;
+    font-size: 32rpx;
     color: var(--color-text-secondary);
   }
 
+  &__agreement-link {
+    font-size: 32rpx;
+    color: var(--color-primary);
+    font-weight: 600;
+  }
+
   &__invite {
-    margin-top: 32px;
+    margin-top: 16rpx;
     text-align: center;
   }
 
   &__invite-toggle {
-    font-size: 24px;
+    font-size: 32rpx;
     color: var(--color-primary);
     text-decoration: underline;
   }
@@ -115,19 +171,19 @@
   }
 
   &__invite-input {
-    height: 80px;
+    height: 80rpx;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    padding: 0 24px;
-    font-size: 28px;
-    letter-spacing: 4px;
+    padding: 0 24rpx;
+    font-size: 34rpx;
+    letter-spacing: 4rpx;
     text-align: center;
     background: var(--color-bg-card);
-    margin-bottom: 16px;
+    margin-bottom: 16rpx;
   }
 
   &__invite-tip {
-    font-size: 22px;
+    font-size: 30rpx;
     color: var(--color-text-secondary);
   }
 }

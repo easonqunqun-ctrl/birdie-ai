@@ -19,7 +19,7 @@ ai_engine/     独立 AI 视觉分析服务（mock 模式默认开启）
 client/        Taro 3 + React 18 + TS（编译 微信小程序 / React Native）
 docs/          产品、API、数据库、规范、测试、知识库、运营文档
 UI/            UI 原型 HTML 与生成图（仅参考，勿当源码）
-小鸟AI高尔夫-产品设计白皮书.md   产品与视觉规范权威文档
+灵鸟golf-产品设计白皮书.md   产品与视觉规范权威文档
 ```
 
 **改动边界**：
@@ -112,6 +112,7 @@ make backend-lint     # ruff
 make backend-test     # pytest
 make backend-revision m="add xxx column"
 make backend-migrate
+# 分析报告软删除：上线档位 R0/R1、Smoke、与支付交叉约定 → docs/release-notes/analysis-soft-delete-release-pattern.md
 ```
 
 ---
@@ -128,7 +129,9 @@ make backend-migrate
 
 ## 9. 当需要澄清时
 
-- 产品意图不明 → 翻 `小鸟AI高尔夫-产品设计白皮书.md`（§5 功能规划 / §7 信息架构 / §7.2 视觉规范）。
+- 产品意图不明 → 翻 `灵鸟golf-产品设计白皮书.md`（§5 功能规划 / §7 信息架构 / §7.2 视觉规范）。
 - 接口字段不明 → `docs/02-API接口设计文档.md`。
 - 数据库字段不明 → `docs/03-数据库设计文档.md`。
+- **分析报告软删除**何时算「可发版」、发布顺序与 R2 backlog → [`docs/release-notes/analysis-soft-delete-release-pattern.md`](docs/release-notes/analysis-soft-delete-release-pattern.md)。
+- **体验版一轮测试**（自动化 + 微信侧 Smoke）→ [`docs/release-notes/experience-version-smoke-runbook.md`](docs/release-notes/experience-version-smoke-runbook.md)。
 - 仍不明 → **停下来问用户**，不要臆测实现。

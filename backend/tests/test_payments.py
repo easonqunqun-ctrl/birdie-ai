@@ -20,9 +20,17 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
 
+from app.config import settings
 from app.core.database import AsyncSessionLocal
 from app.models.payment import PaymentTransaction
 from app.models.user import User
+
+
+def _free_user_expected_quota_totals() -> tuple[int, int]:
+    """严格模式下免费额为 3/5；QUOTA_MODE=unlimited 时建配额行即为无限（-1）。"""
+    if settings.QUOTA_MODE == "unlimited":
+        return (-1, -1)
+    return (3, 5)
 
 
 # ==================== 套餐列表 ====================
@@ -70,8 +78,9 @@ async def test_mock_confirm_activates_membership_and_lifts_quotas(
     # 先让用户产生当月分析配额 + 当日对话配额（通过 /users/me 触发 get_or_create）
     me_before = (await client.get("/v1/users/me", headers=auth_headers)).json()["data"]
     assert me_before["membership_type"] == "free"
-    assert me_before["quota"]["analysis_total"] == 3
-    assert me_before["quota"]["chat_total_today"] == 5
+    exp_an, exp_chat = _free_user_expected_quota_totals()
+    assert me_before["quota"]["analysis_total"] == exp_an
+    assert me_before["quota"]["chat_total_today"] == exp_chat
 
     # 下单
     create = (
@@ -96,8 +105,11 @@ async def test_mock_confirm_activates_membership_and_lifts_quotas(
     assert me_after["membership_type"] == "monthly"
     assert me_after["is_member"] is True
     assert 28 <= me_after["membership_days_remaining"] <= 31
-    assert me_after["quota"]["analysis_remaining"] == 9999
-    assert me_after["quota"]["chat_remaining_today"] == 9999
+    # W8-T3：「无限」统一用 -1 表达（替代历史 9999），前端按 < 0 判断
+    assert me_after["quota"]["analysis_remaining"] == -1
+    assert me_after["quota"]["chat_remaining_today"] == -1
+    assert me_after["quota"]["analysis_total"] == -1
+    assert me_after["quota"]["chat_total_today"] == -1
 
     # /membership 返回一致
     mem = (
@@ -185,6 +197,25 @@ async def test_create_order_rejects_unknown_plan(
         "/v1/payments/orders", headers=auth_headers, json={"plan_type": "platinum"}
     )
     assert resp.status_code in (400, 422)
+
+
+# ==================== sync-from-wechat：mock 模式拒绝 ====================
+@pytest.mark.asyncio
+async def test_sync_from_wechat_rejected_in_mock_mode(
+    client: AsyncClient, auth_headers: dict[str, str]
+):
+    create = (
+        await client.post(
+            "/v1/payments/orders", headers=auth_headers, json={"plan_type": "monthly"}
+        )
+    ).json()["data"]
+    order_id = create["order"]["id"]
+    resp = await client.post(
+        f"/v1/payments/orders/{order_id}/sync-from-wechat",
+        headers=auth_headers,
+    )
+    assert resp.status_code == 400, resp.text
+    assert resp.json()["code"] == 40090
 
 
 # ==================== mock 模式关闭时拒绝 mock-confirm ====================

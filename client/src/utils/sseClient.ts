@@ -67,6 +67,9 @@ export function streamSSE<T = unknown>(
   if (process.env.TARO_ENV === 'h5') {
     return streamH5(options, handlers)
   }
+  if (process.env.TARO_ENV === 'rn') {
+    return streamRN(options, handlers)
+  }
   return streamWeapp(options, handlers)
 }
 
@@ -94,6 +97,11 @@ function streamWeapp<T>(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let task: any
   const parser = new SSEParser<T>()
+  // 记录是否真的走过 chunked 路径。某些上游（如 Cloudflare quick tunnel + http2 + 小响应体）
+  // 会把 SSE response 整体 buffer 后一次下发，导致 wx.request 的 onChunkReceived 一次都不触发，
+  // 而是直接走 success(res) 把完整 body 放在 res.data 里。这种情况下我们要在 success 里
+  // 把 res.data 当成"一整块 chunk"补喂给 SSE 解析器，避免对话假死。
+  let chunkReceived = false
 
   // 超时：本地设一次 setTimeout；到点就 abort
   const timeoutMs = opts.timeoutMs ?? 60000
@@ -136,7 +144,21 @@ function streamWeapp<T>(
           )
           return
         }
-        // 尝试 flush 最后一段 buffer
+        // 兜底：onChunkReceived 一次也没触发（被中间网关 buffer 整流），但 res.data
+        // 里其实已经有完整的 SSE body，按整块解析后再 flush。
+        if (!chunkReceived && res.data) {
+          try {
+            const events = parser.feed(rawBodyToArrayBuffer(res.data))
+            events.forEach((evt) => handlers.onEvent(evt))
+          } catch (e) {
+            handlers.onError?.(
+              new Error(e instanceof Error ? e.message : 'SSE 解析异常'),
+              { aborted: false },
+            )
+            return
+          }
+        }
+        // flush 最后一段 buffer（无论流式还是兜底路径都做一次）
         parser.flush().forEach((evt) => handlers.onEvent(evt))
         handlers.onDone?.()
       },
@@ -162,6 +184,7 @@ function streamWeapp<T>(
     // 注册 chunk 回调；每次 res.data 是 ArrayBuffer
     task?.onChunkReceived?.((res: { data: ArrayBuffer }) => {
       if (aborted || done) return
+      chunkReceived = true
       try {
         const events = parser.feed(res.data)
         events.forEach((evt) => handlers.onEvent(evt))
@@ -196,6 +219,115 @@ function streamWeapp<T>(
     } catch {
       // ignore
     }
+  }
+}
+
+/**
+ * RN：用 XHR.responseType=text + onprogress 收增量 SSE（Hermes/React Native）。
+ * webpack 不走此分支。
+ */
+function streamRN<T>(
+  opts: StreamSSEOptions,
+  handlers: StreamSSEHandlers<T>,
+): StreamCancel {
+  if (typeof XMLHttpRequest === 'undefined') {
+    queueMicrotask(() =>
+      handlers.onError?.(
+        new Error('当前环境不支持 XMLHttpRequest SSE'),
+        { aborted: false },
+      ),
+    )
+    return () => undefined
+  }
+
+  const url = buildUrl(opts.url)
+  const header = buildHeaders(opts)
+  const parser = new SSEParser<T>()
+  let lastChars = 0
+  let done = false
+  let aborted = false
+  let cancelled = false
+
+  const xhr = new XMLHttpRequest()
+  xhr.responseType = 'text'
+
+  const timeoutMs = opts.timeoutMs ?? 60000
+  const timer = setTimeout(() => {
+    if (!done) {
+      aborted = true
+      xhr.abort()
+    }
+  }, timeoutMs)
+
+  xhr.open(opts.method ?? 'POST', url, true)
+  Object.entries(header).forEach(([k, v]) => xhr.setRequestHeader(k, v))
+
+  const flushTail = (): void => {
+    parser.flush().forEach((e) => handlers.onEvent(e))
+  }
+
+  const drainResponse = (): void => {
+    const txt = xhr.responseText || ''
+    const piece = txt.slice(lastChars)
+    lastChars = txt.length
+    parser.feedText(piece).forEach((evt) => handlers.onEvent(evt))
+  }
+
+  xhr.onprogress = (): void => {
+    if (done) return
+    drainResponse()
+  }
+
+  xhr.onload = (): void => {
+    if (done) return
+    clearTimeout(timer)
+    drainResponse()
+    flushTail()
+    done = true
+    if (xhr.status < 200 || xhr.status >= 300) {
+      handlers.onError?.(
+        new Error(`HTTP ${xhr.status}：${extractErrMsg(xhr.responseText)}`),
+        { aborted: false },
+      )
+      return
+    }
+    handlers.onDone?.()
+  }
+
+  xhr.onerror = (): void => {
+    if (done) return
+    clearTimeout(timer)
+    done = true
+    handlers.onError?.(new Error('SSE 传输失败'), { aborted: aborted || cancelled })
+  }
+
+  xhr.onabort = (): void => {
+    if (done) return
+    clearTimeout(timer)
+    done = true
+    if (cancelled) {
+      handlers.onDone?.()
+      return
+    }
+    handlers.onError?.(new Error('连接已中断'), { aborted: true })
+  }
+
+  try {
+    xhr.send(opts.body !== undefined ? JSON.stringify(opts.body) : undefined)
+  } catch (e) {
+    clearTimeout(timer)
+    done = true
+    handlers.onError?.(
+      new Error(e instanceof Error ? e.message : '发起 SSE 请求失败'),
+      { aborted: false },
+    )
+  }
+
+  return () => {
+    if (done) return
+    cancelled = true
+    aborted = true
+    xhr.abort()
   }
 }
 
@@ -294,6 +426,13 @@ class SSEParser<T> {
   feed(chunk: ArrayBuffer): SSEEvent<T>[] {
     this.textBuffer += this.decoder.decode(chunk)
     return this.extract()
+  }
+
+  /** 追加一段已解码 UTF-16 字符串（RN XHR.responseText 增量） */
+  feedText(s: string): SSEEvent<T>[] {
+    if (!s) return []
+    const enc = new TextEncoder()
+    return this.feed(enc.encode(s).buffer)
   }
 
   flush(): SSEEvent<T>[] {
@@ -462,6 +601,45 @@ function buildHeaders(opts: StreamSSEOptions): Record<string, string> {
     if (token) header.Authorization = `Bearer ${token}`
   }
   return header
+}
+
+/**
+ * 把 wx.request success 回调里的 res.data 统一转成 ArrayBuffer，
+ * 便于复用 SSEParser 的 feed(ArrayBuffer) 分支。
+ *
+ * - ArrayBuffer：直接返回
+ * - string：用 utf-8 编码成 ArrayBuffer
+ * - 其它（极少见）：JSON.stringify 后再编码
+ */
+function rawBodyToArrayBuffer(data: unknown): ArrayBuffer {
+  if (data instanceof ArrayBuffer) return data
+  // 微信小程序 ArrayBuffer 在某些基础库下 instanceof 校验不可靠，
+  // 用 byteLength + slice 双重判断兜底
+  if (data && typeof data === 'object' && 'byteLength' in (data as object)) {
+    return data as ArrayBuffer
+  }
+  const text =
+    typeof data === 'string' ? data : JSON.stringify(data ?? '')
+  if (typeof TextEncoder !== 'undefined') {
+    return new TextEncoder().encode(text).buffer as ArrayBuffer
+  }
+  // 极老基础库 fallback：手写 utf-8 编码
+  const bytes: number[] = []
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i)
+    if (code < 0x80) {
+      bytes.push(code)
+    } else if (code < 0x800) {
+      bytes.push(0xc0 | (code >> 6), 0x80 | (code & 0x3f))
+    } else {
+      bytes.push(
+        0xe0 | (code >> 12),
+        0x80 | ((code >> 6) & 0x3f),
+        0x80 | (code & 0x3f),
+      )
+    }
+  }
+  return new Uint8Array(bytes).buffer
 }
 
 function extractErrMsg(data: unknown): string {

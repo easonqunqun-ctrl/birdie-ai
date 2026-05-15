@@ -1,19 +1,43 @@
 .membership {
-  padding: 32px;
+  /**
+   * P1-A1 评估：根是 <ScrollView>，无 flex 父链，min-height 安全。
+   * 若日后加 flex 包装，改 `height: 100vh; overflow: hidden;`。
+   * webview 渲染模式下 scroll-view 不支持 padding，内边距放 &__inner。
+   */
+  /* P2-A1：RN 不写 calc/env */
   background: var(--color-bg-page);
-  min-height: 100vh;
+  min-height: 100%;
   box-sizing: border-box;
 
+  &__inner {
+    padding: 32rpx;
+    box-sizing: border-box;
+  }
+
+  &__notice {
+    margin-bottom: 24rpx;
+    padding: 18rpx 24rpx;
+    background: rgba(212, 175, 55, 0.18);
+    border-left: 6rpx solid var(--color-gold);
+    border-radius: var(--radius-sm);
+  }
+
+  &__notice-text {
+    font-size: 32rpx;
+    color: var(--color-primary-dark);
+    line-height: 1.4;
+  }
+
   &__hero {
-    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-soft) 100%);
+    background: var(--gradient-hero);
     color: var(--color-on-primary);
-    border-radius: var(--radius-md);
-    padding: 40px 32px;
+    border-radius: 18rpx;
+    padding: 40rpx 32rpx;
     display: flex;
     flex-direction: column;
     align-items: center;
-    box-shadow: var(--shadow-sm);
-    margin-bottom: 32px;
+    box-shadow: var(--shadow-md);
+    margin-bottom: 32rpx;
 
     &.is-member {
       background: linear-gradient(135deg, var(--color-gold-dark, #c59b3f) 0%, var(--color-gold-soft, #f3deaa) 100%);
@@ -22,25 +46,25 @@
   }
 
   &__hero-badge {
-    font-size: 56px;
-    margin-bottom: 8px;
+    font-size: 58rpx;
+    margin-bottom: 8rpx;
   }
 
   &__hero-title {
-    font-size: 36px;
+    font-size: 38rpx;
     font-weight: 700;
-    margin-bottom: 4px;
+    margin-bottom: 4rpx;
   }
 
   &__hero-sub {
-    font-size: 26px;
+    font-size: 32rpx;
     opacity: 0.85;
   }
 
   &__plans {
     display: flex;
-    gap: 24px;
-    margin-bottom: 32px;
+    gap: 24rpx;
+    margin-bottom: 32rpx;
   }
 
   &__plan {
@@ -48,13 +72,13 @@
     background: var(--color-bg-card);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-sm);
-    padding: 28px 24px;
-    border: 2px solid transparent;
-    transition: border-color 0.2s;
+    padding: 28rpx 24rpx;
+    border: 1px solid var(--color-border);
+    transition: border-color 0.2s, box-shadow 0.2s;
 
     &.is-active {
-      border-color: var(--color-primary);
-      box-shadow: 0 4px 18px rgba(34, 97, 72, 0.15);
+      border: 1.5px solid var(--color-primary);
+      box-shadow: var(--shadow-md);
     }
   }
 
@@ -62,33 +86,33 @@
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    margin-bottom: 8px;
+    margin-bottom: 8rpx;
   }
 
   &__plan-name {
-    font-size: 28px;
+    font-size: 34rpx;
     font-weight: 600;
-    color: var(--color-text-primary);
+    color: var(--color-primary);
   }
 
   &__plan-price {
-    font-size: 40px;
+    font-size: 42rpx;
     font-weight: 700;
     color: var(--color-primary);
   }
 
   &__plan-duration {
-    font-size: 24px;
+    font-size: 32rpx;
     color: var(--color-text-tertiary);
     display: block;
   }
 
   &__plan-badge {
     display: inline-block;
-    margin-top: 12px;
-    font-size: 22px;
-    padding: 4px 12px;
-    border-radius: 12px;
+    margin-top: 12rpx;
+    font-size: 30rpx;
+    padding: 4rpx 12rpx;
+    border-radius: 12rpx;
     background: var(--color-gold-soft, #f3deaa);
     color: var(--color-gold-dark, #7a5400);
   }
@@ -96,23 +120,23 @@
   &__benefits {
     background: var(--color-bg-card);
     border-radius: var(--radius-md);
-    padding: 24px 32px;
+    padding: 24rpx 32rpx;
     box-shadow: var(--shadow-sm);
-    margin-bottom: 32px;
+    margin-bottom: 32rpx;
   }
 
   &__benefits-header {
-    margin-bottom: 16px;
+    margin-bottom: 16rpx;
   }
 
   &__benefits-title {
-    font-size: 28px;
+    font-size: 34rpx;
     font-weight: 600;
   }
 
   &__benefits-row {
     display: flex;
-    padding: 12px 0;
+    padding: 12rpx 0;
     border-bottom: 1px solid var(--color-border);
 
     &:last-child {
@@ -122,13 +146,13 @@
     &--head {
       font-weight: 600;
       color: var(--color-text-secondary);
-      font-size: 24px;
+      font-size: 32rpx;
     }
   }
 
   &__benefits-col {
     flex: 1;
-    font-size: 26px;
+    font-size: 32rpx;
     color: var(--color-text-primary);
     text-align: center;
 
@@ -147,47 +171,47 @@
   &__cta {
     background: var(--color-bg-card);
     border-radius: var(--radius-md);
-    padding: 24px;
+    padding: 24rpx;
     box-shadow: var(--shadow-sm);
-    margin-bottom: 32px;
+    margin-bottom: 32rpx;
   }
 
   &__btn {
     background: var(--color-primary) !important;
     color: var(--color-on-primary) !important;
     border-radius: var(--radius-xl) !important;
-    height: 88px !important;
-    line-height: 88px !important;
-    font-size: 30px !important;
+    height: 88rpx !important;
+    line-height: 88rpx !important;
+    font-size: 36rpx !important;
     width: 100%;
   }
 
   &__cta-hint {
     display: block;
     text-align: center;
-    margin-top: 12px;
-    font-size: 22px;
+    margin-top: 12rpx;
+    font-size: 30rpx;
     color: var(--color-text-tertiary);
   }
 
   &__orders {
     background: var(--color-bg-card);
     border-radius: var(--radius-md);
-    padding: 24px 32px;
+    padding: 24rpx 32rpx;
     box-shadow: var(--shadow-sm);
   }
 
   &__orders-header {
-    margin-bottom: 16px;
+    margin-bottom: 16rpx;
   }
 
   &__orders-title {
-    font-size: 28px;
+    font-size: 34rpx;
     font-weight: 600;
   }
 
   &__order {
-    padding: 16px 0;
+    padding: 16rpx 0;
     border-bottom: 1px solid var(--color-border);
 
     &:last-child {
@@ -198,18 +222,18 @@
   &__order-main {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 8px;
+    margin-bottom: 8rpx;
   }
 
   &__order-name {
-    font-size: 28px;
+    font-size: 34rpx;
     font-weight: 600;
   }
 
   &__order-status {
-    font-size: 22px;
-    padding: 2px 10px;
-    border-radius: 10px;
+    font-size: 30rpx;
+    padding: 2px 10rpx;
+    border-radius: 10rpx;
 
     &--paid {
       color: var(--color-primary);
@@ -225,7 +249,7 @@
   &__order-meta {
     display: flex;
     justify-content: space-between;
-    font-size: 24px;
+    font-size: 32rpx;
     color: var(--color-text-tertiary);
   }
 

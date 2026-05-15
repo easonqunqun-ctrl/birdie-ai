@@ -13,8 +13,10 @@ import { FC, useEffect, useMemo, useState } from 'react'
 import { View, Text, Button, ScrollView } from '@tarojs/components'
 import Taro, { useRouter } from '@tarojs/taro'
 import { analysisService } from '@/services/analysisService'
+import { checkVideoFirstFrame } from '@/services/mediaCheck'
 import { useAnalysisStore } from '@/store/analysisStore'
 import { useUserStore } from '@/store/userStore'
+import { track } from '@/utils/track'
 import {
   CAMERA_ANGLE_DESC,
   CAMERA_ANGLE_LABEL,
@@ -53,17 +55,24 @@ const AnalysisParamsPage: FC = () => {
     tempFilePath?: string
     size?: string
     duration?: string
+    thumbTempFilePath?: string
   }
 
   const tempFilePath = query.tempFilePath ? decodeURIComponent(query.tempFilePath) : ''
   const size = Number(query.size || 0)
   const duration = Number(query.duration || 0)
+  // W8-T5：视频首帧路径（weapp chooseMedia 返回）；RN / 部分机型可能为空
+  const thumbTempFilePath = query.thumbTempFilePath
+    ? decodeURIComponent(query.thumbTempFilePath)
+    : ''
 
   const [cameraAngle, setCameraAngle] = useState<CameraAngle>('face_on')
   const [clubType, setClubType] = useState<ClubType>('iron_7')
   const [submitting, setSubmitting] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
-  const [phase, setPhase] = useState<'idle' | 'signing' | 'uploading' | 'creating'>('idle')
+  const [phase, setPhase] = useState<
+    'idle' | 'checking' | 'signing' | 'uploading' | 'creating'
+  >('idle')
 
   const setCurrent = useAnalysisStore((s) => s.setCurrent)
   const fetchMe = useUserStore((s) => s.fetchMe)
@@ -90,9 +99,28 @@ const AnalysisParamsPage: FC = () => {
       return
     }
     setSubmitting(true)
-    setPhase('signing')
-    Taro.showLoading({ title: '申请上传凭证' })
     try {
+      // W8-T5：上传视频前先走一遍微信 imgSecCheck（首帧合规预检）。
+      //   - 只有真的拒绝（passed=false）才 abort；fail-open 场景照常上传。
+      //   - 没 thumbTempFilePath 的端（RN / 老机型）会被 checkVideoFirstFrame 直接返回 passed=true。
+      if (thumbTempFilePath) {
+        setPhase('checking')
+        Taro.showLoading({ title: '内容审核中' })
+        const check = await checkVideoFirstFrame(thumbTempFilePath, 'analysis')
+        if (!check.passed) {
+          Taro.hideLoading()
+          Taro.showModal({
+            title: '内容审核未通过',
+            content: check.reason || '视频内容涉嫌违规，请更换视频',
+            showCancel: false,
+            confirmText: '我知道了',
+          })
+          return
+        }
+      }
+
+      setPhase('signing')
+      Taro.showLoading({ title: '申请上传凭证' })
       const contentType = guessContentType(tempFilePath)
       const token = await analysisService.getUploadToken({
         file_name: deriveFileName(tempFilePath),
@@ -120,6 +148,15 @@ const AnalysisParamsPage: FC = () => {
 
       Taro.hideLoading()
       setCurrent(created.analysis_id)
+
+      // W8-T5：核心闭环埋点 — 用户成功提交一次分析任务
+      track('analysis_submit', {
+        analysis_id: created.analysis_id,
+        club_type: clubType,
+        camera_angle: cameraAngle,
+        duration,
+        size,
+      })
 
       // 刷新一下用户配额（创建成功后 analysis_remaining 会 -1）
       fetchMe().catch(() => undefined)

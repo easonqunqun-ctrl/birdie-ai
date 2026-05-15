@@ -8,6 +8,7 @@
  *   4. 问题诊断（按 severity 排序 + 关键帧图 + 点击跳帧）
  *   5. 训练建议（drill 详情卡 + 加入训练计划占位）
  *   6. 底部动作栏（分享 / 对比 / AI 教练 全部占位 toast）
+ *   7. 删除：顶部「更多」操作表 + 底部按钮（不做左滑，避免与纵向滚动、视频手势冲突）
  *
  * 关键工程决策：
  *   - `phase_scores / phase_timestamps` 是 dict[str, {...}]，需要遍历 PHASE_ORDER
@@ -25,6 +26,7 @@ import Taro, { useRouter, useShareAppMessage } from '@tarojs/taro'
 import { analysisService } from '@/services/analysisService'
 import { shareService, type PublicReport } from '@/services/shareService'
 import { useUserStore } from '@/store/userStore'
+import { switchToCoach } from '@/utils/tabNav'
 import { getDrillDetail } from '@/constants/drillLibrary'
 import { SCORE_LEVEL_META, scoreLevelFromScore } from '@/constants/scoreLevel'
 import {
@@ -225,19 +227,59 @@ const ReportPage: FC = () => {
   /**
    * "问 AI 教练"跳转。
    *
-   * - 真实报告（id 以 `ana_` 开头）：把 analysis_id 带到 coach 页，
-   *   让后端在 `POST /chat/sessions` 时把该分析注入 system prompt 的"最近分析"
-   * - 示例报告（id = 'sample'）：不带 analysis_id，走通用 system prompt
-   *   —— 示例报告后端不落真实 analysis 数据，带过去会让 create-session 报 404
-   * - 预填问题：方便用户点进去直接按"发送"，不强制（可删可改）
+   * tabBar 页必须用 `switchTab`，不可用 `navigateTo`（微信会直接失败）。
+   * 上下文经 `switchToCoach` 写入 storage，由 coach 页 `consumeCoachPendingContext` 一次性读取。
+   *
+   * - 真实报告：`analysisId` 注入会话；示例报告不带，避免 create-session 404
+   * - `prefill`：明文写入 storage，无需 URL encode
    */
   const handleAskCoach = () => {
-    const prefill = encodeURIComponent('这次我的挥杆，需要重点改什么？')
-    const queryParts = [`prefill=${prefill}`]
-    if (analysisId && analysisId !== 'sample') {
-      queryParts.push(`analysis_id=${analysisId}`)
-    }
-    Taro.navigateTo({ url: `/pages/coach/index?${queryParts.join('&')}` })
+    const prefill = '这次我的挥杆，需要重点改什么？'
+    const ctx =
+      analysisId && analysisId !== 'sample'
+        ? { analysisId, prefill }
+        : { prefill }
+    switchToCoach(ctx).catch(() => {
+      Taro.showToast({ title: '暂时无法打开 AI 教练', icon: 'none' })
+    })
+  }
+
+  /**
+   * 删除入口（软删除，列表页同步消失）。
+   * 交互说明：详情页为纵向长 ScrollView + 视频控件，左滑删除会与滚动/拖拽冲突，
+   * 故采用「顶部更多 · 操作表」+「底部显式按钮」双通道；列表页更适合滑动露出删除（后续可加）。
+   */
+  const handleDeleteReport = () => {
+    if (!analysisId || analysisId === 'sample') return
+    Taro.showModal({
+      title: '删除报告',
+      content: '删除后无法在「我的报告」中查看此条记录，确认删除？',
+      confirmText: '删除',
+      confirmColor: '#ef4444',
+      success: async (res) => {
+        if (!res.confirm) return
+        try {
+          await analysisService.deleteAnalysis(analysisId)
+          Taro.showToast({ title: '已删除', icon: 'success' })
+          setTimeout(() => {
+            Taro.navigateBack().catch(() => {
+              Taro.redirectTo({ url: '/pages/analysis/history' }).catch(() => undefined)
+            })
+          }, 400)
+        } catch {
+          /* toast 由 http */
+        }
+      },
+    })
+  }
+
+  const openReportMoreMenu = () => {
+    Taro.showActionSheet({
+      itemList: ['删除此报告'],
+      success: (res) => {
+        if (res.tapIndex === 0) handleDeleteReport()
+      },
+    }).catch(() => undefined)
   }
 
   // ---------------- 渲染 ----------------
@@ -353,18 +395,27 @@ const ReportPage: FC = () => {
           </Text>
         </View>
       )}
+      {!isSample && (
+        <View className='report__toolbar'>
+          <Text className='report__toolbar-more' onClick={openReportMoreMenu}>
+            更多
+          </Text>
+        </View>
+      )}
       {/* ==================== 1. 视频回放 ==================== */}
       <View className='report__video-wrap'>
-        <Video
-          id={VIDEO_ID}
-          className='report__video'
-          src={videoSrc}
-          controls
-          showFullscreenBtn
-          showCenterPlayBtn
-          poster={report.thumbnail_url || undefined}
-          initialTime={0}
-        />
+        <View className='report__video-frame'>
+          <Video
+            id={VIDEO_ID}
+            className='report__video'
+            src={videoSrc}
+            controls
+            showFullscreenBtn
+            showCenterPlayBtn
+            poster={report.thumbnail_url || undefined}
+            initialTime={0}
+          />
+        </View>
 
         {/* 阶段色条（在 video 下方；点击跳帧） */}
         {report.phase_timestamps && (
@@ -582,6 +633,13 @@ const ReportPage: FC = () => {
       )}
 
       {/* ==================== 6. 底部动作栏 ==================== */}
+      {!isSample && (
+        <View className='report__footer-delete-wrap'>
+          <Button className='report__footer-delete' onClick={handleDeleteReport}>
+            删除此报告
+          </Button>
+        </View>
+      )}
       <View className='report__footer'>
         <Button
           className='report__footer-btn'

@@ -1,57 +1,57 @@
 .params {
-  padding: 24px;
-  padding-bottom: 240px;
+  padding: 24rpx;
+  padding-bottom: 240rpx;
 
   &__summary {
     background: var(--color-bg-card);
     border-radius: var(--radius-md);
-    padding: 24px;
+    padding: 24rpx;
     box-shadow: var(--shadow-sm);
-    margin-bottom: 24px;
+    margin-bottom: 24rpx;
   }
 
   &__summary-label {
-    font-size: 24px;
+    font-size: 32rpx;
     color: var(--color-text-secondary);
     display: block;
-    margin-bottom: 4px;
+    margin-bottom: 4rpx;
   }
 
   &__summary-meta {
-    font-size: 30px;
+    font-size: 36rpx;
     color: var(--color-text-primary);
     font-weight: 600;
   }
 
   &__summary-error {
-    margin-top: 8px;
+    margin-top: 8rpx;
     display: block;
-    font-size: 24px;
+    font-size: 32rpx;
     color: var(--color-error);
   }
 
   &__section {
-    margin-bottom: 32px;
+    margin-bottom: 32rpx;
   }
 
   &__section-title {
-    font-size: 30px;
+    font-size: 36rpx;
     font-weight: 600;
     color: var(--color-text-primary);
     display: block;
   }
 
   &__section-hint {
-    font-size: 22px;
+    font-size: 30rpx;
     color: var(--color-text-tertiary);
     display: block;
-    margin-bottom: 16px;
+    margin-bottom: 16rpx;
   }
 
   /* 角度 */
   &__angle-grid {
     display: flex;
-    gap: 16px;
+    gap: 16rpx;
   }
 
   &__angle-card {
@@ -59,7 +59,7 @@
     background: var(--color-bg-card);
     border: 2rpx solid var(--color-border);
     border-radius: var(--radius-md);
-    padding: 24px;
+    padding: 24rpx;
     box-shadow: var(--shadow-sm);
     transition: border-color 0.15s, background 0.15s;
 
@@ -70,47 +70,47 @@
   }
 
   &__angle-title {
-    font-size: 28px;
+    font-size: 34rpx;
     font-weight: 600;
     color: var(--color-text-primary);
     display: block;
-    margin-bottom: 8px;
+    margin-bottom: 8rpx;
   }
 
   &__angle-desc {
-    font-size: 22px;
+    font-size: 30rpx;
     color: var(--color-text-secondary);
     line-height: 1.4;
   }
 
   /* 球杆 */
   &__club-scroll {
-    max-height: 560px;
+    max-height: 560rpx;
   }
 
   &__club-group {
-    margin-bottom: 16px;
+    margin-bottom: 16rpx;
   }
 
   &__club-group-title {
-    font-size: 24px;
+    font-size: 32rpx;
     color: var(--color-text-secondary);
     display: block;
-    margin-bottom: 8px;
+    margin-bottom: 8rpx;
   }
 
   &__club-grid {
     display: flex;
     flex-wrap: wrap;
-    gap: 12px;
+    gap: 12rpx;
   }
 
   &__club-chip {
-    padding: 14px 22px;
+    padding: 14rpx 22rpx;
     border: 2rpx solid var(--color-border);
     border-radius: var(--radius-xl);
     background: var(--color-bg-card);
-    font-size: 26px;
+    font-size: 32rpx;
     color: var(--color-text-primary);
     transition: border-color 0.15s, background 0.15s, color 0.15s;
 
@@ -128,18 +128,18 @@
     right: 0;
     bottom: 0;
     background: var(--color-bg-card);
-    padding: 20px 24px;
-    padding-bottom: calc(20px + env(safe-area-inset-bottom));
-    box-shadow: 0 -4px 12px rgba(15, 61, 46, 0.06);
+    padding: 20rpx 24rpx;
+    padding-bottom: 20rpx;
+    box-shadow: 0 -4px 12rpx rgba(26, 35, 126, 0.08);
   }
 
   &__progress {
-    margin-bottom: 12px;
+    margin-bottom: 12rpx;
   }
 
   &__progress-bar {
-    height: 8px;
-    border-radius: 8px;
+    height: 8rpx;
+    border-radius: 8rpx;
     background: var(--color-border);
     overflow: hidden;
   }
@@ -151,8 +151,8 @@
   }
 
   &__progress-text {
-    margin-top: 8px;
-    font-size: 22px;
+    margin-top: 8rpx;
+    font-size: 30rpx;
     color: var(--color-text-secondary);
     text-align: center;
     display: block;
@@ -162,10 +162,10 @@
     background: var(--color-primary) !important;
     color: var(--color-on-primary) !important;
     border-radius: var(--radius-xl) !important;
-    font-size: 32px !important;
+    font-size: 36rpx !important;
     font-weight: 600 !important;
-    height: 96px !important;
-    line-height: 96px !important;
+    height: 96rpx !important;
+    line-height: 96rpx !important;
 
     &--disabled {
       background: var(--color-text-tertiary) !important;

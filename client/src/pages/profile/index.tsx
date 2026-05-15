@@ -1,23 +1,55 @@
-import { FC } from 'react'
+import { FC, useEffect } from 'react'
 import { View, Text, Button } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
+import EnvBadge from '@/components/EnvBadge'
 import { useUserStore } from '@/store/userStore'
+import { switchToCoach } from '@/utils/tabNav'
 import { FREQ_LABEL, GOAL_LABEL, LEVEL_LABEL } from '@/constants/golf'
+import { PAYMENT_ENABLED_FLAG } from '@/constants/flags'
 import type { GolfLevel, PrimaryGoal, WeeklyFreq } from '@/types/api'
 import './index.scss'
 
 const ProfilePage: FC = () => {
-  const { user, token, logout, fetchMe } = useUserStore()
+  const { user, token, initialized, logout, fetchMe, bootstrap } = useUserStore()
+
+  useEffect(() => {
+    if (!initialized) {
+      void bootstrap()
+    }
+  }, [initialized, bootstrap])
 
   // 从"编辑档案"返回时自动刷新，保证卡片展示是最新的。
   useDidShow(() => {
     if (token) fetchMe().catch(() => undefined)
   })
 
+  if (!initialized) {
+    return (
+      <View className='profile profile--empty'>
+        <Text>加载中...</Text>
+      </View>
+    )
+  }
+
+  if (!token) {
+    const goLogin = () => {
+      Taro.navigateTo({ url: '/pages/login/index' })
+    }
+    return (
+      <View className='profile profile--empty'>
+        <EnvBadge />
+        <Text className='profile__guest-hint'>请先登录以查看账号、分析与设置</Text>
+        <Button className='profile__guest-login' type='primary' onClick={goLogin}>
+          去登录
+        </Button>
+      </View>
+    )
+  }
+
   if (!user) {
     return (
       <View className='profile profile--empty'>
-        <Text>请先登录</Text>
+        <Text>加载中...</Text>
       </View>
     )
   }
@@ -54,8 +86,21 @@ const ProfilePage: FC = () => {
     ? FREQ_LABEL[user.weekly_practice_frequency as WeeklyFreq]
     : '未设置'
 
+  const delAt = user.account_deletion_scheduled_at
+
   return (
     <View className='profile'>
+      <EnvBadge />
+      {delAt && (
+        <View
+          className='profile__del-banner'
+          onClick={() => Taro.navigateTo({ url: '/pages/profile/account-deletion' })}
+        >
+          <Text className='profile__del-banner-text'>
+            账号已排期注销，点此查看或撤销
+          </Text>
+        </View>
+      )}
       <View className='profile__card'>
         <View className='profile__avatar'>
           <Text>{(user.nickname || '球友')[0]}</Text>
@@ -125,20 +170,28 @@ const ProfilePage: FC = () => {
           </View>
           <View
             className='profile__menu-item'
-            onClick={() => Taro.navigateTo({ url: '/pages/coach/index' })}
+            onClick={() => switchToCoach()}
           >
             <Text className='profile__menu-icon'>💬</Text>
             <Text className='profile__menu-label'>AI 教练对话</Text>
             <Text className='profile__menu-arrow'>›</Text>
           </View>
-          <View
-            className='profile__menu-item'
-            onClick={() => Taro.navigateTo({ url: '/pages/profile/membership' })}
-          >
-            <Text className='profile__menu-icon'>👑</Text>
-            <Text className='profile__menu-label'>会员中心</Text>
-            <Text className='profile__menu-arrow'>›</Text>
-          </View>
+          {/*
+            W8-T3：会员中心入口 PAYMENT_ENABLED 门控。
+              - false（W8 内测）：隐藏整行，避免普通用户看到"开通"链路
+              - true（W9 正式）：恢复正常入口
+            页面 `pages/profile/membership` 本身不删（管理员仍可手动 navigateTo 走 mock-pay）
+          */}
+          {PAYMENT_ENABLED_FLAG && (
+            <View
+              className='profile__menu-item'
+              onClick={() => Taro.navigateTo({ url: '/pages/profile/membership' })}
+            >
+              <Text className='profile__menu-icon'>👑</Text>
+              <Text className='profile__menu-label'>会员中心</Text>
+              <Text className='profile__menu-arrow'>›</Text>
+            </View>
+          )}
           <View
             className='profile__menu-item'
             onClick={() => Taro.navigateTo({ url: '/pages/profile/invitations' })}
@@ -150,11 +203,21 @@ const ProfilePage: FC = () => {
           <View
             className='profile__menu-item'
             onClick={() =>
-              Taro.showToast({ title: '对话历史 W8 再开放', icon: 'none' })
+              Taro.navigateTo({ url: '/pages/profile/chat-history' })
             }
           >
             <Text className='profile__menu-icon'>🗂️</Text>
             <Text className='profile__menu-label'>对话历史</Text>
+            <Text className='profile__menu-arrow'>›</Text>
+          </View>
+          <View
+            className='profile__menu-item'
+            onClick={() =>
+              Taro.navigateTo({ url: '/pages/profile/account-deletion' })
+            }
+          >
+            <Text className='profile__menu-icon'>⚠️</Text>
+            <Text className='profile__menu-label'>注销账号</Text>
             <Text className='profile__menu-arrow'>›</Text>
           </View>
         </View>

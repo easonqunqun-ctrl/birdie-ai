@@ -59,6 +59,14 @@ class UserResponse(BaseModel):
     stats: UserStats | None = None
     quota: UserQuota | None = None
     created_at: datetime
+    # MVP §3.4 注销冷静期：非空表示将于该 UTC 时间后硬删
+    account_deletion_scheduled_at: datetime | None = None
+
+
+class AccountDeletionRequest(BaseModel):
+    """须输入大写 `DELETE` 以二次确认。"""
+
+    confirm_text: str = Field(..., min_length=3, max_length=32)
 
 
 class WechatLoginRequest(BaseModel):

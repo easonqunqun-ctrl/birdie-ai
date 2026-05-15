@@ -28,7 +28,7 @@ client/
 pnpm install                  # 装依赖
 
 # 微信小程序
-pnpm dev:weapp                # 监听模式，输出到 dist/weapp
+pnpm dev:weapp                # 监听模式，输出到 dist/（见 config outputRoot）
 pnpm build:weapp              # 生产构建
 
 # React Native App

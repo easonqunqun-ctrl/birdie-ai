@@ -3,6 +3,7 @@
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -10,6 +11,16 @@ from app.core.security import new_id
 from app.models.analysis import AnalysisQuota
 from app.models.chat import ChatQuota
 from app.models.user import User
+
+# W8-T3：「无限」对外 sentinel。前端约定 < 0 即无限，避免每个调用方
+#   各自记 9999 等魔法数。会员（quota.total = -1）和 QUOTA_MODE=unlimited
+#   都通过该 sentinel 透出。
+UNLIMITED_REMAINING: int = -1
+
+
+def _is_unlimited_mode() -> bool:
+    """W8-T3：QUOTA_MODE=unlimited 时整个后端跳过配额限制（仅测试环境用）."""
+    return settings.QUOTA_MODE == "unlimited"
 
 
 def _now_month_str() -> str:
@@ -36,6 +47,11 @@ def _is_member(user: User) -> bool:
     return is_member(user)
 
 
+def _is_unlimited_user(user: User) -> bool:
+    """该用户是否享有无限配额（会员 / QUOTA_MODE=unlimited）."""
+    return _is_unlimited_mode() or _is_member(user)
+
+
 # ==================== 分析配额 ====================
 async def get_or_create_analysis_quota(
     db: AsyncSession,
@@ -55,7 +71,7 @@ async def get_or_create_analysis_quota(
     if not create:
         return None
 
-    total = -1 if _is_member(user) else settings.FREE_USER_MONTHLY_ANALYSES
+    total = -1 if _is_unlimited_user(user) else settings.FREE_USER_MONTHLY_ANALYSES
     quota = AnalysisQuota(
         id=new_id("aq"),
         user_id=user.id,
@@ -65,14 +81,22 @@ async def get_or_create_analysis_quota(
         bonus=0,
     )
     db.add(quota)
-    await db.flush()
+    # 并发首次写入会触发 (user_id, quota_month) UNIQUE 冲突；
+    # 用 SAVEPOINT 包裹 flush，冲突时只回滚 SAVEPOINT、保留外层事务，
+    # 然后把别人写好的行 SELECT 回来返回给调用方。
+    try:
+        async with db.begin_nested():
+            await db.flush()
+    except IntegrityError:
+        existing = (await db.execute(stmt)).scalar_one()
+        return existing
     return quota
 
 
 def analysis_remaining(quota: AnalysisQuota) -> int:
-    """剩余次数。-1 = 无限."""
+    """剩余次数。-1 = 无限（前端约定 < 0 即无限）."""
     if quota.total < 0:
-        return 9999
+        return UNLIMITED_REMAINING
     return max(0, quota.total + quota.bonus - quota.used)
 
 
@@ -86,7 +110,10 @@ async def check_analysis_quota(db: AsyncSession, user: User) -> AnalysisQuota:
 
     quota = await get_or_create_analysis_quota(db, user)
     assert quota is not None  # create=True 时不会返回 None
-    if analysis_remaining(quota) <= 0:
+    # W8-T3：剩余 = -1（unlimited / 会员）或 > 0 都放行；
+    #   "==0" 才算耗尽。原 `<= 0` 会把 -1 误判为耗尽。
+    remaining = analysis_remaining(quota)
+    if remaining == 0:
         raise QuotaExceededError(
             code=40006,
             message="本月分析次数已用完",
@@ -97,17 +124,34 @@ async def check_analysis_quota(db: AsyncSession, user: User) -> AnalysisQuota:
 async def consume_analysis_quota(db: AsyncSession, user: User) -> AnalysisQuota:
     """扣减一次分析配额（创建 SwingAnalysis 记录时调用）。
 
-    并发保护：依赖 SQLAlchemy 事务 + 同会话内的 flush；
-    实际并发场景下若要严格防双扣，应在更上层使用 Redis 分布式锁或数据库行锁。
-    MVP 阶段保持简单。
+    并发保护（P0-4）：
+        1. 先 ``get_or_create`` 确保当月行存在（首次写入会持有插入锁，
+           插入冲突由 `uq_analysis_quota` 保证唯一）。
+        2. 再用 ``SELECT ... FOR UPDATE`` 把该行排它锁回来，重新读取最新
+           ``used`` 值，避免两个并发请求同时读到 ``used=N``、各 +1 → ``N+1``，
+           导致一次配额被扣两次（原实现的"双花"风险）。
+        3. 锁在事务提交后释放；上层 API 处于同一个事务里，commit 之后才
+           对其它请求可见。
+
+    依赖：调用方运行在 ``AsyncSession`` 的事务中（FastAPI 默认 ``get_db``
+    会在 yield 内开启一个事务）。SQLite 无视 ``FOR UPDATE``，因此这条
+    保护只在 PostgreSQL 上真正生效；测试若用 SQLite 不影响功能。
     """
     from app.core.exceptions import QuotaExceededError
 
     quota = await get_or_create_analysis_quota(db, user)
     assert quota is not None
-    if analysis_remaining(quota) <= 0:
+    # 关键：行锁定 + 重新读取，避免并发双扣
+    locked_stmt = (
+        select(AnalysisQuota)
+        .where(AnalysisQuota.id == quota.id)
+        .with_for_update()
+    )
+    quota = (await db.execute(locked_stmt)).scalar_one()
+
+    if analysis_remaining(quota) == 0:
         raise QuotaExceededError(code=40006, message="本月分析次数已用完")
-    # total=-1 表示无限，不计数（避免 used 无意义累加）
+    # total=-1 表示无限（会员 / QUOTA_MODE=unlimited），不计数（避免 used 无意义累加）
     if quota.total >= 0:
         quota.used += 1
         await db.flush()
@@ -163,7 +207,7 @@ async def get_or_create_chat_quota(
     if not create:
         return None
 
-    total = -1 if _is_member(user) else settings.FREE_USER_DAILY_CHATS
+    total = -1 if _is_unlimited_user(user) else settings.FREE_USER_DAILY_CHATS
     quota = ChatQuota(
         id=new_id("cq"),
         user_id=user.id,
@@ -172,13 +216,19 @@ async def get_or_create_chat_quota(
         total=total,
     )
     db.add(quota)
-    await db.flush()
+    # SAVEPOINT 同上：并发首次写入冲突时只回滚 nested，把已存在行返回
+    try:
+        async with db.begin_nested():
+            await db.flush()
+    except IntegrityError:
+        existing = (await db.execute(stmt)).scalar_one()
+        return existing
     return quota
 
 
 def chat_remaining(quota: ChatQuota) -> int:
     if quota.total < 0:
-        return 9999
+        return UNLIMITED_REMAINING
     return max(0, quota.total - quota.used)
 
 
@@ -188,7 +238,7 @@ async def check_chat_quota(db: AsyncSession, user: User) -> ChatQuota:
 
     quota = await get_or_create_chat_quota(db, user)
     assert quota is not None
-    if chat_remaining(quota) <= 0:
+    if chat_remaining(quota) == 0:
         raise ChatQuotaExhaustedError()
     return quota
 
@@ -199,12 +249,22 @@ async def consume_chat_quota(db: AsyncSession, user: User) -> ChatQuota:
     约定：一"轮" = 1 条 user message（无论 AI 回复是否成功）。
     但如果 AI 回复因服务端错误（超时 / LLM 5xx）失败，调用方应负责调
     `refund_chat_quota` 退回。用户主动中断不退（已经消耗了 LLM 预算）。
+
+    并发保护（P0-4）：与 ``consume_analysis_quota`` 同思路，
+    用 ``SELECT ... FOR UPDATE`` 锁住当日行后再 +1，避免并发双扣。
     """
     from app.core.exceptions import ChatQuotaExhaustedError
 
     quota = await get_or_create_chat_quota(db, user)
     assert quota is not None
-    if chat_remaining(quota) <= 0:
+    locked_stmt = (
+        select(ChatQuota)
+        .where(ChatQuota.id == quota.id)
+        .with_for_update()
+    )
+    quota = (await db.execute(locked_stmt)).scalar_one()
+
+    if chat_remaining(quota) == 0:
         raise ChatQuotaExhaustedError()
     if quota.total >= 0:
         quota.used += 1

@@ -1,22 +1,12 @@
-"""AI 对话业务逻辑（M3-T1：非流式 JSON 版本 + 会话管理）.
+"""AI 对话业务逻辑：会话管理 + LLM 回复（同步 JSON / SSE 流）.
 
-T1 范围
--------
-- 会话管理：创建/复用活跃会话（24h 内）、列表、历史、删除
-- 消息发送：非流式（`send_message_sync`）；用一个固定的"mock 回复"占位，
-  T2 会把 `_generate_reply` 替换为真正的 LLM 调用。
-- 配额：发送前预检 + 扣减；不做速率限制（T2 加）
-
-设计要点
+范围要点
 --------
-1. **"活跃会话" = 24h 内且未删除**；超过 24h 再进 chat 页后端给一个新 session。
-   这个阈值以 `last_message_at` 为锚点；新建但没发消息过的会话 `last_message_at`
-   取自 `created_at`。
-2. 创建时传了 `context_analysis_id` 则**总是新建会话**：让报告页"问 AI 教练"
-   每次都对应一条独立的会话，避免串台。
-3. `_generate_reply` 抽成顶层函数，T2 替换为真 LLM + SSE。
-   T1 测试里可 monkeypatch 它，跳过"假 LLM 回复"的随机性。
-4. 删除会话走**硬删**（CASCADE 会带走 messages）；软删留到 W8 归档策略一起做。
+- 会话：创建/复用活跃会话（24h 内）、列表、历史、删除；报告页带 `context_analysis_id`
+  时总是新建会话。
+- 回复：`get_llm_client()` + OpenAI 兼容流式接口；`LLM_MOCK_MODE` / 占位密钥可走 Fake；
+  文本可走微信内容安全（配置开启时）。
+- 配额：发送前预检与扣减。
 """
 
 from __future__ import annotations
@@ -28,9 +18,10 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import ForbiddenError, NotFoundError
+from app.core.exceptions import BadRequestError, ForbiddenError, NotFoundError
 from app.core.security import new_id
 from app.integrations.llm import AbstractLLMClient, get_llm_client
+from app.integrations.wechat_security import check_text as wechat_check_text
 from app.models.analysis import SwingAnalysis
 from app.models.chat import ChatMessage, ChatSession
 from app.models.user import User
@@ -53,7 +44,7 @@ from app.services.chat_prompt import (
 # ==================== 常量 ====================
 ACTIVE_SESSION_HOURS = 24
 WELCOME_MESSAGE = (
-    "你好！我是你的 AI 高尔夫教练小鸟。"
+    "你好！我是领翼golf 的 AI 高尔夫教练。"
     "随时可以问我挥杆技术、练习方法或高尔夫知识方面的问题。"
 )
 # 最长的消息预览字段（docs/03 §3.5 last_message_preview VARCHAR(200)，这里保守切 100）
@@ -107,6 +98,8 @@ async def _validate_context_analysis(
         raise NotFoundError(code=40401, message="分析记录不存在")
     if analysis.user_id != user.id:
         raise ForbiddenError(code=40301, message="无权访问该分析")
+    if analysis.deleted_at is not None:
+        raise NotFoundError(code=40401, message="分析记录不存在")
     return analysis
 
 
@@ -328,6 +321,17 @@ async def prepare_turn(
     返回 `(session, user_msg, quota, llm_messages)`。
     """
     session = await _ensure_session_owned(db, user, session_id)
+
+    # P1-C1：内容审核必须发生在配额扣减**之前**——违规消息不应该消耗配额，
+    # 否则用户每次写错话都"白扣一次额度"。
+    wx_oid = user.wechat_openid or user.wechat_app_openid or ""
+    sec_result = await wechat_check_text(content, openid=wx_oid)
+    if not sec_result.passed:
+        raise BadRequestError(
+            code=40017,
+            message=sec_result.reason or "内容涉嫌违规，请调整后重试",
+        )
+
     quota = await quota_service.consume_chat_quota(db, user)
 
     user_msg = ChatMessage(
@@ -474,9 +478,8 @@ async def send_message_sync(
         db=db, session=session, reply_text=partial, usage=usage
     )
 
+    # W8-T3：chat_remaining 现已统一在 quota.total<0 时返回 -1，无需再做 fixup
     remaining = quota_service.chat_remaining(quota)
-    if quota.total < 0:
-        remaining = -1
 
     return SendMessageResponse(
         user_message=_to_item(user_msg),
@@ -583,9 +586,8 @@ async def stream_message(
     session.message_count = (session.message_count or 0) + 2
     await db.flush()
 
+    # W8-T3：chat_remaining 现已统一在 quota.total<0 时返回 -1，无需再做 fixup
     remaining = quota_service.chat_remaining(quota)
-    if quota.total < 0:
-        remaining = -1
 
     yield {
         "type": "message_end",

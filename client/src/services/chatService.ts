@@ -78,6 +78,7 @@ export const chatService = {
   getQuickQuestions() {
     return http.get<QuickQuestionsResponse>('/chat/quick-questions', {
       noAuth: true,
+      timeout: 60000,
     })
   },
 
@@ -114,6 +115,7 @@ export const chatService = {
     const suffix = qs.toString()
     return http.get<ChatMessagesResponse>(
       `/chat/sessions/${sessionId}/messages${suffix ? `?${suffix}` : ''}`,
+      { timeout: 60000 },
     )
   },
 

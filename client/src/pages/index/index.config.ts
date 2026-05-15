@@ -1,4 +1,4 @@
 export default definePageConfig({
-  navigationBarTitleText: '小鸟 AI',
+  navigationBarTitleText: '领翼golf',
   enablePullDownRefresh: true
 })

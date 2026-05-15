@@ -1,6 +1,7 @@
 """挥杆分析相关 Pydantic schema（对齐 docs/02-API接口设计文档.md §三 /analyses）."""
 
 from datetime import datetime
+import math
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -189,9 +190,23 @@ class AnalysisListQuery(BaseModel):
 
 # ==================== 内部常量 ====================
 
-# 分阶段预计剩余秒数（基线 25s，T2 接入 Celery 后以实际阶段为准）
+# 与 `tasks/analysis_tasks.py` 中装饰性阶段推进共用同一张时间表（从这里 import）。
+# 单位：秒。总和应与 AI 管线「装饰进度」口径一致（真实引擎可能比表更慢 ⇒ 下文 ETA 单独加 slack）。
+SWING_STAGE_TIMELINE: list[tuple[str, int]] = [
+    ("preprocessing", 4),
+    ("pose_estimating", 8),
+    ("phase_segmenting", 3),
+    ("scoring", 3),
+    ("diagnosing", 3),
+    ("generating", 2),
+]
+
+# STAGE_ETA_SECONDS 与 SWING_STAGE_TIMELINE 分工（请勿把逐项数字逐项对齐 timeline）：
+# - SWING_STAGE_TIMELINE：status=processing 时装饰进度、`estimate_swing_remaining_seconds` 的主时间轴。
+# - STAGE_ETA_SECONDS：仅用于 pending（未被 worker pickup 的体感）及 unknown stage / 兜底查表，
+#   以及 completed/failed 等固定 0 字段；不要求与各 processing 阶段的秒数一致。
 STAGE_ETA_SECONDS: dict[str, int] = {
-    "pending": 25,
+    "pending": 18,
     "preprocessing": 20,
     "pose_estimating": 15,
     "phase_segmenting": 12,
@@ -201,6 +216,43 @@ STAGE_ETA_SECONDS: dict[str, int] = {
     "completed": 0,
     "failed": 0,
 }
+
+
+def estimate_swing_remaining_seconds(
+    *,
+    status: str,
+    stage: str | None,
+    stage_progress: int,
+) -> int:
+    """`/status.estimated_remaining_seconds`：基于当前 phase + stage_progress 估算剩余等待秒数."""
+
+    if status == "completed" or status == "failed":
+        return 0
+    if status == "pending":
+        return STAGE_ETA_SECONDS["pending"]
+
+    prog = max(0, min(99, stage_progress))
+    # stage_progress→99：本 phase 快走完了；`(99-prog)` 避免出现 0 → 与用户体感「卡住」相悖
+    in_phase_frac = max(1, 99 - prog) / 99
+
+    idx = next(
+        (i for i, (name, _) in enumerate(SWING_STAGE_TIMELINE) if name == stage),
+        None,
+    )
+    if idx is None:
+        # 后端新增 stage 或未匹配：降级为静态表（至少不为 0）
+        return max(12, STAGE_ETA_SECONDS.get(stage or "", 25))
+
+    remaining = SWING_STAGE_TIMELINE[idx][1] * in_phase_frac
+    for j in range(idx + 1, len(SWING_STAGE_TIMELINE)):
+        remaining += SWING_STAGE_TIMELINE[j][1]
+
+    # 装饰时间表总和低于 AI_ENGINE_TIMEOUT；略收紧 slack，减少「还剩很久」的误判
+    slack = 12
+    return max(
+        8,
+        min(78, math.ceil(remaining + slack)),
+    )
 
 
 def score_level(overall: int | None) -> str | None:
@@ -218,10 +270,26 @@ def score_level(overall: int | None) -> str | None:
     return "needs_improvement"
 
 
+class AnalysisProgressPoint(BaseModel):
+    """MVP §6 进步曲线：按时间序的得分点（仅正式分析，不含 sample）."""
+
+    analysis_id: str
+    analyzed_at: datetime
+    overall_score: int
+
+
+class AnalysisProgressResponse(BaseModel):
+    points: list[AnalysisProgressPoint]
+
+
 __all__ = [
     "STAGE_ETA_SECONDS",
+    "SWING_STAGE_TIMELINE",
+    "estimate_swing_remaining_seconds",
     "AnalysisListItem",
     "AnalysisListQuery",
+    "AnalysisProgressPoint",
+    "AnalysisProgressResponse",
     "AnalysisReportResponse",
     "AnalysisStage",
     "AnalysisStatus",

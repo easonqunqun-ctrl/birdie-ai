@@ -11,11 +11,22 @@ Thumbs.db
 # ==================== 环境变量 ====================
 .env
 .env.local
+# 本机拷贝/编辑器备份（易夹带密钥，勿提交）
+.env*.bak
+.env.local.bak*
+*.env.bak
 .env.*.local
 .env.dev
 .env.staging
 .env.prod
 !.env.example
+
+# 微信支付 apiclient_key.pem 挂载（仅本机，勿提交仓库）
+docker-compose.wechat-pay-key.yml
+backend/.secrets/
+
+# 本机记录 CVM SSH 目标（勿提交）
+infra/deploy/cvm-host.local
 
 # ==================== Python ====================
 __pycache__/
@@ -68,6 +79,9 @@ miniprogram/.temp/
 client/dist/
 client/.temp/
 client/.swc/
+# RN native shell：bootstrap 克隆，内含独立 .git，禁止嵌套提交
+client/rn-shell/
+
 project.private.config.json
 
 # ==================== React Native ====================
@@ -122,3 +136,13 @@ coverage/
 
 # ==================== 文档归档 ====================
 docs.zip
+
+# ==================== W8-T6 真机内测素材 ====================
+# 原始视频 / 大图不入库，只保留 .gitkeep；截图/GIF/JSON/SQL 允许提交
+docs/release-notes/W8-evidence/source-media/*
+!docs/release-notes/W8-evidence/source-media/.gitkeep
+
+# ==================== W8 nginx TLS（勿入库）====================
+infra/test/certs/*.pem
+infra/test/certs/server.crt
+infra/test/certs/server.key

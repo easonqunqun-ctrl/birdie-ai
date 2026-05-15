@@ -9,61 +9,82 @@
  *
  * 使用约束：
  *   - 小程序新 Canvas 2d 需要在 `useReady` 之后通过 `createSelectorQuery` 取 node
- *   - 父组件必须给容器一个固定高度（默认 480rpx），否则 `fields({ size: true })`
- *     拿到的 height 可能为 0
+ *   - 父组件 .report__section 已经给了 padding，雷达图容器自身用 padding-top: 100%
+ *     trick 强制正方形，CSS 层面对调用方零要求
  */
 
-import { FC, useEffect, useRef, useState } from 'react'
+import { FC, useEffect, useState } from 'react'
 import { Canvas, View, Text } from '@tarojs/components'
 import Taro, { useReady } from '@tarojs/taro'
 
-/** 雷达图一个轴的数据点 */
-export interface RadarAxis {
-  key: string
-  /** 轴标签（显示在顶点外侧） */
-  label: string
-  /** 分数（0-100） */
-  score: number
-  /** 是否为弱项（高亮色） */
-  is_weakest?: boolean
-}
+import type { RadarAxis, RadarChartProps } from './radar-chart-types'
 
-export interface RadarChartProps {
-  axes: RadarAxis[]
-  /** 点击顶点（或顶点标签）回调 */
-  onTapAxis?: (key: string) => void
-  /** Canvas 内部坐标像素；不同于 rpx。默认 300 × 300，适配 750rpx 屏约 600rpx */
-  size?: number
-}
+export type { RadarAxis, RadarChartProps }
 
 const CANVAS_ID = 'radar-chart-canvas'
 const LEVELS = 4 // 网格层数（25 / 50 / 75 / 100）
 const PADDING = 40 // Canvas 四周留白（像素）
 
-const RadarChart: FC<RadarChartProps> = ({ axes, onTapAxis, size = 300 }) => {
+const RadarChart: FC<RadarChartProps> = ({ axes, onTapAxis }) => {
+  /**
+   * `ready` 双触发：
+   *   - useReady：page 首次 onReady 时 set true（首次进入报告页有效）
+   *   - useEffect setTimeout 80ms：fallback，覆盖"组件被异步渲染（report 数据
+   *     fetch 完成后才挂载 RadarChart）→ 此时 page 早已 onReady 过，useReady
+   *     回调不会再触发"的场景。两条路径只要任何一条触发，drawRadar 就开跑。
+   */
   const [ready, setReady] = useState(false)
-  const canvasSizeRef = useRef<{ w: number; h: number }>({ w: size, h: size })
-
-  // Canvas 节点只取一次，绘制依赖 axes 变化时重绘
   useReady(() => setReady(true))
+  useEffect(() => {
+    if (ready) return
+    const t = setTimeout(() => setReady(true), 80)
+    return () => clearTimeout(t)
+  }, [ready])
 
   useEffect(() => {
-    if (!ready) return
-    drawRadar(axes, canvasSizeRef.current.w, canvasSizeRef.current.h)
-    // 仅在 axes 数据变化时重绘
+    if (!ready || axes.length === 0) return
+    /**
+     * Canvas 2d 节点 mount 后 selectorQuery 不一定立刻拿得到 node，
+     * 在低端机或 webview 升级后偶发为 null。带最多 3 次重试 + 指数退避
+     * （0ms / 120ms / 360ms），命中率经验值 > 99%。
+     */
+    let cancelled = false
+    let attempt = 0
+    const tryDraw = () => {
+      if (cancelled) return
+      drawRadar(axes, (ok) => {
+        if (cancelled) return
+        if (ok) return
+        attempt += 1
+        if (attempt >= 3) {
+          console.warn('[RadarChart] canvas node 取不到，已重试 3 次仍失败')
+          return
+        }
+        setTimeout(tryDraw, 120 * attempt)
+      })
+    }
+    tryDraw()
+    return () => {
+      cancelled = true
+    }
   }, [axes, ready])
 
   /** 顶点标签的屏幕坐标（百分比，相对容器） */
   const labelPositions = computeLabelPositions(axes.length)
 
   return (
-    <View className='radar' style={{ '--radar-size': `${size * 2}rpx` } as React.CSSProperties}>
+    <View className='radar'>
+      {/**
+       * Canvas 不再 inline 写死宽高，而是 className 走 padding-top 撑出来的
+       * absolute fill。inline 写死 600rpx 会 override CSS 100%，在某些低端机
+       * 上反而触发 0 高度（容器实际能给的高度算到不一样）。绘图分辨率以
+       * selectorQuery 取到的实际 css 尺寸 × dpr 为准。
+       */}
       <Canvas
         type='2d'
         id={CANVAS_ID}
         canvasId={CANVAS_ID}
         className='radar__canvas'
-        style={{ width: `${size * 2}rpx`, height: `${size * 2}rpx` }}
       />
       {axes.map((ax, i) => {
         const pos = labelPositions[i]
@@ -93,21 +114,40 @@ export default RadarChart
 // =====================================================================
 // Canvas 绘制核心
 // =====================================================================
-function drawRadar(axes: RadarAxis[], targetW: number, targetH: number) {
+/**
+ * @param onDone 绘制成功 → ok=true；node 取不到（需要外层重试）→ ok=false
+ */
+function drawRadar(axes: RadarAxis[], onDone?: (ok: boolean) => void) {
   Taro.createSelectorQuery()
     .select(`#${CANVAS_ID}`)
     .fields({ node: true, size: true })
     .exec((res) => {
-      if (!res || !res[0] || !res[0].node) return
-      const canvas = res[0].node as unknown as {
+      const node = res?.[0]?.node
+      if (!node) {
+        // selectorQuery 在某些低端机上首次会返回 null，让外层走重试
+        onDone?.(false)
+        return
+      }
+      const canvas = node as unknown as {
         getContext: (ctxType: string) => CanvasRenderingContext2D
         width: number
         height: number
       }
-      // 按 DPR 放大绘图分辨率，避免小程序上模糊
-      const dpr = Taro.getSystemInfoSync().pixelRatio || 2
-      const cssW = res[0].width || targetW
-      const cssH = res[0].height || targetH
+      // 按 DPR 放大绘图分辨率，避免小程序上模糊。
+      // getSystemInfoSync 在新基础库 deprecated，优先用 getWindowInfo；
+      // 都拿不到时兜底 dpr = 2（iOS Retina 通用值，避免 NaN/0）
+      const dpr =
+        (Taro.getWindowInfo?.() as { pixelRatio?: number } | undefined)?.pixelRatio ||
+        Taro.getSystemInfoSync?.().pixelRatio ||
+        2
+      const cssW = res[0].width || 0
+      const cssH = res[0].height || 0
+      if (cssW <= 0 || cssH <= 0) {
+        // 容器塌了 → 上层 .radar 高度为 0，画了也看不见，避免静默 NaN
+        console.warn('[RadarChart] canvas 容器尺寸为 0，跳过绘制', { cssW, cssH })
+        onDone?.(false)
+        return
+      }
       canvas.width = cssW * dpr
       canvas.height = cssH * dpr
       const ctx = canvas.getContext('2d')
@@ -119,7 +159,7 @@ function drawRadar(axes: RadarAxis[], targetW: number, targetH: number) {
       const n = axes.length
 
       // 1) 底层网格（4 层正多边形 + 中心放射线）
-      ctx.strokeStyle = 'rgba(26, 74, 59, 0.18)'
+      ctx.strokeStyle = 'rgba(26, 35, 126, 0.18)'
       ctx.lineWidth = 1
       for (let lv = 1; lv <= LEVELS; lv++) {
         const r = (radius * lv) / LEVELS
@@ -133,7 +173,7 @@ function drawRadar(axes: RadarAxis[], targetW: number, targetH: number) {
         ctx.stroke()
       }
       // 放射线
-      ctx.strokeStyle = 'rgba(26, 74, 59, 0.15)'
+      ctx.strokeStyle = 'rgba(26, 35, 126, 0.15)'
       for (let i = 0; i < n; i++) {
         const { x, y } = polarPoint(cx, cy, radius, i, n)
         ctx.beginPath()
@@ -151,8 +191,8 @@ function drawRadar(axes: RadarAxis[], targetW: number, targetH: number) {
         else ctx.lineTo(x, y)
       })
       ctx.closePath()
-      ctx.fillStyle = 'rgba(26, 74, 59, 0.35)' // primary 带透明
-      ctx.strokeStyle = '#1a4a3b'
+      ctx.fillStyle = 'rgba(26, 35, 126, 0.32)' // 主色带透明
+      ctx.strokeStyle = '#1a237e'
       ctx.lineWidth = 2
       ctx.fill()
       ctx.stroke()
@@ -163,7 +203,7 @@ function drawRadar(axes: RadarAxis[], targetW: number, targetH: number) {
         const { x, y } = polarPoint(cx, cy, r, i, n)
         ctx.beginPath()
         ctx.arc(x, y, ax.is_weakest ? 6 : 4, 0, Math.PI * 2)
-        ctx.fillStyle = ax.is_weakest ? '#c9a227' : '#1a4a3b'
+        ctx.fillStyle = ax.is_weakest ? '#c9a227' : '#1a237e'
         ctx.fill()
         if (ax.is_weakest) {
           ctx.strokeStyle = '#ffffff'
@@ -171,6 +211,7 @@ function drawRadar(axes: RadarAxis[], targetW: number, targetH: number) {
           ctx.stroke()
         }
       })
+      onDone?.(true)
     })
 }
 
@@ -183,11 +224,17 @@ function polarPoint(cx: number, cy: number, r: number, idx: number, n: number) {
   }
 }
 
-/** DOM 层顶点标签的百分比坐标（相对容器） */
+/**
+ * DOM 层顶点标签的百分比坐标（相对容器）。
+ *
+ * r 值历史教训：原值 54 会让 i=3（底部 downswing）的 label 落到 y=104%，
+ * 直接被 .radar 容器（aspect-ratio square）下边缘裁掉，6 个轴只能看到 5 个。
+ * 现在锁到 48：再大的 label 也保证 ≤ 100% 留在容器内；canvas 的 PADDING=40
+ * 已经把绘制区压缩到 80% 半径，留下的 20% 给 label 浮在多边形外侧足够。
+ */
 function computeLabelPositions(n: number) {
   const out: { x: number; y: number }[] = []
-  // 让标签比雷达边再往外 8%（保证不盖住雷达边线）
-  const r = 54
+  const r = 48
   for (let i = 0; i < n; i++) {
     const angle = -Math.PI / 2 + (Math.PI * 2 * i) / n
     out.push({

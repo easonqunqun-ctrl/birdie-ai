@@ -46,6 +46,13 @@ export interface CreateOrderResponse {
   mock_mode: boolean
 }
 
+/** POST /payments/orders/{id}/sync-from-wechat */
+export interface SyncOrderFromWechatResponse {
+  order: Order
+  synced: boolean
+  detail: string
+}
+
 export interface MembershipInfo {
   is_member: boolean
   membership_type: 'free' | 'monthly' | 'yearly' | 'family'

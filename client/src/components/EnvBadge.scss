@@ -1,0 +1,20 @@
+.env-badge {
+  position: fixed;
+  top: 4px;
+  right: 4px;
+  z-index: 9999;
+  padding: 4px 12px;
+  background: var(--color-gold);
+  color: var(--color-primary-dark);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  pointer-events: none;
+  opacity: 0.88;
+
+  &__text {
+    font-size: 30rpx;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+}

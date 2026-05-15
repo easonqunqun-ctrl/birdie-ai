@@ -160,7 +160,7 @@
 - **"小鸟"**（Birdie）：高尔夫术语，低于标准杆 1 杆，象征进步与成就
 - **记忆度高**：两个字，好念好传播
 - **情感联想**：轻盈、自由、向上
-- **域名/商标**：建议注册 xiaoniaoai.com / 小鸟AI 商标
+- **域名/商标**：生产 API 以备案域名为准（示例 **`api.birdieai.cn`**）；另建议完善「小鸟 AI / 灵鸟」相关商标注册
 
 ---
 
@@ -676,6 +676,14 @@
 | **消息队列** | Kafka / RabbitMQ | 异步处理视频分析任务 |
 | **异步任务** | Celery | Python 生态标准异步方案 |
 | **云服务** | 腾讯云 | 微信小程序最佳兼容 + GPU 实例 |
+
+### 8.2.1 React Native App（W10，与小程序同源代码）
+
+- **框架**：Taro 3 编译至 React Native；业务 UI 与逻辑与小程序共享 `client/src`，端差异集中在 `adapters/*`、授权与系统能力。
+- **登录**：微信开放平台 **移动应用 OAuth2**（非 `jscode2session`）；需将移动应用与小程序绑定于 **同一微信开放平台** 以获取 **unionid**，从而在服务端合并为同一 `users` 记录（字段 `wechat_openid` / `wechat_app_openid`）。
+- **分享首版降级**：不强制复刻「朋友圈/好友卡片」形态，可用系统分享或后续接微信 SDK；详见 [docs/18-W10-RN-App端规划.md](./docs/18-W10-RN-App端规划.md)。
+- **支付**：App 侧首期与 W8/W9 对齐，默认 **隐藏付费入口**；正式 IAP/应用内支付单独评审（与小程序 JSAPI 支付参数不通用）。
+- **上架自检**：参考 [docs/release-notes/W10-rn-smoke-checklist.md](./docs/release-notes/W10-rn-smoke-checklist.md)。
 
 ### 8.3 视频分析流水线详细设计
 

@@ -1,4 +1,4 @@
-# 小鸟 AI · 高尔夫智能教练
+# 领翼golf · 高尔夫智能教练
 
 > 中国首款 AI 高尔夫智能教练 —— 双端同步：微信小程序 + iOS/Android App
 
@@ -87,10 +87,10 @@ make check
 
 ```bash
 make client-install              # 首次运行
-make client-dev-weapp            # 编译到 client/dist/weapp
+make client-dev-weapp            # 编译到 client/dist（Taro outputRoot）
 ```
 
-打开**微信开发者工具** → 导入项目 → 选择 `client/dist/weapp` 目录。
+打开**微信开发者工具** → 导入项目 → 选择 **`client` 目录**（根目录含 `project.config.json`，其中 `miniprogramRoot` 为 `dist/`）。**不要**只选 `client/dist`，否则容易找不到工程配置。
 
 ### 5. 启动客户端（React Native App）
 
@@ -101,6 +101,15 @@ make client-dev-rn-ios
 # Android（需要 Android Studio + 模拟器）
 make client-dev-rn-android
 ```
+
+### 6. CVM / 云上测试栈（微信小程序内测 HTTPS）
+
+单机测试环境：**`docker-compose.yml` + `docker-compose.test.yml` + nginx 终结 TLS**，全流程见 **`docs/release-notes/W8-test-env-runbook.md`**。仓库根常用命令：
+
+- **`make deploy-test`**：证书就绪且存在 `.env.local` 时起栈（见 Makefile 前置检查）
+- **`make deploy-check-env`**：自检 `.env.local` 是否仍含尖括号占位等
+- **`bash infra/deploy/cvm-rebuild-backend.sh`**：CVM 上重建 backend/celery，并处理绑定挂载导致的 **`.venv` / `uv sync`** 问题
+- **Let's Encrypt / 真机可信证书**：**`infra/deploy/README.md`**（`make issue-le-cert` 等）
 
 ---
 
@@ -181,10 +190,11 @@ make ci                 # test 基础上 + 真实引擎 smoke（bouncing_box →
 - [x] W5：AI 对话（LLM 流式接入）—— M3-T1 后端骨架/配额 ✅ · M3-T2 LLM 客户端 + system prompt + SSE 流式 ✅ · M3-T3 前端对话页 + 非流式打通 ✅ · M3-T4 前端 SSE 流式 + 打字动画 + drill_card ✅ · M3-T5 报告页/首页入口闭环 ✅ · M3-T6 文档同步 + walkthrough ✅
 - [x] **W6**：AI 真实引擎替换 —— W6-T1 预处理 + MediaPipe ✅ · T2 阶段分割 + 15 特征 + 评分 + 诊断 ✅ · T3 骨骼可视化 + MinIO ✅ · T4 真实引擎接入 + stage 推进 + 错误码透传 ✅ · T5 Docker + CI 质量门 ✅ · T6 文档同步 + walkthrough ✅（详见 [W6 任务拆分](./docs/14-W6任务拆分.md) 与 [W6 真实引擎 walkthrough](./docs/release-notes/W6-real-engine-walkthrough.md)）
 - [x] **W7**：商业化与社交 —— T1 支付订单 + 会员权益（mock-pay）✅ · T2 客户端会员中心 + 替换 7 处占位 ✅ · T3 训练计划 + 打卡 + streak ✅ · T4 邀请裂变（绑定/结算/奖励）✅ · T5 分享报告 + 脱敏公开报告 + share_actions ✅ · T6 文档同步 + walkthrough ✅（详见 [W7 任务拆分](./docs/15-W7任务拆分.md) 与 [W7 商业化 walkthrough](./docs/release-notes/W7-commerce-walkthrough.md)）
-- [ ] W8：双端发布准备
+- [x] **W8**：双端发布准备 —— T1 合规拦截 + 微信隐私运行时 ✅ · T2 端侧发布打磨（TabBar/朋友圈/低版本兜底）✅ · T3 支付入口下架 + 测试期配额放宽（`QUOTA_MODE=unlimited`）✅ · T4 真实微信登录 + 测试环境部署（cloudflared 双隧道 + 自动同步）✅ · T5 视频首帧合规（`/security/media-check`）+ 6 类埋点（`/v1/events` + `events` 表）+ 错误兜底 ✅ · T6 团队真机内测 walkthrough（iPhone 首轮 7/10 步 + 高风险三段全 PASS，P0=0/P1=1 已修/P2=5 全修）✅ · T7 文档同步 + W9 草稿 ✅（详见 [W8 任务拆分](./docs/16-W8任务拆分.md)、[W8 真机走查](./docs/release-notes/W8-internal-walkthrough.md) 与 [W9 任务拆分草稿](./docs/17-W9任务拆分.md)）
+- [ ] W9：正式上线（待备案通过启动）—— 真实微信支付 + COS / CDN + TKE + 安全加固 + 审核 + 灰度
 
 ---
 
 ## 许可
 
-内部机密 · © 2026 小鸟 AI
+内部机密 · © 2026 领翼golf

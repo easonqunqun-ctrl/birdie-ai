@@ -261,7 +261,7 @@ PHASE_LABELS = {
 async def run_mock_analysis(req: AnalyzeRequest) -> AnalyzeResult:
     """模拟分析过程（短暂等待 + 返回随机但合理的结果）."""
     # 模拟分析耗时 2-5 秒
-    await asyncio.sleep(random.uniform(2, 5))
+    await asyncio.sleep(random.uniform(1.2, 2.8))
 
     # 各阶段评分（中等水平用户）
     base_scores = {

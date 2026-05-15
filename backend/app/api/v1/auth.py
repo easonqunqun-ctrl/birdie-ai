@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_token_payload
 from app.core.database import get_db
 from app.core.security import create_access_token
-from app.integrations.wechat import code2session
+from app.integrations.wechat import code2session, oauth2_access_token_app
 from app.schemas.base import APIResponse, ok
 from app.schemas.user import (
     TokenRefreshResponse,
@@ -51,7 +51,44 @@ async def wechat_login(
 
     token, expires_in = create_access_token(
         user_id=user.id,
-        openid=user.wechat_openid,
+        openid=user.wechat_subject_for_jwt(),
+        membership=user.membership_type,
+    )
+
+    return ok(
+        WechatLoginResponse(
+            token=token,
+            expires_in=expires_in,
+            is_new_user=is_new_user,
+            user=_user_response(user),
+        )
+    )
+
+
+@router.post(
+    "/wechat-open-login",
+    summary="微信开放平台移动应用登录（RN App OAuth2）",
+    response_model=APIResponse[WechatLoginResponse],
+)
+async def wechat_open_login(
+    payload: WechatLoginRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """用 App 拉起微信授权返回的 `code`（非小程序 `wx.login` code）换取 JWT。
+
+    **须在微信开放平台绑定移动应用**；与小程序共用同一开放平台主体时，`unionid` 可用于合并帐号。
+    """
+    oauth = await oauth2_access_token_app(payload.code)
+    user, is_new_user = await user_service.login_or_create_user_app_oauth(
+        db,
+        oauth,
+        invite_code=payload.invite_code,
+    )
+    await db.commit()
+
+    token, expires_in = create_access_token(
+        user_id=user.id,
+        openid=user.wechat_subject_for_jwt(),
         membership=user.membership_type,
     )
 
@@ -79,7 +116,7 @@ async def refresh_token(
     user = await user_service.get_user_by_id(db, user_id)
     token, expires_in = create_access_token(
         user_id=user.id,
-        openid=user.wechat_openid,
+        openid=user.wechat_subject_for_jwt(),
         membership=user.membership_type,
     )
     return ok(TokenRefreshResponse(token=token, expires_in=expires_in))

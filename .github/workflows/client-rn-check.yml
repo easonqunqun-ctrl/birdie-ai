@@ -1,0 +1,36 @@
+# Client：React Native bundle + TypeScript 门禁（Linux，不跑模拟器）
+name: client-rn-check
+
+on:
+  push:
+    branches: [main, master, develop]
+    paths:
+      - 'client/**'
+      - '.github/workflows/client-rn-check.yml'
+  pull_request:
+    paths:
+      - 'client/**'
+
+jobs:
+  rn:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: client/pnpm-lock.yaml
+
+      - name: pnpm install (client)
+        run: pnpm install --frozen-lockfile
+        working-directory: client
+
+      - name: make client-check-rn
+        run: make client-check-rn

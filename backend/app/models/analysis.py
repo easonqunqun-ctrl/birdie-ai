@@ -85,6 +85,9 @@ class SwingAnalysis(Base, TimestampMixin):
 
     analyzed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # 用户侧软删除：仅隐藏，不物理删；保留用于审计/溯源
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     # 关系
     user = relationship("User", back_populates="analyses", lazy="noload")
     issues: Mapped[list["AnalysisIssue"]] = relationship(

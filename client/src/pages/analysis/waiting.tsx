@@ -2,7 +2,8 @@
  * 分析等待页（MVP §4.2）
  *
  * 完整职责：
- *   1. 每 3 秒轮询 /analyses/{id}/status（useDidShow 恢复 / useDidHide 暂停）
+ *   1. 轮询 /analyses/{id}/status：`pending` 稍慢、`processing` 更频（useDidShow 恢复 /
+ *      useDidHide 暂停），完成后约 250ms 跳转报告
  *   2. 基于后端 `stage` 字段映射到 5 阶段流转
  *      （W6-T4：去掉了"processing 持续时间本地模拟"，因为 backend 自己有
  *      stage 推进 task，会按真实预算推进 stage 字段；前端只读不算）
@@ -16,7 +17,8 @@
  * 设计选型记录：
  *   - 阶段定义固化在本页 `STAGES`，后端 stage 字段的枚举值用来做"后端已经到该阶段"的
  *     语义映射（stage → 阶段索引）；前端不再做时间推进上限，避免与后端 stage 抢话语权
- *   - 轮询用裸 setTimeout 递归，不用 setInterval —— 更容易按 useDidShow/Hide 精准控制
+ *   - 轮询用裸 setTimeout 递归，不用 setInterval —— 更容易按 useDidShow/Hide 精准控制，
+ *     并按 pending / processing 调整间隔
  */
 
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -40,8 +42,15 @@ const STAGES: { key: string; label: string; backendStages: AnalysisStage[] }[] =
   { key: 'render', label: '渲染分析报告', backendStages: [] },
 ]
 
-/** 轮询间隔 / 保护阈值 */
-const POLL_INTERVAL_MS = 3000
+/** 轮询间隔：排队中稍疏；分析中加密，更快感知完成 */
+function pollDelayMs(status: AnalysisStatusResponse['status'] | null): number {
+  if (status === 'pending') return 2200
+  if (status === 'processing') return 1300
+  return 1500
+}
+
+/** 完成后短暂留白再跳转（避免最后一帧 stage 看不见） */
+const COMPLETE_REDIRECT_MS = 250
 const TIMEOUT_FALLBACK_MS = 120_000
 const TIPS_ROTATE_MS = 8000
 const MAX_CONSECUTIVE_ERRORS = 3
@@ -69,6 +78,7 @@ const AnalysisWaitingPage: FC = () => {
 
   // refs（跨生命周期保持）
   const consecutiveErrorsRef = useRef(0)
+  const lastKnownStatusRef = useRef<AnalysisStatusResponse['status'] | null>(null)
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const secondTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const tipTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -83,6 +93,7 @@ const AnalysisWaitingPage: FC = () => {
     try {
       const s = await analysisService.getStatus(analysisId)
       consecutiveErrorsRef.current = 0
+      lastKnownStatusRef.current = s.status
       setStatus(s)
       setServerRemaining(
         typeof s.estimated_remaining_seconds === 'number'
@@ -97,7 +108,7 @@ const AnalysisWaitingPage: FC = () => {
           // 小延时让最后一格"渲染分析报告"有机会亮起
           setTimeout(() => {
             Taro.reLaunch({ url: `/pages/analysis/report?id=${analysisId}` })
-          }, 600)
+          }, COMPLETE_REDIRECT_MS)
         }
         return
       }
@@ -120,7 +131,7 @@ const AnalysisWaitingPage: FC = () => {
     if (!pageActiveRef.current) return
     pollTimerRef.current = setTimeout(() => {
       poll()
-    }, POLL_INTERVAL_MS)
+    }, pollDelayMs(lastKnownStatusRef.current))
   }, [poll])
 
   // 进入页 / useDidShow 时启动轮询
@@ -192,7 +203,7 @@ const AnalysisWaitingPage: FC = () => {
     if (status?.status === 'completed') return 0
     if (status?.status === 'failed') return null
     if (serverRemaining !== null) return serverRemaining
-    return Math.max(0, 25 - elapsedSec)
+    return Math.max(0, 22 - elapsedSec)
   }, [serverRemaining, elapsedSec, status])
 
   // ---------------- 事件 ----------------

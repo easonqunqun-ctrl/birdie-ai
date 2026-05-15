@@ -4,11 +4,14 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     analyses,
+    assets,
     auth,
     chat,
     common,
+    events,
     invitations,
     payments,
+    security,
     shares,
     training,
     users,
@@ -17,6 +20,8 @@ from app.api.v1 import (
 api_router = APIRouter()
 
 api_router.include_router(common.router, tags=["通用"])
+# W8 真机回归修复：图片资源同源代理（解决微信小程序真机 <Image> 对 MinIO 9000 端口拒绝）
+api_router.include_router(assets.router, tags=["资源代理"])
 api_router.include_router(auth.router, prefix="/auth", tags=["认证"])
 api_router.include_router(users.router, prefix="/users", tags=["用户"])
 api_router.include_router(analyses.router, prefix="/analyses", tags=["分析"])
@@ -32,3 +37,6 @@ api_router.include_router(shares.shares_router, prefix="/shares", tags=["分享"
 api_router.include_router(
     shares.analyses_public_router, prefix="/analyses", tags=["分享"]
 )
+# W8-T5：内容安全（视频首帧合规）+ 通用埋点 / 错误上报
+api_router.include_router(security.router, prefix="/security", tags=["内容安全"])
+api_router.include_router(events.router, prefix="/events", tags=["埋点"])

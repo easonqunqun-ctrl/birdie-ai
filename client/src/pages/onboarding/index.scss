@@ -1,122 +1,189 @@
+/**
+ * Onboarding 问卷页样式（W9 视觉对齐）
+ *
+ * 注：稿中 onboarding 是单屏 splash + 微信登录。
+ *     当前业务做的是 3 步问卷（水平/目标/频率），不动 tsx；
+ *     视觉上把按钮、选项、进度条按品牌语言重写。
+ */
+
 .onboarding {
   min-height: 100vh;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 32px 32px 48px;
+  padding: calc(28rpx + env(safe-area-inset-top)) 32rpx calc(48rpx + env(safe-area-inset-bottom));
+  background: var(--color-bg-page);
+  box-sizing: border-box;
 
+  /* ================= 顶部进度 + 跳过 ================= */
   &__header {
     display: flex;
     align-items: center;
-    gap: 24px;
-    margin-bottom: 48px;
+    gap: 20rpx;
+    margin-bottom: 56rpx;
+    padding: 16rpx 0;
   }
 
   &__progress {
     flex: 1;
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 14rpx;
   }
 
   &__progress-bar {
     flex: 1;
-    height: 8px;
+    height: 8rpx;
     background: var(--color-border);
-    border-radius: 9999px;
+    border-radius: 999rpx;
     overflow: hidden;
   }
 
   &__progress-fill {
     height: 100%;
-    background: linear-gradient(
-      90deg,
-      var(--color-primary) 0%,
-      var(--color-primary-soft) 100%
-    );
+    background: var(--gradient-progress);
     border-radius: inherit;
-    transition: width 0.25s ease-out;
+    transition: width 0.3s ease-out;
+    box-shadow: 0 0 6rpx rgba(0, 208, 132, 0.3);
   }
 
   &__progress-text {
-    font-size: 22px;
-    color: var(--color-text-secondary);
-    min-width: 48px;
+    font-size: 30rpx;
+    color: var(--color-text-tertiary);
+    min-width: 60rpx;
     text-align: right;
+    font-weight: 600;
+    letter-spacing: 0.5rpx;
   }
 
   &__skip {
-    font-size: 26px;
-    color: var(--color-text-secondary);
-    padding: 8px 4px;
+    font-size: 30rpx;
+    color: var(--color-text-tertiary);
+    padding: 8rpx 14rpx;
+    border-radius: 999rpx;
+    background: var(--color-bg-card);
+    border: 1rpx solid var(--color-border);
+
+    &:active {
+      opacity: 0.75;
+    }
 
     &--disabled {
-      opacity: 0.4;
+      opacity: 0.45;
     }
   }
 
+  /* ================= 步骤容器（勿 flex:1 吸满纵向空间） ================= */
   &__step {
-    flex: 1;
+    flex: 0 1 auto;
+    min-height: 0;
   }
 
   &__title {
-    font-size: 40px;
-    font-weight: 700;
+    font-size: 46rpx;
+    font-weight: 800;
+    color: var(--color-primary);
     display: block;
-    margin-bottom: 48px;
+    margin-bottom: 40rpx;
+    line-height: 1.3;
+    letter-spacing: -0.5rpx;
   }
 
   &__options {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 14rpx;
   }
 
+  /* 选项卡：白底胶囊 + 选中态浅靛蓝高亮 + 左侧 mint 色条 */
   &__option {
+    position: relative;
     background: var(--color-bg-card);
-    border: 2px solid transparent;
-    border-radius: var(--radius-md);
-    padding: 24px;
-    transition: all 0.2s;
+    border: 2rpx solid var(--color-border);
+    border-radius: 20rpx;
+    padding: 22rpx 26rpx;
+    transition: all 0.18s ease;
+    box-shadow: var(--shadow-xs);
+    overflow: hidden;
+
+    &::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 0;
+      background: linear-gradient(180deg, var(--color-primary), var(--color-accent-mint));
+      transition: width 0.18s ease;
+    }
 
     &--active {
       border-color: var(--color-primary);
       background: var(--color-primary-tint);
+      box-shadow: 0 4rpx 16rpx rgba(26, 35, 126, 0.16);
+
+      &::before {
+        width: 6rpx;
+      }
+    }
+
+    &:active {
+      opacity: 0.92;
     }
   }
 
   &__option-label {
-    font-size: 30px;
-    font-weight: 600;
+    font-size: 30rpx;
+    font-weight: 700;
     display: block;
+    color: var(--color-primary);
+    letter-spacing: -0.3rpx;
   }
 
   &__option-desc {
-    font-size: 24px;
-    color: var(--color-text-secondary);
+    font-size: 30rpx;
+    color: var(--color-text-tertiary);
     display: block;
-    margin-top: 8px;
+    margin-top: 6rpx;
+    line-height: 1.5;
   }
 
+  /* ================= 底部按钮 ================= */
   &__footer {
-    margin-top: 48px;
+    margin-top: 48rpx;
     display: flex;
-    gap: 16px;
+    gap: 14rpx;
   }
 
   &__btn {
     flex: 1;
     background: var(--color-primary) !important;
     color: var(--color-on-primary) !important;
-    font-size: 32px !important;
-    border-radius: var(--radius-xl) !important;
-    height: 96px !important;
-    line-height: 96px !important;
+    font-size: 32rpx !important;
+    font-weight: 800 !important;
+    border-radius: 20rpx !important;
+    height: 96rpx !important;
+    line-height: 96rpx !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: 0 6rpx 18rpx rgba(26, 35, 126, 0.28);
+
+    &::after {
+      border: none !important;
+    }
+
+    &[disabled] {
+      background: var(--color-bg-subtle) !important;
+      color: var(--color-text-tertiary) !important;
+      box-shadow: none !important;
+    }
 
     &--ghost {
       background: var(--color-bg-card) !important;
       color: var(--color-primary) !important;
-      border: 1px solid var(--color-border) !important;
-      flex: 0 0 40%;
+      border: 2rpx solid var(--color-primary) !important;
+      flex: 0 0 38% !important;
+      box-shadow: none !important;
     }
   }
 }

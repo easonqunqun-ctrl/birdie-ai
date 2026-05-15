@@ -7,15 +7,17 @@ from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.core.exceptions import BadRequestError
 from app.models.user import User
+from app.schemas.analysis import AnalysisProgressResponse
 from app.schemas.base import APIResponse, ok
 from app.schemas.user import (
+    AccountDeletionRequest,
     OnboardingRequest,
     UserQuota,
     UserResponse,
     UserStats,
     UserUpdateRequest,
 )
-from app.services import payment_service, quota_service
+from app.services import account_deletion_service, analysis_service, payment_service, quota_service
 
 router = APIRouter()
 
@@ -42,6 +44,7 @@ def _build_user_response(user: User, *, include_stats: bool = True) -> UserRespo
         ) if include_stats else None,
         quota=None,
         created_at=user.created_at,
+        account_deletion_scheduled_at=user.account_deletion_scheduled_at,
     )
 
 
@@ -59,12 +62,22 @@ async def get_me(
     await db.commit()
 
     resp = _build_user_response(user)
+    # W8-T3：会员 / QUOTA_MODE=unlimited 都走 -1 表示无限。
+    #   前端约定：值 < 0 显示"无限"，>= 0 显示具体数字。
     resp.quota = UserQuota(
         analysis_remaining=quota_service.analysis_remaining(a_quota),
-        analysis_total=a_quota.total + a_quota.bonus if a_quota.total >= 0 else 9999,
+        analysis_total=(
+            a_quota.total + a_quota.bonus
+            if a_quota.total >= 0
+            else quota_service.UNLIMITED_REMAINING
+        ),
         analysis_reset_at=quota_service.next_month_reset_iso(),
         chat_remaining_today=quota_service.chat_remaining(c_quota),
-        chat_total_today=c_quota.total if c_quota.total >= 0 else 9999,
+        chat_total_today=(
+            c_quota.total
+            if c_quota.total >= 0
+            else quota_service.UNLIMITED_REMAINING
+        ),
     )
     return ok(resp)
 
@@ -105,6 +118,52 @@ async def update_me(
         raise BadRequestError(code=40010, message="不允许将 onboarding_completed 置为 false")
     for k, v in update_dict.items():
         setattr(user, k, v)
+    await db.commit()
+    await db.refresh(user)
+    return ok(_build_user_response(user))
+
+
+@router.get(
+    "/me/analysis-progress",
+    summary="挥杆分析得分时间序列（进步曲线数据源）",
+    response_model=APIResponse[AnalysisProgressResponse],
+)
+async def get_analysis_progress(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    data = await analysis_service.get_user_analysis_progress(db, user)
+    return ok(data)
+
+
+@router.post(
+    "/me/account-deletion",
+    summary="申请注销账号（7 天冷静期，MVP §3.4）",
+    response_model=APIResponse[UserResponse],
+)
+async def request_account_deletion(
+    payload: AccountDeletionRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await account_deletion_service.request_account_deletion(
+        db, user, confirm_text=payload.confirm_text
+    )
+    await db.commit()
+    await db.refresh(user)
+    return ok(_build_user_response(user))
+
+
+@router.post(
+    "/me/account-deletion/cancel",
+    summary="取消注销申请",
+    response_model=APIResponse[UserResponse],
+)
+async def cancel_account_deletion(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await account_deletion_service.cancel_account_deletion(db, user)
     await db.commit()
     await db.refresh(user)
     return ok(_build_user_response(user))

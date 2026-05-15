@@ -11,6 +11,7 @@ import time
 import uuid
 
 from fastapi import FastAPI, Request, status
+from fastapi.exceptions import ResponseValidationError
 from fastapi.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
@@ -85,6 +86,32 @@ def register_exception_handlers(app: FastAPI) -> None:
                 "code": exc.code,
                 "message": exc.message,
                 "detail": exc.detail,
+            },
+        )
+
+    @app.exception_handler(ResponseValidationError)
+    async def response_validation_handler(
+        request: Request,
+        exc: ResponseValidationError,
+    ) -> JSONResponse:
+        """路由返回值与 response_model 不一致时 FastAPI 会抛此异常。
+
+        若只注册了 ``Exception`` 处理器，该类异常也会被兜底成 HTTP 500，
+        现场只看到「500」而无法区分「响应字段映射错误」。此处单独透出校验明细便于排障。
+        """
+        errs = exc.errors()
+        logger.exception(
+            "response_validation_failed",
+            path=request.url.path,
+            errors=errs,
+        )
+        detail_preview = str(errs)[:1800]
+        return JSONResponse(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            content={
+                "code": 50202,
+                "message": "响应格式校验失败（后端字段与契约不一致）",
+                "detail": detail_preview if request.app.debug else None,
             },
         )
 

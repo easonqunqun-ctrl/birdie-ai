@@ -2,7 +2,10 @@ import { FC, useEffect, useMemo, useState } from 'react'
 import { View, Text, Button, ScrollView } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { paymentService } from '@/services/paymentService'
+import { isRequestError } from '@/services/request'
 import { useUserStore } from '@/store/userStore'
+import { PAYMENT_ENABLED_FLAG, PAYMENT_MOCK_FLAG } from '@/constants/flags'
+import { track } from '@/utils/track'
 import type { Order, PlanOption, PlanType } from '@/types/payment'
 import './membership.scss'
 
@@ -10,8 +13,8 @@ const BENEFITS: { label: string; free: string; member: string }[] = [
   { label: '挥杆视频分析', free: '每月 3 次', member: '无限次' },
   { label: 'AI 教练对话', free: '每天 5 轮', member: '无限次' },
   { label: '训练计划', free: '仅查看', member: '完整个性化' },
-  { label: '进步曲线', free: '—', member: '✔（W8 开放）' },
-  { label: '历史报告对比', free: '—', member: '✔（W8 开放）' }
+  { label: '进步曲线', free: '—', member: '✔（正式版开放）' },
+  { label: '历史报告对比', free: '—', member: '✔（正式版开放）' }
 ]
 
 const MembershipPage: FC = () => {
@@ -49,7 +52,9 @@ const MembershipPage: FC = () => {
     setSubmitting(true)
     try {
       const res = await paymentService.createOrder(selected)
-      if (res.mock_mode || PAYMENT_MOCK) {
+      // 必须与后端 `CreateOrderResponse.mock_mode` 一致：编译期 PAYMENT_MOCK 默认 true，
+      // 若此处再用 PAYMENT_MOCK_FLAG「或」进来，会在服务端已关闭模拟支付时仍走 mockConfirm → 40013。
+      if (res.mock_mode) {
         const confirmed = await new Promise<boolean>((resolve) => {
           Taro.showModal({
             title: '模拟支付',
@@ -66,18 +71,71 @@ const MembershipPage: FC = () => {
         }
         await paymentService.mockConfirm(res.order.id)
       } else {
-        // 真实支付（W8 接入）：此处调用 wx.requestPayment(res.prepay_params)
-        // 成功后后端通过微信回调将订单置 paid。
-        Taro.showToast({ title: '真实支付 W8 接入', icon: 'none' })
-        return
+        const pp = res.prepay_params
+        if (!pp.time_stamp || !pp.nonce_str || !pp.package || !pp.pay_sign) {
+          Taro.showToast({ title: '支付参数异常，请重试', icon: 'none' })
+          return
+        }
+        try {
+          await Taro.requestPayment({
+            timeStamp: pp.time_stamp,
+            nonceStr: pp.nonce_str,
+            package: pp.package,
+            signType: (pp.sign_type || 'RSA') as 'RSA',
+            paySign: pp.pay_sign
+          })
+        } catch (payErr) {
+          const m = (payErr as { errMsg?: string })?.errMsg || ''
+          if (m.includes('cancel')) {
+            Taro.showToast({ title: '已取消', icon: 'none' })
+          } else {
+            Taro.showToast({ title: m || '调起支付失败', icon: 'none' })
+          }
+          return
+        }
+        Taro.showLoading({ title: '确认中...', mask: true })
+        try {
+          try {
+            await paymentService.syncFromWechat(res.order.id)
+          } catch {
+            /* 网络或短暂错误：仍靠下方轮询 /users/me */
+          }
+          for (let i = 0; i < 10; i++) {
+            await fetchMe()
+            const m = useUserStore.getState().user?.is_member
+            if (m) break
+            await new Promise<void>((r) => setTimeout(r, 800))
+          }
+        } finally {
+          Taro.hideLoading()
+        }
       }
-      Taro.showToast({ title: '会员已开通', icon: 'success' })
       await fetchMe()
+      const becameMember = !!useUserStore.getState().user?.is_member
+      const mode: 'mock' | 'real' | 'real_pending' = res.mock_mode
+        ? 'mock'
+        : becameMember
+          ? 'real'
+          : 'real_pending'
+      track('pay_success', {
+        order_id: res.order.id,
+        plan_type: selected,
+        amount: plans.find((p) => p.plan_type === selected)?.amount_yuan_display ?? '',
+        mode
+      })
+      Taro.showToast({
+        title: becameMember
+          ? '会员已开通'
+          : '支付已提交，请稍后在「我的」下拉刷新',
+        icon: becameMember ? 'success' : 'none',
+      })
       await load()
     } catch (e) {
-      const err = e as Error & { code?: number }
-      if (err?.code !== undefined) {
-        Taro.showToast({ title: err.message || '支付失败', icon: 'none' })
+      if (isRequestError(e)) {
+        if (e.kind === 'network') {
+          Taro.showToast({ title: e.message || '网络异常', icon: 'none' })
+        }
+        return
       }
     } finally {
       setSubmitting(false)
@@ -100,6 +158,21 @@ const MembershipPage: FC = () => {
 
   return (
     <ScrollView className='membership' scrollY>
+      <View className='membership__inner'>
+      {/*
+        W8-T3：PAYMENT_ENABLED=false 时本页是"管理员/QA 入口"，
+          普通内测用户不应该出现在这里（profile 页的入口已经隐藏）。
+          顶部 banner 明示当前是内测阶段、付费功能未开放，避免会员状态/订单
+          数据被误读。
+        W9 上线（PAYMENT_ENABLED=true）后该 banner 自动消失。
+      */}
+      {!PAYMENT_ENABLED_FLAG && (
+        <View className='membership__notice'>
+          <Text className='membership__notice-text'>
+            内测阶段·付费功能未开放，所有用户均按「无限」配额体验
+          </Text>
+        </View>
+      )}
       <View className={`membership__hero ${user?.is_member ? 'is-member' : ''}`}>
         <Text className='membership__hero-badge'>
           {user?.is_member ? '👑' : '🎯'}
@@ -158,8 +231,8 @@ const MembershipPage: FC = () => {
           {user?.is_member ? '续费 / 升级' : '立即开通'}
         </Button>
         <Text className='membership__cta-hint'>
-          {PAYMENT_MOCK
-            ? 'W7 开发模式：将走模拟支付，无需真实付款'
+          {PAYMENT_MOCK_FLAG
+            ? '联调构建默认开启模拟开关：真实下单仍以服务端为准（关闭后端模拟时将拉起微信支付）'
             : '将通过微信支付完成'}
         </Text>
       </View>
@@ -189,6 +262,7 @@ const MembershipPage: FC = () => {
           ))}
         </View>
       )}
+      </View>
     </ScrollView>
   )
 }
