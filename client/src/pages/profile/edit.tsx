@@ -1,6 +1,7 @@
 import { FC, useState } from 'react'
 import { View, Text, Button, Input } from '@tarojs/components'
 import Taro from '@tarojs/taro'
+import { describeIntermittentRequestFailure, isRequestError } from '@/services/request'
 import { useUserStore } from '@/store/userStore'
 import { userService } from '@/services/userService'
 import { FREQS, GOALS, LEVELS, MAX_GOALS } from '@/constants/golf'
@@ -92,6 +93,14 @@ const ProfileEditPage: FC = () => {
       setTimeout(() => Taro.navigateBack(), 400)
     } catch (e) {
       console.warn('update profile failed', e)
+      const title =
+        isRequestError(e) && e.kind === 'business' && e.message?.trim()
+          ? e.message.trim().slice(0, 220)
+          : describeIntermittentRequestFailure(e).toastTitle
+      Taro.showToast({
+        title,
+        icon: 'none',
+      })
       setSaving(false)
     }
   }

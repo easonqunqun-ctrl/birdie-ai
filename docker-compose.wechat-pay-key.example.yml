@@ -1,0 +1,23 @@
+# 复制到仓库根：docker-compose.wechat-pay-key.yml（该文件名已在 .gitignore，勿提交 PEM）
+#
+# CVM / 真实微信支付（WECHAT_PAY_MOCK_MODE=false）：
+#   1. 把下面卷挂载里的主机路径改成你的 apiclient_key.pem（商户平台下载的 API 私钥）
+#   2. .env.local 增加一行：
+#        WECHAT_PAY_CERT_PATH=/secrets/apiclient_key.pem
+#   3. 与 CVM 叠加启动（Makefile 会在存在该文件时自动带上）：
+#        make deploy-cvm-up
+#      或：
+#        docker compose -f docker-compose.yml -f docker-compose.test.yml \
+#          -f docker-compose.cvm.yml -f docker-compose.wechat-pay-key.yml \
+#          --env-file .env.local up -d --build
+#
+# 若改用环境变量直灌私钥（K8s Secret 等），可不在 compose 挂载文件，改用 WECHAT_PAY_PRIVATE_KEY_PEM，
+# 此时可不创建本 overlay。
+#
+# notify_url 须与网关一致（nginx 已反代 /v1/ → backend），例如：
+#   WECHAT_PAY_NOTIFY_URL=https://api.birdieai.cn/v1/payments/wechat/notify
+
+services:
+  backend:
+    volumes:
+      - /ABSOLUTE/PATH/ON/HOST/apiclient_key.pem:/secrets/apiclient_key.pem:ro

@@ -15,6 +15,7 @@ import { FC, useEffect, useState } from 'react'
 import { View, Text, Button } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { chooseVideo } from '@/adapters/media'
+import { describeIntermittentRequestFailure } from '@/services/request'
 import { storage } from '@/utils/storage'
 import { VIDEO_CONSTRAINTS } from '@/types/analysis'
 import './capture.scss'
@@ -92,11 +93,18 @@ const CaptureAnalysisPage: FC = () => {
           `&source=${source}` +
           thumbParam,
       })
-    } catch (e) {
+    } catch (e: unknown) {
       const err = e as { errMsg?: string; message?: string }
       const msg = err.errMsg || err.message || ''
       if (/cancel/i.test(msg) || /已取消/i.test(msg)) return
-      Taro.showToast({ title: msg || '选择视频失败', icon: 'none' })
+      const title =
+        msg.trim().length > 0
+          ? msg
+          : describeIntermittentRequestFailure(e).toastTitle
+      Taro.showToast({
+        title: title.length > 120 ? `${title.slice(0, 119)}…` : title,
+        icon: 'none',
+      })
     }
   }
 

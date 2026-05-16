@@ -21,6 +21,11 @@ from app.core.logging import get_logger
 logger = get_logger("http")
 
 
+def _request_id(request: Request) -> str | None:
+    rid = getattr(request.state, "request_id", None)
+    return rid if isinstance(rid, str) and rid.strip() else None
+
+
 class RequestContextMiddleware:
     """注入 request_id 并记录访问日志（纯 ASGI 实现）."""
 
@@ -80,14 +85,15 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(AppException)
     async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
-        return JSONResponse(
-            status_code=exc.http_status,
-            content={
-                "code": exc.code,
-                "message": exc.message,
-                "detail": exc.detail,
-            },
-        )
+        rid = _request_id(request)
+        payload: dict = {
+            "code": exc.code,
+            "message": exc.message,
+            "detail": exc.detail,
+        }
+        if rid:
+            payload["request_id"] = rid
+        return JSONResponse(status_code=exc.http_status, content=payload)
 
     @app.exception_handler(ResponseValidationError)
     async def response_validation_handler(
@@ -106,23 +112,30 @@ def register_exception_handlers(app: FastAPI) -> None:
             errors=errs,
         )
         detail_preview = str(errs)[:1800]
-        return JSONResponse(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            content={
-                "code": 50202,
-                "message": "响应格式校验失败（后端字段与契约不一致）",
-                "detail": detail_preview if request.app.debug else None,
-            },
-        )
+        rid = _request_id(request)
+        payload: dict = {
+            "code": 50202,
+            "message": "响应格式校验失败（后端字段与契约不一致）",
+            "detail": detail_preview if request.app.debug else None,
+        }
+        if rid:
+            payload["request_id"] = rid
+        return JSONResponse(status_code=status.HTTP_502_BAD_GATEWAY, content=payload)
 
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-        logger.exception("unhandled_exception", error=str(exc), path=request.url.path)
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={
-                "code": 50001,
-                "message": "服务内部错误",
-                "detail": str(exc) if request.app.debug else None,
-            },
+        logger.exception(
+            "unhandled_exception",
+            path=request.url.path,
+            exc_type=type(exc).__name__,
+            error=str(exc),
         )
+        rid = _request_id(request)
+        payload: dict = {
+            "code": 50001,
+            "message": "服务内部错误",
+            "detail": str(exc) if request.app.debug else None,
+        }
+        if rid:
+            payload["request_id"] = rid
+        return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content=payload)

@@ -35,20 +35,52 @@ export class RequestError extends Error {
     | 'network'
   status?: number
   code?: number
+  /** 后端统一信封里的 `detail`（如支付 50201 的具体异常文本） */
+  detail?: string | null
+  /** 与后端 JSON `request_id` / 响应头 `X-Request-ID` 对齐，便于 grep 日志 */
+  requestId?: string
   constructor(
     kind: RequestError['kind'],
     message: string,
-    extra?: { status?: number; code?: number },
+    extra?: {
+      status?: number
+      code?: number
+      detail?: string | null
+      requestId?: string
+    },
   ) {
     super(message)
     this.kind = kind
     this.status = extra?.status
     this.code = extra?.code
+    this.detail = extra?.detail
+    this.requestId = extra?.requestId
   }
 }
 
 export function isRequestError(e: unknown): e is RequestError {
   return e instanceof RequestError
+}
+
+function extractResponseRequestId(
+  headers: Record<string, unknown> | undefined,
+  body: Partial<APIResponse<unknown>> | undefined,
+): string | undefined {
+  const fromBody =
+    body &&
+    typeof body.request_id === 'string' &&
+    body.request_id.trim()
+      ? body.request_id.trim()
+      : ''
+  if (fromBody) return fromBody
+  if (!headers || typeof headers !== 'object') return undefined
+  const h = headers as Record<string, string>
+  const raw =
+    h['x-request-id'] ??
+    h['X-Request-Id'] ??
+    h['X-Request-ID']
+  const v = typeof raw === 'string' ? raw.trim() : ''
+  return v || undefined
 }
 
 /** 解析 `Taro.request` / `wx.request` 失败时的对象（往往不是标准 Error）。 */
@@ -154,7 +186,11 @@ export async function request<T = unknown>(opts: RequestOptions): Promise<T> {
     }
   }
 
-  let res: { statusCode: number; data: APIResponse<T> }
+  let res: {
+    statusCode: number
+    data: APIResponse<T>
+    header?: Record<string, unknown>
+  }
   try {
     res = await Taro.request<APIResponse<T>>({
       url,
@@ -199,6 +235,10 @@ export async function request<T = unknown>(opts: RequestOptions): Promise<T> {
    */
   if (res.statusCode >= 500) {
     const maybe = res.data as Partial<APIResponse<unknown>> | string | null | undefined
+    const rid500 =
+      maybe && typeof maybe === 'object'
+        ? extractResponseRequestId(res.header, maybe)
+        : extractResponseRequestId(res.header, undefined)
     if (
       maybe &&
       typeof maybe === 'object' &&
@@ -208,43 +248,107 @@ export async function request<T = unknown>(opts: RequestOptions): Promise<T> {
       const raw =
         typeof maybe.message === 'string' ? maybe.message.trim() : ''
       const msg = raw || '服务暂时不可用'
+      const detailRaw =
+        typeof maybe.detail === 'string' ? maybe.detail.trim() : ''
+      if (!opts.silent && rid500) {
+        console.warn('[request:server]', opts.url, msg, 'request_id=', rid500)
+      }
       if (!opts.silent) {
         Taro.showToast({ title: msg, icon: 'none' })
       }
       throw new RequestError('business', msg, {
         status: res.statusCode,
         code: maybe.code,
+        detail: detailRaw || null,
+        requestId: rid500,
       })
+    }
+    if (!opts.silent && rid500) {
+      console.warn('[request:http]', opts.url, res.statusCode, 'request_id=', rid500)
     }
     if (!opts.silent) {
       Taro.showToast({ title: '服务暂时不可用', icon: 'none' })
     }
     throw new RequestError('http_server_error', `HTTP ${res.statusCode}`, {
       status: res.statusCode,
+      requestId: rid500,
     })
   }
 
   const body = res.data
   if (!body || typeof body.code !== 'number') {
+    const ridBad = extractResponseRequestId(res.header, undefined)
     if (!opts.silent) {
-      console.warn('[request:bad_response]', opts.url, body)
+      console.warn('[request:bad_response]', opts.url, body, ridBad ? `request_id=${ridBad}` : '')
     }
     throw new RequestError('bad_response', '响应格式错误', {
       status: res.statusCode,
+      requestId: ridBad,
     })
   }
 
   if (body.code !== 0) {
+    const ridBiz = extractResponseRequestId(res.header, body)
+    if (!opts.silent && body.code === 50001 && ridBiz) {
+      console.warn('[request:business]', opts.url, body.message, 'request_id=', ridBiz)
+    }
     if (!opts.silent) {
       Taro.showToast({ title: body.message || '请求失败', icon: 'none' })
     }
+    const detailBiz =
+      typeof body.detail === 'string' ? body.detail.trim() : ''
     throw new RequestError('business', body.message || '业务错误', {
       status: res.statusCode,
       code: body.code,
+      detail: detailBiz || null,
+      requestId: ridBiz,
     })
   }
 
   return body.data as T
+}
+
+/**
+ * 轮询、uploadFile 等与 `request()` 分叉的通路：与用户可见的错误文案对齐（证书/域名/5xx）。
+ */
+export function describeIntermittentRequestFailure(e: unknown): {
+  fatalMessage: string
+  toastTitle: string
+} {
+  if (isRequestError(e)) {
+    if (e.kind === 'http_server_error') {
+      return {
+        fatalMessage: '服务暂时不可用，已暂停自动刷新',
+        toastTitle: '服务暂时不可用',
+      }
+    }
+    if (e.kind === 'bad_response') {
+      return {
+        fatalMessage: '服务器响应异常，已暂停自动刷新',
+        toastTitle: '服务响应异常',
+      }
+    }
+    if (e.kind === 'network' && e.message?.trim()) {
+      const t = friendlyNetworkMessage(e.message, undefined)
+      return { fatalMessage: t, toastTitle: t }
+    }
+  }
+  return {
+    fatalMessage: '网络似乎不太稳定，已暂停自动刷新',
+    toastTitle: '网络异常，请稍后重试',
+  }
+}
+
+/** 列表/详情等静态页正文：与同上 helper 对齐，去掉轮询场景专用尾缀「已暂停自动刷新」。 */
+const POLL_PAUSE_SUFFIX = '，已暂停自动刷新'
+
+export function describePageLoadFailure(e: unknown): string {
+  const { fatalMessage, toastTitle } = describeIntermittentRequestFailure(e)
+  return fatalMessage.endsWith(POLL_PAUSE_SUFFIX)
+    ? fatalMessage.slice(0, -POLL_PAUSE_SUFFIX.length)
+    : fatalMessage.length > 0
+      ? fatalMessage
+      : toastTitle
 }
 
 /**

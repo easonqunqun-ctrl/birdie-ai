@@ -295,8 +295,18 @@ class WechatPayV3Context:
 
 
 def load_private_key_file(path: str) -> str:
-    with open(path, encoding="utf-8") as f:
-        return f.read()
+    try:
+        with open(path, encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError as e:
+        raise RuntimeError(
+            f"商户私钥文件不存在：{path}。"
+            "Docker/CVM 请在仓库根复制 docker-compose.wechat-pay-key.example.yml 为 "
+            "docker-compose.wechat-pay-key.yml，挂载 apiclient_key.pem，并在 .env.local 设置 "
+            "WECHAT_PAY_CERT_PATH=/secrets/apiclient_key.pem（与 make deploy-cvm-up 叠加）。"
+        ) from e
+    except OSError as e:
+        raise RuntimeError(f"无法读取商户私钥文件 {path}: {e}") from e
 
 
 def get_wechat_pay_v3() -> WechatPayV3Context:

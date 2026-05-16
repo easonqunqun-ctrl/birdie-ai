@@ -1,0 +1,6 @@
+          id          |  status   | club_type | camera_angle  | overall_score | error_code |             error_message              |          created_at           
+----------------------+-----------+-----------+---------------+---------------+------------+----------------------------------------+-------------------------------
+ ana_4r5v8htz0umb7mxz | failed    | iron_7    | face_on       |               |      50103 | 视频中未检测到完整人物，请确保全身入镜 | 2026-04-25 13:19:29.849382+00
+ ana_ndoiru7y28oof5yp | completed | iron_7    | down_the_line |            49 |            |                                        | 2026-04-25 13:24:25.240212+00
+(2 rows)
+

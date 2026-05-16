@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -71,6 +71,32 @@ async def get_upload_token(
 
 
 @router.post(
+    "/uploads/{upload_id}/video",
+    summary="经 API 上报视频（小程序同源兜底）",
+)
+async def upload_analysis_video(
+    upload_id: str,
+    user: User = Depends(get_current_user),
+    redis: Redis = Depends(get_redis),
+    storage: MinioStorageClient = Depends(get_minio_storage),
+    file: UploadFile = File(..., description="视频文件，字段名 file"),
+):
+    """与 `upload-token` 配套：客户端用 `wx.uploadFile` 直传至此 URL（multipart 单文件 `file`）。
+
+    写入 MinIO/COS 后刷新 Redis 内 `file_size` 为实际上传字节数，以便 `POST /analyses` 校验通过。
+    """
+    body = await file.read()
+    await analysis_service.receive_upload_via_api(
+        user=user,
+        upload_id=upload_id,
+        file_body=body,
+        redis=redis,
+        storage=storage,
+    )
+    return ok(None)
+
+
+@router.post(
     "",
     summary="创建挥杆分析任务",
     response_model=APIResponse[CreateAnalysisResponse],
@@ -90,6 +116,11 @@ async def create_analysis(
         storage=storage,
     )
     await db.commit()
+    await analysis_service.finalize_analysis_dispatch_after_commit(
+        redis=redis,
+        upload_id=payload.upload_id,
+        analysis_id=result.analysis_id,
+    )
     return ok(result, message="分析任务已创建")
 
 

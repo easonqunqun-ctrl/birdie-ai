@@ -23,10 +23,16 @@ import Taro, { useDidShow, useRouter } from '@tarojs/taro'
 import DrillCard from '@/components/DrillCard'
 import EnvBadge from '@/components/EnvBadge'
 import { BRAND_LOGO } from '@/constants/brandAssets'
-import { consumeCoachPendingContext, type CoachPendingContext } from '@/utils/tabNav'
+import {
+  consumeCoachPendingContext,
+  switchToHome,
+  toastTabNavigationFailure,
+  type CoachPendingContext,
+} from '@/utils/tabNav'
 import { PAYMENT_ENABLED_FLAG } from '@/constants/flags'
 import { useUserStore } from '@/store/userStore'
 import {
+  chatErrorCause,
   getSubmitError,
   useChatStore,
   type SubmitMessageError,
@@ -36,6 +42,7 @@ import type {
   DrillCardAttachment,
   QuickQuestionItem,
 } from '@/types/chat'
+import { describeIntermittentRequestFailure } from '@/services/request'
 import './index.scss'
 
 const MAX_CONTENT_LEN = 500
@@ -226,7 +233,7 @@ const CoachPage: FC = () => {
         // 流式失败时：user/assistant 气泡已保留（或标记 errored），这里只做 toast，
         // 不再往输入框回填（不然用户一看"又多了一条 errored 还多了一条草稿"，双重污染）
         const se = getSubmitError(err)
-        toastSubmitError(se)
+        toastSubmitError(se, err)
       }
     },
     [submitMessage],
@@ -268,7 +275,8 @@ const CoachPage: FC = () => {
           content: '这个问题需要结合你的挥杆分析，先去"首页 → 开始分析"拍一次吧。',
           confirmText: '去分析',
           success: ({ confirm }) => {
-            if (confirm) Taro.switchTab?.({ url: '/pages/index/index' })
+            if (confirm)
+              void switchToHome().catch(toastTabNavigationFailure)
           },
         })
         return
@@ -412,6 +420,7 @@ const CoachPage: FC = () => {
         scrollWithAnimation
         scrollIntoView={scrollAnchorRef.current}
         enhanced
+        enableFlex
         showScrollbar={false}
       >
         <View className='coach__scroll-inner'>
@@ -698,9 +707,18 @@ function openOriginalReport(analysisId: string) {
   Taro.navigateTo({ url: `/pages/analysis/report?id=${analysisId}` })
 }
 
-function toastSubmitError(err: SubmitMessageError | null) {
+function toastSubmitError(
+  err: SubmitMessageError | null,
+  wrapped?: unknown,
+): void {
   if (!err) {
-    Taro.showToast({ title: '发送失败', icon: 'none' })
+    Taro.showToast({
+      title:
+        wrapped !== undefined
+          ? describeIntermittentRequestFailure(wrapped).toastTitle
+          : '发送失败',
+      icon: 'none',
+    })
     return
   }
   switch (err.kind) {
@@ -745,10 +763,18 @@ function toastSubmitError(err: SubmitMessageError | null) {
       })
       break
     case 'network':
-    default:
+    default: {
+      const raw = wrapped !== undefined ? chatErrorCause(wrapped) ?? wrapped : undefined
+      const fallback = err.message?.trim() || '网络中断，点击气泡重试'
+      const title =
+        raw !== undefined
+          ? describeIntermittentRequestFailure(raw).toastTitle
+          : fallback
       Taro.showToast({
-        title: err.message || '网络中断，点击气泡重试',
+        title,
         icon: 'none',
       })
+      break
+    }
   }
 }

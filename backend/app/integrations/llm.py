@@ -352,21 +352,51 @@ def get_llm_client() -> AbstractLLMClient:
     - `LLM_MOCK_MODE=true` 强制开
     - `LLM_API_KEY` 为空或匹配占位模式（本地/测试默认，自动降级）
 
+    若已缓存的实例与当前配置不一致（例如测试里切换 mock / 真实 key，
+    或罕见情况下 Settings 热更新），会丢弃缓存并重建。
+
     供测试 monkeypatch 该工厂函数的返回值。
     """
     global _default_client
-    if _default_client is None:
-        if settings.LLM_MOCK_MODE or _is_placeholder_key(settings.LLM_API_KEY):
+
+    want_fake = settings.LLM_MOCK_MODE or _is_placeholder_key(settings.LLM_API_KEY)
+
+    def _build() -> AbstractLLMClient:
+        if want_fake:
             log.info("llm_client_init", impl="FakeLLMClient")
-            _default_client = FakeLLMClient()
-        else:
-            log.info(
-                "llm_client_init",
-                impl="OpenAICompatibleClient",
-                model=settings.LLM_MODEL,
-                base_url=settings.LLM_BASE_URL,
-            )
-            _default_client = OpenAICompatibleClient()
+            return FakeLLMClient()
+        log.info(
+            "llm_client_init",
+            impl="OpenAICompatibleClient",
+            model=settings.LLM_MODEL,
+            base_url=settings.LLM_BASE_URL,
+        )
+        return OpenAICompatibleClient()
+
+    if _default_client is None:
+        _default_client = _build()
+        return _default_client
+
+    if want_fake:
+        if not isinstance(_default_client, FakeLLMClient):
+            _default_client = _build()
+        return _default_client
+
+    if isinstance(_default_client, FakeLLMClient):
+        _default_client = _build()
+        return _default_client
+
+    oc = _default_client
+    assert isinstance(oc, OpenAICompatibleClient)
+    base = settings.LLM_BASE_URL.rstrip("/")
+    if oc.api_key != settings.LLM_API_KEY or oc.base_url != base or oc.model != settings.LLM_MODEL:
+        log.info(
+            "llm_client_rebuild",
+            reason="settings_mismatch",
+            model=settings.LLM_MODEL,
+        )
+        _default_client = _build()
+
     return _default_client
 
 

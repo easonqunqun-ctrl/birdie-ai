@@ -6,6 +6,7 @@ import {
   type InvitationItem,
   type InviteInfo
 } from '@/services/invitationService'
+import { describePageLoadFailure } from '@/services/request'
 import { BRAND_SHARE_COVER } from '@/constants/brandAssets'
 import './invitations.scss'
 
@@ -36,7 +37,7 @@ const InvitationsPage: FC = () => {
       setInfo(i)
       setList(l)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '加载失败')
+      setError(describePageLoadFailure(e))
     } finally {
       setLoading(false)
     }

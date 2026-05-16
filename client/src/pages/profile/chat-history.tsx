@@ -2,7 +2,8 @@ import { FC, useCallback, useEffect, useState } from 'react'
 import { View, Text, Button, ScrollView } from '@tarojs/components'
 import Taro, { usePullDownRefresh } from '@tarojs/taro'
 import { chatService } from '@/services/chatService'
-import { switchToCoachWithSession } from '@/utils/tabNav'
+import { describePageLoadFailure } from '@/services/request'
+import { switchToCoachWithSession, toastTabNavigationFailure } from '@/utils/tabNav'
 import type { ChatSessionListItem } from '@/types/chat'
 import './chat-history.scss'
 
@@ -17,7 +18,7 @@ const ChatHistoryPage: FC = () => {
       setItems(res.items)
       setError(null)
     } catch (e) {
-      setError((e as Error).message || '加载失败')
+      setError(describePageLoadFailure(e))
     } finally {
       setLoading(false)
       Taro.stopPullDownRefresh()
@@ -34,7 +35,9 @@ const ChatHistoryPage: FC = () => {
   })
 
   const openSession = (it: ChatSessionListItem) => {
-    void switchToCoachWithSession(it.id, it.context_analysis_id)
+    void switchToCoachWithSession(it.id, it.context_analysis_id).catch(
+      toastTabNavigationFailure,
+    )
   }
 
   if (loading) {

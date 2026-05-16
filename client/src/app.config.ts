@@ -25,12 +25,16 @@ export default defineAppConfig({
     'pages/profile/chat-history',
     'pages/profile/account-deletion'
   ],
-  /** 对话 SSE 首轮 token 较慢；略高于 wx.request/sseClient timeout，对齐 chatService */
+  /**
+   * 说明：真机上 wx.request **单次等待完整响应**仍有约 60s 量级上限；
+   * AI 教练已默认走 chunked SSE，此项主要服务于其它长请求或开发者工具。
+   */
   networkTimeout: {
-    request: 180000,
+    request: 420000,
     connectSocket: 60000,
     downloadFile: 180000,
-    uploadFile: 180000,
+    /** 视频直传 MinIO（analysisService.uploadToMinio）；弱网适当放宽 */
+    uploadFile: 300000,
   },
   window: {
     backgroundTextStyle: 'light',

@@ -104,7 +104,8 @@ make issue-le-cert EMAIL=you@example.com DOMAIN=api.example.com
 make renew-le-cert DOMAIN=api.example.com
 make sync-le-certs DOMAIN=api.example.com
 make setup-cvm-ssh-key                 # 路径 B：一次 ssh-copy-id 后免密发布
-make publish-backend-cvm               # CVM：scp+compose（优先 ~/.ssh/id_ed25519_birdie_golf）
+make publish-backend-cvm               # CVM：scp+compose（优先 ~/.ssh/id_ed25519_birdie_golf）；远端会先跑支付挂载自检
+make deploy-check-cvm-pay               # WECHAT_PAY_MOCK_MODE=false 时须有 docker-compose.wechat-pay-key.yml（ENV_FILE= 可改）
 # W8 从零搭机：docs/release-notes/W8-test-env-runbook.md；**规范化/Git+密钥+去 bind**：docs/release-notes/CVM-canonical-deploy.md
 
 # 后端

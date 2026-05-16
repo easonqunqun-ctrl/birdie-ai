@@ -5,15 +5,16 @@
  * 任何一个必需参数缺失都直接回退到 capture 重选。
  *
  * 提交流程（串行，带 loading 遮罩防止二次点击）：
- *   getUploadToken -> uploadToMinio -> createAnalysis -> setCurrent(analysisId) -> redirectTo waiting
+ *   getUploadToken -> uploadVideoViaApi（同源 POST multipart）-> createAnalysis -> setCurrent(analysisId) -> redirectTo waiting
  * 任一步失败 toast + 解除 loading；已签发但没上传成功的凭证由后端 TTL 清理，前端无需处理。
  */
 
 import { FC, useEffect, useMemo, useState } from 'react'
 import { View, Text, Button, ScrollView } from '@tarojs/components'
 import Taro, { useRouter } from '@tarojs/taro'
-import { analysisService } from '@/services/analysisService'
+import { analysisService, uploadLikelyNeedsFreshToken } from '@/services/analysisService'
 import { checkVideoFirstFrame } from '@/services/mediaCheck'
+import { describeIntermittentRequestFailure, isRequestError } from '@/services/request'
 import { useAnalysisStore } from '@/store/analysisStore'
 import { useUserStore } from '@/store/userStore'
 import { track } from '@/utils/track'
@@ -122,21 +123,34 @@ const AnalysisParamsPage: FC = () => {
       setPhase('signing')
       Taro.showLoading({ title: '申请上传凭证' })
       const contentType = guessContentType(tempFilePath)
-      const token = await analysisService.getUploadToken({
+      const tokenPayload = {
         file_name: deriveFileName(tempFilePath),
         file_size: size,
         file_type: contentType,
         duration,
-      })
+      }
+      let token = await analysisService.getUploadToken(tokenPayload)
 
       setPhase('uploading')
       Taro.showLoading({ title: '上传视频中 0%' })
-      await analysisService.uploadToMinio(tempFilePath, token, {
-        onProgress: (e) => {
+      const progressOpts = {
+        onProgress: (e: { progress: number }) => {
           setUploadProgress(e.progress)
           Taro.showLoading({ title: `上传视频中 ${e.progress}%` })
         },
-      })
+      }
+      try {
+        await analysisService.uploadToMinio(tempFilePath, token, progressOpts)
+      } catch (uploadErr) {
+        const raw =
+          uploadErr instanceof Error ? uploadErr.message : String(uploadErr)
+        if (!uploadLikelyNeedsFreshToken(raw)) {
+          throw uploadErr instanceof Error ? uploadErr : new Error(raw)
+        }
+        Taro.showLoading({ title: '刷新凭证并重试上传' })
+        token = await analysisService.getUploadToken(tokenPayload)
+        await analysisService.uploadToMinio(tempFilePath, token, progressOpts)
+      }
 
       setPhase('creating')
       Taro.showLoading({ title: '创建分析任务' })
@@ -164,10 +178,31 @@ const AnalysisParamsPage: FC = () => {
       Taro.redirectTo({ url: `/pages/analysis/waiting?id=${created.analysis_id}` })
     } catch (e) {
       Taro.hideLoading()
-      const msg = (e as Error).message || '创建分析任务失败'
+      let msg =
+        isRequestError(e) && typeof e.message === 'string' && e.message.trim()
+          ? e.message.trim()
+          : ''
+      const traceId =
+        isRequestError(e) &&
+        typeof e.requestId === 'string' &&
+        e.requestId.trim()
+          ? e.requestId.trim()
+          : ''
+      if (
+        !msg &&
+        typeof e === 'object' &&
+        e &&
+        'message' in e &&
+        typeof (e as Error).message === 'string'
+      ) {
+        msg = ((e as Error).message || '').trim()
+      }
+      if (!msg) msg = describeIntermittentRequestFailure(e).toastTitle
+      let body = msg.length > 220 ? `${msg.slice(0, 217)}…` : msg
+      if (traceId) body += `\n\n追踪 ID：${traceId}`
       Taro.showModal({
         title: '创建失败',
-        content: msg,
+        content: body,
         showCancel: false,
         confirmText: '我知道了',
       })

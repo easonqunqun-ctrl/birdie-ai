@@ -22,7 +22,11 @@ export const paymentService = {
     return http.get<PlanOption[]>('/payments/plans')
   },
   createOrder(planType: PlanType) {
-    return http.post<CreateOrderResponse>('/payments/orders', { plan_type: planType })
+    return http.post<CreateOrderResponse>(
+      '/payments/orders',
+      { plan_type: planType },
+      { silent: true },
+    )
   },
   mockConfirm(orderId: string) {
     return http.post<Order>(`/payments/orders/${orderId}/mock-confirm`)

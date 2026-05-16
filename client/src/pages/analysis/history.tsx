@@ -17,6 +17,7 @@ import { FC, useCallback, useEffect, useState } from 'react'
 import { View, Text, Image, Button, ScrollView } from '@tarojs/components'
 import Taro, { usePullDownRefresh, useReachBottom } from '@tarojs/taro'
 import { analysisService } from '@/services/analysisService'
+import { describeIntermittentRequestFailure, describePageLoadFailure } from '@/services/request'
 import { SCORE_LEVEL_META, scoreLevelFromScore } from '@/constants/scoreLevel'
 import { CLUB_TYPE_LABEL } from '@/types/analysis'
 import type { AnalysisListItem } from '@/types/analysis'
@@ -46,8 +47,9 @@ const HistoryPage: FC = () => {
         setPage(nextPage)
         setError(null)
       } catch (e) {
-        if (mode === 'init') setError((e as Error).message || '加载失败')
-        else Taro.showToast({ title: '加载失败', icon: 'none' })
+        const { toastTitle } = describeIntermittentRequestFailure(e)
+        if (mode === 'init') setError(describePageLoadFailure(e))
+        else Taro.showToast({ title: toastTitle, icon: 'none' })
       } finally {
         if (mode === 'init') setLoading(false)
         if (mode === 'refresh') Taro.stopPullDownRefresh()

@@ -81,9 +81,22 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   async fetchMe() {
     if (!get().token) return
-    const user = await userService.getMe()
-    set({ user })
-    storage.setUser(user)
+    try {
+      const user = await userService.getMe()
+      set({ user })
+      storage.setUser(user)
+    } catch (e: unknown) {
+      if (isRequestError(e) && e.kind === 'http_unauthorized') {
+        storage.clearToken()
+        set({ token: '', user: null })
+        return
+      }
+      if (process.env.NODE_ENV !== 'production') {
+        // eslint-disable-next-line no-console
+        console.warn('[userStore.fetchMe] skipped update:', e)
+      }
+      // 与 bootstrap：弱网/5xx 保留上一快照，不打断_tab 页静默刷新契约
+    }
   },
 
   logout() {

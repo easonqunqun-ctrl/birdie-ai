@@ -528,3 +528,29 @@ async def test_add_to_plan_from_analysis_forbidden(
     )
     assert resp.status_code == 403
     assert resp.json()["code"] == 40302
+
+
+def test_training_task_to_item_coerces_bad_status():
+    """非法 status 降级，避免序列化链路抛 ValidationError."""
+    from datetime import date as date_cls
+
+    from app.models.training import TrainingTask
+
+    t = TrainingTask(
+        id="task_badstat",
+        plan_id="plan_x",
+        user_id="usr_x",
+        drill_id="drill_towel_arm",
+        scheduled_date=date_cls(2026, 5, 1),
+        sort_order=1,
+        status="oops",
+    )
+    item = training_service.training_task_to_item(t)
+    assert item.status == "pending"
+
+
+def test_normalize_list_camera_and_club_coerce_unknown():
+    from app.services import analysis_service
+
+    assert analysis_service.normalize_list_camera_angle("side_view", analysis_id="a1") == "face_on"
+    assert analysis_service.normalize_list_club_type("seven_iron_legacy", analysis_id="a2") == "unknown"

@@ -21,6 +21,7 @@ class ErrorResponse(BaseModel):
     code: int
     message: str
     detail: str | None = None
+    request_id: str | None = None
 
 
 class PageMeta(BaseModel):

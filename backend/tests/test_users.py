@@ -1,7 +1,7 @@
 """用户相关接口的集成测试（M1-T1）。
 
 覆盖：
-- GET /v1/users/me：返回用户信息、stats、真实 quota。
+- GET /v1/users/me：返回用户信息、stats、quota（随 `QUOTA_MODE` strict / unlimited 断言）。
 - PATCH /v1/users/me：更新昵称、头像。
 - POST /v1/users/me/onboarding：完成引导，写入档案。
 - 鉴权：无 Token / 错 Token 都应 401。
@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import pytest
 from httpx import AsyncClient
+
+from app.config import settings
 
 
 @pytest.mark.asyncio
@@ -50,11 +52,17 @@ async def test_get_me_returns_stats_and_quota(client: AsyncClient, auth_headers:
     }
 
     quota = data["quota"]
-    # 免费用户默认：本月 3 次分析 / 每日 5 轮对话。
-    assert quota["analysis_total"] == 3
-    assert quota["analysis_remaining"] == 3
-    assert quota["chat_total_today"] == 5
-    assert quota["chat_remaining_today"] == 5
+    # 免费用户：strict → 本月 3 次分析 / 每日 5 轮；unlimited → 一律 -1（前端视作无限）。
+    if settings.QUOTA_MODE == "unlimited":
+        assert quota["analysis_total"] == -1
+        assert quota["analysis_remaining"] == -1
+        assert quota["chat_total_today"] == -1
+        assert quota["chat_remaining_today"] == -1
+    else:
+        assert quota["analysis_total"] == 3
+        assert quota["analysis_remaining"] == 3
+        assert quota["chat_total_today"] == 5
+        assert quota["chat_remaining_today"] == 5
 
 
 @pytest.mark.asyncio
@@ -167,3 +175,60 @@ async def test_onboarding_rejects_empty_goals(
         },
     )
     assert resp.status_code in (400, 422)
+
+
+def test_sanitize_primary_goals_dict_returns_empty():
+    from app.schemas.user import sanitize_primary_goals_for_response
+
+    assert sanitize_primary_goals_for_response({"oops": True}) == []
+    assert sanitize_primary_goals_for_response(None) == []
+
+
+def test_sanitize_primary_goals_mixed_list():
+    from app.schemas.user import sanitize_primary_goals_for_response
+
+    assert sanitize_primary_goals_for_response(["distance", "", "  accuracy  ", 1]) == [
+        "distance",
+        "accuracy",
+        "1",
+    ]
+
+
+def test_build_user_response_tolerates_dict_primary_goals():
+    from datetime import UTC, datetime
+
+    from app.models.user import User
+    from app.services.user_presenter import build_user_response
+
+    now = datetime.now(UTC)
+    user = User(id="usr_sanitize_goal", invite_code="SAN12345")
+    user.created_at = now
+    user.updated_at = now
+    user.primary_goals = {"broken": True}
+    user.membership_type = "free"
+    user.onboarding_completed = False
+
+    dto = build_user_response(user)
+
+    assert dto.primary_goals == []
+    assert dto.membership_type == "free"
+
+
+def test_sanitize_membership_type_invalid_coerces_free():
+    from datetime import UTC, datetime
+
+    from app.models.user import User
+    from app.schemas.user import sanitize_membership_type_for_response
+    from app.services.user_presenter import build_user_response
+
+    assert sanitize_membership_type_for_response("not_a_plan") == "free"
+
+    now = datetime.now(UTC)
+    user = User(id="usr_bad_mem", invite_code="MEM12345")
+    user.created_at = now
+    user.updated_at = now
+    user.membership_type = "not_a_plan"
+    user.onboarding_completed = True
+
+    dto = build_user_response(user)
+    assert dto.membership_type == "free"

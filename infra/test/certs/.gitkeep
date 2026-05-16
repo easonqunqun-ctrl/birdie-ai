@@ -1,0 +1,2 @@
+# 占位：让 infra/test/certs/ 目录在 git 中存在
+# 真证书由 ../gen-certs.sh 生成，自动 gitignore

@@ -1,0 +1,56 @@
+# PostgreSQL + Redis 就绪后跑极小 pytest 子集；全量仍为本地 `make backend-test`（Compose）。
+name: backend-pytest-smoke
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  pytest-smoke:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: xiaoniao
+          POSTGRES_PASSWORD: xiaoniao_dev_password
+          POSTGRES_DB: xiaoniao
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U xiaoniao -d xiaoniao"
+          --health-interval 8s
+          --health-timeout 5s
+          --health-retries 12
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    env:
+      APP_ENV: local
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: xiaoniao
+      POSTGRES_PASSWORD: xiaoniao_dev_password
+      POSTGRES_DB: xiaoniao
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      WECHAT_MOCK_LOGIN: "true"
+      WECHAT_PAY_MOCK_MODE: "true"
+      LLM_MOCK_MODE: "true"
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Install, migrate & smoke pytest
+        run: |
+          uv sync --frozen --group dev
+          uv run alembic upgrade head
+          uv run pytest tests/test_parallel_backlog_regressions.py tests/test_health.py tests/test_quota_unlimited.py -q --tb=short

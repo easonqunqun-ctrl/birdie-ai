@@ -2,7 +2,7 @@ import { FC, useEffect, useMemo, useState } from 'react'
 import { View, Text, Button, ScrollView } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { paymentService } from '@/services/paymentService'
-import { isRequestError } from '@/services/request'
+import { describeIntermittentRequestFailure, describePageLoadFailure, isRequestError } from '@/services/request'
 import { useUserStore } from '@/store/userStore'
 import { PAYMENT_ENABLED_FLAG, PAYMENT_MOCK_FLAG } from '@/constants/flags'
 import { track } from '@/utils/track'
@@ -42,6 +42,13 @@ const MembershipPage: FC = () => {
       ])
       setPlans(planList)
       setOrders(orderList)
+    } catch (e: unknown) {
+      const raw = describePageLoadFailure(e)
+      const title = raw.length > 220 ? `${raw.slice(0, 217)}…` : raw
+      Taro.showToast({
+        title,
+        icon: 'none',
+      })
     } finally {
       setLoading(false)
     }
@@ -84,12 +91,18 @@ const MembershipPage: FC = () => {
             signType: (pp.sign_type || 'RSA') as 'RSA',
             paySign: pp.pay_sign
           })
-        } catch (payErr) {
+        } catch (payErr: unknown) {
           const m = (payErr as { errMsg?: string })?.errMsg || ''
-          if (m.includes('cancel')) {
+          if (/cancel/i.test(m) || m.includes('cancel')) {
             Taro.showToast({ title: '已取消', icon: 'none' })
           } else {
-            Taro.showToast({ title: m || '调起支付失败', icon: 'none' })
+            const fromWx =
+              m.replace(/^requestPayment:fail\s*/i, '').trim() || ''
+            const title =
+              fromWx.length > 0 && fromWx.length <= 220
+                ? fromWx
+                : describeIntermittentRequestFailure(payErr).toastTitle
+            Taro.showToast({ title, icon: 'none' })
           }
           return
         }
@@ -133,10 +146,31 @@ const MembershipPage: FC = () => {
     } catch (e) {
       if (isRequestError(e)) {
         if (e.kind === 'network') {
-          Taro.showToast({ title: e.message || '网络异常', icon: 'none' })
+          Taro.showToast({
+            title: describeIntermittentRequestFailure(e).toastTitle,
+            icon: 'none',
+          })
+        } else if (e.kind === 'business' || e.kind === 'http_server_error') {
+          const lines = [e.message || '请求失败']
+          if (e.detail) lines.push(e.detail)
+          const content = lines.filter(Boolean).join('\n\n').slice(0, 3500)
+          Taro.showModal({
+            title: '开通失败',
+            content,
+            showCancel: false,
+          })
+        } else {
+          Taro.showToast({
+            title: describeIntermittentRequestFailure(e).toastTitle,
+            icon: 'none',
+          })
         }
         return
       }
+      Taro.showToast({
+        title: describeIntermittentRequestFailure(e).toastTitle,
+        icon: 'none',
+      })
     } finally {
       setSubmitting(false)
     }

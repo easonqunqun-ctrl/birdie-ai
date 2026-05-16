@@ -59,6 +59,15 @@ export interface StreamSSEHandlers<T = unknown> {
 
 export type StreamCancel = () => void
 
+/**
+ * 微信小程序：是否可走 `enableChunked + onChunkReceived` 的 SSE。
+ * 真机上同步 JSON 等整条 LLM（往往 >60s）会触发 wx.request ~60s 上限；流式配合后端 ping 才可长跑。
+ */
+export function weappSupportsChunkedStreaming(): boolean {
+  const wxApi = typeof wx !== 'undefined' ? wx : undefined
+  return !!wxApi?.canIUse?.('request.object.enableChunked')
+}
+
 /* ==================== 入口 ==================== */
 export function streamSSE<T = unknown>(
   options: StreamSSEOptions,
@@ -78,8 +87,7 @@ function streamWeapp<T>(
   opts: StreamSSEOptions,
   handlers: StreamSSEHandlers<T>,
 ): StreamCancel {
-  const wxApi = typeof wx !== 'undefined' ? wx : undefined
-  if (!wxApi?.canIUse?.('request.object.enableChunked')) {
+  if (!weappSupportsChunkedStreaming()) {
     queueMicrotask(() =>
       handlers.onError?.(
         new Error('当前微信版本不支持流式对话，请升级到最新版微信'),

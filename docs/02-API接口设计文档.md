@@ -79,9 +79,12 @@ Authorization: Bearer <jwt_token>
 {
   "code": 40001,
   "message": "视频时长不符合要求",
-  "detail": "视频时长为 2 秒，最低要求 3 秒"
+  "detail": "视频时长为 2 秒，最低要求 3 秒",
+  "request_id": "a1b2c3d4e5f67890"
 }
 ```
+
+其中 `request_id`（可选）与响应头 `X-Request-ID` 一致，便于对照服务端结构化日志排查。
 
 ### 1.4 错误码规范
 
@@ -123,6 +126,7 @@ Authorization: Bearer <jwt_token>
 | 40403 | 训练计划不存在 | plan_id 无对应记录 |
 | 40904 | 资源状态冲突 | 分析尚未完成却去取报告等状态冲突场景（M2-T1） |
 | 42901 | 请求过于频繁 | 触发限流 |
+| 50301 | 分析任务入队失败 | DB 已写入 `pending`，但 Celery/Redis broker 不可用导致无法调度（用户可稍后重试；运维可对单条 `ana_` 手工补偿 `run_swing_analysis.delay`） |
 | 50001 | 服务内部错误 | 未预期的服务端异常 |
 | 50100 | AI 引擎不可达 | Celery worker 连 AI 引擎超时/连接失败，耗尽 3 次重试后终态失败（backend 侧 transport 级失败，W6-T6 起启用） |
 | 50101 | 视频预处理失败 | ffmpeg 解码失败 / 视频文件下载失败 / 转码异常（W6-T1 真实触发；对应 `ai_engine.PreprocessError`） |
@@ -501,6 +505,32 @@ POST /v1/analyses/upload-token
   }
 }
 ```
+
+---
+
+### 3.1a 经 API 上报视频（微信小程序推荐）
+
+```
+POST /v1/analyses/uploads/{upload_id}/video
+```
+
+**需认证**（`Authorization: Bearer …`，与 `/upload-token` 同一用户）
+
+**Content-Type**：`multipart/form-data`，表单字段 **`file`**（视频二进制）。
+
+**前置**：已成功调用 `POST /v1/analyses/upload-token`，路径参数 **`upload_id`** 与响应中一致。
+
+**行为概要**：
+
+1. 校验 Redis 上传凭证归属当前用户；
+2. 写入对象存储（MinIO / COS），并把 Redis 中的 **`file_size`** 更新为实际上传字节数，以便 **`POST /v1/analyses`** 与对象大小校验一致；
+3. 客户端继续调用 **`POST /v1/analyses`** 创建任务。
+
+**说明**：与接口同源，适合微信小程序 **`wx.uploadFile`**；可避免直连存储网关时的 502 / 超时。RN 或自建工具若仍需预签名直传，可使用 `upload-token` 返回的 `upload_url`。
+
+**小程序客户端策略（实现见 `client/src/services/analysisService.ts`）**：对 **502/503/504**、网关不可用文案、超时及常见连接类 `uploadFile:fail`，默认 **至多 3 次**间隔重试；**401/403（含过期签名语义）及 HTTP 404（缺同源接口）** 不重试同款请求体，其中 **403/ExpiredSignature** 须 **重新** `upload-token` 后再传（`analysis/params` 对已识别错误做一轮刷新）。
+
+**成功响应**：统一信封，`code=0`，`data` 可为 `null`。
 
 ---
 
@@ -1440,7 +1470,7 @@ POST /v1/payments/subscriptions
 ### 6.2 支付结果回调（微信通知后端）
 
 ```
-POST /v1/payments/wechat-notify
+POST /v1/payments/wechat/notify
 ```
 
 **微信服务器调用，非前端接口**
@@ -1826,6 +1856,7 @@ POST /v1/events
 | 7 | POST | /v1/users/me/delete-request | 是 | 申请账号注销 |
 | 8 | POST | /v1/users/me/cancel-delete | 是 | 取消账号注销 |
 | 9 | POST | /v1/analyses/upload-token | 是 | 获取上传凭证 |
+| 9a | POST | /v1/analyses/uploads/{upload_id}/video | 是 | 经 API 上报视频（multipart `file`，小程序推荐） |
 | 10 | POST | /v1/analyses | 是 | 创建分析任务 |
 | 11 | GET | /v1/analyses/{id}/status | 是 | 查询分析状态 |
 | 12 | GET | /v1/analyses/{id} | 是 | 获取分析报告 |
@@ -1846,7 +1877,7 @@ POST /v1/events
 | 25 | GET | /v1/training/progress | 是 | 获取进步曲线 |
 | 26 | GET | /v1/training/calendar | 是 | 获取打卡日历 |
 | 27 | POST | /v1/payments/subscriptions | 是 | 创建订阅订单 |
-| 28 | POST | /v1/payments/wechat-notify | 否 | 微信支付回调 |
+| 28 | POST | /v1/payments/wechat/notify | 否 | 微信支付回调（商户平台 notify_url 须与此路径一致） |
 | 29 | GET | /v1/payments/orders/{id} | 是 | 查询订单状态 |
 | 30 | GET | /v1/payments/membership | 是 | 获取会员信息 |
 | 31 | POST | /v1/payments/membership/cancel-auto-renew | 是 | 取消自动续费 |
@@ -1870,7 +1901,7 @@ POST /v1/events
 | 设计稿（§六） | W7 实际路径 | 备注 |
 |---|---|---|
 | `POST /v1/payments/subscriptions` | `POST /v1/payments/orders` | 请求体仍为 `{plan_type}`；返回 `{order_id, prepay_params}`，mock 模式下 `prepay_params = {"mock": true}` |
-| `POST /v1/payments/wechat-notify` | （**W8 接真实支付时落地**） | W7 目前用 `POST /v1/payments/orders/{id}/mock-confirm`（仅 `WECHAT_PAY_MOCK_MODE=true` 时可调）替代，直接跳 `paid` |
+| `POST /v1/payments/wechat-notify`（旧稿路径） | `POST /v1/payments/wechat/notify` | 已实现；环境变量 `WECHAT_PAY_NOTIFY_URL` 须配公网 HTTPS，例如 `https://api.example.com/v1/payments/wechat/notify`。mock 模式下回调返回 FAIL |
 | `GET /v1/payments/orders/{id}` | `GET /v1/payments/orders/{id}` | ✅ 无变化 |
 | `GET /v1/payments/membership` | `GET /v1/users/me/membership` | 返回 `{is_member, membership_type, expires_at, days_remaining, auto_renew}`；同时 `GET /v1/users/me` 的 `UserResponse` 也扩展了 `is_member` / `membership_days_remaining` 派生字段 |
 | `GET /v1/payments/plans` | `GET /v1/payments/plans` | **新增**：开通页套餐列表 |

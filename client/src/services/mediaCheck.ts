@@ -55,6 +55,7 @@ export async function checkVideoFirstFrame(
       name: 'media',
       formData: { scene },
       header,
+      timeout: 60000,
       success: (res) => {
         if (res.statusCode >= 500) {
           // 后端 5xx：fail open，别卡用户

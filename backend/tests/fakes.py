@@ -12,7 +12,7 @@ class FakeMinioStorage:
     """测试替身。模拟 MinIO 行为但不访问网络。
 
     - `presign_post_policy`：返回可预期的伪字段。
-    - `head_object`：命中 `mark_uploaded` 后返回 stat，否则返回 None。
+    - `head_object`：命中 `mark_uploaded` / `put_object_bytes` 后返回 stat，否则返回 None。
     - `mark_uploaded(key, size, content_type)`：测试代码手动标记"对象已上传"。
     """
 
@@ -49,6 +49,9 @@ class FakeMinioStorage:
             "Content-Type": content_type,
         }
         return f"http://localhost:9000/{self.bucket}", fields, expires_at
+
+    def put_object_bytes(self, *, key: str, data: bytes, content_type: str) -> None:
+        self.mark_uploaded(key, len(data), content_type)
 
     def head_object(self, key: str) -> dict | None:
         return self._uploaded.get(key)

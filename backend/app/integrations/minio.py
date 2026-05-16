@@ -111,6 +111,19 @@ class MinioStorageClient:
         url = f"{self._public_endpoint.rstrip('/')}/{self.bucket}"
         return url, form_fields, expires_at
 
+    def put_object_bytes(self, *, key: str, data: bytes, content_type: str) -> None:
+        """服务端上传对象（微信小程序经 `/v1/analyses/uploads/...` 兜底写入 MinIO/COS）."""
+        from io import BytesIO
+
+        bio = BytesIO(data)
+        self._internal.put_object(
+            self.bucket,
+            key,
+            bio,
+            length=len(data),
+            content_type=content_type,
+        )
+
     def head_object(self, key: str) -> dict | None:
         """查对象元信息；不存在返回 None（其他错误抛出）。"""
         try:

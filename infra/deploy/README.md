@@ -2,7 +2,9 @@
 
 快捷命令（仓库根目录）：`make issue-le-cert` · `make renew-le-cert` · `make sync-le-certs`。
 
-**Git / 密钥单侧真源 / CVM 推荐 `make deploy-cvm-up`**：统一见 [**`docs/release-notes/CVM-canonical-deploy.md`**](../docs/release-notes/CVM-canonical-deploy.md)。
+**Git / 密钥单侧真源 / CVM 推荐 `make deploy-cvm-up`**：统一见 [**`docs/release-notes/CVM-canonical-deploy.md`**](../docs/release-notes/CVM-canonical-deploy.md)。从 rsync-only 迁入云上 Git：**[`docs/release-notes/CVM-migrate-rsync-to-git.md`](../docs/release-notes/CVM-migrate-rsync-to-git.md)**（脚本 **`infra/deploy/cvm-bootstrap-git-on-server.sh`**）。
+
+Makefile 上还常用：**`make cvm-stable-from-mac ENV_FILE=~/secrets/…`**（预检 + TLS + SSH 远端 **`release-cvm-on-server.sh`**；**`DRY_RUN=1`** 只预检）、**`make cvm-preflight`**、**`make cvm-remote-release`**（可选 **`CVM_LOCAL_PREFLIGHT=1 ENV_FILE=…`** 与预检对齐）。
 
 **已在 CVM shell 里登录（控制台 / SSH）要一键发版**：在仓库根执行 **`bash infra/deploy/release-cvm-on-server.sh`**（`git pull` + 全栈 compose build + `alembic upgrade head` + `nginx` 重启）；可选 **`USE_WECHAT_PAY_COMPOSE=1`** 叠加商户 PEM compose。
 

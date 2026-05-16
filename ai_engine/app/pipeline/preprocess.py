@@ -37,6 +37,7 @@ from urllib.parse import urlparse
 
 import numpy as np
 
+from app.config import settings
 from app.errors import PoorQualityError, PreprocessError
 
 # ============================================================
@@ -189,6 +190,41 @@ def preprocess_video(
 # ============================================================
 
 
+def _prefer_internal_minio_download_url(
+    raw: str,
+    *,
+    bucket: str | None = None,
+    internal_endpoint: str | None = None,
+) -> str:
+    """将对外 MinIO/CDN URL 转成容器内可调度的直链后再 curl。
+
+    backend 下发的 `video_url` 常为 `effective_minio_public_endpoint`（如
+    ``https://api.example/minio/<bucket>/<key>``），ai_engine 在 compose 网内应走
+    ``MINIO_ENDPOINT``，避免公网 hostname / NAT 回流 / TLS 等对容器不可达导致的
+    「视频下载失败」。
+
+    带 query（预签名等）的 URL **不改写**，交由 curl 按原样拉取。
+    """
+    parsed = urlparse(raw)
+    if parsed.scheme not in ("http", "https"):
+        return raw
+    if parsed.query:
+        return raw
+
+    b = bucket or settings.MINIO_BUCKET
+    internal = (internal_endpoint or settings.MINIO_ENDPOINT).rstrip("/")
+
+    marker = f"/{b}/"
+    path = parsed.path or ""
+    idx = path.find(marker)
+    if idx < 0:
+        return raw
+    object_key = path[idx + len(marker) :].lstrip("/")
+    if not object_key:
+        return raw
+    return f"{internal}/{b}/{object_key}"
+
+
 def _materialize_input(input_path_or_url: str, work_dir: Path) -> Path:
     """把输入统一落到本地文件系统。
 
@@ -200,7 +236,8 @@ def _materialize_input(input_path_or_url: str, work_dir: Path) -> Path:
     parsed = urlparse(input_path_or_url)
     if parsed.scheme in ("http", "https"):
         dest = work_dir / "source.mp4"
-        cmd = ["curl", "-fsSL", "--max-time", "60", "-o", str(dest), input_path_or_url]
+        fetch_url = _prefer_internal_minio_download_url(input_path_or_url)
+        cmd = ["curl", "-fsSL", "--max-time", "60", "-o", str(dest), fetch_url]
         try:
             subprocess.run(cmd, check=True, capture_output=True, timeout=90)
         except subprocess.CalledProcessError as exc:

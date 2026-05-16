@@ -27,6 +27,12 @@ import { http } from './request'
 
 const ACCEPT_JSON = { Accept: 'application/json' }
 
+/**
+ * 同步发消息要等整条 LLM 完成：后端 `LLM_TIMEOUT_SECONDS` ×（1 + `LLM_HTTP_MAX_RETRIES`）
+ * 量级可达数分钟；原先 185s 会先触发小程序 `wx.request` timeout，表现为「AI 不可用」。
+ */
+const CHAT_SEND_TIMEOUT_MS = 420000
+
 /* ==================== 流式事件类型（与后端 _sse_event_stream 对齐） ==================== */
 export interface StreamStartEvent {
   user_message_id: string
@@ -90,7 +96,10 @@ export const chatService = {
    * - 不传时 24h 内若有未删除的活跃会话则复用，否则新建
    */
   createSession(payload: CreateSessionRequest = {}) {
-    return http.post<CreateSessionResponse>('/chat/sessions', payload)
+    // 与 getQuickQuestions / getMessages 对齐：默认 request 仅 15s，真机弱网易超时导致「对话打不开」
+    return http.post<CreateSessionResponse>('/chat/sessions', payload, {
+      timeout: 60000,
+    })
   },
 
   /** 4.4 会话列表（T3 不用，保留给 T6 历史页） */
@@ -101,6 +110,7 @@ export const chatService = {
     const suffix = qs.toString()
     return http.get<ChatSessionListResponse>(
       `/chat/sessions${suffix ? `?${suffix}` : ''}`,
+      { timeout: 60000 },
     )
   },
 
@@ -125,8 +135,7 @@ export const chatService = {
    * 关键点：
    * - `Accept: application/json` 强制走 JSON 分支
    * - 加 `?stream=false` 双保险，后端即使未来改默认值也不会误走 SSE
-   * - timeout=185s：与 app.config.ts networkTimeout.request + 服务端 LLM 窗对齐；
-   *   单靠调大仍会受微信客户端策略影响，SSE 链路已配合服务端 sse-ping 保活帧。
+   * - timeout：须覆盖后端 LLM 读超时 × 重试次数（见文件顶部 CHAT_SEND_TIMEOUT_MS）
    * - silent=true：业务错误码（40007 配额耗尽、40009 速率限制、50106 LLM 失败）
    *   交给 UI 层自己 toast / 做兜底 UI，避免重复弹"请求失败"
    */
@@ -134,7 +143,7 @@ export const chatService = {
     return http.post<SendMessageResponse>(
       `/chat/sessions/${sessionId}/messages?stream=false`,
       payload,
-      { header: ACCEPT_JSON, timeout: 185000, silent: true },
+      { header: ACCEPT_JSON, timeout: CHAT_SEND_TIMEOUT_MS, silent: true },
     )
   },
 
@@ -157,8 +166,8 @@ export const chatService = {
         url: `/chat/sessions/${sessionId}/messages?stream=true`,
         method: 'POST',
         body: payload,
-        // 须 ≥ 后端 LLM_STREAM read 超时 + 网络余量（默认服务端 120s）
-        timeoutMs: 180000,
+        // 与同步路径同属一轮对话；SSE 少见超长空闲（有 sse-ping），仍放宽以防误判超时
+        timeoutMs: CHAT_SEND_TIMEOUT_MS,
       },
       {
         onEvent: (evt) => {
@@ -191,6 +200,6 @@ export const chatService = {
 
   /** 4.7 删除会话（硬删；后端 CASCADE 带走 messages） */
   deleteSession(sessionId: string) {
-    return http.del<null>(`/chat/sessions/${sessionId}`)
+    return http.del<null>(`/chat/sessions/${sessionId}`, { timeout: 30000 })
   },
 }

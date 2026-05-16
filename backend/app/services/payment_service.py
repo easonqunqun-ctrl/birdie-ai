@@ -104,6 +104,7 @@ async def _create_wechat_prepay(db: AsyncSession, order: Order, user: User) -> P
     try:
         ctx = wechat_pay_v3.get_wechat_pay_v3()
     except (RuntimeError, ValueError, OSError) as e:
+        logger.warning("wechat_pay_v3_init_failed_create_prepay", error=str(e), order_id=order.id)
         raise ThirdPartyError(message=f"支付配置错误：{e!s}", detail=str(e)) from e
 
     pricing = PLAN_PRICING[order.plan_type]
@@ -403,6 +404,7 @@ async def sync_pending_order_from_wechat(
     try:
         ctx = wechat_pay_v3.get_wechat_pay_v3()
     except (RuntimeError, ValueError, OSError) as e:
+        logger.warning("wechat_pay_v3_init_failed_sync_order", error=str(e), order_id=order.id)
         raise ThirdPartyError(message=f"支付配置错误：{e!s}", detail=str(e)) from e
 
     try:

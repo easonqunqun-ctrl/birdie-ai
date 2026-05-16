@@ -1,15 +1,16 @@
 .PHONY: help init up down restart logs ps clean reset \
-        backend-shell backend-logs backend-test backend-lint backend-migrate backend-revision \
+        backend-shell backend-logs backend-test backend-test-smoke backend-lint backend-migrate backend-revision \
         backend-celery-logs backend-celery-shell \
         ai-shell ai-logs ai-engine-test ai-engine-test-local ai-engine-lint ai-engine-smoke \
         ai-engine-synth-fixtures \
         client-install client-bootstrap-rn-shell client-dev-weapp client-dev-rn-ios client-dev-rn-android \
         client-build-weapp client-build-weapp-prod client-build-rn client-tsc client-check-rn \
         check test ci \
-        deploy-check-env \
+        deploy-check-env deploy-check-cvm-pay \
         deploy-test test-logs test-ps test-reset test-restart test-certs test-health \
         issue-le-cert sync-le-certs renew-le-cert verify-weapp-https \
-        deploy-cvm-up deploy-cvm-ps deploy-cvm-logs publish-backend-cvm setup-cvm-ssh-key
+        deploy-cvm-up deploy-cvm-ps deploy-cvm-logs publish-backend-cvm setup-cvm-ssh-key \
+        release-cvm cvm-migrate-git-doc cvm-stable-from-mac cvm-deploy-help cvm-deploy-dry-run cvm-env-preflight cvm-preflight cvm-preflight-tls cvm-remote-release cvm-smoke
 
 # 默认目标：显示帮助
 help:
@@ -28,7 +29,8 @@ help:
 	@echo "  ===== 后端 ====="
 	@echo "  make backend-shell     进入后端容器"
 	@echo "  make backend-logs      查看后端日志"
-	@echo "  make backend-test      运行后端测试"
+	@echo "  make backend-test      运行后端测试（全套 pytest）"
+	@echo "  make backend-test-smoke  CI 对齐冒烟子集（需先 make up）"
 	@echo "  make backend-lint      代码检查（ruff）"
 	@echo "  make backend-migrate   执行数据库迁移"
 	@echo "  make backend-revision m='msg'  生成新的迁移脚本"
@@ -61,13 +63,26 @@ help:
 	@echo "  make test              rollup：后端 + AI 引擎 + 客户端（RN bundle + tsc）"
 	@echo "  make ci                test + 真实引擎 smoke（bouncing_box → 50103）"
 	@echo ""
-	@echo "  ===== W8-T4 测试环境（CVM + nginx HTTPS；小程序须可信 CA） ====="
+	@echo "  ===== W8-T4：云发版（最简单）======"
+	@echo "  make release-cvm           先发代码 git push → 本条：SSH 整包 compose + alembic（.env 只在服务器）"
+	@echo "  make cvm-migrate-git-doc   云上从 rsync 切 git clone：读 docs/release-notes/CVM-migrate-rsync-to-git.md"
+	@echo "  make publish-backend-cvm   无云上 git：scp compose 三件套 + rsync backend/ai_engine → 远端 build + alembic"
+	@echo "                              （REMOTE_RSYNC_COMPOSE=no 可跳过 scp compose；慎用）"
+	@echo "  ===== W8-T4：测试环境与证书（按需）======"
 	@echo "  make deploy-check-env     自检 .env.local 尖括号/穿透占位（可加 ENV_FILE=路径）"
+	@echo "  make deploy-check-cvm-pay WECHAT_PAY_MOCK=false 时须有 docker-compose.wechat-pay-key.yml（ENV_FILE=）"
 	@echo "  bash infra/deploy/cvm-rebuild-backend.sh   CVM：backend 绑定挂载 + .venv/uv sync + 重建（见文档）"
 	@echo "  make test-certs HOST=...  生成自签 HTTPS 证书（首次部署前）"
 	@echo "  make deploy-test          一键起测试栈（compose -f base -f test）"
-	@echo "  make deploy-cvm-up        CVM：+ docker-compose.cvm.yml；若有 docker-compose.wechat-pay-key.yml 则自动挂商户 PEM"
-	@echo "  make publish-backend-cvm   scp backend 关键→默认 ubuntu@1.13.198.172 并 compose rebuild（密钥免密前先 make setup-cvm-ssh-key）"
+	@echo "  make deploy-cvm-up        CVM：+ docker-compose.cvm.yml；若存在 docker-compose.wechat-pay-key.yml 则自动挂商户 PEM；发版前自动跑 deploy-check-cvm-pay"
+	@echo "  make cvm-deploy-help      CVM：打印 deploy-cvm.sh 阶段说明"
+	@echo "  make cvm-deploy-dry-run   CVM：打印服务端建议 compose / curl 片段（不执行 SSH）"
+	@echo "  make cvm-preflight        推荐：先发版前跑一次（占位符自检 + 真实支付 compose 挂载）"
+	@echo "  make cvm-env-preflight    等价调用 deploy-cvm.sh --local-preflight（内含上两项）"
+	@echo "  make cvm-preflight-tls    cvm-preflight 再跑 verify-weapp-https DOMAIN=默认 api.b…"
+	@echo "  make cvm-stable-from-mac  稳妥：ENV_FILE=真实文件路径.env（勿用文档占位符字面量）→ 预检→TLS→release；DRY_RUN=1 只预检"
+	@echo "  make cvm-remote-release   DEPLOY_HOST=… 上 SSH 远端执行 release…（可加 CVM_LOCAL_PREFLIGHT=1 ENV_FILE=…）"
+	@echo "  make cvm-smoke DOMAIN=api… TOKEN=可选  HTTPS 冒烟（curl /v1/health + 可选 Bearer）"
 	@echo "  make setup-cvm-ssh-key     路径 B：专用 ed25519 + ssh-copy-id（只一次输服务器密码）"
 	@echo "  make test-logs            tail 测试栈所有服务日志"
 	@echo "  make test-ps              查看测试栈状态"
@@ -118,6 +133,12 @@ reset:
 	@echo "✓ 已清理所有容器和数据"
 
 # ==================== 后端 ====================
+# 仅跑与 `backend-pytest-smoke.yml` 一致的子集（需先 `make up`）。
+backend-test-smoke:
+	docker compose --env-file .env.local exec backend uv run pytest \
+	  tests/test_parallel_backlog_regressions.py tests/test_health.py tests/test_quota_unlimited.py \
+	  -q --tb=short
+
 backend-shell:
 	docker compose --env-file .env.local exec backend sh
 
@@ -262,6 +283,7 @@ deploy-cvm-up:
 	@if [ ! -f docker-compose.cvm.yml ]; then \
 		echo "✗ 未找到 docker-compose.cvm.yml"; exit 1; \
 	fi
+	@$(MAKE) deploy-check-cvm-pay ENV_FILE="$(or $(ENV_FILE),.env.local)"
 	$(CVM_COMPOSE) up -d --build
 	@echo ""
 	@echo "✓ CVM 栈已更新（镜像内后端/引擎；详见 docs/release-notes/CVM-canonical-deploy.md）"
@@ -276,9 +298,75 @@ deploy-cvm-logs:
 setup-cvm-ssh-key:
 	bash infra/deploy/setup-cvm-ssh-key.sh
 
+# 在云服务器跑一次 migrate 即可（见文档）；本条仅打出路径
+cvm-migrate-git-doc:
+	@echo "云上 rsync→git：docs/release-notes/CVM-migrate-rsync-to-git.md"
+	@echo "脚本（随仓库在云路径后）：bash infra/deploy/cvm-bootstrap-git-on-server.sh  （需 GIT_REPO_URL）"
+
 # 从本 Mac 推到当前 CVM（优先使用 ~/.ssh/id_ed25519_birdie_golf）
 publish-backend-cvm:
 	bash infra/deploy/publish-backend-to-cvm.sh
+
+# ---------------------------------------------------------------------------
+# 极简发版：代码已在 Git 远端后，本条只 SSH 触发 CVM 上的 release-cvm-on-server.sh；
+# 生产 .env.local 只在服务器维护，无需在 Mac 指定 ENV_FILE。
+# 可调：DEPLOY_HOST=… GIT_BRANCH=… SKIP_GIT=1（无 .git / rsync 过渡期）
+release-cvm: cvm-remote-release
+
+cvm-deploy-help:
+	bash scripts/deploy-cvm.sh
+
+cvm-deploy-dry-run:
+	bash scripts/deploy-cvm.sh --dry-run
+
+cvm-env-preflight:
+	bash scripts/deploy-cvm.sh --local-preflight --env-file="$(or $(ENV_FILE),.env.local)"
+
+cvm-preflight:
+	@$(MAKE) deploy-check-env ENV_FILE="$(or $(ENV_FILE),.env.local)"
+	@$(MAKE) deploy-check-cvm-pay ENV_FILE="$(or $(ENV_FILE),.env.local)"
+	@echo ""
+	@echo "✓ cvm-preflight：env + 微信支付 compose 自检完成。"
+	@echo "  可选：DOMAIN=… make verify-weapp-https   ｜发版后 make cvm-smoke DOMAIN=…"
+
+cvm-preflight-tls: cvm-preflight
+	@$(MAKE) verify-weapp-https DOMAIN="$(or $(DOMAIN),api.birdieai.cn)"
+
+cvm-remote-release:
+	bash scripts/cvm-remote-release.sh
+
+# 从 Mac 稳妥发版：生产 ENV_FILE → 预检 →（默认）TLS → SSH 远端整包脚本（Compose + alembic + nginx）。
+# ENV_FILE：须为生产 secrets，勿用含 trycloudflare/ngrok 的开发 .env。
+# SKIP_TLS=1：跳过 verify-weapp-https。
+# DRY_RUN=1：预检(+TLS) 后退出，不发 SSH。
+# 其他：GIT_BRANCH / SKIP_GIT / DEPLOY_HOST 随 shell 传给 cvm-remote-release.sh（与子进程环境一致）。
+cvm-stable-from-mac:
+	@if [ -z "$(ENV_FILE)" ]; then \
+	  echo "✗ cvm-stable-from-mac 必须指定 ENV_FILE=…（示例里的「/你的/生产secrets路径」需换成本机真实路径，不能直接照抄）" >&2; \
+	  exit 1; \
+	fi
+	@if [ ! -f "$(ENV_FILE)" ]; then \
+	  echo "✗ 找不到文件：$(ENV_FILE)" >&2; \
+	  echo "  文档里的 /你的/生产secrets路径.env 只是示意，请在命令里换成你真的用来放密钥的文件。" >&2; \
+	  echo "  示例：ENV_FILE=$(HOME)/secrets/xiaoniao-prod.env  （把文件名改成你自己的）" >&2; \
+	  echo "  或从访达把文件拖进终端，会自动变成绝对路径。" >&2; \
+	  exit 1; \
+	fi
+	@$(MAKE) cvm-preflight ENV_FILE="$(ENV_FILE)"
+	@if [ "$(SKIP_TLS)" != "1" ]; then $(MAKE) verify-weapp-https DOMAIN="$(or $(DOMAIN),api.birdieai.cn)"; fi
+	@if [ "$(DRY_RUN)" = "1" ]; then \
+	  echo ""; \
+	  echo "✓ DRY_RUN=1：预检（与 TLS，若未设 SKIP_TLS=1）已完成，未执行 SSH。"; \
+	  exit 0; \
+	fi
+	@echo ""
+	@echo "→ SSH 执行远端 infra/deploy/release-cvm-on-server.sh（须已 git push；rsync-only 过渡期见 SKIP_GIT=1）"
+	@bash scripts/cvm-remote-release.sh
+
+cvm-smoke:
+	DOMAIN="$(or $(DOMAIN),api.birdieai.cn)" \
+	TOKEN="$(TOKEN)" LOGIN_CODE="$(LOGIN_CODE)" CURL_EXTRA="$(CURL_EXTRA)" \
+	  bash scripts/cvm-smoke.sh
 
 test-certs:
 	@if [ -z "$(HOST)" ]; then \
@@ -292,6 +380,9 @@ test-certs:
 # 自检 .env.local 是否还带尖括号/穿透占位（在仓库根或 CVM compose 目录执行）
 deploy-check-env:
 	bash infra/deploy/quick-check-env-local.sh "$(or $(ENV_FILE),.env.local)"
+
+deploy-check-cvm-pay:
+	bash infra/deploy/check-cvm-pay-mount.sh "$(or $(ENV_FILE),.env.local)"
 
 deploy-test:
 	@if [ ! -f infra/test/certs/fullchain.pem ] || [ ! -f infra/test/certs/privkey.pem ]; then \

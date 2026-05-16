@@ -1,5 +1,6 @@
 """用户相关 Pydantic schema."""
 
+import logging
 from datetime import datetime
 from typing import Literal
 
@@ -9,6 +10,48 @@ GolfLevel = Literal["beginner", "elementary", "intermediate", "advanced"]
 WeeklyFreq = Literal["occasional", "once", "frequent", "daily"]
 PrimaryGoal = Literal["distance", "accuracy", "short_game", "putting", "consistency"]
 MembershipType = Literal["free", "monthly", "yearly", "family"]
+
+_LOG = logging.getLogger(__name__)
+_VALID_GOLF_LEVELS = frozenset({"beginner", "elementary", "intermediate", "advanced"})
+_VALID_WEEKLY_FREQ = frozenset({"occasional", "once", "frequent", "daily"})
+_VALID_MEMBERSHIP = frozenset({"free", "monthly", "yearly", "family"})
+
+
+def sanitize_primary_goals_for_response(raw: object) -> list[str]:
+    """JSONB `primary_goals` 若为 dict / 非标量元素，整块丢弃或过滤，避免 DTO ValidationError."""
+    if not isinstance(raw, list):
+        return []
+    out: list[str] = []
+    for x in raw:
+        if isinstance(x, str) and x.strip():
+            out.append(x.strip())
+        elif isinstance(x, (int, float, bool)):
+            out.append(str(x))
+    return out[:5]
+
+
+def sanitize_optional_golf_level(raw: str | None) -> GolfLevel | None:
+    if raw is None or raw not in _VALID_GOLF_LEVELS:
+        if raw is not None and raw not in _VALID_GOLF_LEVELS:
+            _LOG.warning("invalid_user_golf_level_cleared", extra={"raw": raw})
+        return None
+    return raw  # type: ignore[return-value]
+
+
+def sanitize_optional_weekly_freq(raw: str | None) -> WeeklyFreq | None:
+    if raw is None or raw not in _VALID_WEEKLY_FREQ:
+        if raw is not None and raw not in _VALID_WEEKLY_FREQ:
+            _LOG.warning("invalid_user_weekly_frequency_cleared", extra={"raw": raw})
+        return None
+    return raw  # type: ignore[return-value]
+
+
+def sanitize_membership_type_for_response(raw: str | None) -> MembershipType:
+    v = raw or "free"
+    if v in _VALID_MEMBERSHIP:
+        return v  # type: ignore[return-value]
+    _LOG.warning("invalid_user_membership_type_coerced", extra={"raw": raw})
+    return "free"
 
 
 class UserStats(BaseModel):

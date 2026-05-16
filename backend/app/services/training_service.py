@@ -21,20 +21,47 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, date, datetime, timedelta
+from typing import Literal
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.exceptions import BadRequestError, ConflictError, ForbiddenError, NotFoundError
+from app.core.exceptions import BadRequestError, ForbiddenError, NotFoundError
 from app.core.security import new_id
 from app.models.analysis import AnalysisIssue, SwingAnalysis
 from app.models.training import Drill, PracticeLog, TrainingPlan, TrainingTask
 from app.models.user import User
+from app.schemas.training import TrainingTaskItem
 
 # 每次分析至多生成几个任务（issues 去重后截断）
 MAX_TASKS_PER_ANALYSIS = 5
+
+log = logging.getLogger(__name__)
+
+
+def training_task_to_item(task: TrainingTask) -> TrainingTaskItem:
+    """ORM → Pydantic；非法 `status` 降级，避免 model_validate 抛错导致 HTTP 500。"""
+    raw = task.status or ""
+    status: Literal["pending", "completed"] = "completed" if raw == "completed" else "pending"
+    if raw not in ("pending", "completed"):
+        log.warning(
+            "invalid_training_task_status_coerced",
+            extra={"task_id": task.id, "raw_status": raw},
+        )
+    return TrainingTaskItem(
+        id=task.id,
+        plan_id=task.plan_id,
+        drill_id=task.drill_id,
+        scheduled_date=task.scheduled_date,
+        sort_order=int(task.sort_order or 0),
+        status=status,
+        completed_at=task.completed_at,
+        verification_analysis_id=task.verification_analysis_id,
+    )
 
 
 # ============================================================
@@ -138,7 +165,8 @@ async def generate_or_update_weekly(
     plan = (await db.execute(stmt)).scalar_one_or_none()
 
     if plan is None:
-        plan = TrainingPlan(
+        # 并发「本周首次建计划」可能同时 INSERT，触发 uq_user_week → IntegrityError
+        candidate = TrainingPlan(
             id=new_id("plan"),
             user_id=user_id,
             week_start=monday,
@@ -147,15 +175,20 @@ async def generate_or_update_weekly(
             total_tasks=0,
             completed_tasks=0,
         )
-        db.add(plan)
-        await db.flush()
-        existing_drill_ids: set[str] = set()
-        existing_count = 0
-    else:
-        existing_drill_ids = {t.drill_id for t in plan.tasks}
-        existing_count = len(plan.tasks)
-        # 更新源分析（最新的一次），但不覆盖已有的打卡记录
-        plan.source_analysis_id = analysis_id
+        db.add(candidate)
+        try:
+            async with db.begin_nested():
+                await db.flush()
+        except IntegrityError:
+            plan = (await db.execute(stmt)).scalar_one_or_none()
+            if plan is None:
+                raise
+        else:
+            plan = candidate
+
+    existing_drill_ids = {t.drill_id for t in plan.tasks}
+    existing_count = len(plan.tasks)
+    plan.source_analysis_id = analysis_id
 
     new_drills = [d for d in drill_ids if d not in existing_drill_ids]
     if not new_drills:
@@ -223,7 +256,7 @@ async def complete_task(
     if task is None:
         raise NotFoundError(code=40401, message="任务不存在")
     if task.user_id != user.id:
-        raise ConflictError(code=40301, message="无权操作此任务")
+        raise ForbiddenError(code=40302, message="无权操作此任务")
     if task.status == "completed":
         raise BadRequestError(code=40014, message="任务已完成，无需重复打卡")
 

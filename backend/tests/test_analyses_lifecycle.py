@@ -82,6 +82,50 @@ async def test_upload_token_happy_path_returns_fields(
 
 
 @pytest.mark.asyncio
+async def test_upload_video_via_api_gateway_then_create(
+    client: AsyncClient, auth_headers: dict[str, str], fake_minio: FakeMinioStorage
+):
+    """小程序同源兜底：POST multipart 至 /uploads/{id}/video 写入存储后可创建任务。"""
+    blob = b"fake-mp4-bytes-" + b"x" * 2048
+    token_resp = await client.post(
+        "/v1/analyses/upload-token",
+        headers=auth_headers,
+        json={
+            "file_name": "swing.mp4",
+            "file_size": len(blob),
+            "file_type": "video/mp4",
+            "duration": 8.0,
+        },
+    )
+    assert token_resp.status_code == 200, token_resp.text
+    upload_id = token_resp.json()["data"]["upload_id"]
+    key = token_resp.json()["data"]["key"]
+
+    up = await client.post(
+        f"/v1/analyses/uploads/{upload_id}/video",
+        headers=auth_headers,
+        files={"file": ("swing.mp4", blob, "video/mp4")},
+    )
+    assert up.status_code == 200, up.text
+    assert up.json()["code"] == 0
+
+    stat = fake_minio.head_object(key)
+    assert stat is not None
+    assert stat["size"] == len(blob)
+
+    resp = await client.post(
+        "/v1/analyses",
+        headers=auth_headers,
+        json={
+            "upload_id": upload_id,
+            "camera_angle": "face_on",
+            "club_type": "iron_7",
+        },
+    )
+    assert resp.status_code == 200, resp.text
+
+
+@pytest.mark.asyncio
 async def test_create_analysis_rejects_unknown_upload_id(
     client: AsyncClient, auth_headers: dict[str, str]
 ):
@@ -96,6 +140,50 @@ async def test_create_analysis_rejects_unknown_upload_id(
         },
     )
     assert resp.status_code == 400
+    assert resp.json()["code"] == 40011
+
+
+@pytest.mark.asyncio
+async def test_create_analysis_rejects_corrupted_upload_token_payload(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    fake_minio: FakeMinioStorage,
+):
+    """Redis 凭证 JSON 损坏时不应裸 500，而应视为凭证无效（40011）。"""
+    token_resp = await client.post(
+        "/v1/analyses/upload-token",
+        headers=auth_headers,
+        json={
+            "file_name": "swing.mp4",
+            "file_size": 5 * 1024 * 1024,
+            "file_type": "video/mp4",
+            "duration": 8.0,
+        },
+    )
+    assert token_resp.status_code == 200, token_resp.text
+    upload_id = token_resp.json()["data"]["upload_id"]
+    key = token_resp.json()["data"]["key"]
+    fake_minio.mark_uploaded(key, 5 * 1024 * 1024)
+
+    from app.core.redis import get_redis
+    from app.services.analysis_service import UPLOAD_TOKEN_REDIS_KEY
+
+    redis = await get_redis()
+    await redis.set(
+        UPLOAD_TOKEN_REDIS_KEY.format(upload_id=upload_id),
+        "not-valid-json{{{",
+    )
+
+    resp = await client.post(
+        "/v1/analyses",
+        headers=auth_headers,
+        json={
+            "upload_id": upload_id,
+            "camera_angle": "face_on",
+            "club_type": "driver",
+        },
+    )
+    assert resp.status_code == 400, resp.text
     assert resp.json()["code"] == 40011
 
 

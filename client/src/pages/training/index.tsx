@@ -15,9 +15,11 @@ import Taro, { useDidShow } from '@tarojs/taro'
 import EnvBadge from '@/components/EnvBadge'
 import { trainingService } from '@/services/trainingService'
 import { userService } from '@/services/userService'
+import { describeIntermittentRequestFailure, isRequestError } from '@/services/request'
 import { useUserStore } from '@/store/userStore'
 import { getDrillDetail } from '@/constants/drillLibrary'
 import type { TrainingPlanDetail, TrainingTaskItem } from '@/types/training'
+import { switchToHome, toastTabNavigationFailure } from '@/utils/tabNav'
 import './index.scss'
 
 const TrainingPage: FC = () => {
@@ -37,7 +39,26 @@ const TrainingPage: FC = () => {
       const res = await trainingService.getCurrentPlan()
       setPlan(res)
     } catch (e) {
-      Taro.showToast({ title: '加载失败，请稍后再试', icon: 'none' })
+      let base = '加载失败，请稍后再试'
+      if (isRequestError(e)) {
+        base =
+          e.kind === 'business'
+            ? e.message?.trim() || base
+            : describeIntermittentRequestFailure(e).toastTitle
+      }
+      const rid =
+        isRequestError(e) &&
+        typeof e.requestId === 'string' &&
+        e.requestId.trim()
+          ? e.requestId.trim()
+          : ''
+      const line =
+        rid && `${base}\n追踪ID ${rid}`.length <= 220
+          ? `${base}\n追踪ID ${rid}`
+          : rid
+            ? `${base.slice(0, 170)} …${rid.slice(-12)}`
+            : base
+      Taro.showToast({ title: line.slice(0, 220), icon: 'none', duration: rid ? 4500 : 2500 })
     } finally {
       setLoading(false)
     }
@@ -135,9 +156,12 @@ const TrainingPage: FC = () => {
       setExpandedTaskId(null)
       // 刷新 user 拿最新 streak
       fetchMe().catch(() => undefined)
-    } catch (e: any) {
-      const msg = e?.data?.message || e?.message || '打卡失败'
-      Taro.showToast({ title: msg, icon: 'none' })
+    } catch (e: unknown) {
+      let title =
+        isRequestError(e) && e.kind === 'business' && e.message?.trim()
+          ? e.message.trim().slice(0, 220)
+          : describeIntermittentRequestFailure(e).toastTitle
+      Taro.showToast({ title, icon: 'none' })
     } finally {
       setSubmittingTaskId(null)
     }
@@ -191,7 +215,7 @@ const TrainingPage: FC = () => {
         <Button
           className='training__empty-cta'
           type='primary'
-          onClick={() => Taro.switchTab({ url: '/pages/index/index' })}
+          onClick={() => void switchToHome().catch(toastTabNavigationFailure)}
         >
           去上传视频
         </Button>

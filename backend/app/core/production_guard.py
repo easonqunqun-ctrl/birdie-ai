@@ -33,6 +33,66 @@ def _has_legacy_angle_bracket_placeholder(raw: str) -> bool:
     )
 
 
+def audit_wechat_pay_real_mode(settings: Settings) -> list[str]:
+    """``WECHAT_PAY_MOCK_MODE=false`` 时微信支付 APIv3 必填项。
+
+    staging / prod 在进程启动阶段强制执行，避免「容器起来了但下单立刻 502」。
+    """
+    errors: list[str] = []
+    if settings.WECHAT_PAY_MOCK_MODE:
+        return errors
+
+    if not (settings.WECHAT_PAY_MCH_ID or "").strip():
+        errors.append("WECHAT_PAY_MCH_ID 为空（微信支付商户号）")
+
+    if not (settings.WECHAT_PAY_MCH_SERIAL or "").strip():
+        errors.append("WECHAT_PAY_MCH_SERIAL 为空（商户平台「API 安全」证书序列号）")
+
+    apiv3 = (
+        settings.WECHAT_PAY_API_V3_KEY or settings.WECHAT_PAY_API_KEY or ""
+    ).strip()
+    if len(apiv3) != 32:
+        errors.append(
+            "WECHAT_PAY_API_V3_KEY（或 WECHAT_PAY_API_KEY）须为 32 位，"
+            "与商户平台「API 安全 → APIv3 密钥」一致",
+        )
+
+    notify = (settings.WECHAT_PAY_NOTIFY_URL or "").strip()
+    if not notify:
+        errors.append(
+            "WECHAT_PAY_NOTIFY_URL 为空（须 HTTPS 公网可访问，"
+            "例如 https://api.example.com/v1/payments/wechat/notify）",
+        )
+    elif not notify.lower().startswith("https://"):
+        errors.append("WECHAT_PAY_NOTIFY_URL 须为 https://")
+    elif "localhost" in notify.lower() or "127.0.0.1" in notify:
+        errors.append("WECHAT_PAY_NOTIFY_URL 不可为 localhost（微信服务器无法回调）")
+
+    pem_inline = (getattr(settings, "WECHAT_PAY_PRIVATE_KEY_PEM", None) or "").strip()
+    cert_path = (settings.WECHAT_PAY_CERT_PATH or "").strip()
+    if pem_inline:
+        if "BEGIN" not in pem_inline or "PRIVATE KEY" not in pem_inline:
+            errors.append(
+                "WECHAT_PAY_PRIVATE_KEY_PEM 不似 PEM 私钥（应含 BEGIN PRIVATE KEY / RSA PRIVATE KEY）",
+            )
+    elif cert_path:
+        if not os.path.isfile(cert_path):
+            errors.append(
+                f"WECHAT_PAY_CERT_PATH 在进程内不存在或不可读：{cert_path}。"
+                "CVM 须在仓库根提供 docker-compose.wechat-pay-key.yml 挂载 apiclient_key.pem，"
+                "并使用 make deploy-cvm-up（或与 Makefile 相同的 compose -f 列表）启动 backend。"
+                "勿仅用不含该文件的 docker compose up，否则下单必 502。"
+            )
+    else:
+        errors.append(
+            "商户 API 私钥未配置：在 .env.local 设置 WECHAT_PAY_PRIVATE_KEY_PEM，"
+            "或使用 docker-compose.wechat-pay-key.yml 挂载 apiclient_key.pem 并设置 "
+            "WECHAT_PAY_CERT_PATH=/secrets/apiclient_key.pem",
+        )
+
+    return errors
+
+
 def _is_ephemeral_tunnel_hostname(host: str) -> bool:
     """识别 Cloudflare quick tunnel / ngrok 等临时公网地址，签进 upload_url 会导致微信无法配置合法域名。"""
     h = host.strip().lower()
@@ -180,17 +240,27 @@ def startup_production_guards(logger, settings: Settings) -> None:
 
     errs, warns = audit_production_config(settings)
 
+    pay_errs: list[str] = []
+    if settings.APP_ENV in {"staging", "prod"} and not settings.WECHAT_PAY_MOCK_MODE:
+        pay_errs = audit_wechat_pay_real_mode(settings)
+
     for w in warns:
         logger.warning("production_config_audit", severity="warn", detail=w)
 
     if settings.APP_ENV == "staging":
         for e in errs:
             logger.error("production_config_audit", severity="would_fail_in_prod", detail=e)
+        if pay_errs:
+            msg = "[微信支付·真实商户] 配置不完整，进程拒绝启动（避免下单才返回 502）：\n" + "\n".join(
+                f"  • {e}" for e in pay_errs
+            )
+            logger.error("wechat_pay_config_audit", severity="fatal", errors=pay_errs)
+            raise RuntimeError(msg)
         return
 
-    if settings.APP_ENV == "prod" and errs:
-        msg = "[生产门禁] 以下项会导致登录/上传/HTTPS 不可用，进程拒绝启动：\n" + "\n".join(
-            f"  • {e}" for e in errs
-        )
-        logger.error("production_config_audit", severity="fatal", errors=errs)
-        raise RuntimeError(msg)
+    if settings.APP_ENV == "prod":
+        fatal = [*errs, *pay_errs]
+        if fatal:
+            msg = "[生产门禁] 进程拒绝启动：\n" + "\n".join(f"  • {e}" for e in fatal)
+            logger.error("production_config_audit", severity="fatal", errors=fatal)
+            raise RuntimeError(msg)

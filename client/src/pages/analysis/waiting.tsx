@@ -11,7 +11,7 @@
  *   4. "你知道吗" 小贴士：从 `constants/swingTips.ts` 随机起点 + 8s 滚动
  *   5. status=completed → reLaunch 到 report 页
  *   6. status=failed → 错误 UI，两个按钮（重新拍摄 / 回首页）；若 quota_refunded 加文案
- *   7. > 120s 还没终态 → 展示"分析较长，稍后微信通知你"（UI 占位；W5 做真通知）
+ *   7. ≥60s 非阻断文案「可能比预期稍久」；≥120s 仍终态占位「分析时间较长…」（通知 W8）
  *   8. 连续 3 次轮询失败 → 停止轮询 + toast
  *
  * 设计选型记录：
@@ -25,6 +25,7 @@ import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, Button } from '@tarojs/components'
 import Taro, { useDidHide, useDidShow, useRouter } from '@tarojs/taro'
 import { analysisService } from '@/services/analysisService'
+import { describeIntermittentRequestFailure, isRequestError } from '@/services/request'
 import { useAnalysisStore } from '@/store/analysisStore'
 import { SWING_TIPS, pickStartIndex } from '@/constants/swingTips'
 import type {
@@ -51,6 +52,8 @@ function pollDelayMs(status: AnalysisStatusResponse['status'] | null): number {
 
 /** 完成后短暂留白再跳转（避免最后一帧 stage 看不见） */
 const COMPLETE_REDIRECT_MS = 250
+/** MVP：60s 非阻断提示「可能稍久」；120s 仍作为强提示/占位阈值 */
+const SOFT_LONG_WAIT_SEC = 60
 const TIMEOUT_FALLBACK_MS = 120_000
 const TIPS_ROTATE_MS = 8000
 const MAX_CONSECUTIVE_ERRORS = 3
@@ -116,10 +119,28 @@ const AnalysisWaitingPage: FC = () => {
         return // UI 会基于 status.status 渲染失败界面
       }
     } catch (e) {
+      if (isRequestError(e)) {
+        if (e.kind === 'http_unauthorized') {
+          setFatalError(e.message || '登录已失效，请重新登录')
+          return
+        }
+        if (e.kind === 'business') {
+          const toastTitle =
+            (e.message && e.message.trim()) ||
+            describeIntermittentRequestFailure(e).toastTitle
+          setFatalError(e.message || '无法获取分析状态')
+          Taro.showToast({ title: toastTitle, icon: 'none', duration: 2800 })
+          return
+        }
+      }
+
       consecutiveErrorsRef.current += 1
+
+      const { fatalMessage: fatalMsg, toastTitle } = describeIntermittentRequestFailure(e)
+
       if (consecutiveErrorsRef.current >= MAX_CONSECUTIVE_ERRORS) {
-        setFatalError('网络似乎不太稳定，已暂停自动刷新')
-        Taro.showToast({ title: '网络异常，请稍后重试', icon: 'none' })
+        setFatalError(fatalMsg)
+        Taro.showToast({ title: toastTitle, icon: 'none' })
         return
       }
     }
@@ -276,6 +297,17 @@ const AnalysisWaitingPage: FC = () => {
               : '预计还需不到 30 秒'}
         </Text>
       </View>
+
+      {elapsedSec >= SOFT_LONG_WAIT_SEC &&
+        !timedOut &&
+        status?.status !== 'completed' &&
+        (
+          <View className='waiting__soft-wait'>
+            <Text className='waiting__soft-wait-text'>
+              分析可能比预期稍久，请耐心等待；仍可留在本页或稍后在「我的分析报告」查看结果。
+            </Text>
+          </View>
+        )}
 
       {/* 阶段列表 */}
       <View className='waiting__stages'>

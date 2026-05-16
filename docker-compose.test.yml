@@ -1,0 +1,89 @@
+# =====================================================
+# W8-T4：测试环境覆盖（CVM 单机 + nginx + 自签 HTTPS）
+# =====================================================
+# 用法（在 CVM 上）：
+#   docker compose -f docker-compose.yml -f docker-compose.test.yml --env-file .env.local up -d --build
+# 或直接：
+#   make deploy-test
+#
+# 与本文件配合的 .env.local 应按 .env.test 模板填值，关键差异：
+#   - APP_ENV=staging
+#   - WECHAT_MOCK_LOGIN=false   ← 启用真实 wx.login
+#   - QUOTA_MODE=unlimited      ← 内测期不卡免费配额（W8-T3 落地）
+#   - WECHAT_PAY_MOCK_MODE=true ← 支付仍 mock，前端 PAYMENT_ENABLED=false
+#
+# 设计取舍：
+#   1. backend / ai_engine / minio 全部"不外暴端口"，统一走 nginx 反代
+#      避免 CVM 暴露 8000/9000 这种"裸 HTTP 端口"被脚本扫描到
+#   2. nginx 终结 HTTPS（默认：infra/test/certs 下 fullchain.pem + privkey.pem；
+#      自签由 gen-certs.sh 生成；微信小程序真机须换 Let's Encrypt，见 infra/deploy/README.md）
+#   3. uvicorn 关掉 --reload；测试环境是"准生产"，不允许文件改动热加载
+# =====================================================
+
+services:
+  # PostgreSQL：覆盖 ports，不向公网暴露 5432
+  postgres:
+    ports: !reset []
+
+  # Redis：同上
+  redis:
+    ports: !reset []
+
+  # MinIO：S3 API（9000）由 nginx 代理；管理控制台（容器内 9001）只对 SSH 隧道
+  # 开放。宿主机映射用 9002：避免与其它占用的 127.0.0.1:9001 冲突（腾讯云镜像常见）。
+  # 运维：`ssh -L 9002:127.0.0.1:9002 ubuntu@cvm` → 本机打开 http://127.0.0.1:9002
+  minio:
+    ports:
+      - "127.0.0.1:9002:9001"
+
+  # Backend：去掉公网 8000 端口；改由 nginx 内部访问
+  backend:
+    ports: !reset []
+    # 测试环境关闭 --reload；APP_DEBUG=false 由 .env.local 控制
+    command: >
+      sh -c "
+      uv run alembic upgrade head &&
+      uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+      "
+    # 在 ai_engine 和 redis 都 ready 之后再启动；避免首次 SSE 流时 ai_engine 还没监听
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ai_engine:
+        condition: service_started
+
+  # Celery Worker：测试环境跑单 worker 即可（内测并发不大）
+  celery-worker:
+    command: uv run celery -A app.celery_app worker --loglevel=info --concurrency=1
+
+  # AI Engine：去公网暴露；直接用镜像内 venv（避免「uv run」长期占锁/CVM 上不 bind :9000）
+  ai_engine:
+    ports: !reset []
+    command: ["/app/.venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "9000"]
+
+  # ==================== 新增：nginx 反代 ====================
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: xiaoniao-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"     # HTTP → 自动 301 到 HTTPS
+      - "443:443"   # HTTPS 业务流量
+    volumes:
+      - ./infra/test/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/test/certs:/etc/nginx/certs:ro
+      - ./infra/test/acme-webroot:/var/www/html:rw
+    depends_on:
+      backend:
+        condition: service_started
+      minio:
+        condition: service_healthy
+    # 直连 backend；冷启动 + Alembic/uvicorn 慢时 probes 若在 45s 内未连续成功会一直 unhealthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://backend:8000/v1/health"]
+      interval: 15s
+      timeout: 8s
+      retries: 5
+      start_period: 90s

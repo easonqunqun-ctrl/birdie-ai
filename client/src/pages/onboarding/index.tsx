@@ -1,6 +1,7 @@
 import { FC, useState } from 'react'
 import { View, Text, Button } from '@tarojs/components'
 import Taro from '@tarojs/taro'
+import { describeIntermittentRequestFailure, isRequestError } from '@/services/request'
 import { useUserStore } from '@/store/userStore'
 import { userService } from '@/services/userService'
 import { FREQS, GOALS, LEVELS, MAX_GOALS } from '@/constants/golf'
@@ -56,6 +57,14 @@ const OnboardingPage: FC = () => {
       Taro.reLaunch({ url: '/pages/index/index' })
     } catch (e) {
       console.warn('onboarding failed', e)
+      const title =
+        isRequestError(e) && e.kind === 'business' && e.message?.trim()
+          ? e.message.trim().slice(0, 220)
+          : describeIntermittentRequestFailure(e).toastTitle
+      Taro.showToast({
+        title,
+        icon: 'none',
+      })
       setSubmitting(false)
     }
   }
@@ -80,6 +89,14 @@ const OnboardingPage: FC = () => {
           Taro.reLaunch({ url: '/pages/index/index' })
         } catch (e) {
           console.warn('skip onboarding failed', e)
+          const title =
+            isRequestError(e) && e.kind === 'business' && e.message?.trim()
+              ? e.message.trim().slice(0, 220)
+              : describeIntermittentRequestFailure(e).toastTitle
+          Taro.showToast({
+            title,
+            icon: 'none',
+          })
           setSkipping(false)
         }
       }

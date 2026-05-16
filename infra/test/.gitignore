@@ -1,0 +1,3 @@
+# W8-T4：自签证书私钥不入仓
+certs/server.crt
+certs/server.key

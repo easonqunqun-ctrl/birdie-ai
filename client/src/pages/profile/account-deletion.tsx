@@ -3,6 +3,7 @@ import { View, Text, Input, Button } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { useUserStore } from '@/store/userStore'
 import { userService } from '@/services/userService'
+import { describeIntermittentRequestFailure, isRequestError } from '@/services/request'
 import './account-deletion.scss'
 
 const AccountDeletionPage: FC = () => {
@@ -38,9 +39,12 @@ const AccountDeletionPage: FC = () => {
           await fetchMe()
           Taro.showToast({ title: '已提交注销', icon: 'success' })
           setText('')
-        } catch (e: any) {
-          const msg = e?.data?.message || e?.message || '操作失败'
-          Taro.showToast({ title: msg, icon: 'none' })
+        } catch (e: unknown) {
+          const title =
+            isRequestError(e) && e.kind === 'business' && e.message?.trim()
+              ? e.message.trim().slice(0, 220)
+              : describeIntermittentRequestFailure(e).toastTitle
+          Taro.showToast({ title, icon: 'none' })
         } finally {
           setSubmitting(false)
         }
@@ -59,9 +63,12 @@ const AccountDeletionPage: FC = () => {
           await userService.cancelAccountDeletion()
           await fetchMe()
           Taro.showToast({ title: '已取消', icon: 'success' })
-        } catch (e: any) {
-          const msg = e?.data?.message || e?.message || '操作失败'
-          Taro.showToast({ title: msg, icon: 'none' })
+        } catch (e: unknown) {
+          const title =
+            isRequestError(e) && e.kind === 'business' && e.message?.trim()
+              ? e.message.trim().slice(0, 220)
+              : describeIntermittentRequestFailure(e).toastTitle
+          Taro.showToast({ title, icon: 'none' })
         } finally {
           setCancelling(false)
         }

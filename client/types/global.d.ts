@@ -43,5 +43,7 @@ declare namespace NodeJS {
     TARO_APP_ENV?: string
     TARO_APP_PAYMENT_MOCK?: string
     TARO_APP_PAYMENT_ENABLED?: string
+    /** RN 等直连 MinIO 预签名时使用；小程序默认走同源 `/analyses/uploads/...` */
+    TARO_APP_ANALYSIS_DIRECT_MINIO?: string
   }
 }

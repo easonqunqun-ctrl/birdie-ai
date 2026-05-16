@@ -14,9 +14,12 @@
  */
 
 import { create } from 'zustand'
-import { isRequestError } from '@/services/request'
+import { describePageLoadFailure, isRequestError } from '@/services/request'
 import { chatService } from '@/services/chatService'
-import type { StreamCancel } from '@/utils/sseClient'
+import {
+  weappSupportsChunkedStreaming,
+  type StreamCancel,
+} from '@/utils/sseClient'
 import type {
   DisplayChatMessage,
   MessageAttachment,
@@ -123,7 +126,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         loading: false,
       })
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '加载对话失败'
+      const msg = describePageLoadFailure(err)
       set({ loading: false, bootstrapError: msg })
       throw err
     }
@@ -148,27 +151,32 @@ export const useChatStore = create<ChatState>((set, get) => ({
         loading: false,
       })
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '加载对话失败'
+      const msg = describePageLoadFailure(err)
       set({ loading: false, bootstrapError: msg })
       throw err
     }
   },
 
-  /* ============================== 发送（默认非流式，可切回 SSE） ==============================
+  /* ============================== 发送 ==============================
    *
-   * 默认走 sync 而不是 SSE 的原因：
-   *   - 微信小程序真机环境下 `wx.request({enableChunked:true})` 与多种中间网关
-   *     （Cloudflare quick tunnel / 部分国内运营商劫持）兼容性极差，
-   *     表现为 60s 内既不触发 onChunkReceived 也不触发 success/fail，
-   *     直接 `Error: timeout`，对话假死。
-   *   - 当前 LLM 是 mock，回复瞬时返回，sync 完全够用且最稳。
-   *   - 接通真实 LLM 后，在 `.env.test.local` / `.env.production.local` 设
-   *     `TARO_APP_CHAT_USE_SSE=true` 即可切回 SSE 享受打字效果。
+   * **微信小程序（真机）**：同步 JSON 等整条 LLM 往往超过 wx.request ~60s 上限 → 在支持
+   * `enableChunked` 时**默认走 SSE**（后端 `sse-ping` 保活）。
+   *
+   * **RN / H5**：`TARO_APP_CHAT_USE_SSE=true` 启用流式，否则同步 JSON。
+   *
+   * **调试**：`TARO_APP_CHAT_FORCE_SYNC=true` 强制同步 JSON（真机长对话仍可能超时）。
    */
   submitMessage(content) {
-    const useSSE =
-      typeof process !== 'undefined' &&
-      process.env?.TARO_APP_CHAT_USE_SSE === 'true'
+    const env = typeof process !== 'undefined' ? process.env : undefined
+    const isWeappMiniprogram = env?.TARO_ENV === 'weapp'
+    const forceSync = env?.TARO_APP_CHAT_FORCE_SYNC === 'true'
+
+    if (isWeappMiniprogram && !forceSync && weappSupportsChunkedStreaming()) {
+      return submitMessageStreamImpl(get, set, content)
+    }
+
+    const sseRequested = env?.TARO_APP_CHAT_USE_SSE === 'true'
+    const useSSE = sseRequested && !isWeappMiniprogram
     if (!useSSE) {
       return get().submitMessageSync(content)
     }
@@ -303,7 +311,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
 }))
 
 /* ==================== 错误映射 ==================== */
-function mapSubmitError(err: unknown): Error & { submitError: SubmitMessageError } {
+function mapSubmitError(err: unknown): Error & {
+  submitError: SubmitMessageError
+  chatCause?: unknown
+} {
   const message = err instanceof Error ? err.message : '网络异常'
   const code = isRequestError(err) ? err.code : undefined
   let submitError: SubmitMessageError
@@ -318,16 +329,33 @@ function mapSubmitError(err: unknown): Error & { submitError: SubmitMessageError
   } else {
     submitError = { kind: 'network', message }
   }
-  return wrapError(message, submitError)
+  return wrapError(message, submitError, err)
 }
 
 function wrapError(
   message: string,
   submitError: SubmitMessageError,
-): Error & { submitError: SubmitMessageError } {
-  const wrapped = new Error(message) as Error & { submitError: SubmitMessageError }
+  chatCause?: unknown,
+): Error & {
+  submitError: SubmitMessageError
+  chatCause?: unknown
+} {
+  const wrapped = new Error(message) as Error & {
+    submitError: SubmitMessageError
+    chatCause?: unknown
+  }
   wrapped.submitError = submitError
+  if (chatCause !== undefined) {
+    wrapped.chatCause = chatCause
+  }
   return wrapped
+}
+
+export function chatErrorCause(err: unknown): unknown | undefined {
+  if (err && typeof err === 'object' && 'chatCause' in err) {
+    return (err as { chatCause?: unknown }).chatCause
+  }
+  return undefined
 }
 
 export function getSubmitError(err: unknown): SubmitMessageError | null {
@@ -344,7 +372,7 @@ export const CHAT_ERROR_CODES = {
   SERVICE_ERROR: ERR_CHAT_SERVICE,
 } as const
 
-/* ==================== 流式实现（仅在 TARO_APP_CHAT_USE_SSE=true 时启用） ==================== */
+/* ==================== 流式实现（小程序默认 / RN·H5 由 env 开关） ==================== */
 type GetState = () => ChatState
 type SetState = (
   partial:
@@ -545,7 +573,7 @@ function submitMessageStreamImpl(
           if (meta.aborted) {
             markStreamingBubbleErrored('已中断')
             finish(
-              wrapError(err.message, { kind: 'network', message: err.message }),
+              wrapError(err.message, { kind: 'network', message: err.message }, err),
             )
             return
           }
@@ -558,7 +586,7 @@ function submitMessageStreamImpl(
                 wrapError(err.message, {
                   kind: 'network',
                   message: err.message,
-                }),
+                }, err),
               )
             }
           })

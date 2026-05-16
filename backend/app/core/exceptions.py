@@ -107,6 +107,14 @@ class ConflictError(AppException):
     message = "资源状态不允许本次操作"
 
 
+class AnalysisDispatchError(AppException):
+    """挥杆分析任务已落库，但 Celery / Redis broker 入队失败（用户应稍后重试或由运维补偿调度）."""
+
+    code = 50301
+    http_status = 503
+    message = "分析任务暂时无法排队，请稍后重试"
+
+
 # ==================== 5xx 错误 ====================
 class InternalError(AppException):
     code = 50001

@@ -14,8 +14,17 @@
  */
 
 import Taro from '@tarojs/taro'
+import { describeIntermittentRequestFailure } from '@/services/request'
 
 const COACH_CTX_KEY = 'tab_pending_coach_context'
+
+/** tabBar switchTab reject（页面未注册 / 宿主异常）时兜底 toast */
+export function toastTabNavigationFailure(err: unknown): void {
+  Taro.showToast({
+    title: describeIntermittentRequestFailure(err).toastTitle,
+    icon: 'none',
+  })
+}
 
 export interface CoachPendingContext {
   /** 报告 ID，用于让 coach session 注入最近一次分析 */

@@ -5,7 +5,11 @@ from __future__ import annotations
 import pytest
 
 from app.config import Settings
-from app.core.production_guard import audit_production_config, startup_production_guards
+from app.core.production_guard import (
+    audit_production_config,
+    audit_wechat_pay_real_mode,
+    startup_production_guards,
+)
 
 
 def _prod_aligned_minio_kw() -> dict:
@@ -116,3 +120,66 @@ def test_startup_staging_never_raises_from_guard() -> None:
     kw["APP_ENV"] = "staging"
     kw["WECHAT_MOCK_LOGIN"] = True
     startup_production_guards(_SilentLogger(), Settings(**kw))
+
+
+def test_audit_wechat_pay_real_mode_empty_when_mock() -> None:
+    s = Settings(WECHAT_PAY_MOCK_MODE=True, WECHAT_PAY_MCH_ID="")
+    assert audit_wechat_pay_real_mode(s) == []
+
+
+def test_audit_pay_cert_file_must_exist_when_using_cert_path() -> None:
+    kw = _prod_aligned_minio_kw()
+    kw["WECHAT_PAY_MOCK_MODE"] = False
+    kw["WECHAT_PAY_MCH_ID"] = "1900000109"
+    kw["WECHAT_PAY_MCH_SERIAL"] = "SERIALOK01"
+    kw["WECHAT_PAY_API_V3_KEY"] = "a" * 32
+    kw["WECHAT_PAY_NOTIFY_URL"] = "https://api.example.com/v1/payments/wechat/notify"
+    kw["WECHAT_PAY_PRIVATE_KEY_PEM"] = ""
+    kw["WECHAT_PAY_CERT_PATH"] = "/tmp/__nonexistent_apiclient_for_audit_test__.pem"
+    errs = audit_wechat_pay_real_mode(Settings(**kw))
+    assert any("进程内不存在" in e or "不可读" in e for e in errs)
+
+
+def test_audit_wechat_pay_real_mode_requires_apiv3_length() -> None:
+    kw = _prod_aligned_minio_kw()
+    kw["WECHAT_PAY_MOCK_MODE"] = False
+    kw["WECHAT_PAY_MCH_ID"] = "1900000109"
+    kw["WECHAT_PAY_MCH_SERIAL"] = "7F42F1C123ABCD"
+    kw["WECHAT_PAY_API_V3_KEY"] = "tooshort"
+    kw["WECHAT_PAY_NOTIFY_URL"] = "https://api.example.com/v1/payments/wechat/notify"
+    kw["WECHAT_PAY_PRIVATE_KEY_PEM"] = (
+        "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQ\n-----END PRIVATE KEY-----\n"
+    )
+    errs = audit_wechat_pay_real_mode(Settings(**kw))
+    assert any("32" in e for e in errs)
+
+
+def test_startup_staging_raises_when_real_pay_incomplete() -> None:
+    kw = _prod_aligned_minio_kw()
+    kw["APP_ENV"] = "staging"
+    kw["WECHAT_PAY_MOCK_MODE"] = False
+    kw["WECHAT_PAY_MCH_ID"] = "1900000109"
+    kw["WECHAT_PAY_API_V3_KEY"] = "a" * 32
+    kw["WECHAT_PAY_NOTIFY_URL"] = "https://api.example.com/v1/payments/wechat/notify"
+    kw["WECHAT_PAY_PRIVATE_KEY_PEM"] = (
+        "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQ\n-----END PRIVATE KEY-----\n"
+    )
+    # 缺证书序列号 → 启动门禁应直接失败（与线上下单 502 同源问题）
+    kw["WECHAT_PAY_MCH_SERIAL"] = ""
+    with pytest.raises(RuntimeError, match="微信支付"):
+        startup_production_guards(_SilentLogger(), Settings(**kw))
+
+
+def test_startup_prod_combines_general_and_pay_errors() -> None:
+    kw = _prod_aligned_minio_kw()
+    kw["WECHAT_MOCK_LOGIN"] = True  # prod 常规门禁已不通过
+    kw["WECHAT_PAY_MOCK_MODE"] = False
+    kw["WECHAT_PAY_MCH_ID"] = "1900000109"
+    kw["WECHAT_PAY_API_V3_KEY"] = "a" * 32
+    kw["WECHAT_PAY_NOTIFY_URL"] = "https://api.example.com/v1/payments/wechat/notify"
+    kw["WECHAT_PAY_PRIVATE_KEY_PEM"] = (
+        "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQ\n-----END PRIVATE KEY-----\n"
+    )
+    kw["WECHAT_PAY_MCH_SERIAL"] = "SERIAL1"
+    with pytest.raises(RuntimeError, match="生产门禁"):
+        startup_production_guards(_SilentLogger(), Settings(**kw))

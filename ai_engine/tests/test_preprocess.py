@@ -70,6 +70,48 @@ def test_preprocess_missing_file_raises() -> None:
         preprocess_video("/does/not/exist.mp4")
 
 
+def test_prefer_internal_minio_download_url_api_proxy_style() -> None:
+    """公网网关 /minio/ 前缀 + path-style bucket/key → 容器内 MINIO_ENDPOINT。"""
+    from app.pipeline.preprocess import _prefer_internal_minio_download_url
+
+    out = _prefer_internal_minio_download_url(
+        "https://api.birdieai.cn/minio/xiaoniao-videos/uploads/abc/video.mp4",
+        bucket="xiaoniao-videos",
+        internal_endpoint="http://minio:9000",
+    )
+    assert out == "http://minio:9000/xiaoniao-videos/uploads/abc/video.mp4"
+
+
+def test_prefer_internal_minio_download_url_already_path_style_public() -> None:
+    """localhost:9000 形式公网占位 → 同样改写到内网。"""
+    from app.pipeline.preprocess import _prefer_internal_minio_download_url
+
+    out = _prefer_internal_minio_download_url(
+        "http://localhost:9000/xiaoniao-videos/k.mp4",
+        bucket="xiaoniao-videos",
+        internal_endpoint="http://minio:9000",
+    )
+    assert out == "http://minio:9000/xiaoniao-videos/k.mp4"
+
+
+def test_prefer_internal_minio_download_url_presigned_unchanged() -> None:
+    """带 query 的预签名 URL 不得改写（否则丢签名）。"""
+    from app.pipeline.preprocess import _prefer_internal_minio_download_url
+
+    raw = "https://cdn.example/xiaoniao-videos/obj.mkv?AWSAccessKeyId=x&Signature=y"
+    assert _prefer_internal_minio_download_url(raw, bucket="xiaoniao-videos") == raw
+
+
+def test_prefer_internal_minio_download_url_no_bucket_marker_unchanged() -> None:
+    from app.pipeline.preprocess import _prefer_internal_minio_download_url
+
+    raw = "https://example.com/other-bucket/obj.mp4"
+    assert (
+        _prefer_internal_minio_download_url(raw, bucket="xiaoniao-videos", internal_endpoint="http://minio:9000")
+        == raw
+    )
+
+
 # ============================================================
 # 第 2 层：合成视频质量门（需要 ffmpeg + opencv）
 # ============================================================

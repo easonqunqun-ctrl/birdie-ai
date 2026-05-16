@@ -7,19 +7,29 @@ import type {
 } from '@/types/api'
 import { http } from './request'
 
+/** 真机弱网：默认 wx.request 15s 易超时，身份相关接口单独放宽 */
+const AUTH_READ_TIMEOUT_MS = 60000
+
 export const userService = {
   wechatLogin(payload: WechatLoginRequest) {
     const path =
       process.env.TARO_ENV === 'rn'
         ? '/auth/wechat-open-login'
         : '/auth/wechat-login'
-    return http.post<WechatLoginResponse>(path, payload, { noAuth: true })
+    return http.post<WechatLoginResponse>(path, payload, {
+      noAuth: true,
+      timeout: AUTH_READ_TIMEOUT_MS,
+    })
   },
   refreshToken() {
-    return http.post<{ token: string; expires_in: number }>('/auth/refresh-token', {})
+    return http.post<{ token: string; expires_in: number }>(
+      '/auth/refresh-token',
+      {},
+      { timeout: AUTH_READ_TIMEOUT_MS },
+    )
   },
   getMe() {
-    return http.get<User>('/users/me')
+    return http.get<User>('/users/me', { timeout: AUTH_READ_TIMEOUT_MS })
   },
   completeOnboarding(payload: OnboardingRequest) {
     return http.post<User>('/users/me/onboarding', payload)

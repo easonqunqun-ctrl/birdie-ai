@@ -3,7 +3,7 @@ import { View, Text, Button, Image } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import EnvBadge from '@/components/EnvBadge'
 import { useUserStore } from '@/store/userStore'
-import { switchToCoach, switchToProfile } from '@/utils/tabNav'
+import { switchToCoach, switchToProfile, toastTabNavigationFailure } from '@/utils/tabNav'
 import { analysisService } from '@/services/analysisService'
 import { deferReLaunch } from '@/utils/deferNavigation'
 import { PAYMENT_ENABLED_FLAG } from '@/constants/flags'
@@ -129,7 +129,7 @@ const HomePage: FC = () => {
             </View>
             <Text className='home__quick-arrow'>›</Text>
           </View>
-          <View className='home__quick' onClick={() => switchToCoach()}>
+          <View className='home__quick' onClick={() => void switchToCoach().catch(toastTabNavigationFailure)}>
             <View className='home__quick-icon home__quick-icon--coach'>
               <Text className='home__quick-icon-emoji'>💬</Text>
             </View>
@@ -225,11 +225,11 @@ const HomePage: FC = () => {
 
   const handleAskCoach = () => {
     // W8-T2：coach 已是 tabBar 页，用 switchTab 而非 navigateTo。
-    switchToCoach()
+    void switchToCoach().catch(toastTabNavigationFailure)
   }
 
   const handleOpenProfile = () => {
-    switchToProfile()
+    void switchToProfile().catch(toastTabNavigationFailure)
   }
 
   // ====== 首页"主英雄"用最新一次分析的得分作为故事核心 ======

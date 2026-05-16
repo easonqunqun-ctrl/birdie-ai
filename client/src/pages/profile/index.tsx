@@ -3,7 +3,7 @@ import { View, Text, Button } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import EnvBadge from '@/components/EnvBadge'
 import { useUserStore } from '@/store/userStore'
-import { switchToCoach } from '@/utils/tabNav'
+import { switchToCoach, toastTabNavigationFailure } from '@/utils/tabNav'
 import { FREQ_LABEL, GOAL_LABEL, LEVEL_LABEL } from '@/constants/golf'
 import { PAYMENT_ENABLED_FLAG } from '@/constants/flags'
 import type { GolfLevel, PrimaryGoal, WeeklyFreq } from '@/types/api'
@@ -170,7 +170,7 @@ const ProfilePage: FC = () => {
           </View>
           <View
             className='profile__menu-item'
-            onClick={() => switchToCoach()}
+            onClick={() => void switchToCoach().catch(toastTabNavigationFailure)}
           >
             <Text className='profile__menu-icon'>💬</Text>
             <Text className='profile__menu-label'>AI 教练对话</Text>

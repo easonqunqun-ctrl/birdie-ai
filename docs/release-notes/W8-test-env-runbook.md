@@ -205,6 +205,7 @@ docker compose -f docker-compose.yml -f docker-compose.test.yml logs -f backend
 | `errcode=40029` | wx.login 拿到的 code 拖太久（>5 分钟）才换 | 后端会返回 401 / 业务码 40104，前端会自动重新 wx.login，正常情况无感 |
 | `errcode=40013 invalid appid` | `.env.local` 的 `WECHAT_MINIPROGRAM_APPID` 与开发者工具加载的 AppID 不一致 | 改 `.env.local` 后 `make test-restart` |
 | 上传视频 504 | nginx `client_max_body_size` 太小（默认 1m） | 已设 `100m`，确认 nginx 起的是 `infra/test/nginx.conf` |
+| 上传视频 **502**（响应体含 **502 Bad Gateway** HTML） | nginx → MinIO **upstream 指向过期容器 IP**（常见于 **`docker compose … --force-recreate minio`** 后未复位 nginx）；或使用未含 **`resolver 127.0.0.11`** 的旧版 **`infra/test/nginx.conf`** | **`git pull`** 同步 nginx 配置 → **`docker compose … exec nginx nginx -t`** → **`docker restart xiaoniao-nginx`**；说明见 **`docs/release-notes/CVM-canonical-deploy.md` §8** |
 | SSE 卡顿/一坨下发 | nginx 默认开 `proxy_buffering` | 已显式 `off`，且 `chunked_transfer_encoding on` |
 | MinIO putObject 跨域 / 403 | `MINIO_PUBLIC_ENDPOINT` 不对 | 应是 `https://$HOST/minio`（不是 `http://localhost:9000`） |
 | `make deploy-test` 提示证书未找到 | 未跑 `make test-certs HOST=...`（生成的 **`fullchain.pem`/`privkey.pem`** 缺失） | 先生成证书 |

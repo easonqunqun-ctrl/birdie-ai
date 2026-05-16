@@ -23,6 +23,8 @@ export interface APIResponse<T = unknown> {
   message: string
   data?: T
   detail?: string
+  /** 错误响应可选字段，便于对照服务端日志（HTTP 响应头亦有 X-Request-ID） */
+  request_id?: string
 }
 
 export interface PageData<T> {

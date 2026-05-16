@@ -14,38 +14,12 @@ from app.schemas.user import (
     OnboardingRequest,
     UserQuota,
     UserResponse,
-    UserStats,
     UserUpdateRequest,
 )
-from app.services import account_deletion_service, analysis_service, payment_service, quota_service
+from app.services import account_deletion_service, analysis_service, quota_service
+from app.services.user_presenter import build_user_response
 
 router = APIRouter()
-
-
-def _build_user_response(user: User, *, include_stats: bool = True) -> UserResponse:
-    return UserResponse(
-        id=user.id,
-        nickname=user.nickname,
-        avatar_url=user.avatar_url,
-        golf_level=user.golf_level,
-        primary_goals=user.primary_goals or [],
-        weekly_practice_frequency=user.weekly_practice_frequency,
-        membership_type=user.membership_type,
-        membership_expires_at=user.membership_expires_at,
-        is_member=payment_service.is_member(user),
-        membership_days_remaining=payment_service.days_remaining(user),
-        onboarding_completed=user.onboarding_completed,
-        stats=UserStats(
-            total_analyses=user.total_analyses,
-            total_practices=user.total_practices,
-            streak_days=user.current_streak_days,
-            best_score=user.best_score,
-            score_improvement=0,
-        ) if include_stats else None,
-        quota=None,
-        created_at=user.created_at,
-        account_deletion_scheduled_at=user.account_deletion_scheduled_at,
-    )
 
 
 @router.get(
@@ -61,7 +35,7 @@ async def get_me(
     c_quota = await quota_service.get_or_create_chat_quota(db, user)
     await db.commit()
 
-    resp = _build_user_response(user)
+    resp = build_user_response(user)
     # W8-T3：会员 / QUOTA_MODE=unlimited 都走 -1 表示无限。
     #   前端约定：值 < 0 显示"无限"，>= 0 显示具体数字。
     resp.quota = UserQuota(
@@ -98,7 +72,7 @@ async def complete_onboarding(
     user.onboarding_completed = True
     await db.commit()
     await db.refresh(user)
-    return ok(_build_user_response(user, include_stats=False))
+    return ok(build_user_response(user, include_stats=False))
 
 
 @router.patch(
@@ -120,7 +94,7 @@ async def update_me(
         setattr(user, k, v)
     await db.commit()
     await db.refresh(user)
-    return ok(_build_user_response(user))
+    return ok(build_user_response(user))
 
 
 @router.get(
@@ -151,7 +125,7 @@ async def request_account_deletion(
     )
     await db.commit()
     await db.refresh(user)
-    return ok(_build_user_response(user))
+    return ok(build_user_response(user))
 
 
 @router.post(
@@ -166,4 +140,4 @@ async def cancel_account_deletion(
     await account_deletion_service.cancel_account_deletion(db, user)
     await db.commit()
     await db.refresh(user)
-    return ok(_build_user_response(user))
+    return ok(build_user_response(user))

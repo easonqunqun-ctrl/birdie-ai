@@ -36,4 +36,6 @@ COPY . .
 
 EXPOSE 9000
 
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "9000"]
+# 运行时勿用「uv run」当 PID 1：多进程场景下会与 uv 项目锁抖动，容器内易出现永不 listen :9000
+# （真机 Celery → ConnectError）；本地 docker-compose.yml 仍可覆盖为 uv run --reload。
+CMD ["/app/.venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "9000"]

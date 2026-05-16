@@ -5,6 +5,7 @@ import { useUserStore } from '@/store/userStore'
 import { storage } from '@/utils/storage'
 import type { User } from '@/types/api'
 import { BRAND_LOGO } from '@/constants/brandAssets'
+import { describeIntermittentRequestFailure } from '@/services/request'
 import './index.scss'
 
 /** 微信要求：带 open-type=agreePrivacyAuthorization 的 button 须设置 id（供隐私回调校验） */
@@ -75,11 +76,9 @@ const LoginPage: FC = () => {
         setLoading(false)
         return
       }
-      let title = '登录失败，请稍后重试'
-      if (e instanceof Error && e.message) {
-        title =
-          e.message.length > 48 ? `${e.message.slice(0, 47)}…` : e.message
-      }
+      const { toastTitle } = describeIntermittentRequestFailure(e)
+      const title =
+        toastTitle.length > 48 ? `${toastTitle.slice(0, 47)}…` : toastTitle
       Taro.showToast({ title, icon: 'none', duration: 3200 })
       loginLock.current = false
       setLoading(false)

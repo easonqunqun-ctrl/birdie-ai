@@ -23,7 +23,6 @@ from app.schemas.training import (
     DrillDetail,
     PracticeLogItem,
     TrainingPlanDetail,
-    TrainingTaskItem,
 )
 from app.services import training_service
 
@@ -55,7 +54,7 @@ async def get_current_plan(
         ai_summary=plan.ai_summary,
         total_tasks=plan.total_tasks,
         completed_tasks=plan.completed_tasks,
-        tasks=[TrainingTaskItem.model_validate(t) for t in tasks],
+        tasks=[training_service.training_task_to_item(t) for t in tasks],
         created_at=plan.created_at,
     )
     return ok(detail)
@@ -97,7 +96,7 @@ async def add_to_plan_from_analysis(
         ai_summary=plan.ai_summary,
         total_tasks=plan.total_tasks,
         completed_tasks=plan.completed_tasks,
-        tasks=[TrainingTaskItem.model_validate(t) for t in tasks],
+        tasks=[training_service.training_task_to_item(t) for t in tasks],
         created_at=plan.created_at,
     )
     return ok(detail)
@@ -129,7 +128,7 @@ async def complete_task(
 
     return ok(
         CompleteTaskResponse(
-            task=TrainingTaskItem.model_validate(task),
+            task=training_service.training_task_to_item(task),
             current_streak_days=user.current_streak_days or 0,
             plan_completed_tasks=plan.completed_tasks,
             plan_total_tasks=plan.total_tasks,

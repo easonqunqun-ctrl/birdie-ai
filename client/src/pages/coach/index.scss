@@ -1,7 +1,14 @@
+/* 宿主页铺满：避免仅用 100vh 时与自定义导航/tabBar 区域重复计算，滚动区塌成 0（真机常见） */
+page {
+  height: 100%;
+  box-sizing: border-box;
+}
+
 .coach {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100%;
+  min-height: 0;
   background: var(--color-bg-page);
 
   /* ================= loading / error ================= */
@@ -104,11 +111,11 @@
     }
   }
 
-  /* ================= 滚动区 ================= */
+  /* flex 子项可收缩 + 内部纵向滚动（height:0 部分机型不稳，优先 min-height:0） */
   &__scroll {
     flex: 1;
+    min-height: 0;
     box-sizing: border-box;
-    height: 0; /* 配合 flex:1 让 ScrollView 正确分配高度 */
   }
 
   /* webview 渲染模式下 scroll-view 不支持 padding，挪到内层 View */

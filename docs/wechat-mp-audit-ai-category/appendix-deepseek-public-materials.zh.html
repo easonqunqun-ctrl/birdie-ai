@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>灵鸟golf｜微信小程序「深度合成-AI问答」类目 — 第三方技术公示节选（仅供内部审核装订）</title>
+  <style>
+    @page { margin: 18mm 16mm; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB",
+        "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+      font-size: 11pt;
+      line-height: 1.55;
+      color: #111;
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 8px;
+    }
+    h1 { font-size: 16pt; margin: 0 0 0.6em; }
+    h2 { font-size: 12.5pt; margin: 1.2em 0 0.4em; border-bottom: 1px solid #ccc; padding-bottom: 0.2em; }
+    .muted { color: #444; font-size: 10pt; }
+    .warn {
+      border: 1px solid #b45309;
+      background: #fffbeb;
+      padding: 10px 12px;
+      margin: 12px 0;
+      border-radius: 6px;
+      font-size: 10.5pt;
+    }
+    table { border-collapse: collapse; width: 100%; margin: 8px 0 16px; font-size: 10pt; }
+    th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; vertical-align: top; }
+    th { background: #f6f7f9; }
+    ul { padding-left: 1.35em; }
+    .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 9.5pt; word-break: break-all; }
+    footer { margin-top: 28px; font-size: 9.5pt; color: #555; border-top: 1px solid #ddd; padding-top: 8px; }
+    .meta {
+      margin: 12px 0 16px;
+      padding: 0;
+    }
+    .meta caption {
+      caption-side: top;
+      text-align: left;
+      font-weight: 600;
+      font-size: 12pt;
+      margin-bottom: 6px;
+    }
+    .meta th { width: 32%; }
+  </style>
+</head>
+<body>
+  <h1>微信小程序「深度合成 · AI问答」类目 —— 第三方技术公示节选（装订稿）</h1>
+  <p class="muted">用途：佐证所使用的大模型技术服务方<strong>公开发布</strong>之算法/备案信息与风险说明（以原网页为准）。<br />本文档<strong>不含</strong>微信公众平台后台截图及加盖公章合作协议；须与其余材料一并提交。</p>
+
+  <table class="meta" aria-label="申报主体">
+    <caption>本次申报材料对应主体与小程序（来自工程配置；若与公众平台不一致以<strong>微信公众平台</strong>为准）</caption>
+    <tbody>
+      <tr>
+        <th>微信公众平台认证主体（当前仓库登记）</th>
+        <td>北京思无界控股有限公司<br /><span class="muted">来源：<span class="mono">docs/release-notes/W9-tencent-cloud-purchase-list.md</span>；请与公众平台「设置→主体信息」核对。</span></td>
+      </tr>
+      <tr>
+        <th>小程序展示名称（请以线上为准）</th>
+        <td>领翼golf 高尔夫智能教练<br /><span class="muted">来源：<span class="mono">client/project.config.json</span> → <code>description</code></span></td>
+      </tr>
+      <tr>
+        <th>小程序 AppID</th>
+        <td class="mono">wx045feb5e244fffae<br /><span class="muted">来源：<span class="mono">client/project.config.json</span> → <code>appid</code></span></td>
+      </tr>
+      <tr>
+        <th>涉及生成式 AI 能力说明</th>
+        <td>本产品含「AI 教练」对话与高相关辅助说明，文本由大模型生成。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="warn">
+    <strong>重要说明</strong><br />
+    1）微信「深度合成 - AI问答」类目所需材料<strong>以审核后台当期要求为准</strong>；以下内容不能替代网信办系统截图或服务市场订单等。<br />
+    2）下列备案号与技术说明摘自 DeepSeek CDN 公示页（见文末链接），摘录日期见页脚。<br />
+    3）本产品实际调用以「北京思无界控股有限公司」与 DeepSeek 开放平台（或授权渠道）的订购/协议关系为准。
+  </div>
+
+  <h2>一、第三方技术主体公开发布的信息（节选）</h2>
+  <p>主体：杭州深度求索人工智能基础技术研究有限公司及其关联公司（DeepSeek）。</p>
+  <p>原文标题：《模型原理与训练方法说明》</p>
+
+  <h2>二、DeepSeek「模型公示信息」摘录（表格）</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>备案类型</th>
+        <th>备案名称</th>
+        <th>备案号</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>生成式人工智能服务备案</td>
+        <td>Deepseek Chat</td>
+        <td class="mono">Beijing-DeepseekChat-202404280016</td>
+      </tr>
+      <tr>
+        <td>深度合成服务算法备案（服务技术支持者）</td>
+        <td>DeepSeek大语言模型算法</td>
+        <td class="mono">网信算备110108970550101240011号</td>
+      </tr>
+      <tr>
+        <td>深度合成服务算法备案（服务提供者）</td>
+        <td>DeepSeekChat 求索对话生成算法</td>
+        <td class="mono">网信算备330105747635301240017号</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="muted">注：表中「公示链接」字段以 DeepSeek 原页为准。</p>
+
+  <h2>三、能力与风险说明摘录（简述）</h2>
+  <ul>
+    <li>线上服务为基础大语言模型的推理生成，输出为概率性生成而非简单检索拷贝。</li>
+    <li>官方说明当前无法完全消除「幻觉」，生成内容<strong>仅供参考</strong>。</li>
+    <li>对医疗、法律、金融等专业问题，不构成建议或承诺，应咨询对应专业人士。</li>
+    <li>官方披露采取过滤器、对齐与安全评估等措施降低风险。</li>
+  </ul>
+
+  <h2>四、须经贵司<strong>另行准备</strong>的材料（本站无法代为生成）</h2>
+  <ul>
+    <li>微信公众平台「类目」页的<strong>勾选要求清单</strong>截屏留存。</li>
+    <li>若走第三方路径：与技术方（或与授权经销商）的<strong>合作协议/订单</strong>关键页扫描件。</li>
+    <li>若审核要求网信办系统可查截图：须在<strong>官方备案公示系统或指定渠道</strong>自行截全屏。</li>
+    <li>小程序内：<strong>AI 生成标识、隐私与用户协议路径</strong>与后台「隐私保护指引」一致。</li>
+  </ul>
+
+  <footer>
+    <p><strong>原始公开来源（请审核人员扫码或复制核对）</strong></p>
+    <p class="mono">https://cdn.deepseek.com/policies/zh-CN/model-algorithm-disclosure.html</p>
+    <p class="muted">附：开放平台服务条款（佐证 API 技术服务关系）</p>
+    <p class="mono">https://cdn.deepseek.com/policies/zh-CN/deepseek-open-platform-terms-of-service.html</p>
+    <p class="muted">装订稿 HTML 源码路径：<span class="mono">docs/wechat-mp-audit-ai-category/appendix-deepseek-public-materials.zh.html</span>；PDF 可由 Chrome headless「打印→PDF」或仓库脚本重新生成同名 <span class="mono">.pdf</span>。</p>
+  </footer>
+</body>
+</html>

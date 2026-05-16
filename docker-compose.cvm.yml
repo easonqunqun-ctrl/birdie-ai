@@ -10,6 +10,10 @@
 #   仅以镜像内 Dockerfile `COPY`/构建结果为准。
 # - 云上更新代码：**git pull → build 对应服务**，勿再依赖宿主目录「补 alembic / uv sync」。
 #
+# 真实微信支付：复制 `docker-compose.wechat-pay-key.example.yml` → `docker-compose.wechat-pay-key.yml`，
+# 挂载 `apiclient_key.pem`；`.env.local` 设 `WECHAT_PAY_CERT_PATH=/secrets/apiclient_key.pem`；
+# `make deploy-cvm-up` 会在该文件存在时自动叠加。
+#
 # Compose 合并规则：`volumes: !reset []` 清空基类里对上述服务的 bind（见 Compose merge 文档）。
 # =====================================================
 

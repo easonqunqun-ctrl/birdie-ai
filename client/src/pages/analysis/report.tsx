@@ -24,9 +24,10 @@ import { FC, useEffect, useMemo, useState } from 'react'
 import { View, Text, Video, Image, Button, ScrollView } from '@tarojs/components'
 import Taro, { useRouter, useShareAppMessage } from '@tarojs/taro'
 import { analysisService } from '@/services/analysisService'
+import { describePageLoadFailure } from '@/services/request'
 import { shareService, type PublicReport } from '@/services/shareService'
 import { useUserStore } from '@/store/userStore'
-import { switchToCoach } from '@/utils/tabNav'
+import { switchToCoach, toastTabNavigationFailure } from '@/utils/tabNav'
 import { getDrillDetail } from '@/constants/drillLibrary'
 import { SCORE_LEVEL_META, scoreLevelFromScore } from '@/constants/scoreLevel'
 import {
@@ -82,8 +83,8 @@ const ReportPage: FC = () => {
           setPublicReport(r)
           setLoading(false)
         })
-        .catch((e: Error) => {
-          setError(e.message || '加载报告失败')
+        .catch((e: unknown) => {
+          setError(describePageLoadFailure(e))
           setLoading(false)
         })
       return
@@ -93,7 +94,7 @@ const ReportPage: FC = () => {
         setReport(r)
         setLoading(false)
       })
-      .catch((e: Error) => {
+      .catch((e: unknown) => {
         // 不是自己的 → 尝试公开版兜底
         shareService
           .getPublicReport(analysisId)
@@ -101,8 +102,8 @@ const ReportPage: FC = () => {
             setPublicReport(pr)
             setLoading(false)
           })
-          .catch(() => {
-            setError(e.message || '加载报告失败')
+          .catch((inner: unknown) => {
+            setError(describePageLoadFailure(inner))
             setLoading(false)
           })
       })
@@ -239,9 +240,7 @@ const ReportPage: FC = () => {
       analysisId && analysisId !== 'sample'
         ? { analysisId, prefill }
         : { prefill }
-    switchToCoach(ctx).catch(() => {
-      Taro.showToast({ title: '暂时无法打开 AI 教练', icon: 'none' })
-    })
+    switchToCoach(ctx).catch(toastTabNavigationFailure)
   }
 
   /**

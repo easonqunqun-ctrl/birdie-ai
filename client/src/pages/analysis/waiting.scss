@@ -59,6 +59,20 @@ page {
     opacity: 0.8;
   }
 
+  &__soft-wait {
+    padding: 0 8px;
+    margin: -36px 0 40px;
+    text-align: center;
+  }
+
+  &__soft-wait-text {
+    display: block;
+    font-size: 26px;
+    line-height: 1.45;
+    opacity: 0.75;
+    color: rgba(255, 255, 255, 0.85);
+  }
+
   /* ==================== 阶段列表 ==================== */
   &__stages {
     background: rgba(255, 255, 255, 0.06);
