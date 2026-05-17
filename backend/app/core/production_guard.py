@@ -106,9 +106,7 @@ def _is_ephemeral_tunnel_hostname(host: str) -> bool:
         return True
     if "serveo.net" in h:
         return True
-    if h.endswith(".bore.pub"):
-        return True
-    return False
+    return h.endswith(".bore.pub")
 
 
 def audit_production_config(settings: Settings) -> tuple[list[str], list[str]]:
@@ -220,12 +218,13 @@ def audit_production_config(settings: Settings) -> tuple[list[str], list[str]]:
             "WECHAT_PAY_MOCK_MODE=true：当前仍为微信支付 mock；接真实商户号后设为 false，并补齐证书 / notify_url。",
         )
 
-    if settings.APP_ENV in {"prod", "staging"}:
-        if settings.LLM_MOCK_MODE or _is_placeholder_key(settings.LLM_API_KEY):
-            warns.append(
-                "LLM 当前将使用 FakeLLM（LLM_MOCK_MODE 或 LLM_API_KEY 为空/占位）；"
-                "对话等能力会变成测试替身而非真实模型。",
-            )
+    if settings.APP_ENV in {"prod", "staging"} and (
+        settings.LLM_MOCK_MODE or _is_placeholder_key(settings.LLM_API_KEY)
+    ):
+        warns.append(
+            "LLM 当前将使用 FakeLLM（LLM_MOCK_MODE 或 LLM_API_KEY 为空/占位）；"
+            "对话等能力会变成测试替身而非真实模型。",
+        )
 
     return errors, warns
 

@@ -47,10 +47,10 @@ from app.schemas.analysis import (
     IssueItem,
     PhaseScore,
     PhaseWindow,
-    estimate_swing_remaining_seconds,
     RecommendationItem,
     UploadTokenRequest,
     UploadTokenResponse,
+    estimate_swing_remaining_seconds,
     score_level,
 )
 from app.services import quota_service
@@ -153,10 +153,7 @@ def _decode_upload_token_meta(raw: bytes | memoryview | str) -> dict[str, Any]:
     try:
         if isinstance(raw, memoryview):
             raw = raw.tobytes()
-        if isinstance(raw, bytes):
-            text = raw.decode("utf-8")
-        else:
-            text = raw
+        text = raw.decode("utf-8") if isinstance(raw, bytes) else raw
         meta = json.loads(text)
         if not isinstance(meta, dict):
             raise ValueError("upload_token_meta_not_object")

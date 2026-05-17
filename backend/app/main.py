@@ -9,10 +9,10 @@ from app import __version__
 from app.api.v1.router import api_router
 from app.config import settings
 from app.core.logging import get_logger, setup_logging
-from app.core.production_guard import startup_production_guards
-from app.core.wechat_deploy_hints import log_wechat_miniprogram_domain_hints
 from app.core.middleware import RequestContextMiddleware, register_exception_handlers
+from app.core.production_guard import startup_production_guards
 from app.core.redis import close_redis, get_redis
+from app.core.wechat_deploy_hints import log_wechat_miniprogram_domain_hints
 
 setup_logging()
 logger = get_logger("app")

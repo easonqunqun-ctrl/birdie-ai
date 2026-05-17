@@ -1,7 +1,7 @@
 """挥杆分析相关 Pydantic schema（对齐 docs/02-API接口设计文档.md §三 /analyses）."""
 
-from datetime import datetime
 import math
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -285,7 +285,6 @@ class AnalysisProgressResponse(BaseModel):
 __all__ = [
     "STAGE_ETA_SECONDS",
     "SWING_STAGE_TIMELINE",
-    "estimate_swing_remaining_seconds",
     "AnalysisListItem",
     "AnalysisListQuery",
     "AnalysisProgressPoint",
@@ -308,5 +307,6 @@ __all__ = [
     "UploadTokenRequest",
     "UploadTokenResponse",
     "VideoFileType",
+    "estimate_swing_remaining_seconds",
     "score_level",
 ]

@@ -209,7 +209,7 @@ async def _sse_event_stream(
     try:
         async for event in gen:
             if event.get("type") == "__sse_ping__":
-                yield ": sse-ping\n\n".encode("utf-8")
+                yield b": sse-ping\n\n"
                 if throttle_seconds > 0:
                     await asyncio.sleep(throttle_seconds)
                 continue
