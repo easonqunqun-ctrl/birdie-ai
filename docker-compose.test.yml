@@ -53,6 +53,14 @@ services:
         condition: service_healthy
       ai_engine:
         condition: service_started
+    # 冷启动会先跑 alembic，短时间 8000 未就绪；nginx 通过 depends_on: service_healthy 避免「刚拉起就误判 unhealthy」。
+    # backend 镜像已含 curl（见 backend/Dockerfile）。
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8000/v1/health"]
+      interval: 10s
+      timeout: 8s
+      retries: 6
+      start_period: 180s
 
   # Celery Worker：测试环境跑单 worker 即可（内测并发不大）
   celery-worker:
@@ -77,13 +85,14 @@ services:
       - ./infra/test/acme-webroot:/var/www/html:rw
     depends_on:
       backend:
-        condition: service_started
+        condition: service_healthy
       minio:
         condition: service_healthy
-    # 直连 backend；冷启动 + Alembic/uvicorn 慢时 probes 若在 45s 内未连续成功会一直 unhealthy
+    # 经本容器 443（与 nginx.conf 变量 + Docker DNS 反代链路一致）。
+    # 直连 http://backend:8000 在部分镜像/wget/DNS-v6 组合下易出现「resolved 后对端 refuse」误判。
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://backend:8000/v1/health"]
+      test: ["CMD", "wget", "--no-check-certificate", "-qO-", "https://127.0.0.1/v1/health"]
       interval: 15s
-      timeout: 8s
+      timeout: 12s
       retries: 5
       start_period: 90s
