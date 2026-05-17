@@ -247,16 +247,32 @@ class WechatPayV3Context:
         r = await self._http_post(path, payload)
         return r.get("prepay_id", "")
 
-    async def query_transaction_by_out_trade_no(self, out_trade_no: str) -> dict[str, Any]:
-        """按商户订单号查单（支付 V3），用于异步通知未到时主动对账。
+    async def domestic_refund(
+        self,
+        *,
+        out_trade_no: str,
+        out_refund_no: str,
+        refund_cents: int,
+        total_cents: int,
+        notify_url: str,
+        reason: str | None = None,
+    ) -> dict[str, Any]:
+        """调用 `/v3/refund/domestic/refunds`（全额退款与 order.amount 对齐）."""
+        path = "/v3/refund/domestic/refunds"
+        why = (reason or "用户发起退款").strip() or "退款"
+        payload: dict[str, Any] = {
+            "out_trade_no": out_trade_no,
+            "out_refund_no": out_refund_no[:64],
+            "notify_url": notify_url,
+            "reason": why[:80],
+            "amount": {
+                "refund": refund_cents,
+                "total": total_cents,
+                "currency": "CNY",
+            },
+        }
+        return await self._http_post(path, payload)
 
-        文档：GET /v3/pay/transactions/out-trade-no/{out_trade_no}?mchid={mchid}
-        """
-        from urllib.parse import quote
-
-        safe_no = quote(out_trade_no, safe="")
-        path = f"/v3/pay/transactions/out-trade-no/{safe_no}?mchid={quote(self.mchid, safe='')}"
-        return await self._http_get(path)
 
     def build_miniprogram_prepay(self, prepay_id: str) -> PrepayParams:
         time_stamp = str(int(time.time()))
@@ -344,10 +360,24 @@ def _head_ci(headers: dict[str, str], key: str) -> str:
     return m.get(key.lower(), "")
 
 
-async def handle_payment_notify(
+def resolve_wechat_pay_refund_notify_url() -> str:
+    """退款结果 notify_url：`WECHAT_PAY_REFUND_NOTIFY_URL` 或从支付回调 URL 推导。"""
+    ru = (getattr(settings, "WECHAT_PAY_REFUND_NOTIFY_URL", "") or "").strip()
+    if ru:
+        return ru
+    base = (settings.WECHAT_PAY_NOTIFY_URL or "").strip()
+    if not base:
+        return ""
+    needle = "/payments/wechat/notify"
+    if needle in base:
+        return base.replace(needle, "/payments/wechat/refund-notify")
+    return ""
+
+
+async def decrypt_wechat_pay_notify_resource(
     *, raw_body: bytes, headers: dict[str, str]
 ) -> dict[str, Any] | None:
-    """验签 + 解密，返回内层 transaction JSON；失败抛异常或返回 None。"""
+    """验签 + 解密微信支付 / 退款结果通知的统一 resource ciphertext。"""
     ctx = get_wechat_pay_v3()
     await ctx.prepare_notify_verification()
     serial = _head_ci(headers, "wechatpay-serial")
@@ -373,3 +403,10 @@ async def handle_payment_notify(
     if not res:
         return None
     return ctx.decrypt_notify_resource(res)
+
+
+async def handle_payment_notify(
+    *, raw_body: bytes, headers: dict[str, str]
+) -> dict[str, Any] | None:
+    """验签 + 解密支付 `transaction.success` resource（与解密函数同路径）."""
+    return await decrypt_wechat_pay_notify_resource(raw_body=raw_body, headers=headers)

@@ -96,6 +96,14 @@ class Settings(BaseSettings):
     WECHAT_PAY_MCH_SERIAL: str = ""
     # 小程序支付成功异步通知，须 HTTPS 公网，路径示例 /v1/payments/wechat/notify
     WECHAT_PAY_NOTIFY_URL: str = ""
+    # 退款结果异步通知完整 HTTPS URL；为空时在 WECHAT_PAY_NOTIFY_URL 上推导
+    # `/v1/payments/wechat/notify` → `/v1/payments/wechat/refund-notify`
+    WECHAT_PAY_REFUND_NOTIFY_URL: str = ""
+    # MVP：支付成功后该小时内允许自助全额退款（0 关闭时间窗校验，仅面向测试）
+    PAYMENT_SELF_REFUND_WINDOW_HOURS: int = 24
+
+    # 待支付订单超过该分钟数自动置为 cancelled（定时任务：`xiaoniao.expire_stale_pending_orders`）
+    PAYMENT_PENDING_ORDER_EXPIRE_MINUTES: int = 120
 
     # ==================== 苹果内购 ====================
     APPLE_BUNDLE_ID: str = "com.xiaoniaoai.app"

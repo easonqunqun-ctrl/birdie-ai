@@ -72,9 +72,10 @@ async def test_unlimited_mode_consume_does_not_block(
 async def test_strict_mode_default_still_returns_3_5(
     client: AsyncClient,
     auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
 ):
-    """对照组：默认 strict 模式下，新免费用户拿到 3 / 5（防 unlimited 改动污染默认行为）."""
-    assert settings.QUOTA_MODE == "strict"
+    """对照组：strict 模式下，新免费用户拿到 3 / 5（不因本地 .env QUOTA_MODE=unlimited 而误伤）."""
+    monkeypatch.setattr(settings, "QUOTA_MODE", "strict")
     resp = await client.get("/v1/users/me", headers=auth_headers)
     quota = resp.json()["data"]["quota"]
     assert quota["analysis_remaining"] == 3
@@ -93,6 +94,7 @@ async def test_unlimited_does_not_overwrite_existing_strict_quota(
     既存记录不会被自动改写（设计取舍：避免引入"配额迁移"逻辑），
     新逻辑只对"还没建过当月/当日记录的用户"生效。
     """
+    monkeypatch.setattr(settings, "QUOTA_MODE", "strict")
     # strict 模式：先初始化记录
     me1 = (await client.get("/v1/users/me", headers=auth_headers)).json()["data"]
     assert me1["quota"]["analysis_remaining"] == 3

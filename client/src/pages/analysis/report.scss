@@ -417,6 +417,26 @@
   }
 
   /* ================= 5. 训练建议 ================= */
+  &__training-sync {
+    margin-bottom: 24rpx;
+    padding: 20rpx 20rpx 12rpx;
+    background: var(--color-bg-subtle);
+    border-radius: var(--radius-md);
+  }
+
+  &__training-sync-btn {
+    width: 100%;
+    margin-bottom: 14rpx;
+  }
+
+  &__training-sync-hint {
+    font-size: 24rpx;
+    color: var(--color-text-tertiary);
+    line-height: 1.5;
+    display: block;
+    padding-bottom: 8rpx;
+  }
+
   &__drill {
     padding: 24rpx 0;
     border-bottom: 2rpx solid var(--color-border);

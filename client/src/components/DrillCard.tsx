@@ -9,7 +9,7 @@
  * 交互：
  *   - 默认折叠只显示名称 / 时长 / "查看步骤"
  *   - 点击卡片展开显示 3-5 条步骤
- *   - "加入训练计划" 在 M3 阶段是占位 —— toast `M4 再开放`
+ *   - 「加入训练计划」：单次分析需从报告页的「一键加入本周训练计划」写入服务器；此处给出引导文案
  */
 
 import { FC, useState } from 'react'
@@ -33,7 +33,11 @@ export const DrillCard: FC<DrillCardProps> = ({ attachment }) => {
   const toggle = () => setExpanded((v) => !v)
   const handleAddToPlan = (e: { stopPropagation?: () => void }) => {
     e.stopPropagation?.()
-    Taro.showToast({ title: '训练计划 M4 再开放', icon: 'none' })
+    Taro.showToast({
+      title: '请打开对应挥杆分析报告，在「训练建议」里一键同步到本周任务',
+      icon: 'none',
+      duration: 2600,
+    })
   }
 
   return (

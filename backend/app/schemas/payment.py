@@ -1,7 +1,7 @@
 """支付 / 会员相关 Pydantic schema."""
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -58,6 +58,16 @@ class CreateOrderResponse(BaseModel):
     prepay_params: PrepayParams
     mock_mode: bool = Field(
         description="后端 WECHAT_PAY_MOCK_MODE 值，方便前端决定走 wx.requestPayment 还是直接 confirm",
+    )
+
+
+class ApplyRefundResponse(BaseModel):
+    """已提交微信退款单；仍以退款异步通知为最终态（订单先保持 paid）."""
+
+    order: OrderResponse
+    wechat: dict[str, Any] = Field(
+        default_factory=dict,
+        description="`/v3/refund/domestic/refunds` JSON 应答摘要",
     )
 
 

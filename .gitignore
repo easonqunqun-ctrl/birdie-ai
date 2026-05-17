@@ -28,6 +28,11 @@ backend/.secrets/
 # 本机记录 CVM SSH 目标（勿提交）
 infra/deploy/cvm-host.local
 
+# ==================== 本地运行时产物 ====================
+.runtime/
+backend/celerybeat-schedule
+postgres-lingniao-golf-*.sql.gz
+
 # ==================== Python ====================
 __pycache__/
 *.py[cod]

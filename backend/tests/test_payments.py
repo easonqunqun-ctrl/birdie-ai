@@ -355,3 +355,160 @@ async def test_payment_transaction_is_recorded_on_mock_pay(
         assert txns[0].transaction_type == "payment"
         assert txns[0].amount == 3900
         assert txns[0].wechat_notify_data == {"mock": True}
+
+
+# ==================== 订单超时关闭（pending → cancelled） ====================
+@pytest.mark.asyncio
+async def test_expire_stale_pending_orders_closes_old_pending(
+    client: AsyncClient, auth_headers: dict[str, str]
+):
+    from sqlalchemy import text
+
+    from app.services import payment_service
+
+    create = (
+        await client.post(
+            "/v1/payments/orders", headers=auth_headers, json={"plan_type": "monthly"}
+        )
+    ).json()["data"]
+    order_id = create["order"]["id"]
+    stale_ts = datetime.now(UTC) - timedelta(hours=4)
+    async with AsyncSessionLocal() as db:
+        await db.execute(text("UPDATE orders SET created_at = :ts WHERE id = :oid"), {"ts": stale_ts, "oid": order_id})
+        await db.commit()
+
+    async with AsyncSessionLocal() as db:
+        n = await payment_service.expire_stale_pending_orders(db, now=datetime.now(UTC))
+        await db.commit()
+    assert n >= 1
+
+    detail = await client.get(f"/v1/payments/orders/{order_id}", headers=auth_headers)
+    assert detail.status_code == 200
+    assert detail.json()["data"]["status"] == "cancelled"
+
+
+# ==================== Mock 退款记账 ====================
+@pytest.mark.asyncio
+async def test_mock_refund_demotes_user_and_writes_refund_txn(
+    client: AsyncClient, auth_headers: dict[str, str]
+):
+    create = (
+        await client.post(
+            "/v1/payments/orders", headers=auth_headers, json={"plan_type": "monthly"}
+        )
+    ).json()["data"]
+    order_id = create["order"]["id"]
+    await client.post(f"/v1/payments/orders/{order_id}/mock-confirm", headers=auth_headers)
+
+    refunded = await client.post(
+        f"/v1/payments/orders/{order_id}/mock-refund",
+        headers=auth_headers,
+        params={"reason": "pytest"},
+    )
+    assert refunded.status_code == 200, refunded.text
+    body = refunded.json()["data"]
+    assert body["status"] == "refunded"
+
+    me = (await client.get("/v1/users/me", headers=auth_headers)).json()["data"]
+    assert me["membership_type"] == "free"
+    assert me["is_member"] is False
+
+    async with AsyncSessionLocal() as db:
+        stmt = select(PaymentTransaction).where(PaymentTransaction.order_id == order_id)
+        txns = list((await db.execute(stmt)).scalars().all())
+        types = sorted(t.transaction_type for t in txns)
+        assert types == ["payment", "refund"]
+
+
+@pytest.mark.asyncio
+async def test_process_wechat_refund_notify_full_flow(
+    client: AsyncClient, auth_headers: dict[str, str]
+):
+    from app.services import payment_service
+
+    create = (
+        await client.post(
+            "/v1/payments/orders", headers=auth_headers, json={"plan_type": "monthly"}
+        )
+    ).json()["data"]
+    order_id = create["order"]["id"]
+    await client.post(f"/v1/payments/orders/{order_id}/mock-confirm", headers=auth_headers)
+
+    payload = {
+        "refund_status": "SUCCESS",
+        "out_trade_no": order_id,
+        "out_refund_no": "RF_utest",
+        "amount": {"total": 3900, "refund": 3900, "payer_total": 3900, "payer_refund": 3900},
+    }
+
+    async with AsyncSessionLocal() as db:
+        ok, msg = await payment_service.process_wechat_refund_notify(db, payload)
+        assert ok, msg
+        await db.commit()
+
+    detail = await client.get(f"/v1/payments/orders/{order_id}", headers=auth_headers)
+    assert detail.json()["data"]["status"] == "refunded"
+    me = (await client.get("/v1/users/me", headers=auth_headers)).json()["data"]
+    assert me["membership_type"] == "free"
+
+    async with AsyncSessionLocal() as db:
+        ok2, _ = await payment_service.process_wechat_refund_notify(db, payload)
+        assert ok2
+        await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_apply_refund_forbidden_in_mock_mode(
+    client: AsyncClient, auth_headers: dict[str, str], monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(settings, "WECHAT_PAY_MOCK_MODE", True)
+    create = (
+        await client.post(
+            "/v1/payments/orders", headers=auth_headers, json={"plan_type": "monthly"}
+        )
+    ).json()["data"]
+    order_id = create["order"]["id"]
+    await client.post(f"/v1/payments/orders/{order_id}/mock-confirm", headers=auth_headers)
+
+    resp = await client.post(
+        f"/v1/payments/orders/{order_id}/apply-refund",
+        headers=auth_headers,
+    )
+    assert resp.status_code == 400, resp.text
+    body = resp.json()
+    assert body.get("code") == 40090
+
+
+@pytest.mark.asyncio
+async def test_apply_refund_stubbed_wechat(
+    client: AsyncClient, auth_headers: dict[str, str], monkeypatch: pytest.MonkeyPatch
+):
+    """非 mock：`get_wechat_pay_v3` 打桩为假上下文，不真实连微信。"""
+    from app.integrations import wechat_pay_v3 as wxpay
+
+    create = (
+        await client.post(
+            "/v1/payments/orders", headers=auth_headers, json={"plan_type": "monthly"}
+        )
+    ).json()["data"]
+    order_id = create["order"]["id"]
+    await client.post(f"/v1/payments/orders/{order_id}/mock-confirm", headers=auth_headers)
+
+    monkeypatch.setattr(settings, "WECHAT_PAY_MOCK_MODE", False)
+    monkeypatch.setattr(
+        settings,
+        "WECHAT_PAY_NOTIFY_URL",
+        "https://api.example.com/v1/payments/wechat/notify",
+    )
+
+    class _StubCtx:
+        async def domestic_refund(self, **kwargs):  # noqa: ANN003
+            return {"status": "PROCESSING"}
+
+    monkeypatch.setattr(wxpay, "get_wechat_pay_v3", lambda: _StubCtx())
+
+    resp = await client.post(f"/v1/payments/orders/{order_id}/apply-refund", headers=auth_headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()["data"]
+    assert data["order"]["status"] == "paid"
+    assert data["wechat"]["status"] == "PROCESSING"

@@ -316,6 +316,11 @@ export function describeIntermittentRequestFailure(e: unknown): {
   toastTitle: string
 } {
   if (isRequestError(e)) {
+    /** 静默请求或未走 `request()` 自动 toast：与业务信封文案对齐 */
+    if (e.kind === 'business') {
+      const t = e.message?.trim() || '请求失败'
+      return { fatalMessage: t, toastTitle: t }
+    }
     if (e.kind === 'http_server_error') {
       return {
         fatalMessage: '服务暂时不可用，已暂停自动刷新',
@@ -327,6 +332,10 @@ export function describeIntermittentRequestFailure(e: unknown): {
         fatalMessage: '服务器响应异常，已暂停自动刷新',
         toastTitle: '服务响应异常',
       }
+    }
+    if (e.kind === 'http_unauthorized') {
+      const t = e.message?.trim() || '未登录或登录已过期'
+      return { fatalMessage: t, toastTitle: t }
     }
     if (e.kind === 'network' && e.message?.trim()) {
       const t = friendlyNetworkMessage(e.message, undefined)

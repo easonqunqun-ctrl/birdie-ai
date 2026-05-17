@@ -40,6 +40,8 @@ jobs:
       WECHAT_MOCK_LOGIN: "true"
       WECHAT_PAY_MOCK_MODE: "true"
       LLM_MOCK_MODE: "true"
+      # 与仓库默认生产语义一致；配额相关测试对 strict/unlimited 另行 monkeypatch
+      QUOTA_MODE: "strict"
 
     defaults:
       run:
@@ -53,4 +55,4 @@ jobs:
         run: |
           uv sync --frozen --group dev
           uv run alembic upgrade head
-          uv run pytest tests/test_parallel_backlog_regressions.py tests/test_health.py tests/test_quota_unlimited.py -q --tb=short
+          uv run pytest tests/test_parallel_backlog_regressions.py tests/test_health.py tests/test_quota_unlimited.py tests/test_training.py::test_add_to_plan_from_analysis_creates_plan tests/test_training.py::test_add_to_plan_from_analysis_rejects_sample tests/test_payments.py::test_expire_stale_pending_orders_closes_old_pending tests/test_storage_presign_contract.py -q --tb=short

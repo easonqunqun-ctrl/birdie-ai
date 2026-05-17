@@ -25,6 +25,12 @@ COPY uv.lock* ./
 # 因此必须与 pyproject 一起先 COPY 进来，避免 hatchling 构建报 "Readme file does not exist"。
 COPY README.md ./
 
+# 镜像与超时：与 `ai_engine` Dockerfile 一致；由 compose 传 `UV_PYPI_MIRROR`
+ARG UV_DEFAULT_INDEX=https://pypi.org/simple
+ENV UV_DEFAULT_INDEX=${UV_DEFAULT_INDEX}
+ARG UV_HTTP_TIMEOUT=300
+ENV UV_HTTP_TIMEOUT=${UV_HTTP_TIMEOUT}
+
 # 安装依赖
 RUN uv sync --frozen 2>/dev/null || uv sync
 

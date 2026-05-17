@@ -6,8 +6,8 @@
  *   2. 综合评分（大字 + score_change + 分级徽章）
  *   3. 六维雷达图（手绘 Canvas 2d，点击顶点定位到阶段）
  *   4. 问题诊断（按 severity 排序 + 关键帧图 + 点击跳帧）
- *   5. 训练建议（drill 详情卡 + 加入训练计划占位）
- *   6. 底部动作栏（分享 / 对比 / AI 教练 全部占位 toast）
+ *   5. 训练建议（drill 详情卡 + 「一键加入本周训练计划」→ POST /training-plan/from-analysis）
+ *   6. 底部动作栏（分享：`open-type=share`；对比历史→报告列表；问 AI：`switchToCoach`）
  *   7. 删除：顶部「更多」操作表 + 底部按钮（不做左滑，避免与纵向滚动、视频手势冲突）
  *
  * 关键工程决策：
@@ -24,8 +24,9 @@ import { FC, useEffect, useMemo, useState } from 'react'
 import { View, Text, Video, Image, Button, ScrollView } from '@tarojs/components'
 import Taro, { useRouter, useShareAppMessage } from '@tarojs/taro'
 import { analysisService } from '@/services/analysisService'
-import { describePageLoadFailure } from '@/services/request'
+import { describePageLoadFailure, isRequestError } from '@/services/request'
 import { shareService, type PublicReport } from '@/services/shareService'
+import { trainingService } from '@/services/trainingService'
 import { useUserStore } from '@/store/userStore'
 import { switchToCoach, toastTabNavigationFailure } from '@/utils/tabNav'
 import { getDrillDetail } from '@/constants/drillLibrary'
@@ -65,6 +66,7 @@ const ReportPage: FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [rate, setRate] = useState<number>(1)
+  const [syncingPlan, setSyncingPlan] = useState(false)
 
   useEffect(() => {
     if (!analysisId) {
@@ -175,12 +177,31 @@ const ReportPage: FC = () => {
     if (typeof timestamp === 'number') seekTo(timestamp)
   }
 
-  const toastSoon = (feature: string) => {
-    Taro.showToast({ title: `${feature}即将上线`, icon: 'none', duration: 1500 })
-  }
-
   const handleGoHome = () => Taro.reLaunch({ url: '/pages/index/index' })
   const handleShootAgain = () => Taro.reLaunch({ url: '/pages/analysis/capture' })
+
+  const handleSyncTrainingPlan = async () => {
+    if (!analysisId || analysisId === 'sample') return
+    setSyncingPlan(true)
+    try {
+      await trainingService.addToPlanFromAnalysis(analysisId)
+      Taro.showToast({ title: '已同步到本周训练计划', icon: 'success', duration: 2000 })
+    } catch (e: unknown) {
+      const fallback = describePageLoadFailure(e)
+      const msg =
+        isRequestError(e) && e.message?.trim()
+          ? e.message.trim()
+          : fallback
+      const line = msg.length > 140 ? `${msg.slice(0, 139)}…` : msg
+      Taro.showToast({ title: line, icon: 'none', duration: 2600 })
+    } finally {
+      setSyncingPlan(false)
+    }
+  }
+
+  const handleCompareHistory = () => {
+    Taro.navigateTo({ url: '/pages/analysis/history' }).catch(toastTabNavigationFailure)
+  }
 
   // ---------------- 分享（W7-T5）----------------
   // 小程序分享只能通过「右上角胶囊 · 转发给朋友」或 `<Button open-type='share'>` 触发
@@ -591,6 +612,21 @@ const ReportPage: FC = () => {
               共 {report.recommendations.length} 个动作
             </Text>
           </View>
+          {!isSample && (
+            <View className='report__training-sync'>
+              <Button
+                className='report__btn report__btn--primary report__training-sync-btn'
+                loading={syncingPlan}
+                disabled={syncingPlan}
+                onClick={() => void handleSyncTrainingPlan()}
+              >
+                一键加入本周训练计划
+              </Button>
+              <Text className='report__training-sync-hint'>
+                将根据本次分析的问题自动追加当周任务（与服务器端幂等，不会重复条目）
+              </Text>
+            </View>
+          )}
           {report.recommendations.map((rec) => {
             const drill = getDrillDetail(rec.drill_id)
             return (
@@ -619,12 +655,6 @@ const ReportPage: FC = () => {
                     </View>
                   ))}
                 </View>
-                <Button
-                  className='report__btn report__btn--drill'
-                  onClick={() => toastSoon('加入训练计划')}
-                >
-                  加入训练计划
-                </Button>
               </View>
             )
           })}
@@ -647,7 +677,7 @@ const ReportPage: FC = () => {
         >
           📤 分享报告
         </Button>
-        <Button className='report__footer-btn' onClick={() => toastSoon('对比历史')}>
+        <Button className='report__footer-btn' onClick={handleCompareHistory}>
           📊 对比历史
         </Button>
         <Button className='report__footer-btn' onClick={handleAskCoach}>

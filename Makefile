@@ -1,4 +1,4 @@
-.PHONY: help init up down restart logs ps clean reset \
+.PHONY: help init up down compose-reconcile restart logs ps clean reset \
         backend-shell backend-logs backend-test backend-test-smoke backend-lint backend-migrate backend-revision \
         backend-celery-logs backend-celery-shell \
         ai-shell ai-logs ai-engine-test ai-engine-test-local ai-engine-lint ai-engine-smoke \
@@ -20,6 +20,7 @@ help:
 	@echo "  make init              首次初始化（复制 .env、安装依赖）"
 	@echo "  make up                启动全部服务（PostgreSQL+Redis+MinIO+Backend+AI）"
 	@echo "  make down              停止全部服务"
+	@echo "  make compose-reconcile 若 up 报网络/container 冲突：收口旧 compose 栈后再 up"
 	@echo "  make restart           重启全部服务"
 	@echo "  make logs              查看实时日志"
 	@echo "  make ps                查看服务状态"
@@ -117,6 +118,20 @@ up:
 down:
 	docker compose --env-file .env.local down
 
+compose-reconcile:
+	@echo "→ 收口遗留 Compose（常见：另一目录克隆推导为 project=ai / golf）…"
+	-docker compose -p ai --env-file .env.local -f docker-compose.yml down --remove-orphans
+	-docker compose -p golf --env-file .env.local -f docker-compose.yml down --remove-orphans
+	@echo "→ 按 Docker 标签强制删除仍挂名 project=ai 的容器（释放固定 container_name）…"
+	@if docker ps -aq --filter label=com.docker.compose.project=ai | grep -q .; then \
+		docker ps -aq --filter label=com.docker.compose.project=ai | xargs docker rm -f || true; \
+	else \
+		echo "(无 project=ai 容器)"; fi
+	@echo "→ 收口本项目（Compose 顶层 name:xiaoniao）栈…"
+	-docker compose --env-file .env.local down --remove-orphans
+	@echo ""
+	@echo "✓ reconcile 完成；再执行 make up"
+
 restart: down up
 
 logs:
@@ -137,6 +152,10 @@ reset:
 backend-test-smoke:
 	docker compose --env-file .env.local exec backend uv run pytest \
 	  tests/test_parallel_backlog_regressions.py tests/test_health.py tests/test_quota_unlimited.py \
+	  tests/test_training.py::test_add_to_plan_from_analysis_creates_plan \
+	  tests/test_training.py::test_add_to_plan_from_analysis_rejects_sample \
+	  tests/test_payments.py::test_expire_stale_pending_orders_closes_old_pending \
+	  tests/test_storage_presign_contract.py \
 	  -q --tb=short
 
 backend-shell:

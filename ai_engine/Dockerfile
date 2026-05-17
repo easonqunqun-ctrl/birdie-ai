@@ -30,6 +30,13 @@ COPY uv.lock* ./
 # 因此必须与 pyproject 一起先 COPY 进来，避免 hatchling 构建报 "Readme file does not exist"。
 COPY README.md ./
 
+# 国内等网络下官方 PyPI 易超时；由 compose 传入 `UV_PYPI_MIRROR` → build-arg，见根目录 `docker-compose.yml`
+ARG UV_DEFAULT_INDEX=https://pypi.org/simple
+ENV UV_DEFAULT_INDEX=${UV_DEFAULT_INDEX}
+# 依赖阶段单独放宽，避免大 wheel（如 mediapipe / opencv）偶然慢速断连
+ARG UV_HTTP_TIMEOUT=300
+ENV UV_HTTP_TIMEOUT=${UV_HTTP_TIMEOUT}
+
 RUN uv sync --frozen 2>/dev/null || uv sync
 
 COPY . .

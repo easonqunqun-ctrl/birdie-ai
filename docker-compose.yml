@@ -2,6 +2,9 @@
 # 「小鸟 AI」本地开发环境
 # 使用：make up 一键启动全套服务
 # =====================================================
+# Compose 项目名称固定为 xiaoniao，避免因仓库目录名变为 golf / 路径变化
+# 导致 project 漂移、固定网络 xiaoniao-network 告警或容器 orphan。
+name: xiaoniao
 
 services:
   postgres:
@@ -74,6 +77,10 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        # 国内构建若报 `files.pythonhosted.org` / pycryptodome 超时：在 `.env.local` 加一行
+        # UV_PYPI_MIRROR=https://pypi.tuna.tsinghua.edu.cn/simple（或阿里云 / 腾讯镜像）
+        UV_DEFAULT_INDEX: ${UV_PYPI_MIRROR:-https://pypi.org/simple}
     container_name: xiaoniao-backend
     restart: unless-stopped
     env_file:
@@ -102,6 +109,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        UV_DEFAULT_INDEX: ${UV_PYPI_MIRROR:-https://pypi.org/simple}
     container_name: xiaoniao-celery-worker
     restart: unless-stopped
     env_file:
@@ -125,10 +134,36 @@ services:
     # 生产扩容策略在 docs/release-notes/W6-real-engine-walkthrough.md 里记录。
     command: uv run celery -A app.celery_app worker --loglevel=info --concurrency=2
 
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        UV_DEFAULT_INDEX: ${UV_PYPI_MIRROR:-https://pypi.org/simple}
+    container_name: xiaoniao-celery-beat
+    restart: unless-stopped
+    env_file:
+      - .env.local
+    environment:
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+      MINIO_ENDPOINT: http://minio:9000
+      AI_ENGINE_URL: http://ai_engine:9000
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uv run celery -A app.celery_app beat --loglevel=info
+
   ai_engine:
     build:
       context: ./ai_engine
       dockerfile: Dockerfile
+      args:
+        UV_DEFAULT_INDEX: ${UV_PYPI_MIRROR:-https://pypi.org/simple}
       # MediaPipe 只发布了 x86_64/macOS-arm64/Windows 三种 wheel；Linux aarch64 没有。
       # 为了让 Apple Silicon 开发机（arm64）和生产服务器（x86_64）都能跑同一份镜像，
       # 强制 linux/amd64 构建。M1/M2 Mac 上会走 Rosetta 2 模拟，性能比原生 arm64

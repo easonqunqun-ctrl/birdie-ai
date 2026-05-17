@@ -97,10 +97,9 @@ const CaptureAnalysisPage: FC = () => {
       const err = e as { errMsg?: string; message?: string }
       const msg = err.errMsg || err.message || ''
       if (/cancel/i.test(msg) || /已取消/i.test(msg)) return
+      const intermittent = describeIntermittentRequestFailure(e).toastTitle
       const title =
-        msg.trim().length > 0
-          ? msg
-          : describeIntermittentRequestFailure(e).toastTitle
+        msg.trim().length > 0 ? msg.trim() : intermittent.length > 0 ? intermittent : '操作未完成，请稍后重试'
       Taro.showToast({
         title: title.length > 120 ? `${title.slice(0, 119)}…` : title,
         icon: 'none',

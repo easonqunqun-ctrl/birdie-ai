@@ -177,11 +177,12 @@ if [[ -f docker-compose.wechat-pay-key.yml ]]; then
   PAY_KEY_FLAGS="-f docker-compose.wechat-pay-key.yml"
 fi
 
+# 与 release-cvm-on-server.sh 对齐：整栈 build（compose 中出现 celery-beat 等会自动拉起）
 # shellcheck disable=SC2086
 docker compose --project-directory '${DEPLOY_REPO}' \\
   -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.cvm.yml \\
   \${PAY_KEY_FLAGS} ${REMOTE_EXTRA_COMPOSE_FLAGS} \\
-  --env-file '${DEPLOY_REPO}/.env.local' up -d --build backend celery-worker ai_engine
+  --env-file '${DEPLOY_REPO}/.env.local' up -d --build
 
 if [[ '${REMOTE_ALEMBIC}' != 'no' ]]; then
   echo "→ alembic upgrade head"

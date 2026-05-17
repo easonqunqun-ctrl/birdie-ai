@@ -1483,6 +1483,35 @@ POST /v1/payments/wechat/notify
 
 ---
 
+### 6.2.1 生产：申请全额退款（用户 JWT）
+
+```
+POST /v1/payments/orders/{order_id}/apply-refund
+```
+
+**需认证**。仅在 **`WECHAT_PAY_MOCK_MODE=false`** 可用；mock 演练请用 `mock-refund`。
+
+- 可选 query `reason`。
+- MVP：支付成功后 **`PAYMENT_SELF_REFUND_WINDOW_HOURS`（默认 24）小时内**可申请自助退款；超限返回 `40094`。
+- 成功后本地订单 **仍为 `paid`**；以异步 **`POST /v1/payments/wechat/refund-notify`** 为终态。
+- 响应 `data.wechat`：`/v3/refund/domestic/refunds` JSON 摘要；`data.order`：当前本地订单。
+
+**商户平台退款 notify_url**：填写 **`WECHAT_PAY_REFUND_NOTIFY_URL`**；若留空，则尝试从 `WECHAT_PAY_NOTIFY_URL` 将路径 `.../payments/wechat/notify` 替换为 **`.../payments/wechat/refund-notify`**。
+
+---
+
+### 6.2.2 退款结果异步通知（微信）
+
+```
+POST /v1/payments/wechat/refund-notify
+```
+
+**微信服务器调用，非前端接口**
+
+`refund_status=SUCCESS` 且金额与订单一致时：订单 **`refunded`**、写 **`payment_transactions`（`transaction_type=refund`）**、会员降级（与 mock 退款对齐的 MVP 策略）。
+
+---
+
 ### 6.3 查询订单状态
 
 ```
@@ -1564,6 +1593,29 @@ POST /v1/payments/membership/cancel-auto-renew
   }
 }
 ```
+
+---
+
+### 6.6 Mock 演练：超时关单 / mock 退款
+
+**实际路由（已实现）对齐 `POST /v1/payments/orders`（非历史文档中的 `/subscriptions`）见 §10.**
+
+#### 待支付超时关单（运维 / 调度）
+
+- 服务层：`payment_service.expire_stale_pending_orders` 将 **`pending`** 且 **`created_at`** 早于 `now - PAYMENT_PENDING_ORDER_EXPIRE_MINUTES` 的订单批量置为 **`cancelled`**（默认阈值 **120** 分钟，`.env`: `PAYMENT_PENDING_ORDER_EXPIRE_MINUTES`）。
+- Celery：`xiaoniao.expire_stale_pending_orders`，在 `celery_app.beat_schedule` 中默认为 **每 15 分钟**触发；**须在部署栈中常驻 `celery beat`**（或等价 cron 调 Celery `-A app.celery_app call xiaoniao.expire_stale_pending_orders`），否则仅靠配置不会生效。
+
+```
+（无前端入口；按需由调度器触发同名 Celery task）
+```
+
+#### Mock 全额退款（仅 `WECHAT_PAY_MOCK_MODE=true`）
+
+```
+POST /v1/payments/orders/{order_id}/mock-refund?reason=<可选>
+```
+
+**需认证**；语义：对已 **`paid`** 订单记账 **`refunded`**、写 **`payment_transactions`** 类型 **`refund`**，并将会员降级回 **free**（与生产「微信退款 + 退款回调」链路尚未对接；本接口服务于联调 / 冒烟）。
 
 ---
 
@@ -1878,7 +1930,10 @@ POST /v1/events
 | 26 | GET | /v1/training/calendar | 是 | 获取打卡日历 |
 | 27 | POST | /v1/payments/subscriptions | 是 | 创建订阅订单 |
 | 28 | POST | /v1/payments/wechat/notify | 否 | 微信支付回调（商户平台 notify_url 须与此路径一致） |
+| 28a | POST | /v1/payments/wechat/refund-notify | 否 | 退款结果异步通知（验签解密，见 §6.2.2） |
 | 29 | GET | /v1/payments/orders/{id} | 是 | 查询订单状态 |
+| 29a | POST | /v1/payments/orders/{id}/apply-refund | 是 | **生产**：向微信发起全额退款（见 §6.2.1） |
+| 29b | POST | /v1/payments/orders/{id}/mock-refund | 是 | Mock：`paid`→`refunded` + 降级会员（详见 §6.6） |
 | 30 | GET | /v1/payments/membership | 是 | 获取会员信息 |
 | 31 | POST | /v1/payments/membership/cancel-auto-renew | 是 | 取消自动续费 |
 | 32 | GET | /v1/invitations/me | 是 | 获取邀请信息 |
@@ -1907,6 +1962,9 @@ POST /v1/events
 | `GET /v1/payments/plans` | `GET /v1/payments/plans` | **新增**：开通页套餐列表 |
 | `GET /v1/me/orders` | `GET /v1/users/me/orders` | 我的订单列表，按 `created_at DESC` |
 | `POST /v1/payments/membership/cancel-auto-renew` | （**W8 落地**） | 依赖真实支付委托扣款签约，W7 暂不支持 |
+| —— | `POST /v1/payments/orders/{id}/mock-refund`（**mock**） | 演练：`paid→refunded` + 降级会员 |
+| —— | `POST /v1/payments/orders/{id}/apply-refund` + `POST …/refund-notify` | **生产**：申请退款（§6.2.1）+ 异步结案（§6.2.2）；需 `WECHAT_PAY_NOTIFY_URL`/退款回调与商户平台一致 |
+| —— | Celery **`xiaoniao.expire_stale_pending_orders`** | **pending→cancelled**：默认 > `PAYMENT_PENDING_ORDER_EXPIRE_MINUTES`；需 **`celery beat`** 或小周期等价调度 |
 
 ### 10.2 训练接口（原 §五 → 实际路径）
 

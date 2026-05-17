@@ -27,6 +27,7 @@ import Taro, { useDidHide, useDidShow, useRouter } from '@tarojs/taro'
 import { analysisService } from '@/services/analysisService'
 import { describeIntermittentRequestFailure, isRequestError } from '@/services/request'
 import { useAnalysisStore } from '@/store/analysisStore'
+import { SUBSCRIBE_TPL_ANALYSIS_DONE } from '@/constants/subscribeTemplates'
 import { SWING_TIPS, pickStartIndex } from '@/constants/swingTips'
 import type {
   AnalysisStage,
@@ -89,6 +90,15 @@ const AnalysisWaitingPage: FC = () => {
   const hasRedirectedRef = useRef(false)
 
   const clearCurrent = useAnalysisStore((s) => s.clearCurrent)
+
+  /** 微信小程序：拉起「分析完成」类一次性订阅模板（`TARO_APP_SUBSCRIBE_TPL_ANALYSIS_DONE`）；未配置则跳过 */
+  useEffect(() => {
+    if (!analysisId) return
+    if (process.env.TARO_ENV !== 'weapp') return
+    const tid = SUBSCRIBE_TPL_ANALYSIS_DONE
+    if (!tid) return
+    void Taro.requestSubscribeMessage({ tmplIds: [tid] }).catch(() => {})
+  }, [analysisId])
 
   // ---------------- 轮询核心 ----------------
   const poll = useCallback(async () => {

@@ -15,6 +15,7 @@ from __future__ import annotations
 from urllib.parse import urlparse, urlunparse
 
 from celery import Celery
+from celery.schedules import crontab
 
 from app.config import settings
 
@@ -30,7 +31,7 @@ celery_app = Celery(
     "xiaoniao",
     broker=_with_db(settings.redis_url, 1),
     backend=_with_db(settings.redis_url, 2),
-    include=["app.tasks.analysis_tasks"],
+    include=["app.tasks.analysis_tasks", "app.tasks.payment_tasks"],
 )
 
 celery_app.conf.update(
@@ -47,6 +48,13 @@ celery_app.conf.update(
     broker_connection_retry_on_startup=True,
     # worker 预取 1 条：任务相对重（视频分析），避免一 worker 积压多条长任务
     worker_prefetch_multiplier=1,
+    beat_schedule={
+        # 需在部署栈中常驻 `celery -A app.celery_app beat` 才会触发
+        "expire-stale-payment-orders": {
+            "task": "xiaoniao.expire_stale_pending_orders",
+            "schedule": crontab(minute="*/15"),
+        },
+    },
 )
 
 

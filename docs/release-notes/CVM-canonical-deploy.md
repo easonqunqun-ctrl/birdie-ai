@@ -42,6 +42,13 @@
 | `AI_ENGINE_URL` | HTTP | Celery / backend 调推理，如 `http://ai_engine:9000` |
 | **ai_engine 拉分析视频** | — | 公网 `video_url` 在 **[`ai_engine/app/pipeline/preprocess.py`](../../ai_engine/app/pipeline/preprocess.py)** 中优先改写为内网 `MINIO_ENDPOINT` 再 `curl`，避免容器内访问不到公网网关。 |
 
+### Celery Beat（订单超时关单）
+
+- 任务 **`xiaoniao.expire_stale_pending_orders`** 写入 **`backend/app/celery_app.py`** `beat_schedule`（默认 15min）— **必须跑 `celery beat` 调度进程**才会执行；仅 `worker` 不会触发周期任务。
+- 本地：**`docker-compose.yml`** 内含 **`celery-beat`** 服务（镜像与 worker 同为 backend）；`make up` 若省略该服务请加：  
+  `docker compose --env-file .env.local up -d celery-beat`
+- **CVM**：与 worker 一起在 compose 叠叠乐时 **务必勾选/包含 celery-beat 一条**；发布后 `docker ps | grep celery` 应具备 `beat`。
+
 ### 从 §0 rsync → 本节 Git 主干（一键迁移）
 
 已落地文档与脚本；**在云服务器 SSH 执行**（变量换成你的远端地址即可）：
@@ -197,6 +204,17 @@ docker compose -f docker-compose.yml -f docker-compose.test.yml -f docker-compos
 **根治（仓库已落地）**：`infra/test/nginx.conf` 在 **443 server** 内配置了 **`resolver 127.0.0.11 valid=10s`**，并对 **`/v1/`**、**`/minio/`** 使用 **`proxy_pass http://$backend_host:8000`** / **`http://$minio_host:9000$uri`**（`/minio/` 在 **`rewrite … break`** 之后拼接 **`$uri`**），按请求解析上游，避免 stale IP。
 
 **仅 `docker compose ps` 标记 nginx `unhealthy`**：若公网 **443 已可** `curl /v1/health`，多为 **backend 冷启动**长于健康检查 **`start_period`**。用 **`docker inspect xiaoniao-nginx --format '{{json .State.Health}}'`** 看最近 `Log`。`docker-compose.test.yml` 已将 nginx 自检 **`start_period`** 提到 **90s** 并略放宽 `interval/timeout`（仍探测 `http://backend:8000/v1/health`）。
+
+### 8.2 `nginx` 健康检查「假不健康」的常见误判（false positive）
+
+以下为 **Compose 语义上的 healthy/unhealthy**，与上文 **HTTPS 对用户已可用但 worker 上游 IP 陈旧**（真 502）区分：
+
+| 现象 | 可先当「误判」处理的条件 | 下一步 |
+|------|--------------------------|--------|
+| **`ps` 中 nginx `(unhealthy)`** | **`curl -sf https://<域名>/v1/health`** 已返回 **`"status"`** JSON，且 **`services.database/redis`** 在健康检查里也为 ok | **健康检查探测窗口**：仅等满 **`start_period`** 后再看一眼；仍为 unhealthy 多数是 **阈值过紧**：一次超时即失败。**`docker inspect xiaoniao-nginx --format '{{json .State.Health.Log}}'`** 若多为 **timeout/connect**，可在叠层 compose 略增大 **`interval`/`timeout`**，或确认 **后端启动时间变长（迁移/预热）**。 |
+| **nginx healthy 但公网间歇 502** | 与用户侧 **同一时间** **`docker exec xiaoniao-nginx`** 内设变量反代 **`/v1/health`** 也失败 | 优先按 **§8 根治段**：`resolver + $backend_host`，并 **`docker restart xiaoniao-nginx`** 或 **`--force-recreate nginx`**。 |
+
+**不要将 `depends_on.service.condition: service_healthy` 的失败**笼统当成「网关坏了」：若 **仅是 nginx 自检偶发超时**，可改为 **`service_started`** 或放宽检查后 **仍用外网 `/v1/health`** 作主验收。
 
 **处理**（仍建议在合并 nginx.conf 变更后执行一次，或旧镜像未更新时兜底）：
 

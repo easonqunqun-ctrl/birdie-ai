@@ -2,7 +2,8 @@
 
 > **目的**：在 **不阻断** 当前主干（微信小程序分析 / 对话 / 训练 / 支付与 **CVM 单链路发版**）的前提下，明确可并行推进的工程与体验项，避免与热点救火抢同一 MR。  
 > **发版主轴**：过渡期约定见 **`docs/release-notes/CVM-canonical-deploy.md`** §0（rsync / `publish-backend-cvm` / `tmux` 单次 `compose`）；后续 Git 切换见同文档 §0「下一版切 Git」。  
-> **产品规格对照**：MVP 逐项验收仍以 **`docs/01-MVP功能需求规格说明书.md`** 为准；本文 **不替代** MVP，仅补充「工程与健康度」泳道。
+> **产品规格对照**：MVP 逐项验收仍以 **`docs/01-MVP功能需求规格说明书.md`** 为准；本文 **不替代** MVP，仅补充「工程与健康度」泳道。  
+> **总表**：未完项优先级与源码锚点汇总见 **`docs/19-产品开发迭代计划-当前队列.md`**。
 
 ---
 
@@ -12,6 +13,22 @@
 |------|------|
 | **P1** | 建议近两轮迭代内排到开发；与稳定性 / 合规 / 上线信心强相关 |
 | **P2** | 可与 W8 能力（订阅消息、分享海报等）对齐或顺延；或依赖 W6 真实引擎 |
+
+---
+
+## 核销快照 · P1（2026-05-13）
+
+| 序号 | 项 | 状态 | 备注 |
+|------|-----|------|------|
+| E1 | 上传失败后自动重试 + request_id | **Done（代码侧）** | `client/src/services/analysisService.ts`（退避上限与 HTTP 判别）|
+| E2 | 等待页阈值 60s / 120s 文案 | **Done** | `client/src/pages/analysis/waiting.tsx` MVP 阈值与贴士 |
+| E3 | 网络 Toast 与 `request.ts` 对齐 | **Partial** | 持续随新 `-20x`/`timeout` case 增补 |
+| T1 | 后端 pytest（关键路径） | **Partial / 演进中** | 含 `payments` / quota / streaming 门禁；按需扩展 |
+| T2 | 改接口同步 docs/02 | **纪律项** | 随 PR；无「完成」勾选 |
+| T3 | CI backend 门禁 | **Done（smoke）** | `.github/workflows/backend-pytest-smoke.yml`；全量仍为 `make backend-test` |
+| O1 | nginx unhealthy | **文档 + 口述** | 见 `CVM-canonical-deploy` §8；遇个案再核销 |
+| O2 | Runbook 一页 | **Done（文档侧）** | `CVM-canonical-deploy.md` §0 |
+| O3 | MinIO/COS 变量 | **Done（文档侧）** | §0「环境变量速查」|
 
 ---
 
@@ -49,9 +66,11 @@
 
 | 序号 | 项 | 说明 / 对齐 |
 |------|-----|-------------|
-| C1 | **账号注销**全流程验收：`01` §3.4 四项（冷静期 / 到期清理 / 再进为新用户） | 若已实现，改为 **勾选文档 + 验收记录** |
-| C2 | **会员过期与降级**：`01` §3.5 与代码路径（惰性校验等）逐项对照 | 解决文档 Checkbox 与实际不一致 |
-| C3 | **示例视频 §3.6** 与 M2 「示例」已勾选条目 **文档对齐** | 消除 `01` 内需产品拍板的矛盾 |
+| C1 | **账号注销**全流程验收：`01` §3.4 四项（冷静期 / 到期清理 / 再进为新用户） | **Open**：逐条勾选 `01` + 验收纪要 |
+| C2 | **会员过期与降级**：`01` §3.5 与代码路径（惰性校验等）逐项对照 | **Open**：与 `ensure_membership_valid` 对齐 doc |
+| C3 | **示例视频 §3.6** 与 M2 「示例」已勾选条目 **文档对齐** | **Open** |
+
+**C1–C3 · 对照登记（源码入口，不作为替代验收）**：账号注销 **`client/src/pages/profile/account-deletion.tsx`** · **`backend/app/services/account_deletion_service.py`**；会员过期惰性降级 **`payment_service.ensure_membership_valid`**（读用户时触发）；示例报告 **`id=sample`** 及列表过滤见 **`analysis_service` / `training` API**。
 
 ---
 
@@ -59,17 +78,18 @@
 
 以下内容 **刻意不拆细任务**：已有 **`docs/16-W8任务拆分.md`**、**`docs/15-W7任务拆分.md`**、`01` 中 W8 标注可作源；并行开发时 **领子任务再在对应拆分文档增补 issue 级勾选**。
 
-- **W8**：分析完成 **订阅消息**、**分享海报 / 小程序码**、上传 SLA 真机、**微信支付委托扣费**（若合规需要）等。
+- **W8**：分析完成 **订阅消息**（`waiting`/`membership` 已接线拉模板，`TARO_APP_SUBSCRIBE_TPL_*` 配后用）、**分享海报 / 小程序码**、上传 SLA 真机、**微信支付委托扣费**（若合规需要）等。
 - **W8**：训练 **进步曲线** UI。
-- **W7**：对话 **会话列表** UI（`01` M3 `[~]` 已登记）。
-- **W6**：服务端 **视频质量预检**、骨骼叠加 **≥24fps**（**`docs/14-W6任务拆分.md`**）。
+- ~~**W7**：对话 **会话列表** UI~~ **→ 已并入主线**（`profile/chat-history` + `/chat/sessions`）；以 `docs/01` 勾选为准。
+- **W6**：服务端 **视频质量预检**、骨骼叠加 **≥24fps**（**`docs/14-W6任务拆分.md`**；引擎侧预处理与 `visualize` 见 **`docs/release-notes/W6-engine-productization-roadmap.md`**）。
 
 ---
 
 ## P2 / W9 · 商业与工单（与交付合同对齐时再排）
 
-- 订单超时自动关闭、退款对接等：见 **`docs/release-notes/W9-code-vs-plan-status.md`** 「缺口 / 风险」。
-- 「不做」边界仍以 **`docs/17-W9任务拆分.md`** 为准。
+- **订单超时自动关闭**：代码 + Celery 任务 ✅；Compose 增补 **`celery-beat`** 服务 ✅；仍须在 **目标环境核验 beat 与健康度**。
+- **微信退款**：真实 **`apply-refund` + `refund-notify`** ✅（非 mock）；叠加订阅 / 按比例退仍以工单迭代。
+- 细节仍为 **`docs/release-notes/W9-code-vs-plan-status.md`**。
 
 ---
 
@@ -86,4 +106,5 @@
 
 | 日期 | 说明 |
 |------|------|
+| 2026-05-13 | P1/E/T/O 核销快照；W7 会话列表标 Done；关联 W9 退款/beet、`docs/19`、W6/W10 roadmap 文档 |
 | 2026-05-16 | 初始化：纳入并行工程 backlog，与用户对齐「列入计划」 |

@@ -11,9 +11,10 @@ W7-T1 设计要点：
 """
 
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -452,3 +453,226 @@ async def sync_pending_order_from_wechat(
     )
     await db.refresh(order)
     return True, order, "synced_from_wechat"
+
+
+def refund_out_no_for_order(order_id: str) -> str:
+    """稳定的商户退款单号（单笔订单多次重试仍为同一串，微信侧 DUPLICATE 可查）."""
+    cand = "".join(c for c in order_id if c.isalnum() or c == "_") or "ord"
+    return ("RF_" + cand)[:64]
+
+
+async def apply_wechat_refund_for_order(
+    db: AsyncSession,
+    order: Order,
+    user: User,
+    *,
+    reason: str | None = None,
+) -> tuple[dict[str, Any], Order]:
+    """非 mock：向微信申请全额退款；在退款 NOTIFY 到来前本地订单仍为 paid."""
+    if settings.WECHAT_PAY_MOCK_MODE:
+        raise BadRequestError(code=40090, message="mock 模式下请使用 POST .../mock-refund")
+    if order.user_id != user.id:
+        raise ConflictError(code=40301, message="无权操作此订单")
+    if order.status != "paid":
+        raise PaymentNotAllowedError(message=f"仅已支付订单可申请退款（当前 {order.status}）")
+
+    win = getattr(settings, "PAYMENT_SELF_REFUND_WINDOW_HOURS", 24)
+    paid_at = order.paid_at
+    if paid_at is not None and int(win or 0) > 0:
+        last_ok = paid_at + timedelta(hours=int(win))
+        if datetime.now(UTC) > last_ok:
+            raise BadRequestError(
+                code=40094,
+                message="已超过自助退款时限，如需协助请联系客服",
+            )
+
+    notify_url = wechat_pay_v3.resolve_wechat_pay_refund_notify_url()
+    if not notify_url.strip():
+        raise ThirdPartyError(
+            message="未配置 WECHAT_PAY_REFUND_NOTIFY_URL，且无法在 WECHAT_PAY_NOTIFY_URL 上推导退款回调",
+        )
+
+    try:
+        ctx = wechat_pay_v3.get_wechat_pay_v3()
+    except (RuntimeError, ValueError, OSError) as e:
+        logger.warning("wechat_pay_v3_init_failed_refund", error=str(e), order_id=order.id)
+        raise ThirdPartyError(message=f"支付配置错误：{e!s}", detail=str(e)) from e
+
+    try:
+        wx = await ctx.domestic_refund(
+            out_trade_no=order.id,
+            out_refund_no=refund_out_no_for_order(order.id),
+            refund_cents=int(order.amount),
+            total_cents=int(order.amount),
+            notify_url=notify_url.strip(),
+            reason=reason,
+        )
+    except wechat_pay_v3.WechatPayRequestError as e:
+        logger.warning("wechat_domestic_refund_failed", order_id=order.id, detail=str(e))
+        raise ThirdPartyError(message="微信退款接口调用失败", detail=str(e)) from e
+
+    await db.refresh(order)
+    return wx, order
+
+
+async def process_wechat_refund_notify(db: AsyncSession, refund_payload: dict) -> tuple[bool, str]:
+    """处理退款异步通知解密 JSON；SUCCESS ⇒ `refunded` + 降级会员."""
+    rs = str(refund_payload.get("refund_status") or "").strip().upper()
+    if rs != "SUCCESS":
+        return True, "non_success_ignore"
+
+    out_trade_no = refund_payload.get("out_trade_no")
+    if not out_trade_no:
+        return False, "missing_out_trade_no"
+
+    order = await db.get(Order, str(out_trade_no))
+    if order is None:
+        return False, "order_not_found"
+    if order.status == "refunded":
+        return True, "already_refunded_idempotent"
+    if order.status != "paid":
+        return False, f"unexpected_local_status_{order.status}"
+
+    amt = refund_payload.get("amount")
+    if not isinstance(amt, dict):
+        return False, "bad_amount_payload"
+    total_raw = amt.get("payer_total")
+    refund_raw = amt.get("payer_refund")
+    if total_raw is None:
+        total_raw = amt.get("total")
+    if refund_raw is None:
+        refund_raw = amt.get("refund")
+    try:
+        total_i = int(total_raw)  # type: ignore[arg-type]
+        ref_i = int(refund_raw)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return False, "amount_not_integers"
+    if total_i != int(order.amount) or ref_i != int(order.amount):
+        return False, "amount_not_full_refund_guard"
+
+    user = await db.get(User, order.user_id)
+    if user is None:
+        return False, "user_not_found"
+
+    await _demote_membership_after_mock_refund(db, user)
+    rid = refund_payload.get("out_refund_no") or refund_payload.get("refund_id") or ""
+    rr = (
+        refund_payload.get("user_received_account")
+        or refund_payload.get("remark")
+        or (str(rid).strip() or "wechat_refund_notify")
+    )
+    if isinstance(rr, str) and len(rr) > 500:
+        rr = rr[:500]
+
+    ts = datetime.now(UTC)
+    order.status = "refunded"
+    order.refunded_at = ts
+    order.refund_reason = rr if isinstance(rr, str) else "wechat_refund_notify"
+
+    txn = PaymentTransaction(
+        id=new_id("ptx"),
+        order_id=order.id,
+        user_id=user.id,
+        transaction_type="refund",
+        amount=order.amount,
+        wechat_notify_data=refund_payload,
+    )
+    db.add(txn)
+    await db.flush()
+
+    return True, "ok"
+
+
+async def expire_stale_pending_orders(
+    db: AsyncSession,
+    *,
+    now: datetime | None = None,
+) -> int:
+    """将超过阈值的 pending 订单置为 cancelled。
+
+    Celery：`xiaoniao.expire_stale_pending_orders` 定期触发；不写支付流水。"""
+    ref = now or datetime.now(UTC)
+    ttl = settings.PAYMENT_PENDING_ORDER_EXPIRE_MINUTES
+    if ttl <= 0:
+        return 0
+    cutoff = ref - timedelta(minutes=ttl)
+    res = await db.execute(
+        update(Order)
+        .where(Order.status == "pending", Order.created_at < cutoff)
+        .values(status="cancelled")
+        .execution_options(synchronize_session=False)
+    )
+    return int(res.rowcount or 0)
+
+
+async def _demote_membership_after_mock_refund(db: AsyncSession, user: User) -> None:
+    """Mock 全额退款演练：清零会员与配额（与多次续费等 edge case 解耦）。"""
+    user.membership_type = "free"
+    user.membership_started_at = None
+    user.membership_expires_at = None
+    user.auto_renew = False
+
+    now_cn = datetime.now(UTC) + timedelta(hours=8)
+    month_str = now_cn.strftime("%Y-%m")
+    today_cn = now_cn.date()
+
+    a_q = (
+        await db.execute(
+            select(AnalysisQuota).where(
+                AnalysisQuota.user_id == user.id,
+                AnalysisQuota.quota_month == month_str,
+            )
+        )
+    ).scalar_one_or_none()
+    if a_q is not None and a_q.total < 0:
+        a_q.total = settings.FREE_USER_MONTHLY_ANALYSES
+
+    c_q = (
+        await db.execute(
+            select(ChatQuota).where(
+                ChatQuota.user_id == user.id,
+                ChatQuota.quota_date == today_cn,
+            )
+        )
+    ).scalar_one_or_none()
+    if c_q is not None and c_q.total < 0:
+        c_q.total = settings.FREE_USER_DAILY_CHATS
+
+    await db.flush()
+
+
+async def mock_refund_paid_order(
+    db: AsyncSession,
+    order: Order,
+    user: User,
+    *,
+    reason: str | None = None,
+) -> Order:
+    """Mock 模式下：对已支付订单做全额退款记账 + 将会员降为免费。"""
+    if not settings.WECHAT_PAY_MOCK_MODE:
+        raise PaymentNotAllowedError(message="mock 退款仅在 WECHAT_PAY_MOCK_MODE 下可用")
+    if order.status != "paid":
+        raise PaymentNotAllowedError(message=f"仅已支付订单可退款（当前 {order.status}）")
+    if order.user_id != user.id:
+        raise ConflictError(code=40301, message="无权操作此订单")
+
+    rid = reason.strip() if reason and reason.strip() else "mock_refund"
+    ts = datetime.now(UTC)
+
+    await _demote_membership_after_mock_refund(db, user)
+
+    order.status = "refunded"
+    order.refunded_at = ts
+    order.refund_reason = rid
+
+    txn = PaymentTransaction(
+        id=new_id("ptx"),
+        order_id=order.id,
+        user_id=user.id,
+        transaction_type="refund",
+        amount=order.amount,
+        wechat_notify_data={"mock": True, "reason": rid},
+    )
+    db.add(txn)
+    await db.flush()
+    return order

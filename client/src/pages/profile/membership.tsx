@@ -5,6 +5,7 @@ import { paymentService } from '@/services/paymentService'
 import { describeIntermittentRequestFailure, describePageLoadFailure, isRequestError } from '@/services/request'
 import { useUserStore } from '@/store/userStore'
 import { PAYMENT_ENABLED_FLAG, PAYMENT_MOCK_FLAG } from '@/constants/flags'
+import { SUBSCRIBE_TPL_MEMBERSHIP_EXPIRE } from '@/constants/subscribeTemplates'
 import { track } from '@/utils/track'
 import type { Order, PlanOption, PlanType } from '@/types/payment'
 import './membership.scss'
@@ -32,6 +33,14 @@ const MembershipPage: FC = () => {
   useDidShow(() => {
     fetchMe().catch(() => undefined)
   })
+
+  /** 微信小程序：可选「到期提醒」模板占位；微信公众平台过审后在 env 配 `TARO_APP_*` */
+  useEffect(() => {
+    if (process.env.TARO_ENV !== 'weapp') return
+    const tid = SUBSCRIBE_TPL_MEMBERSHIP_EXPIRE
+    if (!tid) return
+    void Taro.requestSubscribeMessage({ tmplIds: [tid] }).catch(() => {})
+  }, [])
 
   async function load() {
     setLoading(true)
