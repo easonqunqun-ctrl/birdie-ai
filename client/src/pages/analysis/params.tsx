@@ -15,6 +15,11 @@ import Taro, { useRouter } from '@tarojs/taro'
 import { analysisService, uploadLikelyNeedsFreshToken } from '@/services/analysisService'
 import { checkVideoFirstFrame } from '@/services/mediaCheck'
 import { describeIntermittentRequestFailure, isRequestError } from '@/services/request'
+import {
+  confirmQualityWarningsIfNeeded,
+  precheckVideoQuality,
+} from '@/services/videoQualityPrecheck'
+import { linesForQualityWarnings } from '@/constants/qualityWarnings'
 import { useAnalysisStore } from '@/store/analysisStore'
 import { useUserStore } from '@/store/userStore'
 import { track } from '@/utils/track'
@@ -72,8 +77,10 @@ const AnalysisParamsPage: FC = () => {
   const [submitting, setSubmitting] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [phase, setPhase] = useState<
-    'idle' | 'checking' | 'signing' | 'uploading' | 'creating'
+    'idle' | 'quality' | 'checking' | 'signing' | 'uploading' | 'creating'
   >('idle')
+  const [qualityWarnings, setQualityWarnings] = useState<string[]>([])
+  const [qualityChecking, setQualityChecking] = useState(false)
 
   const setCurrent = useAnalysisStore((s) => s.setCurrent)
   const fetchMe = useUserStore((s) => s.fetchMe)
@@ -85,6 +92,36 @@ const AnalysisParamsPage: FC = () => {
       setTimeout(() => Taro.redirectTo({ url: '/pages/analysis/capture' }), 800)
     }
   }, [tempFilePath, size, duration])
+
+  // O-08 子集：首帧缩略图亮度/清晰度启发式（无缩略图则跳过）
+  useEffect(() => {
+    if (!thumbTempFilePath) {
+      setQualityWarnings([])
+      setQualityChecking(false)
+      return
+    }
+    let cancelled = false
+    setQualityChecking(true)
+    precheckVideoQuality({
+      thumbTempFilePath,
+      videoTempFilePath: tempFilePath,
+      durationSec: duration,
+    })
+      .then((r) => {
+        if (!cancelled) setQualityWarnings(r.warnings)
+      })
+      .finally(() => {
+        if (!cancelled) setQualityChecking(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [thumbTempFilePath, tempFilePath, duration])
+
+  const qualityHintLines = useMemo(
+    () => linesForQualityWarnings(qualityWarnings),
+    [qualityWarnings],
+  )
 
   const overLimit = useMemo(() => {
     if (size > VIDEO_CONSTRAINTS.MAX_SIZE_BYTES) return `文件过大：${formatSize(size)}`
@@ -101,6 +138,27 @@ const AnalysisParamsPage: FC = () => {
     }
     setSubmitting(true)
     try {
+      setPhase('quality')
+      let warnCodes = qualityWarnings
+      if (!warnCodes.length && thumbTempFilePath) {
+        Taro.showLoading({ title: '检查拍摄质量' })
+        const pre = await precheckVideoQuality({
+          thumbTempFilePath,
+          videoTempFilePath: tempFilePath,
+          durationSec: duration,
+        })
+        warnCodes = pre.warnings
+        setQualityWarnings(pre.warnings)
+        Taro.hideLoading()
+      }
+      if (warnCodes.length) {
+        const proceed = await confirmQualityWarningsIfNeeded(warnCodes)
+        if (!proceed) {
+          Taro.redirectTo({ url: '/pages/analysis/capture' })
+          return
+        }
+      }
+
       // W8-T5：上传视频前先走一遍微信 imgSecCheck（首帧合规预检）。
       //   - 只有真的拒绝（passed=false）才 abort；fail-open 场景照常上传。
       //   - 没 thumbTempFilePath 的端（RN / 老机型）会被 checkVideoFirstFrame 直接返回 passed=true。
@@ -223,6 +281,22 @@ const AnalysisParamsPage: FC = () => {
           {duration.toFixed(1)}s · {formatSize(size)}
         </Text>
         {overLimit && <Text className='params__summary-error'>⚠ {overLimit}</Text>}
+        {qualityChecking && (
+          <Text className='params__summary-hint'>正在检查拍摄质量…</Text>
+        )}
+        {!qualityChecking && qualityHintLines.length > 0 && (
+          <View className='params__quality-warn'>
+            <Text className='params__quality-warn-title'>拍摄质量提示</Text>
+            {qualityHintLines.map((line) => (
+              <Text key={line} className='params__quality-warn-line'>
+                {line}
+              </Text>
+            ))}
+            <Text className='params__quality-warn-foot'>
+              可继续上传，分析报告会再次提示；建议改善后重拍。
+            </Text>
+          </View>
+        )}
       </View>
 
       <View className='params__section'>
