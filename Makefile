@@ -10,7 +10,7 @@
         deploy-test test-logs test-ps test-reset test-restart test-certs test-health \
         issue-le-cert sync-le-certs renew-le-cert verify-weapp-https \
         deploy-cvm-up deploy-cvm-ps deploy-cvm-logs publish-backend-cvm setup-cvm-ssh-key \
-        release-cvm cvm-migrate-git-doc cvm-stable-from-mac cvm-deploy-help cvm-deploy-dry-run cvm-env-preflight cvm-preflight cvm-preflight-tls cvm-remote-release cvm-smoke
+        release-cvm ship-cvm cvm-migrate-git-doc cvm-stable-from-mac cvm-deploy-help cvm-deploy-dry-run cvm-env-preflight cvm-preflight cvm-preflight-tls cvm-remote-release cvm-smoke
 
 # 默认目标：显示帮助
 help:
@@ -65,7 +65,10 @@ help:
 	@echo "  make ci                test + 真实引擎 smoke（bouncing_box → 50103）"
 	@echo ""
 	@echo "  ===== W8-T4：云发版（最简单）======"
-	@echo "  make release-cvm           先发代码 git push → 本条：SSH 整包 compose + alembic（.env 只在服务器）"
+	@echo "  make setup-cvm-ssh-key     仅一次：专用密钥 + ssh-copy-id（输最后一次服务器密码），之后 make release-cvm 免密"
+	@echo "  make ship-cvm              本机：生产 env 预检 → git push main → SSH 远端发版（须 main + 已 setup-cvm-ssh-key）"
+	@echo "  make release-cvm           代码已在 Git 远端后：SSH 整包 compose + alembic（可选 CVM_LOCAL_PREFLIGHT=1 ENV_FILE=…）"
+	@echo "  顺滑发版说明     docs/release-notes/cvm-release-smooth-runbook.md"
 	@echo "  make cvm-migrate-git-doc   云上从 rsync 切 git clone：读 docs/release-notes/CVM-migrate-rsync-to-git.md"
 	@echo "  make publish-backend-cvm   无云上 git：scp compose 三件套 + rsync backend/ai_engine → 远端 build + alembic"
 	@echo "                              （REMOTE_RSYNC_COMPOSE=no 可跳过 scp compose；慎用）"
@@ -331,6 +334,29 @@ publish-backend-cvm:
 # 生产 .env.local 只在服务器维护，无需在 Mac 指定 ENV_FILE。
 # 可调：DEPLOY_HOST=… GIT_BRANCH=… SKIP_GIT=1（无 .git / rsync 过渡期）
 release-cvm: cvm-remote-release
+
+# 从本机「零 SSH 手工登录」闭环：生产 env 预检 → push 当前分支 → release-cvm（免密依赖 setup-cvm-ssh-key）。
+# 用法（示例）：
+#   DEPLOY_HOST=ubuntu@你的公网IP ENV_FILE=$(HOME)/secrets/lingniao-prod.env make ship-cvm
+# 说明：ENV_FILE 只用于 Mac 侧预检；远端固定拉 GIT_BRANCH=main（与 git push 一致）。
+# 非 main 发版请手动 push 后：GIT_BRANCH=<分支或tag> make release-cvm
+ship-cvm:
+	@if [ -z "$(ENV_FILE)" ]; then \
+	  echo "✗ ship-cvm 需要 ENV_FILE（生产 secrets，用于本机预检）。示例：" >&2; \
+	  echo "  DEPLOY_HOST=ubuntu@x.x.x.x ENV_FILE=\$$HOME/secrets/lingniao-prod.env make ship-cvm" >&2; \
+	  echo "  须已执行：DEPLOY_HOST=… make setup-cvm-ssh-key" >&2; \
+	  exit 1; \
+	fi
+	@if [ ! -f "$(ENV_FILE)" ]; then echo "✗ 找不到 $(ENV_FILE)" >&2; exit 1; fi
+	@cb="$$(git rev-parse --abbrev-ref HEAD)"; \
+	if [ "$$cb" != "main" ]; then \
+	  echo "✗ ship-cvm 仅在 **main** 上执行（与远端默认 GIT_BRANCH=main 对齐）。当前分支：$$cb" >&2; \
+	  echo "  请先合并到 main，或改用：git push origin $$cb && DEPLOY_HOST=… GIT_BRANCH=$$cb CVM_LOCAL_PREFLIGHT=1 ENV_FILE=$(ENV_FILE) make release-cvm" >&2; \
+	  exit 1; \
+	fi
+	$(MAKE) cvm-preflight ENV_FILE="$(ENV_FILE)"
+	git push origin main
+	CVM_LOCAL_PREFLIGHT=0 GIT_BRANCH=main $(MAKE) release-cvm
 
 cvm-deploy-help:
 	bash scripts/deploy-cvm.sh

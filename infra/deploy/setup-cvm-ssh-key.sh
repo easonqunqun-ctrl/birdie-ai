@@ -41,5 +41,9 @@ ssh -i "${BIRDIE_CVM_KEY}" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept
   "${DEPLOY_HOST}" bash -lc 'echo "✓ OK: $(hostname)"'
 
 echo ""
-echo "✓ 路径 B 已就绪；以后发布：`make publish-backend-cvm`（不再需要密码）。"
-echo "  如需换机器或换 IP：`DEPLOY_HOST=… BIRDIE_CVM_KEY=… bash infra/deploy/setup-cvm-ssh-key.sh`"
+echo "✓ 路径 B 已就绪：本机发往 ${DEPLOY_HOST} 不再询问服务器密码（密钥：${BIRDIE_CVM_KEY}）。"
+echo "  Git 发版（推荐）：在仓库根 git push 后执行  make release-cvm"
+echo "  或一条命令（含预检 + push + 远端 compose）：  DEPLOY_HOST=${DEPLOY_HOST} ENV_FILE=~/secrets/lingniao-prod.env make ship-cvm"
+echo "  预检可选：  CVM_LOCAL_PREFLIGHT=1 ENV_FILE=~/secrets/… make release-cvm"
+echo "  rsync 兜底（无云上 git 时）：  make publish-backend-cvm"
+echo "  换机器 / 换 IP：  DEPLOY_HOST=… BIRDIE_CVM_KEY=… bash infra/deploy/setup-cvm-ssh-key.sh"

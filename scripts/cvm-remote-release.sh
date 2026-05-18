@@ -17,6 +17,7 @@
 #   DEPLOY_REPO           远端仓库绝对路径，默认 /home/ubuntu/lingniao-golf
 #   SKIP_GIT              默认 0；设 1 则远端 SKIP_GIT=1（见 release-cvm-on-server.sh）
 #   GIT_BRANCH            默认 main
+#   ALLOW_DIRTY_GIT       默认 0；设 1 时远端跳过「工作区须干净」检查（应急，见 release-cvm-on-server.sh）
 #   SSH_BATCH_MODE        默认 yes（有专用密钥时常用）；no 允许密码交互
 #   CVM_LOCAL_PREFLIGHT   设 1 时在 SSH 前执行 quick-check-env-local + check-cvm-pay-mount（与 deploy-cvm --local-preflight 对齐）
 #   ENV_FILE              同上预检时使用；默认 <repo>/.env.local（开发 env 易被占位符自检拦下）
@@ -31,6 +32,7 @@ DEPLOY_HOST="${DEPLOY_HOST:-ubuntu@1.13.198.172}"
 DEPLOY_REPO="${DEPLOY_REPO:-/home/ubuntu/lingniao-golf}"
 GIT_BRANCH="${GIT_BRANCH:-main}"
 SKIP_GIT="${SKIP_GIT:-0}"
+ALLOW_DIRTY_GIT="${ALLOW_DIRTY_GIT:-0}"
 
 BIRDIE_CVM_KEY="${BIRDIE_CVM_KEY:-$HOME/.ssh/id_ed25519_birdie_golf}"
 SSH_BATCH_MODE="${SSH_BATCH_MODE:-}"
@@ -61,14 +63,15 @@ if [[ "${CVM_LOCAL_PREFLIGHT}" =~ ^(1|true|yes)$ ]]; then
 fi
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  cvm-remote-release  host=$DEPLOY_HOST  repo=$DEPLOY_REPO  branch=$GIT_BRANCH  SKIP_GIT=$SKIP_GIT"
+echo "  cvm-remote-release  host=$DEPLOY_HOST  repo=$DEPLOY_REPO  branch=$GIT_BRANCH  SKIP_GIT=$SKIP_GIT  ALLOW_DIRTY_GIT=$ALLOW_DIRTY_GIT"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-ssh "${SSH_OPTS[@]}" "$DEPLOY_HOST" bash -s -- "$DEPLOY_REPO" "$GIT_BRANCH" "$SKIP_GIT" << 'EOS'
+ssh "${SSH_OPTS[@]}" "$DEPLOY_HOST" bash -s -- "$DEPLOY_REPO" "$GIT_BRANCH" "$SKIP_GIT" "$ALLOW_DIRTY_GIT" << 'EOS'
 set -euo pipefail
 export DEPLOY_REPO="$1"
 export GIT_BRANCH="$2"
 export SKIP_GIT="$3"
+export ALLOW_DIRTY_GIT="$4"
 cd "$DEPLOY_REPO" || {
   echo "✗ cd $DEPLOY_REPO 失败" >&2
   exit 1

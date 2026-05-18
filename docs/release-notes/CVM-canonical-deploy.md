@@ -2,6 +2,8 @@
 
 > 与对话中约定的「科学」运维方式一致：**代码只看 Git**，**密钥只在 Mac（或团队约定的一台）维护一份不入库**，**上线用 `scp`；代码同步永远不盖 `.env.local`**；可选 **`docker-compose.cvm.yml`** 去掉宿主机 bind，减少缺文件 / 跨平台 `.venv`。
 
+**顺滑发版（踩坑与命令表）**：[`cvm-release-smooth-runbook.md`](cvm-release-smooth-runbook.md)。
+
 **记号**：下文 **`$DEPLOY_REPO`** = CVM 上本仓库的路径（常与 `~/lingniao-golf` 一致）。
 
 ---

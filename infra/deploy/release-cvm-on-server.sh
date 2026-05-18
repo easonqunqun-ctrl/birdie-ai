@@ -11,6 +11,8 @@
 #   若存在 docker-compose.wechat-pay-key.yml 会自动叠加（与 make deploy-cvm-up 一致）。
 #   WECHAT_PAY_MOCK_MODE=false 时会先跑 infra/deploy/check-cvm-pay-mount.sh。
 #   SKIP_GIT=1                 跳过 git fetch/checkout/pull（服务端无 .git / rsync-only 过渡期）。
+#   ALLOW_DIRTY_GIT=1          默认：若 .git 存在且工作区不干净则失败，避免 pull 合并冲突 / 镜像打到脏树。
+#                              应急排障可设 1 跳过检查（不推荐日常发版）。
 #
 # 约定见 docs/release-notes/CVM-canonical-deploy.md
 set -euo pipefail
@@ -41,6 +43,18 @@ dc() {
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  CVM 发版  repo=$DEPLOY_REPO  branch=$GIT_BRANCH"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+if [[ -d .git && "${SKIP_GIT:-0}" != "1" && "${ALLOW_DIRTY_GIT:-0}" != "1" ]]; then
+  if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
+    echo "✗ 工作区不干净：继续发版可能导致 git pull 失败或镜像混入未提交改动。" >&2
+    git status -sb >&2
+    echo "" >&2
+    echo "  在确认无未备份内容后，可在仓库根执行（将丢弃本地修改与未跟踪文件）：" >&2
+    echo "    git fetch origin && git reset --hard \"origin/$GIT_BRANCH\" && git clean -fd" >&2
+    echo "  仅应急可：ALLOW_DIRTY_GIT=1 bash infra/deploy/release-cvm-on-server.sh" >&2
+    exit 1
+  fi
+fi
 
 if [[ -d .git && "${SKIP_GIT:-0}" != "1" ]]; then
   git fetch origin
