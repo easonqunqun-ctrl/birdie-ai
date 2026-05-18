@@ -142,6 +142,7 @@ def build_sample_report() -> AnalysisReportResponse:
         issues=issues,
         recommendations=recommendations,
         share_card_url=None,
+        quality_warnings=["low_light"],  # 示例：展示报告顶部提示条样式
         analyzed_at=SAMPLE_ANALYZED_AT,
         created_at=SAMPLE_CREATED_AT,
     )

@@ -80,6 +80,9 @@ class SwingAnalysis(Base, TimestampMixin):
     thumbnail_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     share_card_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
+    # 引擎非阻断质量提示（JSON 字符串列表），如 ["low_light","camera_shake"]
+    quality_warnings: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+
     # 是否为示例视频体验（不计入配额、不入历史）
     is_sample: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 

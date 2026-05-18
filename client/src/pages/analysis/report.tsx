@@ -40,6 +40,7 @@ import {
 } from '@/constants/phaseLabels'
 import { CAMERA_ANGLE_LABEL, CLUB_TYPE_LABEL } from '@/types/analysis'
 import type { AnalysisReportResponse, PhaseWindow } from '@/types/analysis'
+import { linesForQualityWarnings } from '@/constants/qualityWarnings'
 import RadarChart, { RadarAxis } from '@/components/RadarChart'
 import '@/components/RadarChart.scss'
 import './report.scss'
@@ -172,6 +173,11 @@ const ReportPage: FC = () => {
     )
   }, [report])
 
+  const qualityWarningLines = useMemo(
+    () => linesForQualityWarnings(report?.quality_warnings),
+    [report?.quality_warnings],
+  )
+
   const scoreLevel = report?.score_level ?? scoreLevelFromScore(report?.overall_score)
   const levelMeta = scoreLevel ? SCORE_LEVEL_META[scoreLevel] : null
 
@@ -238,6 +244,10 @@ const ReportPage: FC = () => {
     Taro.navigateTo({
       url: `/pages/analysis/history?mode=compare&anchor=${encodeURIComponent(analysisId)}`,
     }).catch(toastTabNavigationFailure)
+  }
+
+  const goScoreGuide = () => {
+    Taro.navigateTo({ url: '/pages/help/score-guide?from=report' }).catch(toastTabNavigationFailure)
   }
 
   // ---------------- 分享（W7-T5）----------------
@@ -357,6 +367,7 @@ const ReportPage: FC = () => {
     const prMeta = prLevel ? SCORE_LEVEL_META[prLevel] : null
     const clubText = CLUB_TYPE_LABEL[pr.club_type as keyof typeof CLUB_TYPE_LABEL] ?? pr.club_type
     const angleText = CAMERA_ANGLE_LABEL[pr.camera_angle as keyof typeof CAMERA_ANGLE_LABEL] ?? pr.camera_angle
+    const publicQualityLines = linesForQualityWarnings(pr.quality_warnings)
     return (
       <ScrollView scrollY className='report report--public'>
         <View className='report__public-hero'>
@@ -387,6 +398,21 @@ const ReportPage: FC = () => {
             <Text className='report__score-unit'>分</Text>
           </View>
         </View>
+
+        <View className='report__score-guide-row' onClick={goScoreGuide}>
+          <Text className='report__score-guide-link'>分数说明</Text>
+        </View>
+
+        {publicQualityLines.length > 0 && (
+          <View className='report__quality-warnings'>
+            <Text className='report__quality-warnings-title'>拍摄提示</Text>
+            {publicQualityLines.map((line, i) => (
+              <Text key={i} className='report__quality-warnings-item'>
+                {line}
+              </Text>
+            ))}
+          </View>
+        )}
 
         <View className='report__meta'>
           <Text className='report__meta-item'>📷 {angleText}</Text>
@@ -540,8 +566,10 @@ const ReportPage: FC = () => {
           <Text className='report__score-caption'>{levelMeta?.caption}</Text>
         </View>
         <View className='report__score-right'>
-          <Text className='report__score-value'>{report.overall_score ?? '-'}</Text>
-          <Text className='report__score-unit'>分</Text>
+          <View className='report__score-value-row'>
+            <Text className='report__score-value'>{report.overall_score ?? '-'}</Text>
+            <Text className='report__score-unit'>分</Text>
+          </View>
           {typeof report.score_change === 'number' && report.score_change !== 0 && (
             <Text
               className={[
@@ -552,8 +580,26 @@ const ReportPage: FC = () => {
               {report.score_change > 0 ? '▲' : '▼'} {Math.abs(report.score_change)}
             </Text>
           )}
+          {typeof report.score_change === 'number' && (
+            <Text className='report__score-change-hint'>较最近一次同类型分析</Text>
+          )}
         </View>
       </View>
+
+      <View className='report__score-guide-row' onClick={goScoreGuide}>
+        <Text className='report__score-guide-link'>分数说明</Text>
+      </View>
+
+      {qualityWarningLines.length > 0 && (
+        <View className='report__quality-warnings'>
+          <Text className='report__quality-warnings-title'>拍摄提示</Text>
+          {qualityWarningLines.map((line, i) => (
+            <Text key={i} className='report__quality-warnings-item'>
+              {line}
+            </Text>
+          ))}
+        </View>
+      )}
 
       {/* 视频元信息 */}
       <View className='report__meta'>

@@ -161,6 +161,19 @@ Authorization: Bearer <jwt_token>
 | 模板字段约定 | **thing1**（标题短语）、**time2**（到期时间，东八区 `YYYY-MM-DD HH:mm`）、**thing3**（行动短语）；与公众平台关键词类型一致 |
 | 失败策略 | 仅记日志 `subscribe_message.*`，**不** 影响用户降级与配额修复 |
 
+### 1.4.3 微信小程序 · 会员到期前 N 天提醒（Celery Beat，非 REST）
+
+| 项目 | 说明 |
+|------|------|
+| 触发时机 | Celery Beat 任务 `xiaoniao.membership_pre_expiry_notify`（默认每日 **00:12** 上海时区日历）；当会员 `membership_expires_at` 与当日相差 **`MEMBERSHIP_PRE_EXPIRY_NOTIFY_DAYS`** 个自然日（默认 **3**）时下发 |
+| 前置 | 用户于会员页已对 `wx.requestSubscribeMessage` **第三项**模板授权（`TARO_APP_SUBSCRIBE_TMPL_IDS` 逗号分隔第 3 个 ID） |
+| 配置 | `WECHAT_SUBSCRIBE_MESSAGE_ENABLED`、`WECHAT_SUBSCRIBE_MEMBERSHIP_PRE_EXPIRE_TEMPLATE_ID`、`MEMBERSHIP_PRE_EXPIRY_NOTIFY_DAYS`（`≤0` 关闭任务）；部署栈须常驻 **celery beat**（与 `expire_stale_pending_orders` 同 `app/celery_app.py::beat_schedule`） |
+| 去重 | Redis key `sub:preexpiry:{user_id}:{expire_date}`，45 天 TTL，避免重复推送 |
+| 模板字段约定 | 与 §1.4.2 相同布局：**thing1**（「会员权益即将到期」）、**time2**（到期时间东八区）、**thing3**（行动短语） |
+| 失败策略 | 单用户失败仅 `pre_expiry_notify_user_failed` 日志，不阻断批任务 |
+
+> **产品余量**：`docs/01` §3.5 所述 **7 天 / 1 天** 多档提醒尚未实现；当前为可配置的 **单档 N 天**（默认 3）。
+
 ### 1.5 限流策略
 
 | 接口类别 | 限流规则 |
@@ -680,6 +693,7 @@ GET /v1/analyses/{analysis_id}
     "overall_score": 78,
     "score_change": 3,
     "score_level": "good",
+    "quality_warnings": [],
 
     "phase_scores": {
       "setup": { "score": 82, "label": "站位准备" },
@@ -744,6 +758,10 @@ GET /v1/analyses/{analysis_id}
 }
 ```
 
+**字段补充**：
+
+- **`quality_warnings`**：`string[]`，AI 引擎返回的**非阻断**拍摄质量提示（machine codes，如 `low_light`、`camera_shake`），入库列 `swing_analyses.quality_warnings`（JSONB）。与失败态 `error` 互斥存在；空数组表示无附加提示。客户端展示文案见 `client/src/constants/qualityWarnings.ts`，产品与话术真源见 [`docs/20` §4.3～§4.4](./20-AI引擎产品力迭代设计.md)。
+
 ---
 
 ### 3.4a 软删除分析报告
@@ -787,6 +805,18 @@ POST /v1/analyses/{analysis_id}/share-card
 ```
 
 小程序码 **scene** 为 `i={analysis_id}`（≤32 字符），落地页 **`pages/analysis/report`** 须在 `onLoad` 从 `options.scene` 解析该参数（与首页扫码进入一致）。
+
+---
+
+### 3.4c 获取公开（脱敏）分析报告
+
+```
+GET /v1/analyses/{analysis_id}/public
+```
+
+**无需认证**。被分享者从分享卡片进入时使用；`is_sample` / 未完成 / 已软删 / 不存在 → **404**（**40402**）。
+
+**成功响应** `data` 字段与 `PublicReport` 对齐，除 `overall_score`、问题摘要外，还包含与 §3.4 同源的 **`quality_warnings`**（字符串数组，machine codes，可为 `[]`）。**不包含** 原视频与骨骼视频 URL、`phase_scores`、`recommendations`、`user_id` 等。
 
 ---
 
@@ -897,6 +927,7 @@ GET /v1/analyses/sample
       {"drill_id": "drill_towel_arm", "target_issue": "casting", "sort_order": 0},
       {"drill_id": "drill_hip_rotation", "target_issue": "early_extension", "sort_order": 1}
     ],
+    "quality_warnings": ["low_light"],
     "share_card_url": null,
     "analyzed_at": "2026-04-01T10:00:03Z",
     "created_at": "2026-04-01T10:00:00Z"
@@ -1923,21 +1954,32 @@ GET /v1/health
 
 **无需认证**
 
-**成功响应**：
+**成功响应**（HTTP 200；`status` 为 `degraded` 时表示子依赖异常，仍返回 200 便于编排探活）：
 
 ```json
 {
   "status": "ok",
   "version": "1.0.0",
+  "env": "local",
   "timestamp": "2026-04-14T10:00:00+08:00",
   "services": {
+    "backend": "ok",
     "database": "ok",
     "redis": "ok",
-    "cos": "ok",
     "ai_engine": "ok"
+  },
+  "ai_engine": {
+    "reachable": true,
+    "mock_mode": false,
+    "warning": null
   }
 }
 ```
+
+字段说明：
+
+- `services.ai_engine`：`ok` 表示 HTTP 探针成功且（`env` 为 `staging`/`prod` 时）引擎**未**处于 Mock；若为 `degraded: mock_mode=true`，说明线上仍误开 `AI_ENGINE_MOCK_MODE`，骨骼/衍生视频将不符合真实 MediaPipe 输出。
+- `ai_engine.mock_mode`：透传引擎 `GET {AI_ENGINE_URL}/health` 的 `mock_mode`，便于与后端配置交叉核对。
 
 ---
 
@@ -2072,7 +2114,7 @@ POST /v1/events
 |---|---|---|
 | `POST /v1/analyses/{id}/share-card`（§3.4b） | `POST /v1/analyses/{id}/share-card` | **已实现**：服务端生成 `wxa_code_url`（小程序码 PNG，scene `i=`…，对象存储缓存）。**未实现**：离屏 Canvas 整图合成海报（若后续需要单独 `share_card_url`，可列为增强项，非当前契约） |
 | —— | `POST /v1/shares/log` | **新增**。请求体 `{share_type: 'report'\|'invite_poster'\|'moments', target_id?}`；W7 只用 `report`；不做业务校验只埋点 |
-| —— | `GET /v1/analyses/{id}/public` | **新增 · 无需登录**。被分享者访问的脱敏报告；对 `is_sample`/未完成/不存在 → 404；只返回 `overall_score` + 最多 3 条 `high/medium` 问题名；**不含**骨骼视频/训练建议/key_frame_url/user_id |
+| —— | `GET /v1/analyses/{id}/public` | **新增 · 无需登录**。被分享者访问的脱敏报告；对 `is_sample`/未完成/不存在 → 404；返回 `overall_score` + 最多 3 条 `high/medium` 问题名 + **`quality_warnings`**；**不含**骨骼视频/训练建议/key_frame_url/user_id |
 
 ### 10.5 `UserResponse` 扩展字段（W7）
 

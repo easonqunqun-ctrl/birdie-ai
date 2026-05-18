@@ -92,6 +92,9 @@ async def test_e2e_happy_path_writes_full_report(
     assert body["recommendations"][0]["drill_id"] == "drill_towel_arm"
     assert body["analyzed_at"] is not None
 
+    me = (await client.get("/v1/users/me", headers=auth_headers)).json()["data"]
+    assert me["has_completed_real_analysis"] is True
+
 
 @pytest.mark.asyncio
 async def test_e2e_engine_failed_refunds_quota(

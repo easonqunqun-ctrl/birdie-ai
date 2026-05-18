@@ -1,0 +1,19 @@
+/**
+ * AI 引擎非阻断质量提示（quality_warnings machine codes）→ 用户可读文案。
+ * 与 `ai_engine/app/pipeline/preprocess.py::quality_warnings_from_preprocess` 对齐。
+ */
+export const QUALITY_WARNING_COPY: Record<string, string> = {
+  low_light: '光线偏暗，关键点检测可能不够稳。建议在光线充足处侧向全身拍摄后重试。',
+  camera_shake: '画面抖动略大，可能影响追踪精度。建议固定机位或使用三脚架后再拍。',
+}
+
+export function linesForQualityWarnings(codes: string[] | null | undefined): string[] {
+  if (!codes?.length) return []
+  const lines: string[] = []
+  for (const code of codes) {
+    const c = String(code).trim()
+    if (!c) continue
+    lines.push(QUALITY_WARNING_COPY[c] ?? `本次分析检测到「${c}」，若结果波动可尝试改善光线与机位后重拍。`)
+  }
+  return lines
+}

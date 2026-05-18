@@ -69,3 +69,7 @@ class AnalyzeResult(BaseModel):
     duration_ms: int | None = None
     error_code: int | None = None
     error_message: str | None = None
+    quality_warnings: list[str] = Field(
+        default_factory=list,
+        description="非阻断质量提示 machine codes，如 low_light / camera_shake",
+    )

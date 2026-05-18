@@ -130,6 +130,11 @@ export interface AnalysisReportResponse {
   phase_timestamps?: Record<string, PhaseWindow> | null
   issues: AnalysisIssueDetail[]
   recommendations: AnalysisRecommendationDetail[]
+  /**
+   * 非阻断质量提示（引擎 machine codes），如 low_light / camera_shake；
+   * 空数组或未返回表示无附加提示。
+   */
+  quality_warnings?: string[] | null
   /** 分享卡片（W7 再生成，MVP 期为 null） */
   share_card_url?: string | null
   error?: AnalysisErrorInfo | null

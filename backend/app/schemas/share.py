@@ -39,6 +39,7 @@ class PublicReport(BaseModel):
     - 球杆/角度元信息
     - 缩略图（公共可访问 CDN URL）
     - 关键问题**仅名称 + 严重度**，最多 3 条且只含 high/medium
+    - `quality_warnings`：与详情接口同源的非阻断拍摄质量提示（无敏感信息）
     - 不含：原视频、骨骼视频、recommendations、phase_scores/phase_timestamps、user_id
     """
 
@@ -54,6 +55,10 @@ class PublicReport(BaseModel):
 
     issues: list[PublicReportIssue] = Field(default_factory=list)
     issues_total: int = 0
+    quality_warnings: list[str] = Field(
+        default_factory=list,
+        description="非阻断质量提示 machine codes（如 low_light / camera_shake）",
+    )
 
     analyzed_at: datetime | None = None
     owner_nickname_masked: str

@@ -96,6 +96,21 @@ class PreprocessResult:
         return self.quality_score >= 0.5
 
 
+# 非阻断警告用软阈值（已通过 PoorQualityError 硬门槛后的提示，对齐 docs/01 §4.4）
+_WARN_LOW_CLARITY_BELOW = 130.0  # 介于「勉强可用」与「较清晰」之间，偏暗/略糊
+_WARN_LOW_STABILITY_BELOW = 0.42  # stability_score ∈ [0,1]，低于此提示抖动
+
+
+def quality_warnings_from_preprocess(pre: PreprocessResult) -> list[str]:
+    """机器可读 warning code，供报告页与 analytics；与产品文案映射在前端完成。"""
+    codes: list[str] = []
+    if pre.clarity_score < _WARN_LOW_CLARITY_BELOW:
+        codes.append("low_light")
+    if pre.stability_score < _WARN_LOW_STABILITY_BELOW:
+        codes.append("camera_shake")
+    return codes
+
+
 # ============================================================
 # 主入口
 # ============================================================

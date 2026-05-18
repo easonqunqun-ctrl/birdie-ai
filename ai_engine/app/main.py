@@ -65,8 +65,8 @@ async def health():
 async def analyze(req: AnalyzeRequest) -> AnalyzeResult:
     """分析单个视频。
 
-    - **mock 模式**：随机生成符合 schema 的报告（约 1.2–2.8 秒）
-    - **真实模式**：W6 接入 MediaPipe + 评分模型（待实现）
+    - **mock 模式**（`AI_ENGINE_MOCK_MODE=true`）：随机生成符合 schema 的报告
+    - **真实模式**（默认）：`real_pipeline`（MediaPipe 姿态 → 阶段 → 评分 → 诊断 → 骨骼衍生视频）
     """
     log.info("analyze_start", analysis_id=req.analysis_id, video_url=req.video_url)
 

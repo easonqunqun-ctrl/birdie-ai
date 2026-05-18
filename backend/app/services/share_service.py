@@ -89,6 +89,11 @@ async def get_public_report(
         if it.severity in ("high", "medium")
     ][:3]
 
+    qw = analysis.quality_warnings
+    quality_warnings_out: list[str] = (
+        [str(x) for x in qw if x is not None] if isinstance(qw, list) else []
+    )
+
     return PublicReport(
         id=analysis.id,
         overall_score=analysis.overall_score,
@@ -98,6 +103,7 @@ async def get_public_report(
         club_type=analysis.club_type,
         issues=public_issues,
         issues_total=len(issue_rows),
+        quality_warnings=quality_warnings_out,
         analyzed_at=analysis.analyzed_at,
         owner_nickname_masked=owner_nickname_masked,
     )

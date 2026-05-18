@@ -36,7 +36,7 @@ from app.pipeline.diagnose import diagnose
 from app.pipeline.features import extract_features
 from app.pipeline.phases import segment_phases
 from app.pipeline.pose import estimate_poses
-from app.pipeline.preprocess import preprocess_video
+from app.pipeline.preprocess import preprocess_video, quality_warnings_from_preprocess
 from app.pipeline.recommend import recommend
 from app.pipeline.scoring import score_all_phases, score_overall, weakest_phase
 from app.pipeline.visualize import (
@@ -73,6 +73,7 @@ async def run_real_analysis(req: AnalyzeRequest) -> AnalyzeResult:
     # 1. 预处理（下载 + 转码 + 质量门）
     pre = preprocess_video(req.video_url)
     fps = pre.fps
+    quality_warnings = quality_warnings_from_preprocess(pre)
     log.info(
         "preprocess_done",
         extra={
@@ -199,6 +200,7 @@ async def run_real_analysis(req: AnalyzeRequest) -> AnalyzeResult:
         skeleton_data_url=skeleton_data_url,
         thumbnail_url=thumb_url,
         duration_ms=duration_ms,
+        quality_warnings=quality_warnings,
     )
 
 

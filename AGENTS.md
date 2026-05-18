@@ -131,6 +131,8 @@ make backend-migrate
 ## 9. 当需要澄清时
 
 - 产品意图不明 → 翻 `灵鸟golf-产品设计白皮书.md`（§5 功能规划 / §7 信息架构 / §7.2 视觉规范）。
+- **MVP 一期收尾（真引擎可观测、明确不做项）** → [`docs/19-产品开发迭代计划-当前队列.md`](docs/19-产品开发迭代计划-当前队列.md) **§七**（**详单**：§六、`docs/01`）。
+- **AI 引擎产品力**（评分哲学与话术、ECS 标定集、Trust/Calibration/Consensus 三线）→ [`docs/20-AI引擎产品力迭代设计.md`](docs/20-AI引擎产品力迭代设计.md)（白皮书 **§5.2.1**）；**站会 PLAN-ID** → [`docs/19` §6.3 **ENG-***](docs/19-产品开发迭代计划-当前队列.md#63-主表plan-id)；**验收** → [`docs/01` §4.5](docs/01-MVP功能需求规格说明书.md#45-ai-引擎产品力对齐-docs20)。
 - 接口字段不明 → `docs/02-API接口设计文档.md`。
 - 数据库字段不明 → `docs/03-数据库设计文档.md`。
 - **分析报告软删除**何时算「可发版」、发布顺序与 R2 backlog → [`docs/release-notes/analysis-soft-delete-release-pattern.md`](docs/release-notes/analysis-soft-delete-release-pattern.md)。

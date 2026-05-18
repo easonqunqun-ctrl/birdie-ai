@@ -46,6 +46,7 @@ async def _seed_analysis(
     is_sample: bool = False,
     overall_score: int | None = 78,
     issues: list[tuple[str, str, str]] | None = None,
+    quality_warnings: list[str] | None = None,
 ) -> str:
     """issues: [(type, name, severity), ...]."""
     aid = new_id("ana")
@@ -61,6 +62,7 @@ async def _seed_analysis(
             is_sample=is_sample,
             overall_score=overall_score,
             thumbnail_url="https://cdn.example.com/thumb.jpg",
+            quality_warnings=quality_warnings,
         )
         db.add(analysis)
         await db.flush()
@@ -167,12 +169,26 @@ async def test_public_report_strips_sensitive_fields(client: AsyncClient):
     # 总数字段包含全部（5 条）
     assert data["issues_total"] == 5
 
+    assert data["quality_warnings"] == []
+
     # 确保敏感字段不在响应里
     assert "recommendations" not in data
     assert "skeleton_video_url" not in data
     assert "skeleton_data_url" not in data
     assert "phase_scores" not in data
     assert "user_id" not in data  # 换成脱敏昵称
+
+
+@pytest.mark.asyncio
+async def test_public_report_includes_quality_warnings(client: AsyncClient):
+    u = await _register(client)
+    aid = await _seed_analysis(
+        user_id=u["user"]["id"],
+        quality_warnings=["low_light", "camera_shake"],
+    )
+    r = await client.get(f"/v1/analyses/{aid}/public")
+    assert r.status_code == 200
+    assert r.json()["data"]["quality_warnings"] == ["low_light", "camera_shake"]
 
 
 @pytest.mark.asyncio

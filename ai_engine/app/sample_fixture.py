@@ -160,6 +160,7 @@ def build_sample_analyze_result() -> AnalyzeResult:
         skeleton_video_url=SAMPLE_VIDEO_URL,  # mock 期和原视频同源
         thumbnail_url=SAMPLE_THUMBNAIL_URL,
         duration_ms=0,  # 示例结果是查表的，"分析耗时"对用户无意义
+        quality_warnings=["low_light"],
     )
 
 

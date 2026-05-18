@@ -315,4 +315,5 @@ async def run_mock_analysis(req: AnalyzeRequest) -> AnalyzeResult:
         skeleton_video_url=req.video_url.replace(".mp4", "_skeleton.mp4"),
         thumbnail_url=req.video_url.replace(".mp4", "_thumb.jpg"),
         duration_ms=random.randint(2000, 5000),
+        quality_warnings=[],  # mock 期不产生警告；真机联调走 real_pipeline
     )

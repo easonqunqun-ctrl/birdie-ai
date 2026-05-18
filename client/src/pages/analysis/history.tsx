@@ -107,8 +107,12 @@ const HistoryPage: FC = () => {
     })
   }
 
-  const onCardClick = (id: string) => {
+  const onCardClick = (id: string, status: AnalysisListItem['status']) => {
     if (compareMode) {
+      if (status !== 'completed') {
+        Taro.showToast({ title: '仅可选已完成的报告', icon: 'none', duration: 2000 })
+        return
+      }
       togglePick(id)
       return
     }
@@ -187,8 +191,17 @@ const HistoryPage: FC = () => {
               disabled={picked.length < 2}
               onClick={() => {
                 const [x, y] = picked
+                const itemX = items.find((it) => it.id === x)
+                const itemY = items.find((it) => it.id === y)
+                const tX = itemX
+                  ? new Date(itemX.analyzed_at || itemX.created_at).getTime()
+                  : 0
+                const tY = itemY
+                  ? new Date(itemY.analyzed_at || itemY.created_at).getTime()
+                  : 0
+                const [leftId, rightId] = tX <= tY ? [x, y] : [y, x]
                 void Taro.navigateTo({
-                  url: `/pages/analysis/compare?left=${encodeURIComponent(x)}&right=${encodeURIComponent(y)}`,
+                  url: `/pages/analysis/compare?left=${encodeURIComponent(leftId)}&right=${encodeURIComponent(rightId)}`,
                 })
               }}
             >
@@ -203,11 +216,18 @@ const HistoryPage: FC = () => {
         const meta = level ? SCORE_LEVEL_META[level] : null
         const date = formatDate(it.analyzed_at || it.created_at)
         const isPicked = picked.includes(it.id)
+        const compareDisabled = compareMode && it.status !== 'completed'
         return (
           <View
             key={it.id}
-            className={['history__card', isPicked ? 'history__card--picked' : ''].join(' ')}
-            onClick={() => onCardClick(it.id)}
+            className={[
+              'history__card',
+              isPicked ? 'history__card--picked' : '',
+              compareDisabled ? 'history__card--compare-disabled' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+            onClick={() => onCardClick(it.id, it.status)}
           >
             <View className='history__thumb'>
               {it.thumbnail_url ? (

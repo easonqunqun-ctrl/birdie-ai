@@ -100,6 +100,10 @@
       opacity: 0.92;
     }
 
+    &--compare-disabled {
+      opacity: 0.55;
+    }
+
     &--picked {
       border: 2rpx solid var(--color-gold);
       box-shadow: 0 4rpx 16rpx rgba(198, 160, 89, 0.35);

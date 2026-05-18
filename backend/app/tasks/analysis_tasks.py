@@ -311,6 +311,11 @@ async def _mark_completed(analysis_id: str, engine_result: dict) -> None:
         analysis.skeleton_video_url = engine_result.get("skeleton_video_url")
         analysis.skeleton_data_url = engine_result.get("skeleton_data_url")
         analysis.thumbnail_url = engine_result.get("thumbnail_url")
+        qw = engine_result.get("quality_warnings")
+        if isinstance(qw, list):
+            analysis.quality_warnings = [str(x) for x in qw if x is not None]
+        else:
+            analysis.quality_warnings = None
         analysis.analyzed_at = datetime.now(UTC)
 
         # 清掉旧子记录（幂等：重跑任务时不累加）

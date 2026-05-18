@@ -160,6 +160,11 @@ class AnalysisReportResponse(BaseModel):
     issues: list[IssueItem] = Field(default_factory=list)
     recommendations: list[RecommendationItem] = Field(default_factory=list)
 
+    quality_warnings: list[str] = Field(
+        default_factory=list,
+        description="非阻断质量提示（与 ai_engine 相同 machine code）；空列表表示无",
+    )
+
     share_card_url: str | None = None
     analyzed_at: datetime | None = None
     created_at: datetime

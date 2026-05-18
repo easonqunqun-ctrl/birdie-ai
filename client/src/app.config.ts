@@ -9,6 +9,7 @@ export default defineAppConfig({
     'pages/consent/index',
     'pages/legal/terms',
     'pages/legal/privacy',
+    'pages/help/score-guide',
     'pages/login/index',
     'pages/onboarding/index',
     'pages/analysis/capture',

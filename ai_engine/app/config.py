@@ -18,7 +18,8 @@ class Settings(BaseSettings):
     APP_DEBUG: bool = True
     APP_LOG_LEVEL: str = "INFO"
 
-    AI_ENGINE_MOCK_MODE: bool = True
+    # 与仓库根 `.env.example` 一致：默认走真实 MediaPipe；仅本地想跳推理时显式设 true
+    AI_ENGINE_MOCK_MODE: bool = False
     AI_ENGINE_PORT: int = 9000
 
     # 模型路径（真实模式才用到）
@@ -54,6 +55,3 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
-
-# 容器外开发时的兜底
-os.environ.setdefault("AI_ENGINE_MOCK_MODE", "true")

@@ -20,9 +20,19 @@
 services:
   backend:
     volumes: !reset []
+    # CVM 无源码挂载时 `uv run` 易在启动阶段长时间锁 PyPI；镜像内 .venv 已 uv sync，直接调二进制。
+    command: >
+      sh -c "
+      /app/.venv/bin/alembic upgrade head &&
+      /app/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+      "
 
   celery-worker:
     volumes: !reset []
+    command: /app/.venv/bin/celery -A app.celery_app worker --loglevel=info --concurrency=2
+
+  celery-beat:
+    command: /app/.venv/bin/celery -A app.celery_app beat --loglevel=info
 
   ai_engine:
     volumes: !reset []

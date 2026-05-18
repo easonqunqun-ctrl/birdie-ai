@@ -31,6 +31,8 @@ export interface PublicReport {
   thumbnail_url: string | null
   issues: PublicReportIssue[]
   issues_total: number
+  /** 与完整报告 `quality_warnings` 一致；脱敏接口仍展示拍摄条件提示 */
+  quality_warnings?: string[]
   analyzed_at: string | null
   owner_nickname_masked: string
 }

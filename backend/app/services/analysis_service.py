@@ -619,6 +619,11 @@ async def get_report(*, analysis_id: str, user: User, db: AsyncSession) -> Analy
         for r in sorted(analysis.recommendations, key=lambda x: x.sort_order)
     ]
 
+    _qw = analysis.quality_warnings
+    quality_warnings_out: list[str] = (
+        [str(x) for x in _qw] if isinstance(_qw, list) else []
+    )
+
     return AnalysisReportResponse(
         id=analysis.id,
         user_id=analysis.user_id,
@@ -637,6 +642,7 @@ async def get_report(*, analysis_id: str, user: User, db: AsyncSession) -> Analy
         phase_timestamps=phase_timestamps,
         issues=issues,
         recommendations=recs,
+        quality_warnings=quality_warnings_out,
         share_card_url=to_proxy_image_url(analysis.share_card_url),
         analyzed_at=analysis.analyzed_at,
         created_at=analysis.created_at,

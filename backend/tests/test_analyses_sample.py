@@ -66,6 +66,8 @@ async def test_sample_full_report_shape(client: AsyncClient) -> None:
         {"drill_towel_arm", "drill_hip_rotation", "drill_half_swing"}
     )
 
+    assert data.get("quality_warnings") == ["low_light"]
+
 
 @pytest.mark.asyncio
 async def test_sample_idempotent(client: AsyncClient) -> None:

@@ -258,7 +258,8 @@ const HomePage: FC = () => {
 
   // ====== 三联统计（来自 user.stats，后端聚合好）======
   const stats = user.stats
-  const showSampleCta = recent.length === 0 && !user.has_completed_real_analysis
+  // O-03：完成过非示例分析后不再展示示例入口（与 `users.has_completed_real_analysis` 对齐）
+  const showSampleCta = !user.has_completed_real_analysis
 
   return (
     <View className='home'>
