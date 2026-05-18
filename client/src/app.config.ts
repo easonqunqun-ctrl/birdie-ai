@@ -16,6 +16,7 @@ export default defineAppConfig({
     'pages/analysis/waiting',
     'pages/analysis/report',
     'pages/analysis/history',
+    'pages/analysis/compare',
     'pages/coach/index',
     'pages/training/index',
     'pages/profile/index',

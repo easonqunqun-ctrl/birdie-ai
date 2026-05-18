@@ -141,6 +141,26 @@ Authorization: Bearer <jwt_token>
 | 50202 | 支付服务异常 | 微信支付接口异常 |
 | 50203 | 存储服务异常 | COS 上传/读取失败 |
 
+### 1.4.1 微信小程序 · 分析完成订阅消息（服务端，非 REST）
+
+| 项目 | 说明 |
+|------|------|
+| 触发时机 | Celery 分析任务 `_mark_completed` 事务提交成功后；**非** `is_sample` 记录 |
+| 前置 | 用户于等待页已对模板发起 `wx.requestSubscribeMessage` 并接受；与下发使用同一 `template_id` |
+| 配置 | `WECHAT_SUBSCRIBE_MESSAGE_ENABLED`、`WECHAT_SUBSCRIBE_ANALYSIS_TEMPLATE_ID`（须与客户端 `TARO_APP_SUBSCRIBE_TMPL_IDS` 首项一致）、`WECHAT_SUBSCRIBE_MINIPROGRAM_STATE`（`developer`/`trial`/`formal`） |
+| 模板字段约定 | 下发 body 使用 **thing1**（标题短语）、**number2**（综合分）、**time3**（完成时间，东八区 `YYYY-MM-DD HH:mm`）；公众平台新建模板时需选用对应类型关键词，与代码一致 |
+| 失败策略 | 微信返回拒绝/无次数等 **不** 影响分析报告落库；结构化日志 `subscribe_message.*` |
+
+### 1.4.2 微信小程序 · 会员到期（惰性降级）订阅消息（服务端，非 REST）
+
+| 项目 | 说明 |
+|------|------|
+| 触发时机 | `ensure_membership_valid` 判定 `membership_expires_at <= now` 并完成降级与 `flush` 之后；**非**定时「到期前 N 天」提醒 |
+| 前置 | 用户于会员页已对模板发起 `wx.requestSubscribeMessage` 并接受；与下发使用同一 `template_id`（客户端 `TARO_APP_SUBSCRIBE_TMPL_IDS` **第二项**） |
+| 配置 | 共用 `WECHAT_SUBSCRIBE_MESSAGE_ENABLED`、`WECHAT_SUBSCRIBE_MINIPROGRAM_STATE`；另需 `WECHAT_SUBSCRIBE_MEMBERSHIP_EXPIRE_TEMPLATE_ID` |
+| 模板字段约定 | **thing1**（标题短语）、**time2**（到期时间，东八区 `YYYY-MM-DD HH:mm`）、**thing3**（行动短语）；与公众平台关键词类型一致 |
+| 失败策略 | 仅记日志 `subscribe_message.*`，**不** 影响用户降级与配额修复 |
+
 ### 1.5 限流策略
 
 | 接口类别 | 限流规则 |
@@ -308,6 +328,9 @@ GET /v1/users/me
     "weekly_practice_frequency": "frequent",
     "membership_type": "free",
     "membership_expires_at": null,
+    "is_member": false,
+    "membership_days_remaining": 0,
+    "has_completed_real_analysis": false,
     "onboarding_completed": true,
     "stats": {
       "total_analyses": 12,
@@ -743,6 +766,30 @@ DELETE /v1/analyses/{analysis_id}
 
 ---
 
+### 3.4b 生成分享用小程序码（对象存储缓存）
+
+```
+POST /v1/analyses/{analysis_id}/share-card
+```
+
+**需认证**（仅本人 **`completed`** 且未软删的分析；`sample` 不允许）
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "wxa_code_url": "https://…/share/wxa/ana_xxx.png"
+  }
+}
+```
+
+小程序码 **scene** 为 `i={analysis_id}`（≤32 字符），落地页 **`pages/analysis/report`** 须在 `onLoad` 从 `options.scene` 解析该参数（与首页扫码进入一致）。
+
+---
+
 ### 3.5 获取分析历史列表
 
 ```
@@ -863,24 +910,9 @@ GET /v1/analyses/sample
 
 ### 3.7 生成分享卡片
 
-```
-POST /v1/analyses/{analysis_id}/share-card
-```
+**与 §3.4b 为同一路径**：`POST /v1/analyses/{analysis_id}/share-card`。契约与示例见 **§3.4b**（响应仅含 `wxa_code_url`）。
 
-**需认证**
-
-**成功响应**：
-
-```json
-{
-  "code": 0,
-  "message": "success",
-  "data": {
-    "share_card_url": "https://cos.xiaoniaoai.com/cards/ana_def456.png",
-    "mini_program_path": "pages/analysis/detail?id=ana_def456&inviter=usr_abc123"
-  }
-}
-```
+本节保留为目录锚点；早期设计稿中的 `share_card_url` / `mini_program_path` **未落地**。
 
 ---
 
@@ -1384,6 +1416,22 @@ GET /v1/training/progress?period=30d
 
 ---
 
+### 5.4.1 用户进步曲线数据源（已实现 · `/users/me`）
+
+```
+GET /v1/users/me/analysis-progress?window_days=90
+```
+
+**需认证 + 仅统计正式分析**（`is_sample=false`、已完成、未软删、`overall_score` 非空）
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| window_days | int | 否 | 仅取最近 N 日历天内的点；不传或 `0` 表示不按天截断（仍受服务端 `max_points` 上限，默认 500） |
+
+**响应**：`data.points[]`，元素为 `analysis_id` + `analyzed_at` + `overall_score`（时间升序）。
+
+---
+
 ### 5.5 获取打卡日历
 
 ```
@@ -1509,6 +1557,40 @@ POST /v1/payments/wechat/refund-notify
 **微信服务器调用，非前端接口**
 
 `refund_status=SUCCESS` 且金额与订单一致时：订单 **`refunded`**、写 **`payment_transactions`（`transaction_type=refund`）**、会员降级（与 mock 退款对齐的 MVP 策略）。
+
+---
+
+### 6.2.3 自动续费 / 委托代扣（Q-B5）
+
+```
+POST /v1/payments/auto-renew
+```
+
+**需认证**。请求体：`{"enabled": true|false}`。
+
+- **`WECHAT_PAY_MOCK_MODE=true`**：`enabled=true` 时直接 `users.auto_renew=true`；关闭时 `auto_renew=false`。
+- **真实模式**：关闭时直接 `auto_renew=false`；**开启**时调用微信 **`/v3/papay/scheduled-deduct-sign/contracts/pre-entrust-sign/mini-program`**，响应：
+
+```json
+{
+  "auto_renew": false,
+  "papay_sign": {
+    "pre_entrustweb_id": "…",
+    "redirect_appid": "wxbd687630cd02ce1d",
+    "redirect_path": "pages/PwdExemptContract/index"
+  }
+}
+```
+
+客户端使用 `wx.navigateToMiniProgram` 跳转，并将 **`pre_entrustweb_id`** 拼入 `redirect_path` 的 query（字段名以微信文档为准）。签约成功后微信回调：
+
+```
+POST /v1/payments/wechat/papay-notify
+```
+
+配置 **`WECHAT_PAY_PAPAY_PLAN_ID`**、**`WECHAT_PAY_PAPAY_NOTIFY_URL`（HTTPS）**；服务端尝试与支付回调一致的 V3 `resource` 解密，失败则按平文 JSON 解析。成功后写入 **`users.papay_contract_id`** 且 **`auto_renew=true`**。
+
+**`GET /v1/users/me/membership`** 增加字段 **`papay_contract_id`**（可空）。
 
 ---
 
@@ -1958,7 +2040,7 @@ POST /v1/events
 | `POST /v1/payments/subscriptions` | `POST /v1/payments/orders` | 请求体仍为 `{plan_type}`；返回 `{order_id, prepay_params}`，mock 模式下 `prepay_params = {"mock": true}` |
 | `POST /v1/payments/wechat-notify`（旧稿路径） | `POST /v1/payments/wechat/notify` | 已实现；环境变量 `WECHAT_PAY_NOTIFY_URL` 须配公网 HTTPS，例如 `https://api.example.com/v1/payments/wechat/notify`。mock 模式下回调返回 FAIL |
 | `GET /v1/payments/orders/{id}` | `GET /v1/payments/orders/{id}` | ✅ 无变化 |
-| `GET /v1/payments/membership` | `GET /v1/users/me/membership` | 返回 `{is_member, membership_type, expires_at, days_remaining, auto_renew}`；同时 `GET /v1/users/me` 的 `UserResponse` 也扩展了 `is_member` / `membership_days_remaining` 派生字段 |
+| `GET /v1/payments/membership` | `GET /v1/users/me/membership` | 返回 `is_member, membership_type, expires_at, days_remaining, auto_renew, papay_contract_id`；`GET /v1/users/me` 另含 `is_member` / `membership_days_remaining` / `has_completed_real_analysis` 等派生字段 |
 | `GET /v1/payments/plans` | `GET /v1/payments/plans` | **新增**：开通页套餐列表 |
 | `GET /v1/me/orders` | `GET /v1/users/me/orders` | 我的订单列表，按 `created_at DESC` |
 | `POST /v1/payments/membership/cancel-auto-renew` | （**W8 落地**） | 依赖真实支付委托扣款签约，W7 暂不支持 |
@@ -1988,7 +2070,7 @@ POST /v1/events
 
 | 设计稿 | W7 实际路径 | 备注 |
 |---|---|---|
-| `POST /v1/analyses/{id}/share-card`（§3.7） | （**W8 落地**） | 依赖 Canvas 离屏拼图 + 小程序码；W7 只做原生聊天分享卡片（`title + imageUrl + path`） |
+| `POST /v1/analyses/{id}/share-card`（§3.4b） | `POST /v1/analyses/{id}/share-card` | **已实现**：服务端生成 `wxa_code_url`（小程序码 PNG，scene `i=`…，对象存储缓存）。**未实现**：离屏 Canvas 整图合成海报（若后续需要单独 `share_card_url`，可列为增强项，非当前契约） |
 | —— | `POST /v1/shares/log` | **新增**。请求体 `{share_type: 'report'\|'invite_poster'\|'moments', target_id?}`；W7 只用 `report`；不做业务校验只埋点 |
 | —— | `GET /v1/analyses/{id}/public` | **新增 · 无需登录**。被分享者访问的脱敏报告；对 `is_sample`/未完成/不存在 → 404；只返回 `overall_score` + 最多 3 条 `high/medium` 问题名；**不含**骨骼视频/训练建议/key_frame_url/user_id |
 
@@ -2001,6 +2083,7 @@ POST /v1/events
   "membership_expires_at": "2026-05-21T...",
   "is_member": true,                         // 派生：membership_type!='free' && now()<expires_at
   "membership_days_remaining": 29,           // 派生：max(0, (expires_at - now()).days)
+  "has_completed_real_analysis": true,      // 派生：至少一条非示例且 status=completed 的分析
   "stats": {
     "total_analyses": 12,
     "streak_days": 4,                        // W7-T3：current_streak_days

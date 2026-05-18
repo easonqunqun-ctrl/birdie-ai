@@ -270,6 +270,12 @@ def score_level(overall: int | None) -> str | None:
     return "needs_improvement"
 
 
+class ShareCardResponse(BaseModel):
+    """分享用小程序码 PNG 的公网 URL（对象存储直链）."""
+
+    wxa_code_url: str = Field(..., description="小程序码图片 URL，可用作分享 imageUrl 等")
+
+
 class AnalysisProgressPoint(BaseModel):
     """MVP §6 进步曲线：按时间序的得分点（仅正式分析，不含 sample）."""
 
@@ -301,6 +307,7 @@ __all__ = [
     "IssueItem",
     "IssueSeverity",
     "MinioPostFields",
+    "ShareCardResponse",
     "PhaseScore",
     "PhaseWindow",
     "RecommendationItem",

@@ -11,9 +11,13 @@ declare const API_BASE_URL: string
 
 class App extends Component<PropsWithChildren> {
   componentDidMount() {
-    console.log('%c[BUILD-MARKER] dist@2026-05-14 isolate-off+nav-defer', 'color:#0a0;font-weight:bold')
+    console.log(
+      '%c[BUILD-MARKER]',
+      'color:#062;font-weight:bold',
+      'dist@2026-05-18 waiting-lg+spin report-no-delbtn | 若非此串请：`cd client && pnpm dev:weapp` 后预览，或用「详情→清缓存」',
+    )
 
-    if (process.env.TARO_ENV === 'weapp' && typeof API_BASE_URL === 'string') {
+    if (TARO_BUILD_TARGET === 'weapp' && typeof API_BASE_URL === 'string') {
       const u = API_BASE_URL.trim().toLowerCase()
       const hits: string[] = []
       if (u.includes('test.example.com')) hits.push('test.example.com')

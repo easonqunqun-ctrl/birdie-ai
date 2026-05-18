@@ -49,7 +49,9 @@ from app.core.database import AsyncSessionLocal
 from app.core.database import engine as _shared_async_engine
 from app.core.security import new_id
 from app.integrations.ai_engine import get_ai_engine
+from app.integrations.wechat_subscribe_message import send_analysis_completed_notification
 from app.models.analysis import AnalysisIssue, AnalysisRecommendation, SwingAnalysis
+from app.models.user import User
 from app.schemas.analysis import SWING_STAGE_TIMELINE as STAGE_PROGRESSION
 from app.services import invitation_service, quota_service, training_service
 
@@ -376,7 +378,30 @@ async def _mark_completed(analysis_id: str, engine_result: dict) -> None:
                 error=str(exc),
             )
 
+        # 一次性订阅消息：分析完成提醒（commit 后发送；不阻断主流程）
+        mini_openid: str | None = None
+        if not analysis.is_sample:
+            user_row = await db.get(User, analysis.user_id)
+            if user_row is not None:
+                user_row.has_completed_real_analysis = True
+                mini_openid = user_row.wechat_openid or None
+
         await db.commit()
+
+        if mini_openid:
+            try:
+                await send_analysis_completed_notification(
+                    openid=mini_openid,
+                    analysis_id=analysis.id,
+                    overall_score=analysis.overall_score,
+                    analyzed_at=analysis.analyzed_at,
+                )
+            except Exception as exc:
+                log.warning(
+                    "subscribe_message.unexpected_error",
+                    analysis_id=analysis.id,
+                    error=str(exc),
+                )
 
 
 # =====================================================================

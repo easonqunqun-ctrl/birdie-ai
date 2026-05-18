@@ -6,7 +6,7 @@
  *   2. 下拉刷新（小程序原生 `usePullDownRefresh` + `stopPullDownRefresh`）
  *   3. 上拉加载更多（`useReachBottom`，总条数没到就继续拉）
  *   4. 空态 / 错误态 / 完成态三种状态区分
- *   5. 整卡点击 → 进入报告页（删除仅在报告详情页底部操作）
+ *   5. 整卡点击 → 进入报告页（删除在报告详情页顶部「⋯ / 更多」操作表）
  *
  * 设计说明：
  *   - 不存 list 到 zustand；历史列表属于"消费型数据"，进入页拉即可，退出页回收
@@ -15,7 +15,7 @@
 
 import { FC, useCallback, useEffect, useState } from 'react'
 import { View, Text, Image, Button, ScrollView } from '@tarojs/components'
-import Taro, { usePullDownRefresh, useReachBottom } from '@tarojs/taro'
+import Taro, { usePullDownRefresh, useReachBottom, useRouter } from '@tarojs/taro'
 import { analysisService } from '@/services/analysisService'
 import { describeIntermittentRequestFailure, describePageLoadFailure } from '@/services/request'
 import { SCORE_LEVEL_META, scoreLevelFromScore } from '@/constants/scoreLevel'
@@ -26,12 +26,38 @@ import './history.scss'
 const PAGE_SIZE = 20
 
 const HistoryPage: FC = () => {
+  const router = useRouter()
+  const { mode: routeMode, anchor: routeAnchor } = router.params as {
+    mode?: string
+    anchor?: string
+  }
+  const compareMode = routeMode === 'compare'
+  const anchorId = (routeAnchor || '').trim()
+
   const [items, setItems] = useState<AnalysisListItem[]>([])
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true) // 首屏 loading
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [picked, setPicked] = useState<string[]>([])
+
+  useEffect(() => {
+    if (compareMode && anchorId) {
+      setPicked([anchorId])
+    }
+    if (!compareMode) {
+      setPicked([])
+    }
+  }, [compareMode, anchorId])
+
+  useEffect(() => {
+    if (compareMode) {
+      void Taro.setNavigationBarTitle({ title: '选择两篇报告对比' })
+    } else {
+      void Taro.setNavigationBarTitle({ title: '我的分析报告' })
+    }
+  }, [compareMode])
 
   const hasMore = items.length < total
 
@@ -72,6 +98,22 @@ const HistoryPage: FC = () => {
     setLoadingMore(true)
     fetchPage(page + 1, 'more')
   })
+
+  const togglePick = (id: string) => {
+    setPicked((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id)
+      if (prev.length >= 2) return [prev[1], id]
+      return [...prev, id]
+    })
+  }
+
+  const onCardClick = (id: string) => {
+    if (compareMode) {
+      togglePick(id)
+      return
+    }
+    goReport(id)
+  }
 
   const goReport = (id: string) => {
     Taro.navigateTo({ url: `/pages/analysis/report?id=${id}` })
@@ -128,12 +170,45 @@ const HistoryPage: FC = () => {
         <Text className='history__summary-label'>条分析记录</Text>
       </View>
 
+      {compareMode && (
+        <View className='history__compare-bar'>
+          <Text className='history__compare-bar-text'>已选 {picked.length}/2 条（点选卡片）</Text>
+          <View className='history__compare-bar-actions'>
+            <Button
+              className='history__btn history__btn--ghost'
+              size='mini'
+              onClick={() => setPicked(anchorId ? [anchorId] : [])}
+            >
+              重置
+            </Button>
+            <Button
+              className='history__btn history__btn--primary'
+              size='mini'
+              disabled={picked.length < 2}
+              onClick={() => {
+                const [x, y] = picked
+                void Taro.navigateTo({
+                  url: `/pages/analysis/compare?left=${encodeURIComponent(x)}&right=${encodeURIComponent(y)}`,
+                })
+              }}
+            >
+              并排对比
+            </Button>
+          </View>
+        </View>
+      )}
+
       {items.map((it) => {
         const level = it.score_level ?? scoreLevelFromScore(it.overall_score)
         const meta = level ? SCORE_LEVEL_META[level] : null
         const date = formatDate(it.analyzed_at || it.created_at)
+        const isPicked = picked.includes(it.id)
         return (
-          <View key={it.id} className='history__card' onClick={() => goReport(it.id)}>
+          <View
+            key={it.id}
+            className={['history__card', isPicked ? 'history__card--picked' : ''].join(' ')}
+            onClick={() => onCardClick(it.id)}
+          >
             <View className='history__thumb'>
               {it.thumbnail_url ? (
                 <Image mode='aspectFill' src={it.thumbnail_url} className='history__thumb-img' />

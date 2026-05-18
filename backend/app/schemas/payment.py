@@ -87,3 +87,24 @@ class MembershipInfo(BaseModel):
     expires_at: datetime | None
     days_remaining: int  # 会员剩余天数；非会员为 0
     auto_renew: bool
+    papay_contract_id: str | None = Field(
+        default=None,
+        description="微信委托代扣签约成功后的 contract_id；未签约为 null",
+    )
+
+
+class PapayMiniProgramSignPayload(BaseModel):
+    """真实开通自动续费：跳转微信支付签约半屏小程序所需参数."""
+
+    pre_entrustweb_id: str
+    redirect_appid: str
+    redirect_path: str
+
+
+class AutoRenewRequest(BaseModel):
+    enabled: bool
+
+
+class AutoRenewResponse(BaseModel):
+    auto_renew: bool
+    papay_sign: PapayMiniProgramSignPayload | None = None

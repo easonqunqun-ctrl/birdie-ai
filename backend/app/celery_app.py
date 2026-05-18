@@ -54,6 +54,10 @@ celery_app.conf.update(
             "task": "xiaoniao.expire_stale_pending_orders",
             "schedule": crontab(minute="*/15"),
         },
+        "membership-pre-expiry-notify": {
+            "task": "xiaoniao.membership_pre_expiry_notify",
+            "schedule": crontab(hour=0, minute=12),
+        },
     },
 )
 

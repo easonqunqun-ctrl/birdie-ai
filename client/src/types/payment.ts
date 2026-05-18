@@ -59,4 +59,16 @@ export interface MembershipInfo {
   expires_at: string | null
   days_remaining: number
   auto_renew: boolean
+  papay_contract_id?: string | null
+}
+
+export interface PapayMiniProgramSignPayload {
+  pre_entrustweb_id: string
+  redirect_appid: string
+  redirect_path: string
+}
+
+export interface AutoRenewResponse {
+  auto_renew: boolean
+  papay_sign: PapayMiniProgramSignPayload | null
 }

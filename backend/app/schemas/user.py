@@ -99,6 +99,8 @@ class UserResponse(BaseModel):
     is_member: bool = False
     membership_days_remaining: int = 0
     onboarding_completed: bool
+    # O-03：曾完成至少一次非示例分析；为 true 时客户端隐藏示例报告入口
+    has_completed_real_analysis: bool = False
     stats: UserStats | None = None
     quota: UserQuota | None = None
     created_at: datetime

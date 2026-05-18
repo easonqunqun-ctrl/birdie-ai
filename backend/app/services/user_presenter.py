@@ -25,6 +25,7 @@ def build_user_response(user: User, *, include_stats: bool = True) -> UserRespon
         is_member=payment_service.is_member(user),
         membership_days_remaining=payment_service.days_remaining(user),
         onboarding_completed=user.onboarding_completed,
+        has_completed_real_analysis=bool(user.has_completed_real_analysis),
         stats=UserStats(
             total_analyses=int(user.total_analyses or 0),
             total_practices=int(user.total_practices or 0),

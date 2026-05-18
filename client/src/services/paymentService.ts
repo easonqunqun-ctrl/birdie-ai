@@ -1,4 +1,5 @@
 import type {
+  AutoRenewResponse,
   CreateOrderResponse,
   MembershipInfo,
   Order,
@@ -45,5 +46,11 @@ export const paymentService = {
   },
   getMembership() {
     return http.get<MembershipInfo>('/users/me/membership')
-  }
+  },
+
+  postAutoRenew(enabled: boolean) {
+    return http.post<AutoRenewResponse>('/payments/auto-renew', {
+      enabled,
+    })
+  },
 }

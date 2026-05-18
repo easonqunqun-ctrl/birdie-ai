@@ -75,6 +75,18 @@ class Settings(BaseSettings):
     WECHAT_MINIPROGRAM_APPID: str = "wx_placeholder_appid"
     WECHAT_MINIPROGRAM_SECRET: str = "placeholder_secret"
     WECHAT_MOCK_LOGIN: bool = True
+    # 一次性订阅消息：分析完成等场景调用 subscribeMessage.send；默认关闭，避免模板未对齐时报错
+    WECHAT_SUBSCRIBE_MESSAGE_ENABLED: bool = False
+    # 须与公众平台模板 ID、客户端 TARO_APP_SUBSCRIBE_TMPL_IDS 首项一致
+    WECHAT_SUBSCRIBE_ANALYSIS_TEMPLATE_ID: str = ""
+    # 下发一次性订阅消息时的小程序版本：须与当前分发渠道一致
+    WECHAT_SUBSCRIBE_MINIPROGRAM_STATE: Literal["developer", "trial", "formal"] = "developer"
+    # 须与客户端 TARO_APP_SUBSCRIBE_TMPL_IDS 第二项一致（会员到期提醒）
+    WECHAT_SUBSCRIBE_MEMBERSHIP_EXPIRE_TEMPLATE_ID: str = ""
+    # 第三项：会员「即将到期」（日历剩余天数 = MEMBERSHIP_PRE_EXPIRY_NOTIFY_DAYS）预提醒
+    WECHAT_SUBSCRIBE_MEMBERSHIP_PRE_EXPIRE_TEMPLATE_ID: str = ""
+    # 在「到期日当天之前」的第 N 个日历日（按 Asia/Shanghai）尝试发第三模板（每日 Celery 扫一次）
+    MEMBERSHIP_PRE_EXPIRY_NOTIFY_DAYS: int = 3
 
     # ==================== 微信开放平台（App） ====================
     WECHAT_OPEN_APPID: str = ""
@@ -104,6 +116,11 @@ class Settings(BaseSettings):
 
     # 待支付订单超过该分钟数自动置为 cancelled（定时任务：`xiaoniao.expire_stale_pending_orders`）
     PAYMENT_PENDING_ORDER_EXPIRE_MINUTES: int = 120
+
+    # Q-B5：微信委托代扣（预约扣费）模板 ID，商户平台申请后填入；0 表示未开通能力
+    WECHAT_PAY_PAPAY_PLAN_ID: int = 0
+    # 委托代扣签约结果通知 URL（HTTPS，可与支付 notify 不同路径）；须登记到商户平台
+    WECHAT_PAY_PAPAY_NOTIFY_URL: str = ""
 
     # ==================== 苹果内购 ====================
     APPLE_BUNDLE_ID: str = "com.xiaoniaoai.app"

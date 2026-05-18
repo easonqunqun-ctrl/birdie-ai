@@ -66,6 +66,8 @@ export interface User {
   /** W7-T1：会员剩余天数；非会员为 0 */
   membership_days_remaining: number
   onboarding_completed: boolean
+  /** O-03：曾完成非示例分析为 true 时隐藏首页示例入口 */
+  has_completed_real_analysis?: boolean
   stats?: UserStats
   quota?: UserQuota
   created_at: string

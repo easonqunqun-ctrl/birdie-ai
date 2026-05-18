@@ -1,6 +1,6 @@
 """用户相关接口."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -105,8 +105,15 @@ async def update_me(
 async def get_analysis_progress(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    window_days: int | None = Query(
+        default=None,
+        ge=0,
+        le=3660,
+        description="仅取最近 N 天的得分点；不传或 0 表示不按天截断（仍受服务端 max_points 限制）",
+    ),
 ):
-    data = await analysis_service.get_user_analysis_progress(db, user)
+    wd = window_days if window_days and window_days > 0 else None
+    data = await analysis_service.get_user_analysis_progress(db, user, window_days=wd)
     return ok(data)
 
 

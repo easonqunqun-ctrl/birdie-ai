@@ -21,8 +21,10 @@ declare const PAYMENT_MOCK: boolean
  *   W9 正式上线前置为 true。
  */
 declare const PAYMENT_ENABLED: boolean
-/** 逗号分隔的微信订阅消息模板 ID（编译期注入） */
+/** 逗号分隔的微信订阅消息模板 ID（编译期注入）；顺序见 `constants/subscribeTemplates.ts` */
 declare const SUBSCRIBE_TEMPLATES: string
+/** Taro 构建目标（weapp / h5 / rn …），与 `process.env.TARO_ENV` 等价但无 `process` */
+declare const TARO_BUILD_TARGET: string
 /** 微信开放平台移动 AppID（RN `registerApp`；小程序构建可为空字符串） */
 declare const WECHAT_OPEN_APPID: string
 

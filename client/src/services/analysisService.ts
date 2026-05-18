@@ -177,6 +177,11 @@ export const analysisService = {
   deleteAnalysis(analysisId: string) {
     return http.del(`/analyses/${analysisId}`)
   },
+
+  /** 分享物料：小程序码 PNG（服务端落 COS/MinIO） */
+  createShareCard(analysisId: string) {
+    return http.post<{ wxa_code_url: string }>(`/analyses/${analysisId}/share-card`, {})
+  },
 }
 
 function uploadVideoViaApiAttempt(

@@ -56,6 +56,9 @@ const config: UserConfigExport = {
     PAYMENT_ENABLED: JSON.stringify(process.env.TARO_APP_PAYMENT_ENABLED === 'true'),
     /** 逗号分隔的订阅消息模板 ID；空则 `requestSubscribeMessage` 不调用 */
     SUBSCRIBE_TEMPLATES: JSON.stringify(process.env.TARO_APP_SUBSCRIBE_TMPL_IDS || ''),
+    /** 顺序：1 分析完成 2 会员已到期 3 会员即将到期（到期前 N 天，与后端第三模板一致） */
+    /** 供业务代码替代 `process.env.TARO_ENV`（懒加载 chunk 内 process 可能未注入） */
+    TARO_BUILD_TARGET: JSON.stringify(process.env.TARO_ENV || ''),
     WECHAT_OPEN_APPID: JSON.stringify(process.env.TARO_APP_WECHAT_OPEN_APPID || ''),
   },
   copy: {

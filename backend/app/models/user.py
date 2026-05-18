@@ -30,11 +30,18 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
     weekly_practice_frequency: Mapped[str | None] = mapped_column(String(20), nullable=True)
     onboarding_completed: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
+    # MVP §3.6 O-03：任意非示例分析曾达 completed 后置 true，用于首页隐藏「示例报告」入口
+    has_completed_real_analysis: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
+    )
+
     # 会员
     membership_type: Mapped[str] = mapped_column(String(20), default="free", server_default="'free'")
     membership_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     membership_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     auto_renew: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Q-B5：委托代扣签约成功后微信返回的 contract_id（仅真实开通后非空）
+    papay_contract_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     # 邀请
     invite_code: Mapped[str] = mapped_column(String(8), unique=True, nullable=False)

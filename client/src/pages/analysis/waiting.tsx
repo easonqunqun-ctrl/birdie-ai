@@ -21,7 +21,17 @@
  *     并按 pending / processing 调整间隔
  */
 
-import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Component,
+  type ErrorInfo,
+  type FC,
+  type PropsWithChildren,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { View, Text, Button } from '@tarojs/components'
 import Taro, { useDidHide, useDidShow, useRouter } from '@tarojs/taro'
 import { analysisService } from '@/services/analysisService'
@@ -68,7 +78,43 @@ function backendStageToIndex(stage: AnalysisStage | null | undefined): number {
   return idx === -1 ? 0 : idx
 }
 
-const AnalysisWaitingPage: FC = () => {
+/** 微信小程序部分基础库渲染子树异常时整块空白：兜底提示并避免用户误以为「卡住」。 */
+class WaitingErrorBoundary extends Component<PropsWithChildren, { err: Error | null }> {
+  static getDerivedStateFromError(err: Error): { err: Error } {
+    return { err }
+  }
+
+  state = { err: null as Error | null }
+
+  componentDidCatch(err: Error, info: ErrorInfo) {
+    if (APP_ENV !== 'production') {
+      // eslint-disable-next-line no-console
+      console.error('[waiting boundary]', err, info.componentStack)
+    }
+  }
+
+  handleBack() {
+    void Taro.reLaunch({ url: '/pages/index/index' })
+  }
+
+  render() {
+    if (this.state.err) {
+      return (
+        <View className='waiting waiting--error'>
+          <Text className='waiting__error-title'>
+            分析页加载出错，请点击返回首页后重新上传。多次出现请告知我们排查。
+          </Text>
+          <Button className='waiting__btn waiting__btn--primary' onClick={() => this.handleBack()}>
+            返回首页
+          </Button>
+        </View>
+      )
+    }
+    return this.props.children
+  }
+}
+
+const WaitingPageInner: FC = () => {
   const router = useRouter()
   const analysisId = (router.params as { id?: string }).id || ''
 
@@ -91,14 +137,11 @@ const AnalysisWaitingPage: FC = () => {
 
   const clearCurrent = useAnalysisStore((s) => s.clearCurrent)
 
-  /** 微信小程序：拉起「分析完成」类一次性订阅模板（`TARO_APP_SUBSCRIBE_TPL_ANALYSIS_DONE`）；未配置则跳过 */
-  useEffect(() => {
-    if (!analysisId) return
-    if (process.env.TARO_ENV !== 'weapp') return
-    const tid = SUBSCRIBE_TPL_ANALYSIS_DONE
-    if (!tid) return
-    void Taro.requestSubscribeMessage({ tmplIds: [tid] }).catch(() => {})
-  }, [analysisId])
+  /**
+   * 微信一次性订阅必须由用户手势触发；在 useEffect / 页面刚进来自动调用
+   * 可能导致真机白屏/half-render（仅见导航标题「分析中」、正文深蓝空页）。
+   * 改成可选按钮触发，见文案区底部。
+   */
 
   // ---------------- 轮询核心 ----------------
   const poll = useCallback(async () => {
@@ -221,6 +264,15 @@ const AnalysisWaitingPage: FC = () => {
     }
   }, [elapsedSec, timedOut, status])
 
+  /** 静态 `waiting.config.ts` 标题为「分析中」；终态 / 致命错误时需与正文一致 */
+  useEffect(() => {
+    let title = '分析中'
+    if (fatalError) title = '分析遇到问题'
+    else if (status?.status === 'failed') title = '分析失败'
+    else if (status?.status === 'completed') title = '分析完成'
+    void Taro.setNavigationBarTitle({ title })
+  }, [fatalError, status?.status])
+
   // ---------------- 派生：当前阶段索引（W6-T4：完全以 backend 为准） ----------------
   const stageIndex = useMemo(() => {
     if (!status) return 0
@@ -245,6 +297,19 @@ const AnalysisWaitingPage: FC = () => {
   const handleGoHome = () => {
     clearCurrent()
     Taro.reLaunch({ url: '/pages/index/index' })
+  }
+
+  /** 用户点击后才调 subscribeMessage（微信平台要求）；避免进店自动拉起导致卡顿/白屏 */
+  const handleSubscribeAnalysisDone = () => {
+    if (TARO_BUILD_TARGET !== 'weapp') return
+    const tid = SUBSCRIBE_TPL_ANALYSIS_DONE
+    if (!tid) {
+      Taro.showToast({ title: '暂未配置通知模板', icon: 'none' })
+      return
+    }
+    void Taro.requestSubscribeMessage({ tmplIds: [tid], entityIds: [] }).catch(
+      () => {}
+    )
   }
 
   // ---------------- 渲染 ----------------
@@ -306,6 +371,14 @@ const AnalysisWaitingPage: FC = () => {
               ? `预计还需 ${displayRemaining} 秒`
               : '预计还需不到 30 秒'}
         </Text>
+        {TARO_BUILD_TARGET === 'weapp' && SUBSCRIBE_TPL_ANALYSIS_DONE ? (
+          <Button
+            className='waiting__btn waiting__btn--ghost waiting__subscribe-cta'
+            onClick={handleSubscribeAnalysisDone}
+          >
+            完成时提醒我（需点此授权）
+          </Button>
+        ) : null}
       </View>
 
       {elapsedSec >= SOFT_LONG_WAIT_SEC &&
@@ -371,4 +444,10 @@ const AnalysisWaitingPage: FC = () => {
   )
 }
 
-export default AnalysisWaitingPage
+export default function WaitingPage() {
+  return (
+    <WaitingErrorBoundary>
+      <WaitingPageInner />
+    </WaitingErrorBoundary>
+  )
+}

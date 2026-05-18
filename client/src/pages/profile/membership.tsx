@@ -1,11 +1,12 @@
 import { FC, useEffect, useMemo, useState } from 'react'
-import { View, Text, Button, ScrollView } from '@tarojs/components'
+import { View, Text, Button, ScrollView, Switch } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { paymentService } from '@/services/paymentService'
 import { describeIntermittentRequestFailure, describePageLoadFailure, isRequestError } from '@/services/request'
 import { useUserStore } from '@/store/userStore'
 import { PAYMENT_ENABLED_FLAG, PAYMENT_MOCK_FLAG } from '@/constants/flags'
-import { SUBSCRIBE_TPL_MEMBERSHIP_EXPIRE } from '@/constants/subscribeTemplates'
+import { SUBSCRIBE_TPL_MEMBERSHIP_EXPIRE, SUBSCRIBE_TPL_MEMBERSHIP_PRE_EXPIRE } from '@/constants/subscribeTemplates'
+import type { MembershipInfo } from '@/types/payment'
 import { track } from '@/utils/track'
 import type { Order, PlanOption, PlanType } from '@/types/payment'
 import './membership.scss'
@@ -25,22 +26,27 @@ const MembershipPage: FC = () => {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [memInfo, setMemInfo] = useState<MembershipInfo | null>(null)
+  const [memBusy, setMemBusy] = useState(false)
+
+  async function refreshMembershipInfo() {
+    try {
+      const m = await paymentService.getMembership()
+      setMemInfo(m)
+    } catch {
+      /* 非致命：页面其它区块仍可展示 */
+    }
+  }
 
   useEffect(() => {
     load()
+    void refreshMembershipInfo()
   }, [])
 
   useDidShow(() => {
     fetchMe().catch(() => undefined)
+    void refreshMembershipInfo()
   })
-
-  /** 微信小程序：可选「到期提醒」模板占位；微信公众平台过审后在 env 配 `TARO_APP_*` */
-  useEffect(() => {
-    if (process.env.TARO_ENV !== 'weapp') return
-    const tid = SUBSCRIBE_TPL_MEMBERSHIP_EXPIRE
-    if (!tid) return
-    void Taro.requestSubscribeMessage({ tmplIds: [tid] }).catch(() => {})
-  }, [])
 
   async function load() {
     setLoading(true)
@@ -60,6 +66,63 @@ const MembershipPage: FC = () => {
       })
     } finally {
       setLoading(false)
+    }
+  }
+
+  /** 须用户点击触发（微信平台要求）；未配置 `TARO_APP_SUBSCRIBE_TMPL_IDS` 第 2 项则无操作 */
+  function handleSubscribeMembershipExpireNotify() {
+    if (TARO_BUILD_TARGET !== 'weapp') return
+    const tid = SUBSCRIBE_TPL_MEMBERSHIP_EXPIRE
+    if (!tid) {
+      Taro.showToast({ title: '暂未配置到期提醒模板', icon: 'none' })
+      return
+    }
+    void Taro.requestSubscribeMessage({ tmplIds: [tid], entityIds: [] }).catch(
+      () => {}
+    )
+  }
+
+  /** 须用户点击触发（微信平台要求）；未配置 `TARO_APP_SUBSCRIBE_TMPL_IDS` 第 3 项则无操作 */
+  function handleSubscribePreExpireNotify() {
+    if (TARO_BUILD_TARGET !== 'weapp') return
+    const tid = SUBSCRIBE_TPL_MEMBERSHIP_PRE_EXPIRE
+    if (!tid) {
+      Taro.showToast({ title: '暂未配置即将到期模板', icon: 'none' })
+      return
+    }
+    void Taro.requestSubscribeMessage({ tmplIds: [tid], entityIds: [] }).catch(() => {})
+  }
+
+  async function handleAutoRenewChange(next: boolean) {
+    if (memBusy) return
+    setMemBusy(true)
+    try {
+      const res = await paymentService.postAutoRenew(next)
+      if (res.papay_sign && TARO_BUILD_TARGET === 'weapp' && next) {
+        const { pre_entrustweb_id, redirect_appid, redirect_path } = res.papay_sign
+        const sep = redirect_path.includes('?') ? '&' : '?'
+        const path = `${redirect_path}${sep}pre_entrustweb_id=${encodeURIComponent(pre_entrustweb_id)}`
+        await Taro.navigateToMiniProgram({
+          appId: redirect_appid,
+          path,
+        })
+      }
+      await refreshMembershipInfo()
+      await fetchMe()
+    } catch (e: unknown) {
+      if (isRequestError(e)) {
+        Taro.showToast({
+          title: (e.message || '操作失败').slice(0, 220),
+          icon: 'none',
+        })
+      } else {
+        Taro.showToast({
+          title: describeIntermittentRequestFailure(e).toastTitle,
+          icon: 'none',
+        })
+      }
+    } finally {
+      setMemBusy(false)
     }
   }
 
@@ -224,6 +287,29 @@ const MembershipPage: FC = () => {
         <Text className='membership__hero-sub'>{headlineSub}</Text>
       </View>
 
+      {user?.is_member && PAYMENT_ENABLED_FLAG && (
+        <View className='membership__renew-card'>
+          <View className='membership__renew-row'>
+            <View className='membership__renew-texts'>
+              <Text className='membership__renew-title'>自动续费</Text>
+              <Text className='membership__renew-desc'>
+                {PAYMENT_MOCK_FLAG
+                  ? '联调模式：开关将直接保存意向。'
+                  : memInfo?.papay_contract_id
+                    ? '已签约微信委托代扣，到期前将按规则发起续费（以微信支付结果为准）。'
+                    : '开启后将跳转微信支付小程序完成委托代扣签约。'}
+              </Text>
+            </View>
+            <Switch
+              color='#1a237e'
+              checked={!!memInfo?.auto_renew}
+              disabled={memBusy}
+              onChange={(e) => void handleAutoRenewChange(e.detail.value)}
+            />
+          </View>
+        </View>
+      )}
+
       <View className='membership__plans'>
         {plans.map((p) => {
           const active = p.plan_type === selected
@@ -273,6 +359,26 @@ const MembershipPage: FC = () => {
         >
           {user?.is_member ? '续费 / 升级' : '立即开通'}
         </Button>
+        {TARO_BUILD_TARGET === 'weapp' &&
+          user?.is_member &&
+          SUBSCRIBE_TPL_MEMBERSHIP_EXPIRE && (
+            <Button
+              className='membership__btn membership__btn--subscribe-notify'
+              onClick={handleSubscribeMembershipExpireNotify}
+            >
+              接收会员到期提醒（微信通知，需点此授权）
+            </Button>
+          )}
+        {TARO_BUILD_TARGET === 'weapp' &&
+          user?.is_member &&
+          SUBSCRIBE_TPL_MEMBERSHIP_PRE_EXPIRE && (
+            <Button
+              className='membership__btn membership__btn--subscribe-notify'
+              onClick={handleSubscribePreExpireNotify}
+            >
+              接收「即将到期」提醒（第三模板，需点此授权）
+            </Button>
+          )}
         <Text className='membership__cta-hint'>
           {PAYMENT_MOCK_FLAG
             ? '联调构建默认开启模拟开关：真实下单仍以服务端为准（关闭后端模拟时将拉起微信支付）'

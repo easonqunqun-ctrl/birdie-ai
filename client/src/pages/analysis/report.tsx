@@ -8,7 +8,7 @@
  *   4. 问题诊断（按 severity 排序 + 关键帧图 + 点击跳帧）
  *   5. 训练建议（drill 详情卡 + 「一键加入本周训练计划」→ POST /training-plan/from-analysis）
  *   6. 底部动作栏（分享：`open-type=share`；对比历史→报告列表；问 AI：`switchToCoach`）
- *   7. 删除：顶部「更多」操作表 + 底部按钮（不做左滑，避免与纵向滚动、视频手势冲突）
+ *   7. 删除：仅顶部「更多」操作表（不做左滑，避免与纵向滚动、视频手势冲突）
  *
  * 关键工程决策：
  *   - `phase_scores / phase_timestamps` 是 dict[str, {...}]，需要遍历 PHASE_ORDER
@@ -53,10 +53,28 @@ const SEVERITY_LABEL: Record<string, string> = {
 }
 const PLAYBACK_RATES = [0.5, 1, 1.5, 2] as const
 
+function resolveAnalysisIdFromRoute(params: {
+  id?: string
+  scene?: string
+}): string {
+  const id = (params.id || '').trim()
+  if (id) return id
+  const raw = (params.scene || '').trim()
+  if (!raw) return ''
+  let decoded = raw
+  try {
+    decoded = decodeURIComponent(raw)
+  } catch {
+    /* 保持 raw */
+  }
+  const m = /^i=([A-Za-z0-9_]+)$/.exec(decoded)
+  return m ? m[1] : ''
+}
+
 const ReportPage: FC = () => {
   const router = useRouter()
-  const params = router.params as { id?: string; from_share?: string }
-  const analysisId = params.id || ''
+  const params = router.params as { id?: string; from_share?: string; scene?: string }
+  const analysisId = resolveAnalysisIdFromRoute(params)
   // W7-T5：`from_share=1` 的 path 由朋友分享出来，被分享者点进来走"脱敏公开报告"分支
   const fromShare = params.from_share === '1'
   const currentUserToken = useUserStore((s) => s.token)
@@ -67,6 +85,8 @@ const ReportPage: FC = () => {
   const [loading, setLoading] = useState(true)
   const [rate, setRate] = useState<number>(1)
   const [syncingPlan, setSyncingPlan] = useState(false)
+  /** 服务端生成的小程序码 PNG，用于分享卡片配图（O-11/O-12） */
+  const [shareImageUrl, setShareImageUrl] = useState('')
 
   useEffect(() => {
     if (!analysisId) {
@@ -110,6 +130,17 @@ const ReportPage: FC = () => {
           })
       })
   }, [analysisId, fromShare, currentUserToken])
+
+  useEffect(() => {
+    if (!analysisId || analysisId === 'sample' || !currentUserToken || fromShare) {
+      setShareImageUrl('')
+      return
+    }
+    analysisService
+      .createShareCard(analysisId)
+      .then((r) => setShareImageUrl(r.wxa_code_url || ''))
+      .catch(() => setShareImageUrl(''))
+  }, [analysisId, currentUserToken, fromShare])
 
   // 默认给 Taro.setNavigationBarTitle 一个更友好的标题
   useEffect(() => {
@@ -200,7 +231,13 @@ const ReportPage: FC = () => {
   }
 
   const handleCompareHistory = () => {
-    Taro.navigateTo({ url: '/pages/analysis/history' }).catch(toastTabNavigationFailure)
+    if (!analysisId || analysisId === 'sample') {
+      Taro.navigateTo({ url: '/pages/analysis/history' }).catch(toastTabNavigationFailure)
+      return
+    }
+    Taro.navigateTo({
+      url: `/pages/analysis/history?mode=compare&anchor=${encodeURIComponent(analysisId)}`,
+    }).catch(toastTabNavigationFailure)
   }
 
   // ---------------- 分享（W7-T5）----------------
@@ -221,7 +258,10 @@ const ReportPage: FC = () => {
       title,
       path: `/pages/analysis/report?id=${analysisId}&from_share=1`,
       imageUrl:
-        report?.thumbnail_url || publicReport?.thumbnail_url || ''
+        shareImageUrl ||
+        report?.thumbnail_url ||
+        publicReport?.thumbnail_url ||
+        '',
     }
   })
 
@@ -266,8 +306,7 @@ const ReportPage: FC = () => {
 
   /**
    * 删除入口（软删除，列表页同步消失）。
-   * 交互说明：详情页为纵向长 ScrollView + 视频控件，左滑删除会与滚动/拖拽冲突，
-   * 故采用「顶部更多 · 操作表」+「底部显式按钮」双通道；列表页更适合滑动露出删除（后续可加）。
+   * 仅从顶部「⋯ / 更多」操作表唤起，避免正文区再放红色删除按钮打断阅读。
    */
   const handleDeleteReport = () => {
     if (!analysisId || analysisId === 'sample') return
@@ -662,13 +701,6 @@ const ReportPage: FC = () => {
       )}
 
       {/* ==================== 6. 底部动作栏 ==================== */}
-      {!isSample && (
-        <View className='report__footer-delete-wrap'>
-          <Button className='report__footer-delete' onClick={handleDeleteReport}>
-            删除此报告
-          </Button>
-        </View>
-      )}
       <View className='report__footer'>
         <Button
           className='report__footer-btn'

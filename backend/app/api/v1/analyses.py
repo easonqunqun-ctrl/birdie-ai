@@ -20,12 +20,14 @@ from app.schemas.analysis import (
     ClubType,
     CreateAnalysisRequest,
     CreateAnalysisResponse,
+    ShareCardResponse,
     UploadTokenRequest,
     UploadTokenResponse,
 )
 from app.schemas.base import APIResponse, PageData, ok, page_data
 from app.services import analysis_service
 from app.services.sample_fixture import build_sample_report
+from app.services.share_card_service import ensure_share_wxa_code_url
 
 router = APIRouter()
 
@@ -136,6 +138,24 @@ async def get_analysis_status(
 ):
     result = await analysis_service.get_status(analysis_id=analysis_id, user=user, db=db)
     return ok(result)
+
+
+@router.post(
+    "/{analysis_id}/share-card",
+    summary="生成分享用小程序码 PNG URL（对象存储缓存）",
+    response_model=APIResponse[ShareCardResponse],
+)
+async def create_share_card(
+    analysis_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    storage: MinioStorageClient = Depends(get_minio_storage),
+):
+    url = await ensure_share_wxa_code_url(
+        db=db, user=user, analysis_id=analysis_id, storage=storage
+    )
+    await db.commit()
+    return ok(ShareCardResponse(wxa_code_url=url))
 
 
 @router.get(

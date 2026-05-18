@@ -45,9 +45,13 @@ export const userService = {
   cancelAccountDeletion() {
     return http.post<User>('/users/me/account-deletion/cancel', {})
   },
-  getAnalysisProgress() {
+  getAnalysisProgress(windowDays?: number) {
+    const qs =
+      typeof windowDays === 'number' && windowDays > 0
+        ? `?window_days=${windowDays}`
+        : ''
     return http.get<{ points: { analysis_id: string; analyzed_at: string; overall_score: number }[] }>(
-      '/users/me/analysis-progress',
+      `/users/me/analysis-progress${qs}`,
     )
-  }
+  },
 }

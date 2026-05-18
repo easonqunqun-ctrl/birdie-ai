@@ -17,3 +17,12 @@
 3. **质量门与 MVP §4.3**：告警型问题透传到报告文案；阻断策略与产品经理拍板后对 `01` Checkbox 核销。
 
 验收：每条需附 **_fixture 短视频 + pytest / 冒烟**（或记录在 `docs/07`）。
+
+## 生产 / 预发切换速记
+
+| 步骤 | 说明 |
+|------|------|
+| ai_engine 容器 | 设置 **`AI_ENGINE_MOCK_MODE=false`**（及所需模型权重挂载），使 `POST /analyze` 走 [`real_pipeline.py`](../../ai_engine/app/pipeline/real_pipeline.py)。 |
+| backend | 仅消费 `AI_ENGINE_URL` / `AI_ENGINE_TIMEOUT`；无需为 mock 单独改代码。 |
+| Celery | worker 与 **beat** 常驻；beat 已含分析任务调度与支付/会员周边周期任务（见 `app/celery_app.py`）。 |
+| 回归 | `make backend-test` + [`docs/release-notes/mvp-o01-o04-par-runbook.md`](mvp-o01-o04-par-runbook.md) 真机上传条目（与 O-01/O-04 交叉）。 |

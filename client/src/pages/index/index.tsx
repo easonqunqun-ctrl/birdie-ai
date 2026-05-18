@@ -258,7 +258,7 @@ const HomePage: FC = () => {
 
   // ====== 三联统计（来自 user.stats，后端聚合好）======
   const stats = user.stats
-  const showSampleCta = recent.length === 0
+  const showSampleCta = recent.length === 0 && !user.has_completed_real_analysis
 
   return (
     <View className='home'>

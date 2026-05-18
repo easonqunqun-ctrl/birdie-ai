@@ -14,7 +14,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from redis.asyncio import Redis
-from sqlalchemy import and_, func, select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -698,19 +698,39 @@ async def list_analyses(
 # MVP 进步曲线数据（§6.1）
 # ==================================================================
 async def get_user_analysis_progress(
-    db: AsyncSession, user: User
+    db: AsyncSession,
+    user: User,
+    *,
+    window_days: int | None = None,
+    max_points: int = 500,
 ) -> AnalysisProgressResponse:
-    stmt = (
-        select(SwingAnalysis)
-        .where(
-            SwingAnalysis.user_id == user.id,
-            SwingAnalysis.is_sample.is_(False),
-            SwingAnalysis.deleted_at.is_(None),
-            SwingAnalysis.status == "completed",
-            SwingAnalysis.overall_score.isnot(None),
+    """进步曲线数据源：按时间升序；`window_days>0` 时只取最近 N 天；`max_points` 防止超大列表。
+
+    `window_days` 为 ``None`` 或 ``0`` 表示不按时间窗截断（仍受 ``max_points`` 限制）。
+    """
+    from datetime import timedelta
+
+    now = datetime.now(UTC)
+    stmt = select(SwingAnalysis).where(
+        SwingAnalysis.user_id == user.id,
+        SwingAnalysis.is_sample.is_(False),
+        SwingAnalysis.deleted_at.is_(None),
+        SwingAnalysis.status == "completed",
+        SwingAnalysis.overall_score.isnot(None),
+    )
+    if window_days is not None and window_days > 0:
+        cutoff = now - timedelta(days=window_days)
+        stmt = stmt.where(
+            or_(
+                and_(SwingAnalysis.analyzed_at.isnot(None), SwingAnalysis.analyzed_at >= cutoff),
+                and_(SwingAnalysis.analyzed_at.is_(None), SwingAnalysis.created_at >= cutoff),
+            )
         )
-        .order_by(SwingAnalysis.analyzed_at.asc().nulls_last(), SwingAnalysis.created_at.asc())
-        .limit(60)
+    stmt = (
+        stmt.order_by(
+            SwingAnalysis.analyzed_at.asc().nulls_last(),
+            SwingAnalysis.created_at.asc(),
+        ).limit(min(max(max_points, 1), 2000))
     )
     rows = (await db.execute(stmt)).scalars().all()
     pts: list[AnalysisProgressPoint] = [

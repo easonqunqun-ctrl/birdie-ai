@@ -247,6 +247,38 @@ class WechatPayV3Context:
         r = await self._http_post(path, payload)
         return r.get("prepay_id", "")
 
+    async def papay_pre_entrust_mini_program(
+        self,
+        *,
+        openid: str,
+        plan_id: int,
+        out_contract_code: str,
+        contract_display_account: str,
+        contract_notify_url: str,
+        estimated_deduct_date: str,
+        estimated_deduct_total: int,
+        description: str,
+    ) -> dict[str, Any]:
+        """预约扣费 / 委托代扣：小程序预签约（返回跳转微信签约页参数）。"""
+        path = "/v3/papay/scheduled-deduct-sign/contracts/pre-entrust-sign/mini-program"
+        payload: dict[str, Any] = {
+            "appid": self.appid,
+            "openid": openid,
+            "plan_id": int(plan_id),
+            "out_contract_code": out_contract_code[:32],
+            "contract_display_account": contract_display_account[:32],
+            "contract_notify_url": contract_notify_url[:256],
+            "deduct_schedule": {
+                "estimated_deduct_date": estimated_deduct_date,
+                "estimated_deduct_amount": {
+                    "total": int(estimated_deduct_total),
+                    "currency": "CNY",
+                },
+                "description": description[:32],
+            },
+        }
+        return await self._http_post(path, payload)
+
     async def domestic_refund(
         self,
         *,

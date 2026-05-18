@@ -14,6 +14,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
+from redis.asyncio import Redis
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -283,6 +284,7 @@ async def ensure_membership_valid(db: AsyncSession, user: User) -> bool:
         return False
 
     # 已过期：降级
+    expired_at = user.membership_expires_at
     user.membership_type = "free"
     user.auto_renew = False
 
@@ -314,6 +316,25 @@ async def ensure_membership_valid(db: AsyncSession, user: User) -> bool:
         c_q.total = settings.FREE_USER_DAILY_CHATS
 
     await db.flush()
+
+    mini_openid = user.wechat_openid
+    if mini_openid:
+        try:
+            from app.integrations.wechat_subscribe_message import (
+                send_membership_expired_notification,
+            )
+
+            await send_membership_expired_notification(
+                openid=mini_openid,
+                expired_at=expired_at,
+            )
+        except Exception as exc:
+            logger.warning(
+                "membership_expired_subscribe_notify_failed",
+                user_id=user.id,
+                error=str(exc),
+            )
+
     return True
 
 
@@ -611,6 +632,7 @@ async def _demote_membership_after_mock_refund(db: AsyncSession, user: User) -> 
     user.membership_started_at = None
     user.membership_expires_at = None
     user.auto_renew = False
+    user.papay_contract_id = None
 
     now_cn = datetime.now(UTC) + timedelta(hours=8)
     month_str = now_cn.strftime("%Y-%m")
@@ -676,3 +698,133 @@ async def mock_refund_paid_order(
     db.add(txn)
     await db.flush()
     return order
+
+
+async def apply_auto_renew(
+    db: AsyncSession,
+    user: User,
+    *,
+    enabled: bool,
+    redis: Redis | None = None,
+) -> dict[str, Any] | None:
+    """更新自动续费意向。
+
+    - 关闭：仅写 `auto_renew=False`；
+    - mock 开通：直接 `auto_renew=True`；
+    - 真实开通：返回 ``papay`` 跳转参数（不立即改 auto_renew，等签约 notify）。
+    """
+    import secrets
+    from zoneinfo import ZoneInfo
+
+    from app.core.redis import get_redis
+
+    if not enabled:
+        user.auto_renew = False
+        await db.flush()
+        return None
+
+    if settings.WECHAT_PAY_MOCK_MODE:
+        user.auto_renew = True
+        await db.flush()
+        return None
+
+    if not (user.wechat_openid and user.wechat_openid.strip()):
+        raise BadRequestError(
+            code=40014,
+            message="需在微信内完成签约以获取 openid",
+        )
+
+    plan_id = int(settings.WECHAT_PAY_PAPAY_PLAN_ID or 0)
+    if plan_id <= 0:
+        raise BadRequestError(
+            code=40096,
+            message="商户未开通委托代扣或未配置 WECHAT_PAY_PAPAY_PLAN_ID",
+        )
+    notify = (settings.WECHAT_PAY_PAPAY_NOTIFY_URL or "").strip()
+    if not notify:
+        raise BadRequestError(
+            code=40097,
+            message="未配置 WECHAT_PAY_PAPAY_NOTIFY_URL",
+        )
+
+    try:
+        ctx = wechat_pay_v3.get_wechat_pay_v3()
+    except (RuntimeError, ValueError, OSError) as e:
+        logger.warning("wechat_pay_v3_init_failed_papay", error=str(e), user_id=user.id)
+        raise ThirdPartyError(message=f"支付配置错误：{e!s}", detail=str(e)) from e
+
+    out_contract_code = secrets.token_hex(16)
+    cn = ZoneInfo("Asia/Shanghai")
+    now_cn = datetime.now(UTC).astimezone(cn)
+    est = (now_cn + timedelta(days=2)).date().isoformat()
+
+    display_base = (user.nickname or "领翼用户").strip() or "领翼用户"
+    display = display_base[:32]
+
+    try:
+        data = await ctx.papay_pre_entrust_mini_program(
+            openid=user.wechat_openid.strip(),
+            plan_id=plan_id,
+            out_contract_code=out_contract_code,
+            contract_display_account=display,
+            contract_notify_url=notify,
+            estimated_deduct_date=est,
+            estimated_deduct_total=int(PLAN_PRICING["monthly"]["amount_cents"]),
+            description="领翼golf会员自动续费",
+        )
+    except wechat_pay_v3.WechatPayRequestError as e:
+        logger.warning("papay_pre_entrust_failed", user_id=user.id, detail=str(e))
+        raise ThirdPartyError(message="微信预签约失败", detail=str(e)) from e
+
+    r = redis if redis is not None else await get_redis()
+    await r.set(f"papay:occ:{out_contract_code}", user.id, ex=900)
+
+    pid = str(data.get("pre_entrustweb_id") or "")
+    aid = str(data.get("redirect_appid") or "")
+    rpath = str(data.get("redirect_path") or "")
+    if not pid or not aid or not rpath:
+        raise ThirdPartyError(message="微信预签约返回不完整", detail=str(data)[:500])
+    return {
+        "pre_entrustweb_id": pid,
+        "redirect_appid": aid,
+        "redirect_path": rpath,
+    }
+
+
+async def process_papay_contract_notify(db: AsyncSession, payload: dict[str, Any]) -> tuple[bool, str]:
+    """解析委托代扣签约 notify（MVP：优先平文本 JSON；字段名随微信文档演进做宽容读取）。"""
+    from app.core.redis import get_redis
+
+    out_code = str(
+        payload.get("out_contract_code")
+        or payload.get("OutContractCode")
+        or "",
+    ).strip()
+    cid = str(payload.get("contract_id") or payload.get("contractId") or "").strip()
+    if not out_code and not cid:
+        return False, "missing_contract_reference"
+
+    redis = await get_redis()
+    user: User | None = None
+    if out_code:
+        raw_uid = await redis.get(f"papay:occ:{out_code}")
+        if raw_uid is not None:
+            uid = raw_uid.decode() if isinstance(raw_uid, bytes) else str(raw_uid)
+            user = await db.get(User, uid)
+
+    if user is None and cid:
+        stmt = select(User).where(User.papay_contract_id == cid).limit(1)
+        user = (await db.execute(stmt)).scalar_one_or_none()
+
+    if user is None:
+        return True, "unknown_user_idempotent"
+
+    if cid:
+        user.papay_contract_id = cid[:64]
+        user.auto_renew = True
+        await db.flush()
+
+    if out_code:
+        await redis.delete(f"papay:occ:{out_code}")
+
+    return True, "ok"

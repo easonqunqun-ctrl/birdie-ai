@@ -60,7 +60,29 @@
     color: var(--color-text-secondary);
   }
 
-  /* =========== 列表卡片（整卡进入详情；删除仅在报告页） =========== */
+  &__compare-bar {
+    padding: 16rpx 8rpx 20rpx;
+    margin-bottom: 8rpx;
+    background: var(--color-bg-card);
+    border-radius: var(--radius-md);
+    border: 1rpx solid var(--color-border);
+  }
+
+  &__compare-bar-text {
+    font-size: 26rpx;
+    color: var(--color-text-secondary);
+    display: block;
+    margin-bottom: 12rpx;
+  }
+
+  &__compare-bar-actions {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-end;
+    gap: 16rpx;
+  }
+
+  /* =========== 列表卡片（整卡进入详情；删除见报告详情页顶部更多） =========== */
   &__card {
     display: flex;
     align-items: center;
@@ -76,6 +98,11 @@
 
     &:active {
       opacity: 0.92;
+    }
+
+    &--picked {
+      border: 2rpx solid var(--color-gold);
+      box-shadow: 0 4rpx 16rpx rgba(198, 160, 89, 0.35);
     }
   }
 

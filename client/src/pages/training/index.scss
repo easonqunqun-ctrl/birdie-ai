@@ -35,7 +35,9 @@
     align-items: center;
     gap: 16rpx;
 
-    .training__trend {
+    .training__trend,
+    .training__member-curve,
+    .training__curve-lock {
       width: 100%;
       max-width: 100%;
     }
@@ -138,6 +140,151 @@
     color: var(--color-text-tertiary);
     display: block;
     margin-top: 8rpx;
+  }
+
+  /* ========== 进步曲线（会员）；内含 1～2 个 &__trend 卡片 ========== */
+  &__member-curve {
+    width: 100%;
+    margin-bottom: 16rpx;
+  }
+
+  &__member-curve-heading {
+    font-size: 32rpx;
+    font-weight: 800;
+    color: var(--color-primary);
+    display: block;
+    margin: 0 4rpx 12rpx;
+    letter-spacing: -0.3rpx;
+  }
+
+  &__window-pills {
+    display: flex;
+    flex-direction: row;
+    gap: 16rpx;
+    margin: 0 4rpx 16rpx;
+  }
+
+  &__pill {
+    font-size: 26rpx;
+    padding: 10rpx 24rpx;
+    border-radius: 999rpx;
+    border: 1rpx solid var(--color-border);
+    color: var(--color-text-secondary);
+    background: var(--color-bg-card);
+
+    &.is-active {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+      font-weight: 700;
+      background: rgba(26, 35, 126, 0.06);
+    }
+  }
+
+  &__member-curve-empty {
+    font-size: 30rpx;
+    line-height: 1.55;
+    color: var(--color-text-tertiary);
+    display: block;
+    padding: 20rpx 24rpx;
+    background: var(--color-bg-card);
+    border: 1rpx solid var(--color-border);
+    border-radius: 20rpx;
+  }
+
+  &__trend--in-curve {
+    margin-bottom: 12rpx;
+  }
+
+  &__trend--practice {
+    margin-bottom: 0;
+  }
+
+  &__practice-title {
+    margin-top: 4rpx;
+  }
+
+  &__practice-bars-row {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 8rpx;
+    padding-bottom: 6rpx;
+    min-height: 140rpx;
+  }
+
+  &__practice-bar-col {
+    flex-shrink: 0;
+    width: 32rpx;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  &__practice-bar-track {
+    height: 120rpx;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    background: var(--color-bg-subtle);
+    border-radius: 10rpx;
+    overflow: hidden;
+  }
+
+  &__practice-bar-fill {
+    width: 100%;
+    min-height: 6rpx;
+    background: var(--gradient-progress);
+    border-radius: 8rpx;
+    align-self: stretch;
+  }
+
+  &__practice-bar-day {
+    font-size: 22rpx;
+    color: var(--color-text-tertiary);
+    margin-top: 6rpx;
+    line-height: 1;
+  }
+
+  &__curve-lock {
+    margin-bottom: 16rpx;
+    padding: 24rpx 28rpx;
+    background: var(--color-bg-card);
+    border: 1rpx solid var(--color-border);
+    border-left: 6rpx solid var(--color-gold);
+    border-radius: 20rpx;
+    box-shadow: var(--shadow-xs);
+    box-sizing: border-box;
+  }
+
+  &__curve-lock-title {
+    font-size: 32rpx;
+    font-weight: 800;
+    color: var(--color-primary);
+    display: block;
+    margin-bottom: 10rpx;
+  }
+
+  &__curve-lock-desc {
+    font-size: 30rpx;
+    line-height: 1.55;
+    color: var(--color-text-secondary);
+    display: block;
+    margin-bottom: 20rpx;
+  }
+
+  &__curve-lock-cta {
+    background: var(--color-primary) !important;
+    color: var(--color-on-primary) !important;
+    border-radius: 16rpx !important;
+    height: 80rpx !important;
+    line-height: 80rpx !important;
+    font-size: 30rpx !important;
+    font-weight: 700 !important;
+
+    &::after {
+      border: none !important;
+    }
   }
 
   /* ================= hero（本周训练 + 进度 + 连续天数）================= */

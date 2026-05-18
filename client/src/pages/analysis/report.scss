@@ -527,24 +527,7 @@
     line-height: 1.5;
   }
 
-  /* ================= 6. 底部占位栏 ================= */
-  &__footer-delete-wrap {
-    margin-top: 8rpx;
-    margin-bottom: 8rpx;
-  }
-
-  &__footer-delete {
-    width: 100% !important;
-    background: transparent !important;
-    color: var(--color-error) !important;
-    border: 2rpx solid var(--color-error) !important;
-    font-size: 28rpx !important;
-    height: 80rpx !important;
-    line-height: 80rpx !important;
-    border-radius: var(--radius-md) !important;
-    font-weight: 500 !important;
-  }
-
+  /* ================= 6. 底部动作栏 ================= */
   &__footer {
     display: flex;
     flex-wrap: wrap;

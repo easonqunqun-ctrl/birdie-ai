@@ -3,21 +3,26 @@
 端点概览：
 - `GET  /v1/payments/plans`                    套餐列表（前端开通页用）
 - `POST /v1/payments/orders`                   下单
+- `POST /v1/payments/auto-renew`              自动续费（mock 落库；真实开通返回 papay 跳转参数）
 - `POST /v1/payments/orders/{id}/mock-confirm` mock 模式立即支付
 - `POST /v1/payments/orders/{id}/mock-refund`  mock 模式退款演练
 - `POST /v1/payments/orders/{id}/apply-refund` 生产：微信「申请退款」，非 mock
 - `POST /v1/payments/orders/{id}/sync-from-wechat` 客户端支付成功后主动拉微信查单补账（非 mock）
 - `POST /v1/payments/wechat/notify`          微信支付异步通知（无 JWT，验签）
 - `POST /v1/payments/wechat/refund-notify`   微信退款结果异步通知
+- `POST /v1/payments/wechat/papay-notify`    委托代扣签约结果（平文/加密兼容尝试）
 - `GET  /v1/payments/orders/{id}`              订单详情
 - `GET  /v1/users/me/orders`                   当前用户订单列表
 - `GET  /v1/users/me/membership`               当前会员状态
 """
 
+import json
+
 import structlog
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
+from redis.asyncio import Redis
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,15 +30,19 @@ from app.api.deps import get_current_user
 from app.config import settings
 from app.core.database import get_db
 from app.core.exceptions import AppException, ThirdPartyError
+from app.core.redis import get_redis
 from app.integrations import wechat_pay_v3
 from app.models.user import User
 from app.schemas.base import APIResponse, ok
 from app.schemas.payment import (
     ApplyRefundResponse,
+    AutoRenewRequest,
+    AutoRenewResponse,
     CreateOrderRequest,
     CreateOrderResponse,
     MembershipInfo,
     OrderResponse,
+    PapayMiniProgramSignPayload,
     PlanOption,
     SyncOrderFromWechatResponse,
 )
@@ -50,6 +59,36 @@ logger = structlog.get_logger("payments")
 )
 async def list_plans() -> APIResponse[list[PlanOption]]:
     return ok(payment_service.list_plans())
+
+
+@router.post(
+    "/auto-renew",
+    summary="开通/关闭自动续费（mock 直接落库；真实模式开通时返回跳转签约参数）",
+    response_model=APIResponse[AutoRenewResponse],
+)
+async def post_auto_renew(
+    payload: AutoRenewRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
+) -> APIResponse[AutoRenewResponse]:
+    try:
+        extra = await payment_service.apply_auto_renew(
+            db, user, enabled=payload.enabled, redis=redis
+        )
+        await db.commit()
+        await db.refresh(user)
+    except AppException:
+        await db.rollback()
+        raise
+    papay = None
+    if extra:
+        papay = PapayMiniProgramSignPayload(
+            pre_entrustweb_id=extra["pre_entrustweb_id"],
+            redirect_appid=extra["redirect_appid"],
+            redirect_path=extra["redirect_path"],
+        )
+    return ok(AutoRenewResponse(auto_renew=user.auto_renew, papay_sign=papay))
 
 
 @router.post(
@@ -266,6 +305,50 @@ async def wechat_refund_notify(
         return JSONResponse(content={"code": "FAIL", "message": "处理失败"}, status_code=200)
 
 
+@router.post(
+    "/wechat/papay-notify",
+    summary="微信委托代扣签约结果通知（HTTPS POST JSON）",
+    include_in_schema=True,
+)
+async def wechat_papay_contract_notify(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """MVP：优先按平文 JSON；若外层带 `resource`，再尝试按 V3 AEAD 解密。"""
+    if settings.WECHAT_PAY_MOCK_MODE:
+        return JSONResponse(
+            content={"code": "FAIL", "message": "mock 模式不处理"},
+            status_code=200,
+        )
+    body = await request.body()
+    headers = {k: v for k, v in request.headers.items()}
+    payload: dict
+    try:
+        outer = json.loads(body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return JSONResponse(content={"code": "FAIL", "message": "bad json"}, status_code=200)
+    if not isinstance(outer, dict):
+        return JSONResponse(content={"code": "FAIL", "message": "bad json"}, status_code=200)
+    payload = outer
+    if "resource" in outer:
+        dec = await wechat_pay_v3.decrypt_wechat_pay_notify_resource(
+            raw_body=body, headers=headers
+        )
+        if isinstance(dec, dict):
+            payload = dec
+    try:
+        ok_n, msg = await payment_service.process_papay_contract_notify(db, payload)
+        if ok_n:
+            await db.commit()
+            return JSONResponse(content={"code": "SUCCESS", "message": "成功"}, status_code=200)
+        await db.rollback()
+        return JSONResponse(content={"code": "FAIL", "message": msg}, status_code=200)
+    except Exception as e:
+        await db.rollback()
+        logger.exception("papay_notify_handle_fail", error=str(e))
+        return JSONResponse(content={"code": "FAIL", "message": "处理失败"}, status_code=200)
+
+
 @router.get(
     "/orders/{order_id}",
     summary="订单详情",
@@ -319,5 +402,6 @@ async def get_membership(
             expires_at=user.membership_expires_at,
             days_remaining=payment_service.days_remaining(user),
             auto_renew=user.auto_renew,
+            papay_contract_id=user.papay_contract_id,
         )
     )
