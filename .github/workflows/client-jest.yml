@@ -1,0 +1,53 @@
+# Client：Jest 单测（services + utils + store + components 端无关层）
+#
+# 与 client-rn-check 同源 trigger 但解耦为独立 job，便于：
+#   - 单独追踪覆盖率趋势 / artifact
+#   - 失败影响面清晰（"是 RN bundle 挂了？还是单测挂了？"）
+name: client-jest
+
+on:
+  push:
+    branches: [main, master, develop]
+    paths:
+      - 'client/**'
+      - '.github/workflows/client-jest.yml'
+  pull_request:
+    paths:
+      - 'client/**'
+      - '.github/workflows/client-jest.yml'
+
+jobs:
+  jest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: client/pnpm-lock.yaml
+
+      - name: pnpm install (client)
+        run: pnpm install --frozen-lockfile
+        working-directory: client
+
+      - name: Jest（CI 模式 + 覆盖率）
+        # test:ci 已包含 --coverage；不要再用 `pnpm test:ci -- --coverage`，
+        # pnpm 透传时 jest 会把它当 positional 测试 pattern → No tests found
+        run: pnpm test:ci
+        working-directory: client
+
+      - name: Upload coverage（Jest html/lcov）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-jest-coverage
+          path: client/coverage
+          if-no-files-found: ignore
+          retention-days: 14
