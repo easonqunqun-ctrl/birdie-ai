@@ -78,13 +78,22 @@ function backendStageToIndex(stage: AnalysisStage | null | undefined): number {
   return idx === -1 ? 0 : idx
 }
 
-/** 微信小程序部分基础库渲染子树异常时整块空白：兜底提示并避免用户误以为「卡住」。 */
+/** 微信小程序部分基础库渲染子树异常时整块空白：兜底提示并避免用户误以为「卡住」。
+ *
+ * RN 端 metro v0.72 + terser 的 minifier 在「class field 初始化 + 普通方法混排」
+ * 的语义上会崩（`Unexpected token: name (_000)`，client-rn-check 长期红）。
+ * 这里改用 constructor 赋值 state + arrow method 绑定 this，**等价**于
+ * `state = { ... }` + `handleBack() { ... }`，但避开 minifier 的 class field 解析路径。
+ */
 class WaitingErrorBoundary extends Component<PropsWithChildren, { err: Error | null }> {
+  constructor(props: PropsWithChildren) {
+    super(props)
+    this.state = { err: null }
+  }
+
   static getDerivedStateFromError(err: Error): { err: Error } {
     return { err }
   }
-
-  state = { err: null as Error | null }
 
   componentDidCatch(err: Error, info: ErrorInfo) {
     if (APP_ENV !== 'production') {
