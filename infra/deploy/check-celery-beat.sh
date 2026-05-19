@@ -78,7 +78,8 @@ else
 fi
 
 section "3) PAYMENT_PENDING_ORDER_EXPIRE_MINUTES 阈值"
-threshold_cmd='python -c "from app.config import settings; print(settings.PAYMENT_PENDING_ORDER_EXPIRE_MINUTES)"'
+# 容器内系统 python 无项目依赖；与 release 镜像一致走 /app/.venv
+threshold_cmd='/app/.venv/bin/python -c "from app.config import settings; print(settings.PAYMENT_PENDING_ORDER_EXPIRE_MINUTES)"'
 threshold_out=$(run_compose "exec -T ${BACKEND_SERVICE} ${threshold_cmd}" 2>&1 || true)
 threshold=$(echo "${threshold_out}" | tail -n 1 | tr -d '\r')
 if [[ "${threshold}" =~ ^[0-9]+$ ]]; then
