@@ -117,6 +117,28 @@ git clean -fd
 
 ---
 
+## 七·补 发版前 5 分钟巡检（U-1～U-4 紧急队列）
+
+> 与 [`docs/19-产品开发迭代计划-当前队列.md`](../19-产品开发迭代计划-当前队列.md) **§二 紧急队列**逐项对齐。脚本本身只做**只读**校验，不会写远端。
+
+| 巡检项 | 命令 | 通过标志 |
+|--------|------|---------|
+| **U-1** Celery beat 在线 + 近 30min 派发 + 阈值 | `DEPLOY_HOST=ubuntu@<IP> make check-cvm-beat` | 三段全部 `✓`；阈值 `PAYMENT_PENDING_ORDER_EXPIRE_MINUTES > 0` |
+| **U-2** COS / CDN 真桶 | `COS_BUCKET=… COS_REGION=… COS_SECRET_ID=… COS_SECRET_KEY=… [CDN_HOST=…] make check-cos-smoke` | PUT/HEAD/GET/CORS/DELETE 五步全过；CDN 段有节点头 |
+| **U-3** HTTPS + 小程序合法域名 | `make check-weapp-domains` | 每个 host TLS 链合法、`/v1/health` 2xx；输出可粘贴的服务器域名清单 |
+| **U-4** 支付/退款回调路径 | `ENV=$HOME/secrets/lingniao-prod.env make check-pay-callbacks` | NOTIFY_URL 路径精确等于 `/v1/payments/wechat/notify`；REFUND 同理 |
+
+聚合入口：
+
+```bash
+ENV=$HOME/secrets/lingniao-prod.env make check-preflight
+# 提示打印 U-1 / U-3 / U-2 的命令；按业务需要逐条执行
+```
+
+**注意**：U-2 涉及真凭据，**不要**把 `COS_SECRET_*` 写进 Makefile 或 .env 入库。命令行 inline 或临时 source 一个**未跟踪**的 `~/secrets/cos-smoke.env`。
+
+---
+
 ## 八、附录：命令速查
 
 | 场景 | 命令（在 Mac 仓库根，按需带 `DEPLOY_HOST=`） |
@@ -126,6 +148,10 @@ git clean -fd
 | 一键 push + 发版 | `ENV_FILE=~/secrets/lingniao-prod.env make ship-cvm` |
 | 仅远端发版 | `CVM_LOCAL_PREFLIGHT=1 ENV_FILE=... make release-cvm` |
 | 打印 compose 片段（不 SSH） | `make cvm-deploy-dry-run` |
+| U-1 beat 巡检 | `DEPLOY_HOST=ubuntu@IP make check-cvm-beat` |
+| U-2 COS 真桶 | `COS_BUCKET=… COS_REGION=… COS_SECRET_ID=… COS_SECRET_KEY=… make check-cos-smoke` |
+| U-3 域名 / TLS | `make check-weapp-domains` |
+| U-4 支付回调 | `ENV=~/secrets/lingniao-prod.env make check-pay-callbacks` |
 
 ---
 

@@ -8,6 +8,32 @@
 
 ---
 
+## −1. 本地 Compose vs CVM Compose（关键差异速查）
+
+> 本地 `make up` 跑得动 ≠ 生产同款跑得动。下表列出 **本地** 与 **CVM 生产形态** 在容器集合 / 卷 / 网络 / 外部依赖上的实际差异，用于发版前对照。
+> 配套巡检：[`cvm-release-smooth-runbook.md`](cvm-release-smooth-runbook.md) **§七·补**（U-1～U-4 命令表）。
+
+| 维度 | 本地 (`make up`) | CVM 测试栈 (`make deploy-test` / `deploy-cvm-up`) | 生产 (W9 后) |
+|------|--------------------|---------------------------------------------------|--------------|
+| Compose 文件 | `docker-compose.yml` | `+ docker-compose.test.yml + docker-compose.cvm.yml [+ docker-compose.wechat-pay-key.yml]` | 同 CVM 测试栈；按需删 `docker-compose.test.yml` 中的开发用映射 |
+| 容器集合 | `backend / celery-worker / celery-beat / ai_engine / postgres / redis / minio` | 同左 **+ nginx** | 同左；可选移除 minio 改 COS |
+| 对外入口 | `backend:8000` 直暴 / minio:9000 直暴 | **nginx 终结 TLS**，反代 `/v1` → backend、`/minio/*` → minio | 同 CVM；证书必须公有 CA |
+| `.env` 来源 | 仓库根 `.env.local`（开发占位符） | CVM **服务器上**的 `.env.local`（生产凭据，不入 Git） | 同 CVM；W9 加 `WECHAT_PAY_*` 真值与 COS 凭据 |
+| 微信支付 PEM | mock (`WECHAT_PAY_MOCK_MODE=true`) | 同 mock，除非 `docker-compose.wechat-pay-key.yml` 挂载 | 必须挂载真 `apiclient_key.pem` 且 mock=false |
+| 对象存储 | MinIO（容器内 `minio:9000`，公网 `localhost:9000`） | MinIO（公网走 `https://<host>/minio/*` 经 nginx） | **COS**（`STORAGE_PROVIDER=cos`，桶 + CDN 真域） |
+| LLM | mock (`LLM_MOCK_MODE=true`) | 可 mock 或接 DeepSeek 真 key | DeepSeek 真 key + 预算 |
+| AI 引擎 | mock_pipeline.py | mock 或 real_pipeline.py（按 `AI_ENGINE_MOCK_MODE`） | real_pipeline.py（依赖 MediaPipe + 真桶视频） |
+| Celery beat | 容器内运行（同 worker 镜像） | 同左；**需 `docker ps` 实测在线** | 同左 + 监控告警 |
+| 微信登录 | mock (`WECHAT_MOCK_LOGIN=true`) | false，走真实 `wx.login`（W8-T4） | false |
+| 配额 | `QUOTA_MODE=` 取默认（受限） | `QUOTA_MODE=unlimited`（W8-T3 测试期） | 按业务恢复受限 |
+| 公网证书 | 自签 / 跳过 | 自签或 Let's Encrypt | **必须 Let's Encrypt / 公有 CA** |
+| 关键变量差异 | `APP_ENV=development` | `APP_ENV=staging` | `APP_ENV=production` |
+| 运维入口 | `make up` / `make logs` | `make deploy-cvm-up` / `make deploy-cvm-ps` / `make deploy-cvm-logs` | `make ship-cvm` / `make release-cvm` |
+
+发版前 **U-1～U-4** 命令表见 [`cvm-release-smooth-runbook.md`](cvm-release-smooth-runbook.md) **§七·补**。
+
+---
+
 ## 0. 过渡期：本次不走服务端 Git（rsync），下次再切 Git
 
 若 CVM 上 **没有 `.git`**、代码靠 **`infra/deploy/publish-backend-to-cvm.sh`** 同步：**默认**用 **`scp`** 将仓库根的 **`docker-compose.yml`**、**`docker-compose.test.yml`**、**`docker-compose.cvm.yml`** 推到 **`$DEPLOY_REPO/`**，再 **rsync** **`backend/`** 与 **`ai_engine/`**，本节为**唯一推荐主干链路**（与 **`docs`** 正文 §2 「代码只看 Git」冲突时，**以你正处于的阶段为准**：过渡完成后再删掉本节依赖）。
@@ -50,6 +76,32 @@
 - 本地：**`docker-compose.yml`** 内含 **`celery-beat`** 服务（镜像与 worker 同为 backend）；`make up` 若省略该服务请加：  
   `docker compose --env-file .env.local up -d celery-beat`
 - **CVM**：与 worker 一起在 compose 叠叠乐时 **务必勾选/包含 celery-beat 一条**；发布后 `docker ps | grep celery` 应具备 `beat`。
+
+#### 日常巡检（U-1 紧急队列）
+
+> 一次性核验「容器在 + 近 30 分钟有派发 + 阈值生效」，对应 [`docs/19-产品开发迭代计划-当前队列.md`](../19-产品开发迭代计划-当前队列.md) **§二 U-1**。
+
+```bash
+# 默认走远端 CVM（与 publish-backend-cvm 同一对 SSH 密钥/Host/项目路径）
+make check-cvm-beat
+
+# 本机 compose 栈（开发环境复现）
+LOCAL=1 make check-cvm-beat
+
+# 自定义远端
+DEPLOY_HOST=ubuntu@1.2.3.4 DEPLOY_REPO=/home/ubuntu/lingniao-golf \
+  BIRDIE_CVM_KEY=$HOME/.ssh/id_ed25519_birdie_golf \
+  make check-cvm-beat
+
+# 失败诊断：放宽窗口看更长历史
+SINCE=2h make check-cvm-beat
+```
+
+脚本三段输出对应：
+
+1. `docker compose ps celery-beat` —— 是否 `Up/running`
+2. `docker compose logs --since ${SINCE} celery-beat` —— 是否抓到 `expire_stale_pending_orders` / `xiaoniao.expire_stale_pending_orders`
+3. `docker compose exec backend python -c "from app.config import settings; print(settings.PAYMENT_PENDING_ORDER_EXPIRE_MINUTES)"` —— 阈值（默认 `120`，`≤0` 关闭超时回收）
 
 ### 从 §0 rsync → 本节 Git 主干（一键迁移）
 
