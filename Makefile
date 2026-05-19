@@ -473,12 +473,13 @@ check-weapp-domains:
 check-pay-callbacks:
 	bash scripts/check-payment-callbacks.sh
 
-# U-1～U-4 一键巡检（发版前 5 分钟）
-check-preflight: check-pay-callbacks
-	@echo ""
-	@echo "→ 继续：DEPLOY_HOST=… make check-cvm-beat"
-	@echo "→ 继续：make check-weapp-domains"
-	@echo "→ 继续：COS_BUCKET=… COS_REGION=… COS_SECRET_ID=… COS_SECRET_KEY=… make check-cos-smoke"
+# U-0：.env.local 隧道 URL → api.birdieai.cn 同源（仅当检测到 trycloudflare/ngrok）
+check-heal-local-env:
+	bash scripts/heal-local-env-tunnels.sh
+
+# U-1～U-4 一键巡检（发版前 5 分钟；无需人工逐步敲命令）
+check-preflight: check-heal-local-env check-pay-callbacks check-weapp-domains check-cos-smoke check-cvm-beat
+	@printf '\n\033[32m✓ check-preflight：U-0～U-4 已全部执行（COS 未配密钥时 U-2 自动跳过）\033[0m\n'
 
 deploy-test:
 	@if [ ! -f infra/test/certs/fullchain.pem ] || [ ! -f infra/test/certs/privkey.pem ]; then \
