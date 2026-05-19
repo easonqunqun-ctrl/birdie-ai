@@ -61,6 +61,11 @@ UI/            UI 原型 HTML 与生成图（仅参考，勿当源码）
 - 样式 **以 flex 为主**；避免 grid / float / 复杂选择器（RN 不支持）。
 - 路由跳转统一用 `Taro.navigateTo` / `Taro.reLaunch`；不要直接拼 URL。
 - 新建页面：同时建 `.tsx` / `.scss` / `.config.ts` 三件套，并在 `app.config.ts` 中登记。
+- **前端单测**（W9 起强制门禁，详见 [`docs/07`](docs/07-测试策略文档.md) §2.1）：
+  - 修改 `src/services` / `src/utils` / `src/store` / `src/components/*.tsx`（非 `.rn.tsx`）**必须同步加 / 更新**对应 `__tests__/*.test.ts`。
+  - 新增 Taro API 调用前，**先**到 `src/__mocks__/tarojs.ts` 里补 `jest.fn` 桩，再写测试，避免每个测试文件手工 mock 同一 API。
+  - 不要在测试里直接 import 真实 `@tarojs/taro` / `@tarojs/components`：jsdom 下会触发小程序运行时初始化失败。
+  - 端分叉 `*.rn.tsx` / `adapters/*.{weapp,rn}.ts` 不纳入 Jest，由 `make client-check-rn` + 真机 smoke 兜底。
 
 ---
 
@@ -95,6 +100,8 @@ cd client && pnpm install && pnpm dev:weapp
 cd client && pnpm type-check && pnpm lint
 make client-bootstrap-rn-shell       # RN：首次克隆 taro-native-shell 至 client/rn-shell（幂等）
 make client-check-rn                  # RN：bundle 门禁 + type-check（已并入 make test；CI：.github/workflows/client-rn-check.yml）
+make client-test                      # Jest 单测（services/utils/store/components 端无关层；首次需先 pnpm install）
+make client-test-coverage             # 带覆盖率阈值；CI 走 client-test-ci，见 .github/workflows/client-jest.yml；详 docs/07
 make client-build-weapp-prod          # 微信小程序正式包：先填 client/.env.production，见 docs/release-notes/go-live-weapp-fool-checklist.md
 
 # CVM / HTTPS（微信小程序真机须可信 CA；详见 infra/deploy/README.md）

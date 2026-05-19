@@ -5,6 +5,7 @@
         ai-engine-synth-fixtures \
         client-install client-bootstrap-rn-shell client-dev-weapp client-dev-rn-ios client-dev-rn-android \
         client-build-weapp client-build-weapp-prod client-build-rn client-tsc client-check-rn \
+        client-test client-test-watch client-test-coverage client-test-ci \
         check test ci \
         deploy-check-env deploy-check-cvm-pay \
         deploy-test test-logs test-ps test-reset test-restart test-certs test-health \
@@ -48,6 +49,10 @@ help:
 	@echo ""
 	@echo "  ===== 客户端（Taro 双端） ====="
 	@echo "  make client-install         安装客户端依赖"
+	@echo "  make client-test            Jest 单测（默认本地交互）"
+	@echo "  make client-test-watch      Jest 监听模式"
+	@echo "  make client-test-coverage   Jest 覆盖率（带阈值检查）"
+	@echo "  make client-test-ci         Jest CI 模式（单 worker + silent）"
 	@echo "  make client-bootstrap-rn-shell 克隆 taro-native-shell 到 client/rn-shell（幂等）"
 	@echo "  make client-dev-weapp       开发：编译微信小程序（用 微信开发者工具 打开 client/dist）"
 	@echo "  make client-dev-rn-ios      开发：iOS App"
@@ -272,6 +277,21 @@ client-tsc:
 # RN bundle + 类型（已并入 make test）
 client-check-rn: client-build-rn client-tsc
 
+# 客户端 Jest 单测（services + utils + store + components 端无关层）
+# 首次需先 `cd client && pnpm install` 拉 jest / @testing-library/* / babel-jest 等
+client-test:
+	cd client && pnpm test
+
+client-test-watch:
+	cd client && pnpm test:watch
+
+client-test-coverage:
+	cd client && pnpm test:coverage
+
+# CI 入口：单 worker / silent / 失败即返回非 0
+client-test-ci:
+	cd client && pnpm test:ci
+
 # ==================== 健康检查 ====================
 check:
 	@curl -s http://localhost:8000/v1/health | python3 -m json.tool || echo "✗ 后端未启动或异常"
@@ -279,9 +299,9 @@ check:
 # ==================== 质量门 rollup（W6-T5） ====================
 # make test：常规 PR/commit 前的全量单测 + lint + tsc
 # make ci：在 test 基础上再跑 smoke（需 make up 已起真实 ai_engine）
-test: backend-lint backend-test ai-engine-lint ai-engine-test client-check-rn
+test: backend-lint backend-test ai-engine-lint ai-engine-test client-check-rn client-test-ci
 	@echo ""
-	@echo "✓ backend + ai_engine + client（含 RN/tsc）全部绿"
+	@echo "✓ backend + ai_engine + client（含 RN/tsc + Jest）全部绿"
 
 ci: test ai-engine-smoke
 	@echo ""
