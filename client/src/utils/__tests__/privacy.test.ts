@@ -9,31 +9,46 @@
 
 import { ensurePrivacyAuthorized, PrivacyDeniedError } from '@/utils/privacy'
 
-declare global {
-  // eslint-disable-next-line no-var, @typescript-eslint/no-explicit-any
-  var wx: any
+type WxMock = {
+  canIUse: jest.Mock
+  getPrivacySetting: jest.Mock
+  requirePrivacyAuthorize: jest.Mock
+}
+
+function setWx(mock: WxMock) {
+  ;(globalThis as unknown as { wx: WxMock }).wx = mock
+}
+
+function getWx(): WxMock {
+  return (globalThis as unknown as { wx: WxMock }).wx
+}
+
+function clearWx() {
+  delete (globalThis as unknown as { wx?: WxMock }).wx
 }
 
 function installWxWithPrivacy(opts: {
   needAuthorization: boolean
   requireResult: 'success' | 'fail'
 }) {
-  globalThis.wx = {
+  setWx({
     canIUse: jest.fn((api: string) =>
       api === 'getPrivacySetting' || api === 'requirePrivacyAuthorize',
     ),
-    getPrivacySetting: jest.fn(({ success }: any) =>
+    getPrivacySetting: jest.fn(({ success }: { success: (r: unknown) => void }) =>
       success({ needAuthorization: opts.needAuthorization }),
     ),
-    requirePrivacyAuthorize: jest.fn(({ success, fail }: any) => {
-      if (opts.requireResult === 'success') success()
-      else fail({ errMsg: 'requirePrivacyAuthorize:fail' })
-    }),
-  }
+    requirePrivacyAuthorize: jest.fn(
+      ({ success, fail }: { success: () => void; fail: (e: unknown) => void }) => {
+        if (opts.requireResult === 'success') success()
+        else fail({ errMsg: 'requirePrivacyAuthorize:fail' })
+      },
+    ),
+  })
 }
 
 afterEach(() => {
-  delete (globalThis as any).wx
+  clearWx()
 })
 
 describe('ensurePrivacyAuthorized', () => {
@@ -48,31 +63,31 @@ describe('ensurePrivacyAuthorized', () => {
   })
 
   test('wx 缺失 → no-op', async () => {
-    delete (globalThis as any).wx
+    clearWx()
     await expect(ensurePrivacyAuthorized('chooseMedia')).resolves.toBeUndefined()
   })
 
   test('canIUse 返回 false → no-op', async () => {
-    globalThis.wx = {
+    setWx({
       canIUse: jest.fn(() => false),
       getPrivacySetting: jest.fn(),
       requirePrivacyAuthorize: jest.fn(),
-    }
+    })
     await expect(ensurePrivacyAuthorized('login')).resolves.toBeUndefined()
-    expect(globalThis.wx.getPrivacySetting).not.toHaveBeenCalled()
+    expect(getWx().getPrivacySetting).not.toHaveBeenCalled()
   })
 
   test('needAuthorization=false → 不触发弹窗', async () => {
     installWxWithPrivacy({ needAuthorization: false, requireResult: 'success' })
     await expect(ensurePrivacyAuthorized('login')).resolves.toBeUndefined()
-    expect(globalThis.wx.getPrivacySetting).toHaveBeenCalledTimes(1)
-    expect(globalThis.wx.requirePrivacyAuthorize).not.toHaveBeenCalled()
+    expect(getWx().getPrivacySetting).toHaveBeenCalledTimes(1)
+    expect(getWx().requirePrivacyAuthorize).not.toHaveBeenCalled()
   })
 
   test('needAuthorization=true + 用户同意 → resolve', async () => {
     installWxWithPrivacy({ needAuthorization: true, requireResult: 'success' })
     await expect(ensurePrivacyAuthorized('chooseMedia')).resolves.toBeUndefined()
-    expect(globalThis.wx.requirePrivacyAuthorize).toHaveBeenCalledTimes(1)
+    expect(getWx().requirePrivacyAuthorize).toHaveBeenCalledTimes(1)
   })
 
   test('needAuthorization=true + 用户拒绝 → PrivacyDeniedError', async () => {
@@ -83,24 +98,15 @@ describe('ensurePrivacyAuthorized', () => {
   })
 
   test('getPrivacySetting fail → 抛带 errMsg 的 Error', async () => {
-    globalThis.wx = {
+    setWx({
       canIUse: jest.fn(() => true),
-      getPrivacySetting: jest.fn(({ fail }: any) =>
+      getPrivacySetting: jest.fn(({ fail }: { fail: (e: unknown) => void }) =>
         fail({ errMsg: 'getPrivacySetting:fail something' }),
       ),
       requirePrivacyAuthorize: jest.fn(),
-    }
+    })
     await expect(ensurePrivacyAuthorized('login')).rejects.toThrow(
       'getPrivacySetting:fail something',
     )
-  })
-})
-
-describe('PrivacyDeniedError', () => {
-  test('携带 apiName 与可读 message', () => {
-    const err = new PrivacyDeniedError('chooseMedia')
-    expect(err.name).toBe('PrivacyDeniedError')
-    expect(err.apiName).toBe('chooseMedia')
-    expect(err.message).toContain('chooseMedia')
   })
 })

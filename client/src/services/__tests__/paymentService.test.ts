@@ -30,11 +30,11 @@ describe('paymentService', () => {
 
   test('createOrder → POST /payments/orders + silent', async () => {
     T.request.mockResolvedValueOnce(ok({ order_id: 'o1', mock_mode: true }))
-    await paymentService.createOrder('month')
+    await paymentService.createOrder('monthly')
     const sent = T.request.mock.calls[0][0]
     expect(sent.method).toBe('POST')
     expect(sent.url).toContain('/payments/orders')
-    expect(sent.data).toEqual({ plan_type: 'month' })
+    expect(sent.data).toEqual({ plan_type: 'monthly' })
     // 业务错误码（40301 等）由 UI 处理，不应该走默认 toast
     // 触发一次 silent 路径
     T.request.mockReset()
@@ -42,7 +42,7 @@ describe('paymentService', () => {
       statusCode: 200,
       data: { code: 40301, message: '套餐已下架' },
     })
-    await expect(paymentService.createOrder('year')).rejects.toThrow()
+    await expect(paymentService.createOrder('yearly')).rejects.toThrow()
     expect(T.showToast).not.toHaveBeenCalled()
   })
 
