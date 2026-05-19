@@ -19,4 +19,8 @@ describe('linesForQualityWarnings', () => {
     const lines = linesForQualityWarnings(['custom_code'])
     expect(lines[0]).toContain('custom_code')
   })
+
+  test('空字符串 code 被跳过', () => {
+    expect(linesForQualityWarnings(['low_light', '', '  '])).toHaveLength(1)
+  })
 })
