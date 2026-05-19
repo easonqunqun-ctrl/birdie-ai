@@ -449,6 +449,37 @@ deploy-check-env:
 deploy-check-cvm-pay:
 	bash infra/deploy/check-cvm-pay-mount.sh "$(or $(ENV_FILE),.env.local)"
 
+# ---------------------------------------------------------------------------
+# 紧急队列 U-1～U-6 巡检脚本（docs/19 §二）
+# 默认走远端 CVM（DEPLOY_HOST=… BIRDIE_CVM_KEY=… 可覆盖）；本机栈用 LOCAL=1。
+# ---------------------------------------------------------------------------
+
+# U-1：Celery beat + expire_stale_pending_orders 派发
+check-cvm-beat:
+	bash infra/deploy/check-celery-beat.sh
+
+# U-2：COS / CDN 真桶冒烟（PUT/HEAD/GET/CORS/DELETE，可选 CDN_HOST）
+# 用法：COS_BUCKET=foo COS_REGION=ap-shanghai COS_SECRET_ID=… COS_SECRET_KEY=… make check-cos-smoke
+check-cos-smoke:
+	bash scripts/cos-smoke.sh
+
+# U-3：从 client/.env.production(.local) + .env.local 汇集 host，
+# 逐个跑 verify-weapp-https-readiness.sh，并输出「服务器域名」登记清单
+check-weapp-domains:
+	bash scripts/check-weapp-domains.sh
+
+# U-4：校验 WECHAT_PAY_NOTIFY_URL / REFUND_NOTIFY_URL 路径与后端路由一致
+# 用法：ENV=.env.local make check-pay-callbacks
+check-pay-callbacks:
+	bash scripts/check-payment-callbacks.sh
+
+# U-1～U-4 一键巡检（发版前 5 分钟）
+check-preflight: check-pay-callbacks
+	@echo ""
+	@echo "→ 继续：DEPLOY_HOST=… make check-cvm-beat"
+	@echo "→ 继续：make check-weapp-domains"
+	@echo "→ 继续：COS_BUCKET=… COS_REGION=… COS_SECRET_ID=… COS_SECRET_KEY=… make check-cos-smoke"
+
 deploy-test:
 	@if [ ! -f infra/test/certs/fullchain.pem ] || [ ! -f infra/test/certs/privkey.pem ]; then \
 		echo "✗ 未找到 infra/test/certs/fullchain.pem / privkey.pem"; \

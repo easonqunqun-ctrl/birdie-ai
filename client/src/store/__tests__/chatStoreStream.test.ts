@@ -35,10 +35,21 @@ import type {
   StreamErrorEvent,
   StreamHandlers,
 } from '@/services/chatService'
+import type { ChatMessageItem } from '@/types/chat'
 
 // ============================================================================
 // helpers
 // ============================================================================
+
+function mockMessagesPage(items: ChatMessageItem[]) {
+  return {
+    items,
+    total: items.length,
+    page: 1,
+    page_size: 20,
+    has_more: false,
+  } as Awaited<ReturnType<typeof chatService.getMessages>>
+}
 
 type Capture = {
   handlers?: StreamHandlers
@@ -376,10 +387,7 @@ describe('chatStore.submitMessage · 传输层错误', () => {
   })
 
   test('aborted=false + history 无 assistant → "网络中断" 兜底', async () => {
-    jest.spyOn(chatService, 'getMessages').mockResolvedValue({
-      items: [],
-      next_page: null,
-    } as Awaited<ReturnType<typeof chatService.getMessages>>)
+    jest.spyOn(chatService, 'getMessages').mockResolvedValue(mockMessagesPage([]))
     const cap = captureStreamMessage()
     const promise = useChatStore.getState().submitMessage('hi')
 
@@ -391,8 +399,8 @@ describe('chatStore.submitMessage · 传输层错误', () => {
   })
 
   test('aborted=false + history 有 assistant → 替换占位 + resolve 不报错', async () => {
-    jest.spyOn(chatService, 'getMessages').mockResolvedValue({
-      items: [
+    jest.spyOn(chatService, 'getMessages').mockResolvedValue(
+      mockMessagesPage([
         {
           id: 'srv-u',
           role: 'user',
@@ -407,9 +415,8 @@ describe('chatStore.submitMessage · 传输层错误', () => {
           created_at: '',
           attachments: [],
         },
-      ],
-      next_page: null,
-    } as Awaited<ReturnType<typeof chatService.getMessages>>)
+      ]),
+    )
     const cap = captureStreamMessage()
     const promise = useChatStore.getState().submitMessage('hi')
 
@@ -429,8 +436,8 @@ describe('chatStore.submitMessage · 传输层错误', () => {
 
 describe('chatStore.submitMessage · onClose 兜底 & cancel', () => {
   test('onClose 在没有任何事件前到达（sawAnyEvent=false）→ recoverFromHistory；拿到 → 静默 resolve', async () => {
-    jest.spyOn(chatService, 'getMessages').mockResolvedValue({
-      items: [
+    jest.spyOn(chatService, 'getMessages').mockResolvedValue(
+      mockMessagesPage([
         {
           id: 'srv-a',
           role: 'assistant',
@@ -438,9 +445,8 @@ describe('chatStore.submitMessage · onClose 兜底 & cancel', () => {
           created_at: '',
           attachments: [],
         },
-      ],
-      next_page: null,
-    } as Awaited<ReturnType<typeof chatService.getMessages>>)
+      ]),
+    )
     const cap = captureStreamMessage()
     const promise = useChatStore.getState().submitMessage('hi')
 

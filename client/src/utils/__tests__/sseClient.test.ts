@@ -36,6 +36,13 @@ function utf8(s: string): Uint8Array {
   return new TextEncoder().encode(s)
 }
 
+function utf8Buffer(s: string): ArrayBuffer {
+  const u8 = utf8(s)
+  const ab = new ArrayBuffer(u8.byteLength)
+  new Uint8Array(ab).set(u8)
+  return ab
+}
+
 /** 用 jsdom 自带 ReadableStream 包出 fetch.Response 风格的对象 */
 function makeResponse(opts: {
   ok: boolean
@@ -131,7 +138,7 @@ describe('streamSSE · 端分叉', () => {
     ;(Taro.request as jest.Mock).mockImplementation((cfg) => {
       // 异步推一帧 chunk + success
       queueMicrotask(() => {
-        onChunkCb?.({ data: utf8('event: hello\ndata: "x"\n\n').buffer })
+        onChunkCb?.({ data: utf8Buffer('event: hello\ndata: "x"\n\n') })
         ;(cfg.success as (r: { statusCode: number; data: string }) => void)({
           statusCode: 200,
           data: '',
@@ -528,7 +535,7 @@ describe('weapp · 关键分支', () => {
       queueMicrotask(() => {
         ;(cfg.success as (r: { statusCode: number; data: ArrayBuffer }) => void)({
           statusCode: 200,
-          data: utf8('event: a\ndata: 1\n\nevent: b\ndata: 2\n\n').buffer,
+          data: utf8Buffer('event: a\ndata: 1\n\nevent: b\ndata: 2\n\n'),
         })
       })
       return task
