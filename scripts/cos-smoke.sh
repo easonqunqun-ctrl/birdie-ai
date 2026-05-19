@@ -18,22 +18,50 @@
 #   KEEP=1                跑完不删除测试对象（人对桶时调试用）
 set -euo pipefail
 
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 red()   { printf '\033[31m%s\033[0m\n' "$*" >&2; }
 green() { printf '\033[32m%s\033[0m\n' "$*"; }
 yellow(){ printf '\033[33m%s\033[0m\n' "$*"; }
 section(){ printf '\n\033[1m=== %s ===\033[0m\n' "$*"; }
 
-require() {
-  if [[ -z "${!1:-}" ]]; then
-    red "✗ 缺少必填环境变量：$1"
-    exit 2
-  fi
+# 从 .env.local / ENV_FILE 自动加载 COS_*（与 check-payment-callbacks 一致）
+load_env_file() {
+  local f="$1"
+  [[ -f "${f}" ]] || return 0
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    line="${line%%#*}"
+    line="$(echo "${line}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    [[ -z "${line}" || "${line}" != *=* ]] && continue
+    local k="${line%%=*}"
+    local v="${line#*=}"
+    v="${v%\"}"; v="${v#\"}"
+    v="${v%\'}"; v="${v#\'}"
+    case "${k}" in
+      COS_BUCKET|COS_REGION|COS_SECRET_ID|COS_SECRET_KEY|COS_ENDPOINT|CDN_HOST)
+        if [[ -z "${!k:-}" ]]; then
+          export "${k}=${v}"
+        fi
+        ;;
+    esac
+  done < "${f}"
 }
 
-require COS_BUCKET
-require COS_REGION
-require COS_SECRET_ID
-require COS_SECRET_KEY
+ENV_FILE="${ENV_FILE:-${ENV:-${REPO_ROOT}/.env.local}}"
+load_env_file "${ENV_FILE}"
+
+require() {
+  if [[ -z "${!1:-}" ]]; then
+    return 1
+  fi
+  return 0
+}
+
+if ! require COS_BUCKET || ! require COS_REGION || ! require COS_SECRET_ID || ! require COS_SECRET_KEY; then
+  yellow "! U-2 跳过：COS 四元组未配置（可在 ${ENV_FILE} 填写 COS_BUCKET/REGION/SECRET_*）"
+  yellow "  契约测试仍由 backend pytest test_storage_presign_contract 覆盖；真桶冒烟待密钥就绪后再跑。"
+  exit 0
+fi
 
 COS_ENDPOINT="${COS_ENDPOINT:-https://cos.${COS_REGION}.myqcloud.com}"
 ORIGIN="${ORIGIN:-https://servicewechat.com}"
