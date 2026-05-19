@@ -38,7 +38,9 @@ jobs:
         working-directory: client
 
       - name: Jest（CI 模式 + 覆盖率）
-        run: pnpm test:ci -- --coverage
+        # test:ci 已包含 --coverage；不要再用 `pnpm test:ci -- --coverage`，
+        # pnpm 透传时 jest 会把它当 positional 测试 pattern → No tests found
+        run: pnpm test:ci
         working-directory: client
 
       - name: Upload coverage（Jest html/lcov）
