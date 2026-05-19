@@ -20,6 +20,7 @@ Thumbs.db
 .env.staging
 .env.prod
 !.env.example
+!.env.test
 
 # 微信支付 apiclient_key.pem 挂载（仅本机，勿提交仓库）
 docker-compose.wechat-pay-key.yml
@@ -27,6 +28,22 @@ backend/.secrets/
 
 # 本机记录 CVM SSH 目标（勿提交）
 infra/deploy/cvm-host.local
+
+# ==================== SSH 私钥兜底（防误提交，工作区根/任意子目录均拦截） ====================
+# 仅文件名层面拦截；如有合法测试 fixture 需例外，请用 ! 显式放行
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+id_ecdsa
+id_ecdsa.pub
+id_dsa
+id_dsa.pub
+id_*_birdie_golf
+id_*_birdie_golf.pub
+*.openssh
+# 不拦截 ai_engine 测试 fixtures 与 W8 nginx 证书目录（已由后续规则单独管理）
+!ai_engine/tests/fixtures/**/*.pem
 
 # ==================== 本地运行时产物 ====================
 .runtime/
