@@ -11,9 +11,10 @@ W9 上线前由设计师替换同名文件即可，不需要改 app.config.ts。
   - training : 实心等腰三角
   - profile  : 实心菱形
 
-颜色：
+颜色（**W8 占位**；W9 正式出图后会被设计师覆盖，本脚本只是临时工具）：
   - 默认态 : #9ca3af（灰）
-  - 激活态 : #0f3d2e（深绿，与品牌主色一致）
+  - 激活态 : #0f3d2e（**早期"深绿"占位；与当前品牌主色 #1a237e 靛蓝存在 drift**——
+                      正式 token 见 `client/src/app.scss`，本占位不要被业务页面当 token 引用）
 
 运行：
   python3 scripts/gen_tab_icons.py

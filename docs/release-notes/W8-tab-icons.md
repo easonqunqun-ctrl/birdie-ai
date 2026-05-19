@@ -8,9 +8,9 @@
 
 - 尺寸：**81×81 px**（微信推荐上限；`cover-view` 下自动缩放）
 - 格式：**PNG RGBA**（透明背景）
-- 颜色：
+- 颜色（**W8 占位现状，与 W9 正式品牌色 `#1a237e` 靛蓝存在 drift，等设计师出图统一替换**）：
   - 默认态 `#9ca3af`（中性灰，与 `color: '#6b7280'` 的文字搭配）
-  - 激活态 `#0f3d2e`（品牌深绿，与 `selectedColor: '#0f3d2e'` 一致）
+  - 激活态 PNG `#0f3d2e`（**早期"深绿"占位**；由 [`scripts/gen_tab_icons.py`](../../scripts/gen_tab_icons.py) `FILL_ACTIVE` 决定，与 `app.config.ts::selectedColor = '#1a237e'` 当前**不一致**——这是已知 drift；正式出图前先用占位，**禁止在此期间作为"激活色 token"被业务页面引用**）
 - 形状（仅用于 4 个 tab 彼此视觉区分，**不代表最终视觉稿**）：
 
 | Tab      | pagePath                | 形状         |

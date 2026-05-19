@@ -7,7 +7,8 @@
  *
  * - 仅渲染一个 fixed 小标签，不拦截点击（pointer-events: none）
  * - 生产环境下直接返回 null，零运行时开销
- * - 颜色：深绿主题的反向色（金色），避免与 navigationBar 冲突
+ * - 颜色：金底 (`var(--color-gold)`) + 深靛文字 (`var(--color-primary-dark)`)，
+ *   既是与主色靛蓝的对比强调，又避免与 navigationBar 冲突
  */
 
 import { FC } from 'react'
