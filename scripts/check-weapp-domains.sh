@@ -145,6 +145,9 @@ run_one() {
     localhost|127.0.0.1|0.0.0.0|*.local|*.internal|*.lan)
       yellow "! 跳过非公网 host：${host}"
       return 0 ;;
+    *.trycloudflare.com|*.ngrok-free.app|*.ngrok.io)
+      yellow "! 跳过本地穿透隧道 host（${host}）；隧道过期后勿登记到公众平台，prod 用 api.* / COS 域"
+      return 0 ;;
   esac
 
   if grep -Fxq "${host}" "${WORKDIR}/checked" 2>/dev/null; then
