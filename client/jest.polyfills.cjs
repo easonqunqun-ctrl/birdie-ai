@@ -15,6 +15,21 @@ if (typeof globalThis.TextDecoder === 'undefined') {
   globalThis.TextDecoder = TextDecoder
 }
 
+// jsdom 没有 web streams API（ReadableStream），但部分模块（如 sseClient.ts
+// 的 H5 路径）会用到。node 18+ 在 'stream/web' 里自带，挂到 globalThis 备用。
+//
+// 注意：测试里如果直接需要 `Response` / `fetch` / `ReadableStream` 等 web 标准
+// API，最稳的做法是给那个文件加 `@jest-environment node`（node 18+ 全局自带
+// undici 实现），见 src/utils/__tests__/sseClient.test.ts。这里只是兜底。
+try {
+  const webStreams = require('stream/web')
+  if (typeof globalThis.ReadableStream === 'undefined' && webStreams.ReadableStream) {
+    globalThis.ReadableStream = webStreams.ReadableStream
+  }
+} catch (_) {
+  // node <18：跳过
+}
+
 // 部分代码读 process.env.TARO_ENV 来做端分叉；测试默认按 weapp 走
 if (!process.env.TARO_ENV) {
   process.env.TARO_ENV = 'weapp'
