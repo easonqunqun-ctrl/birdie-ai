@@ -75,24 +75,30 @@ module.exports = {
      *   sseClient.ts（664 行，对话流式心脏） / track.ts（埋点） /
      *   videoQualityPrecheck.ts / mediaCheck.ts / chatStore 流式编排 / analysisService.uploadToMinio。
      */
-    // 全局基线：取当前实测 - 0.5pt（首批 167 用例覆盖到的水位）。
-    // 后续每加一批测试 → 同步提高这里的阈值，CI 自带防退化护栏。
-    global: { branches: 1, functions: 5, lines: 3, statements: 3 },
+    // 全局基线（防退化）：
+    //   注意 Jest 29+ 的 `global` 阈值**只**针对没被 per-file/glob 阈值显式覆盖的
+    //   剩余文件计算（未测的 mediaCheck / trainingService / drillLibrary 等），
+    //   不是「整体覆盖率」。整体水位由 per-file 锁住（W9 末 ~68% lines）。
+    //   global 这里取剩余文件的合理低基线即可：未测文件 ~10%，加 buffer 设 4%。
+    global: { branches: 3, functions: 4, lines: 4, statements: 4 },
 
     // 已测文件锁水位（数值 = 当前实测 - 1~3%，留出 minor refactor 缓冲）
     './src/services/request.ts':         { branches: 65, functions: 90, lines: 85, statements: 80 },
     './src/services/paymentService.ts':  { branches: 90, functions: 100, lines: 100, statements: 100 },
     './src/services/userService.ts':     { branches: 90, functions: 100, lines: 100, statements: 100 },
     './src/services/chatService.ts':     { branches: 45, functions: 55, lines: 50, statements: 50 },
-    './src/services/analysisService.ts': { branches: 12, functions: 25, lines: 18, statements: 18 },
+    './src/services/analysisService.ts': { branches: 65, functions: 85, lines: 85, statements: 85 },
     './src/utils/storage.ts':            { branches: 95, functions: 90, lines: 95, statements: 95 },
     './src/utils/privacy.ts':            { branches: 88, functions: 85, lines: 95, statements: 95 },
     './src/utils/sdkVersion.ts':         { branches: 85, functions: 100, lines: 95, statements: 95 },
     './src/utils/tabNav.ts':             { branches: 95, functions: 100, lines: 95, statements: 95 },
     './src/utils/wxDomainMessages.ts':   { branches: 90, functions: 100, lines: 95, statements: 95 },
+    './src/utils/sseClient.ts':          { branches: 40, functions: 50, lines: 48, statements: 45 },
+    './src/utils/track.ts':              { branches: 75, functions: 95, lines: 95, statements: 90 },
+    './src/utils/videoQualityPrecheck.ts': { branches: 85, functions: 100, lines: 95, statements: 95 },
     './src/store/analysisStore.ts':      { branches: 95, functions: 100, lines: 95, statements: 95 },
     './src/store/userStore.ts':          { branches: 85, functions: 100, lines: 95, statements: 95 },
-    './src/store/chatStore.ts':          { branches: 30, functions: 38, lines: 42, statements: 40 },
+    './src/store/chatStore.ts':          { branches: 78, functions: 95, lines: 88, statements: 88 },
   },
   clearMocks: true,
   restoreMocks: true,
