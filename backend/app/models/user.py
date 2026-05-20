@@ -61,7 +61,10 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
 
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    # 账号注销（MVP §3.4）：非空且 <= now 时由 `get_user_by_id` 触发硬删
+    # 账号注销（MVP §3.4）：非空且 <= now 时清理；两条触发路径：
+    #   1) 懒清理：`get_user_by_id` 用户下次发请求时触发（`user_service.py`）
+    #   2) Beat 兜底：`xiaoniao.purge_due_account_deletions` 每小时扫一次（`tasks/account_tasks.py`），
+    #      用户即便不再登录也能按 PIPL 承诺如期清掉
     account_deletion_scheduled_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,

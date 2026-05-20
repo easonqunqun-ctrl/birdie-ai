@@ -31,7 +31,11 @@ celery_app = Celery(
     "xiaoniao",
     broker=_with_db(settings.redis_url, 1),
     backend=_with_db(settings.redis_url, 2),
-    include=["app.tasks.analysis_tasks", "app.tasks.payment_tasks"],
+    include=[
+        "app.tasks.analysis_tasks",
+        "app.tasks.payment_tasks",
+        "app.tasks.account_tasks",
+    ],
 )
 
 celery_app.conf.update(
@@ -57,6 +61,11 @@ celery_app.conf.update(
         "membership-pre-expiry-notify": {
             "task": "xiaoniao.membership_pre_expiry_notify",
             "schedule": crontab(hour=0, minute=12),
+        },
+        # MVP §3.4 账号注销冷静期硬删兜底：用户即便不再登录也按时清理（PIPL）
+        "purge-due-account-deletions": {
+            "task": "xiaoniao.purge_due_account_deletions",
+            "schedule": crontab(minute=17),  # 每小时第 17 分
         },
     },
 )
