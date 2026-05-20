@@ -165,6 +165,23 @@ class Settings(BaseSettings):
     # 切换不影响付费会员（会员本来就 -1），只影响免费用户
     QUOTA_MODE: Literal["strict", "unlimited"] = "strict"
 
+    # ==================== Sentry（监控告警；PMF 阶段必装） ====================
+    # DSN 为空 → ``setup_sentry()`` 直接 no-op，本地开发与 CI 不需要配置；
+    # 生产环境填上 Sentry 项目 DSN 后 backend / Celery 异常会自动上报。
+    SENTRY_DSN: str = ""
+    # 性能采样率（0.0~1.0）。MVP 期建议 0.0（不发性能事件）或 0.05（小流量采样）；
+    # 仅捕获异常 + 慢请求即足以排障，全量 trace 会快速吃掉 Sentry 免费额度。
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.0
+    # 仅对未捕获异常生效；profile 同理保留为 0，避免误吞额度。
+    SENTRY_PROFILES_SAMPLE_RATE: float = 0.0
+    # 上报的 environment 标签；不设则用 APP_ENV（local / dev / staging / prod）。
+    SENTRY_ENVIRONMENT: str = ""
+    # 版本号；不设则用 app.__version__；CD 流水线可注入 git short SHA 便于灰度对比。
+    SENTRY_RELEASE: str = ""
+    # 发送 PII（IP / 用户 ID 等）：MVP 期默认 False 走合规保守，
+    # 仅在排障某具体用户时临时打开（仍受 PIPL §47 的最小必要原则约束）。
+    SENTRY_SEND_DEFAULT_PII: bool = False
+
     @property
     def database_url(self) -> str:
         """优先使用显式 DATABASE_URL，否则按字段组装."""

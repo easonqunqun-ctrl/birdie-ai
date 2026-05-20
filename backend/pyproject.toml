@@ -33,6 +33,8 @@ dependencies = [
     "minio>=7.2.0",                # 本地 MinIO
     # 微信 SDK：暂不引入。wechatpy 2.x 仅有 pre-release（2.0.0a26），1.x 系列已不再维护。
     # MVP 阶段直接用 httpx 调 code2session HTTP 接口即可；接真微信前再决定 SDK/自实现方案。
+    # 监控告警：DSN 为空时 ``app/core/sentry.py::setup_sentry`` 直接 no-op，本地/CI 无副作用
+    "sentry-sdk[fastapi,celery]>=2.0.0",
 ]
 
 [project.optional-dependencies]

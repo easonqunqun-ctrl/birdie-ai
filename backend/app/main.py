@@ -12,9 +12,13 @@ from app.core.logging import get_logger, setup_logging
 from app.core.middleware import RequestContextMiddleware, register_exception_handlers
 from app.core.production_guard import startup_production_guards
 from app.core.redis import close_redis, get_redis
+from app.core.sentry import setup_sentry
 from app.core.wechat_deploy_hints import log_wechat_miniprogram_domain_hints
 
 setup_logging()
+# setup_sentry() 在 setup_logging 后调用：DSN 为空时 no-op，否则注册 FastAPI integration。
+# 任何后续 unhandled 异常都会被 Sentry 捕获并上报，前提是 .env.local 配过 SENTRY_DSN。
+setup_sentry()
 logger = get_logger("app")
 
 

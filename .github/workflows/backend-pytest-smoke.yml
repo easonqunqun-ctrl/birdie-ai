@@ -55,4 +55,4 @@ jobs:
         run: |
           uv sync --frozen --group dev
           uv run alembic upgrade head
-          uv run pytest tests/test_parallel_backlog_regressions.py tests/test_health.py tests/test_quota_unlimited.py tests/test_training.py::test_add_to_plan_from_analysis_creates_plan tests/test_training.py::test_add_to_plan_from_analysis_rejects_sample tests/test_payments.py::test_expire_stale_pending_orders_closes_old_pending tests/test_storage_presign_contract.py tests/test_account_deletion.py -q --tb=short
+          uv run pytest tests/test_parallel_backlog_regressions.py tests/test_health.py tests/test_quota_unlimited.py tests/test_training.py::test_add_to_plan_from_analysis_creates_plan tests/test_training.py::test_add_to_plan_from_analysis_rejects_sample tests/test_payments.py::test_expire_stale_pending_orders_closes_old_pending tests/test_storage_presign_contract.py tests/test_account_deletion.py tests/test_sentry.py -q --tb=short
