@@ -14,11 +14,29 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
+import pytest_asyncio
 from httpx import AsyncClient
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app.core.database import AsyncSessionLocal
 from app.models.user import User
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def _isolate_account_deletion_table() -> None:
+    """模块级隔离：每个用例开始前清空所有用户的 ``account_deletion_scheduled_at``。
+
+    动机：beat 任务 ``_purge_due_account_deletions_async`` 会扫全表清理所有到期账号，
+    若上一个测试残留了 ``scheduled_at IS NOT NULL`` 的行，本测试断言精确数量时会被污染。
+    本 fixture 仅清字段（不删用户），开销小；惰性清理用例可在自己 setUp 后再 set 时间。
+    """
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            update(User)
+            .where(User.account_deletion_scheduled_at.isnot(None))
+            .values(account_deletion_scheduled_at=None)
+        )
+        await db.commit()
 
 
 async def _register(client: AsyncClient) -> tuple[str, dict[str, str]]:
@@ -183,7 +201,7 @@ async def test_lazy_purge_skips_when_not_due(client: AsyncClient) -> None:
 async def test_purge_due_account_deletions_async_purges_due_users(
     client: AsyncClient,
 ) -> None:
-    """Beat 任务：到期用户应被硬删；未到期保留。"""
+    """Beat 任务：到期用户应被硬删；未到期保留；其余用户保留。"""
     uid_due, _ = await _register(client)
     uid_future, _ = await _register(client)
     uid_active, _ = await _register(client)  # 未申请注销，应保留
@@ -195,8 +213,10 @@ async def test_purge_due_account_deletions_async_purges_due_users(
 
     from app.tasks.account_tasks import _purge_due_account_deletions_async
 
-    purged = await _purge_due_account_deletions_async()
-    assert purged >= 1  # 容忍其它测试残留同时清掉
+    purged, failed = await _purge_due_account_deletions_async()
+    # autouse fixture 已隔离过 scheduled_at，所以这里能做精确断言
+    assert purged == 1
+    assert failed == 0
 
     async with AsyncSessionLocal() as db:
         assert await db.get(User, uid_due) is None, "到期用户应已被清理"
@@ -208,16 +228,54 @@ async def test_purge_due_account_deletions_async_purges_due_users(
 async def test_purge_due_account_deletions_async_noop_when_nothing_due(
     client: AsyncClient,
 ) -> None:
-    """没有任何到期用户时返回 0；保留新建活跃用户。"""
+    """没有任何到期用户时返回 (0, 0)；保留新建活跃用户。"""
     uid, _ = await _register(client)
 
     from app.tasks.account_tasks import _purge_due_account_deletions_async
 
-    purged = await _purge_due_account_deletions_async()
-    # 测试环境里可能有残留：只要新建用户没被误删即可
-    assert purged >= 0
+    purged, failed = await _purge_due_account_deletions_async()
+    assert purged == 0
+    assert failed == 0
     async with AsyncSessionLocal() as db:
         assert await db.get(User, uid) is not None
+
+
+@pytest.mark.asyncio
+async def test_purge_due_account_deletions_async_counts_failures(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``purge_user_if_due`` 抛异常时 → 计入 ``failed`` 而非 ``purged``，且不打断后续清理。"""
+    uid_bad, _ = await _register(client)
+    uid_ok, _ = await _register(client)
+    await _set_deletion_due_at(uid_bad, datetime.now(UTC) - timedelta(hours=2))
+    await _set_deletion_due_at(uid_ok, datetime.now(UTC) - timedelta(hours=1))
+
+    from app.services import account_deletion_service
+    from app.tasks import account_tasks as mod
+
+    real_purge = account_deletion_service.purge_user_if_due
+
+    async def flaky_purge(db, user):  # type: ignore[no-untyped-def]
+        if user.id == uid_bad:
+            raise RuntimeError("synthetic CASCADE failure")
+        return await real_purge(db, user)
+
+    # account_tasks 里写的是 `account_deletion_service.purge_user_if_due`，patch 源模块即可
+    monkeypatch.setattr(
+        account_deletion_service, "purge_user_if_due", flaky_purge
+    )
+    # account_tasks 模块内通过 `from app.services import account_deletion_service`
+    # 引用，monkeypatch 源模块属性已能生效（不是 `from ... import ...` 的 name binding）
+
+    purged, failed = await mod._purge_due_account_deletions_async()
+    assert purged == 1
+    assert failed == 1
+
+    async with AsyncSessionLocal() as db:
+        # 失败的 user 仍在表里（说明异常被吞掉、scheduled_at 也没改）
+        assert await db.get(User, uid_bad) is not None
+        assert await db.get(User, uid_ok) is None
 
 
 # ============================================================

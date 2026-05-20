@@ -29,12 +29,14 @@ log = structlog.get_logger("tasks.account")
 BATCH_SIZE = 500
 
 
-async def _purge_due_account_deletions_async() -> int:
+async def _purge_due_account_deletions_async() -> tuple[int, int]:
     """扫描所有冷静期已到期的 user 行并逐个调 ``purge_user_if_due``。
 
-    返回成功清理的数量。出现任何单行异常 → 记录日志后跳过该行，不影响后续清理。
+    返回 ``(purged_count, failed_count)``。出现任何单行异常 → 记 ``log.exception``
+    保留 traceback 后跳过该行，不影响后续清理。
     """
     purged = 0
+    failed = 0
     now = datetime.now(UTC)
     async with AsyncSessionLocal() as db:
         stmt = (
@@ -58,19 +60,24 @@ async def _purge_due_account_deletions_async() -> int:
             try:
                 if await account_deletion_service.purge_user_if_due(db, fresh):
                     purged += 1
-            except Exception as exc:  # pragma: no cover - 防御性兜底
+            except Exception:  # pragma: no cover - 防御性兜底
                 await db.rollback()
-                log.warning(
-                    "account_deletion_purge_failed",
-                    user_id=user.id,
-                    error=str(exc),
-                )
-    return purged
+                failed += 1
+                # log.exception 自动带 traceback；structlog 的 KV 仍然附在条目上
+                log.exception("account_deletion_purge_failed", user_id=user.id)
+    return purged, failed
 
 
-@celery_app.task(name="xiaoniao.purge_due_account_deletions")
-def purge_due_account_deletions_task() -> int:
+# 任务时长 override：默认 worker 配置 task_time_limit=300s 是面向单条挥杆分析的；
+# 本任务做 500 条用户 CASCADE 删除（含 swing_analyses / orders 等子表），在生产积压
+# 历史时需要更宽的时长上限。soft=25min 给一次主动 cleanup 机会；hard=30min 上限。
+@celery_app.task(
+    name="xiaoniao.purge_due_account_deletions",
+    time_limit=30 * 60,
+    soft_time_limit=25 * 60,
+)
+def purge_due_account_deletions_task() -> dict[str, int]:
     """Celery 入口；按 ``celery_app.beat_schedule`` 每小时触发。"""
-    n = _run_coro_in_thread(_purge_due_account_deletions_async())
-    log.info("account_deletion_purge_done", count=n)
-    return n
+    purged, failed = _run_coro_in_thread(_purge_due_account_deletions_async())
+    log.info("account_deletion_purge_done", purged=purged, failed=failed)
+    return {"purged": purged, "failed": failed}
