@@ -1,43 +1,48 @@
-# W8-T2 · tabBar 占位图标说明
+# W8 · tabBar 图标说明（**2026-05-20 已升级为正式版**）
 
-> 本文档描述 W8 内测期 tabBar 图标的占位方案与 W9 上线前的替换流程。
+> 本文档原为 W8 内测期 **占位图标** 的方案；2026-05-20 已用代设计师产出的「正式版」覆盖：
+> 形状从「圆 / 方 / 三角 / 菱形」升级为「房屋 / 对话气泡 / 球场旗杆 / 人形」；
+> 激活色从「深绿 #0f3d2e」修正为「靛蓝 #1a237e」，与 `app.config.ts::selectedColor`、
+> `app.scss::--color-primary` 三处同源。
 
-## 现状（W8 内测）
-
-设计师尚未出正式 tabBar 图标，为了让团队白名单真机扫码内测时 tab 栏能正常显示（微信规定 tabBar 图标 **必填**，缺失会整条底栏不渲染），我们用脚本生成了 8 张纯色几何形状 PNG 作为临时占位。
+## 现状（2026-05-20 起）
 
 - 尺寸：**81×81 px**（微信推荐上限；`cover-view` 下自动缩放）
-- 格式：**PNG RGBA**（透明背景）
-- 颜色（**W8 占位现状，与 W9 正式品牌色 `#1a237e` 靛蓝存在 drift，等设计师出图统一替换**）：
-  - 默认态 `#9ca3af`（中性灰，与 `color: '#6b7280'` 的文字搭配）
-  - 激活态 PNG `#0f3d2e`（**早期"深绿"占位**；由 [`scripts/gen_tab_icons.py`](../../scripts/gen_tab_icons.py) `FILL_ACTIVE` 决定，与 `app.config.ts::selectedColor = '#1a237e'` 当前**不一致**——这是已知 drift；正式出图前先用占位，**禁止在此期间作为"激活色 token"被业务页面引用**）
-- 形状（仅用于 4 个 tab 彼此视觉区分，**不代表最终视觉稿**）：
+- 格式：**PNG RGBA**（透明背景）+ **4× 超采样抗锯齿**（边缘平滑过渡）
+- 颜色（**与三处同源**：[`client/src/app.config.ts::tabBar`](../../client/src/app.config.ts) / [`client/src/app.scss::--color-primary`](../../client/src/app.scss) / 本仓库白皮书 §7.2）：
+  - 默认态 `#888888`（与 `tabBar.color` 完全一致）
+  - 激活态 `#1a237e`（与 `tabBar.selectedColor` / `--color-primary` 完全一致）
+- 形状（**正式版语义**）：
 
-| Tab      | pagePath                | 形状         |
-|----------|-------------------------|--------------|
-| 首页     | `pages/index/index`     | 实心圆       |
-| AI 教练  | `pages/coach/index`     | 实心正方形   |
-| 训练     | `pages/training/index`  | 实心等腰三角 |
-| 我的     | `pages/profile/index`   | 实心菱形     |
+| Tab      | pagePath                | 形状（语义）                            |
+|----------|-------------------------|-----------------------------------------|
+| 首页     | `pages/index/index`     | **房屋**（屋顶 + 屋身 + 门洞，"家"）    |
+| AI 教练  | `pages/coach/index`     | **对话气泡**（圆角矩形 + 左下尾巴）     |
+| 训练     | `pages/training/index`  | **球场旗杆 + 三角旗 + 底座**（高尔夫）  |
+| 我的     | `pages/profile/index`   | **人形**（圆头 + 半圆肩膀 + 分离缝）    |
 
 ## 生成脚本
 
-```
+```bash
 python3 scripts/gen_tab_icons.py
 ```
 
-脚本纯标准库（`struct` + `zlib`），不依赖 PIL/Pillow，CI 机器无需额外环境即可跑。输出路径固定为 `client/src/assets/tab/`。
+脚本纯标准库（`struct` + `zlib`），不依赖 PIL/Pillow，CI 机器无需额外环境即可跑。
+**4× 超采样**（每像素 16 子样本）让斜边 / 圆弧抗锯齿，整次生成约 ~0.5 秒。
+输出路径固定为 `client/src/assets/tab/`。
 
 ## 构建流程
 
-- `client/config/index.ts::copy.patterns` 里声明：
+- [`client/config/index.ts::copy.patterns`](../../client/config/index.ts) 里声明：
   ```
   { from: 'src/assets/tab/', to: 'dist/assets/tab/' }
   ```
-  每次 `pnpm build:weapp` / `pnpm build:weapp:test` 构建时，会把 8 张 PNG 同步到 `dist/assets/tab/` 下（与 `miniprogramRoot` 一致）。
-- `client/src/app.config.ts::tabBar.list` 里以相对路径 `assets/tab/home.png` 形式引用，微信运行时即能找到。
+  每次 `pnpm build:weapp` / `pnpm build:weapp:test` 构建时，会把 8 张 PNG 同步到
+  `dist/assets/tab/` 下（与 `miniprogramRoot` 一致）。
+- [`client/src/app.config.ts::tabBar.list`](../../client/src/app.config.ts) 里以相对路径
+  `assets/tab/home.png` 形式引用，微信运行时即能找到。
 
-## 设计师替换流程（W9 上线前）
+## 设计稿替换流程（若后续设计师出更高质感的稿）
 
 **替换方式：直接覆盖同名 PNG 即可，零代码改动。**
 
@@ -49,12 +54,19 @@ python3 scripts/gen_tab_icons.py
    training.png        training_active.png
    profile.png         profile_active.png
    ```
-3. 放到 `client/src/assets/tab/` 覆盖占位版本
-4. 提交前删除 `scripts/gen_tab_icons.py` 也可以（或保留作为后续快速占位工具）
+3. 放到 `client/src/assets/tab/` 覆盖现有版本
+4. 删除 `scripts/gen_tab_icons.py` 也可以（或保留作快速兜底工具）
 5. 重新 `pnpm build:weapp:prod` 出包；用开发者工具预览，确认 4 个 tab 视觉一致
 
 ## 注意事项
 
-- 微信要求 **图标 < 40KB**。占位图平均 < 300 B；设计稿实际约 1~5 KB。若超过 40 KB，tabBar 会不显示图标，需让设计师压缩。
+- 微信要求 **图标 < 40KB**。当前 8 张 PNG 平均 < 500 B（远低于上限）；设计稿实际约 1~5 KB 也安全。
 - `iconPath` 不能是 HTTP URL 或本地绝对路径，**只能**是 `miniprogramRoot` 下的相对路径。
 - 小程序 tabBar **同时只允许 2-5 个 tab**，新增/删除 tab 需一起改 `app.config.ts::tabBar.list` 和 `pages` 数组（tabBar 页必须同时出现在 pages 里）。
+
+## 历史
+
+| 日期 | 版本 | 说明 |
+|------|------|------|
+| 2026-04（W8） | **占位版** | 圆 / 方 / 三角 / 菱形几何图形；激活色 `#0f3d2e` 深绿；为 W8 真机白名单内测让 tab 栏能正常显示 |
+| 2026-05-20 | **正式版（当前）** | 形状升级为房屋 / 气泡 / 旗杆 / 人形；激活色修正为 `#1a237e` 靛蓝（与品牌系统三处同源）；加 4× 超采样抗锯齿 |
