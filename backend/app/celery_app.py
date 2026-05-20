@@ -18,6 +18,12 @@ from celery import Celery
 from celery.schedules import crontab
 
 from app.config import settings
+from app.core.sentry import setup_sentry
+
+# Sentry 初始化要在 ``Celery(...)`` 实例创建之前（CeleryIntegration 通过 signals
+# 织入 ``task_prerun`` / ``task_failure`` 钩子，越早越可靠）。
+# DSN 为空时 no-op；不会影响本地开发 / pytest（不连 broker 的纯测试也安全）。
+setup_sentry()
 
 
 def _with_db(url: str, db: int) -> str:
