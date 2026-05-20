@@ -64,6 +64,19 @@ python3 scripts/gen_tab_icons.py
 - `iconPath` 不能是 HTTP URL 或本地绝对路径，**只能**是 `miniprogramRoot` 下的相对路径。
 - 小程序 tabBar **同时只允许 2-5 个 tab**，新增/删除 tab 需一起改 `app.config.ts::tabBar.list` 和 `pages` 数组（tabBar 页必须同时出现在 pages 里）。
 
+## CI 守护
+
+[`/.github/workflows/tab-icons-guard.yml`](../../.github/workflows/tab-icons-guard.yml) 在改到以下任一文件时自动触发，确保**脚本 / PNG / app.config.ts** 三者永远同步：
+
+- `scripts/gen_tab_icons.py`
+- `client/src/assets/tab/**`
+- `client/src/app.config.ts`
+
+守护断言两条：
+
+1. **PNG bit-exact**：跑一次 \`python3 scripts/gen_tab_icons.py\` → \`git diff --exit-code client/src/assets/tab/\` 必须无差异。改脚本但忘重生成、或手 P 图但脚本未同步，CI 红。
+2. **图标色与文字色同源**：\`app.config.ts::tabBar.color\` 必须 == \`gen_tab_icons.py::FILL_DEFAULT\`；\`tabBar.selectedColor\` 必须 == \`FILL_ACTIVE\`。误改其一就 CI 红。
+
 ## 历史
 
 | 日期 | 版本 | 说明 |
