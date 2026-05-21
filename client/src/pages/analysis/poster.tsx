@@ -55,13 +55,48 @@ function resolveCanvasNode(): Promise<CanvasNodeLike> {
   })
 }
 
+function resolvePosterImageUrl(url: string): string {
+  if (!url) return url
+  const matched = url.match(/^(https?:\/\/[^/]+)\/minio\/[^/]+\/(share\/wxa\/[^?#]+)/i)
+  if (matched) {
+    return `${matched[1]}/v1/assets/image/${matched[2]}`
+  }
+  return url
+}
+
+function readCanvasPixelRatio(): number {
+  try {
+    const info = Taro.getWindowInfo?.()
+    if (info?.pixelRatio) {
+      return Math.max(1, Math.min(3, info.pixelRatio))
+    }
+  } catch {
+    /* noop */
+  }
+  return 2
+}
+
 async function loadImageToCanvas(
   canvas: CanvasNodeLike,
   remoteUrl: string,
 ): Promise<unknown> {
   if (!remoteUrl) return null
+
+  const normalizedUrl = resolvePosterImageUrl(remoteUrl)
+  let localPath = normalizedUrl
+  if (/^https?:\/\//i.test(normalizedUrl)) {
+    try {
+      const dl = await Taro.downloadFile({ url: normalizedUrl })
+      if (dl.statusCode === 200 && dl.tempFilePath) {
+        localPath = dl.tempFilePath
+      }
+    } catch {
+      /* 回退 getImageInfo 直链 */
+    }
+  }
+
   try {
-    const info = await Taro.getImageInfo({ src: remoteUrl })
+    const info = await Taro.getImageInfo({ src: localPath })
     return await new Promise((resolve) => {
       const img = canvas.createImage()
       img.onload = () => resolve(img)
@@ -102,6 +137,7 @@ const PosterPage: FC = () => {
 
   const [report, setReport] = useState<AnalysisReportResponse | null>(null)
   const [wxaCodeUrl, setWxaCodeUrl] = useState<string>('')
+  const [wxaFetchSettled, setWxaFetchSettled] = useState(false)
   const [posterTempPath, setPosterTempPath] = useState<string>('')
   const [drawing, setDrawing] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -130,6 +166,7 @@ const PosterPage: FC = () => {
       .createShareCard(analysisId)
       .then((r) => setWxaCodeUrl(r.wxa_code_url || ''))
       .catch(() => setWxaCodeUrl(''))
+      .finally(() => setWxaFetchSettled(true))
   }, [analysisId, currentUserToken])
 
   const generatePoster = useCallback(async () => {
@@ -144,8 +181,7 @@ const PosterPage: FC = () => {
       }
       const canvas = await resolveCanvasNode()
       const ctx = canvas.getContext('2d')
-      const sysInfo = Taro.getSystemInfoSync()
-      const dpr = Math.max(1, Math.min(3, sysInfo.pixelRatio || 2))
+      const dpr = readCanvasPixelRatio()
       canvas.width = POSTER_WIDTH * dpr
       canvas.height = POSTER_HEIGHT * dpr
       ctx.scale(dpr, dpr)
@@ -198,19 +234,11 @@ const PosterPage: FC = () => {
   }, [analysisId, drawing, report, wxaCodeUrl])
 
   useEffect(() => {
-    if (report) {
-      generatePoster()
-    }
-    // 故意不把 generatePoster 放进依赖 - useCallback 已记忆，多次触发由 drawing guard 兜底
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [report])
-
-  useEffect(() => {
-    if (report && wxaCodeUrl) {
+    if (report && wxaFetchSettled) {
       generatePoster()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wxaCodeUrl])
+  }, [report, wxaFetchSettled, wxaCodeUrl])
 
   const handleSave = async () => {
     if (!posterTempPath || saving) return
@@ -289,7 +317,7 @@ const PosterPage: FC = () => {
       )}
 
       <View className='poster__tip'>
-        <Text>海报内含小程序码，球友扫码后能直接进入「领翼golf」体验 AI 私教。</Text>
+        <Text>保存或转发海报，邀请球友扫码查看完整挥杆报告。</Text>
       </View>
 
       <View className='poster__actions'>

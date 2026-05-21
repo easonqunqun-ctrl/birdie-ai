@@ -14,6 +14,6 @@
 | 7 | COS 桶 · CDN · 跨域与会话密钥（U-2 自检：`COS_BUCKET=… COS_REGION=… COS_SECRET_ID=… COS_SECRET_KEY=… [CDN_HOST=…] make check-cos-smoke`） | □ |
 | 8 | 生产库备份策略 · Redis · 密钥轮换 | □ |
 | 9 | Celery worker + **beat**（含 `expire_stale_pending_orders`） | □ |
-|10 | HTTPS 合法域名（小程序后台 request/upload/socket） | □ |
+|10 | HTTPS 合法域名（小程序后台 request / uploadFile / downloadFile / socket；staging：`https://api.birdieai.cn`） | □ |
 
 **不必提交本勾选表到私有仓库**：可按团队惯例存 Confluence / 飞书；若入库请脱敏（无密钥、无 AppSecret 明文）。

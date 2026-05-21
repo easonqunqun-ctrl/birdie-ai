@@ -23,7 +23,15 @@
 |------|---------------------------|
 | **request 合法域名** | 后端 API 主机，与 **`TARO_APP_API_BASE_URL`** **同源**：例如 **`https://api.xxx.com`** |
 | **uploadFile 合法域名** | **`wx.uploadFile` 直连上传**的目标；本项目 MinIO 经 nginx 反代时，预签名 URL 的 host 应与 **`MINIO_PUBLIC_ENDPOINT`** 一致（常为 API 同主机 **`https://api.xxx.com`**，否则填签名 URL 里的真实 **`https://…`**） |
-| **downloadFile 合法域名** | 视频/图片 **CDN/COS**，可与 API 不同，例如 **`https://video.xxx.com`** |
+| **downloadFile 合法域名** | **`Taro.downloadFile` / 视频播放 / 海报小程序码** 等资源下载 host；MinIO 反代在同主机时与 API **同源**（见下表）；切 COS/CDN 后改为 CDN 主机，例如 **`https://video.xxx.com`** |
+
+**当前 CVM staging / 体验版已登记（2026-05-21，产品确认）**
+
+| 类型 | 已填域名 | 用途说明 |
+|------|----------|----------|
+| **request** | `https://api.birdieai.cn` | API `/v1/*` |
+| **uploadFile** | `https://api.birdieai.cn` | MinIO 预签名直传（`/minio/…`） |
+| **downloadFile** | `https://api.birdieai.cn` | 报告视频/缩略图、**分享海报小程序码**（`share/wxa/*.png` 等，经 `/minio` 反代） |
 
 **说明**：本项目教练页 SSE 走的是 **HTTPS 请求 + 分块**（[`client/src/utils/sseClient.ts`](../../client/src/utils/sseClient.ts)），**不是 WebSocket**，一般**不用**再单独配「socket 合法域名」，只要 **request** 里已有 API 域名即可。
 

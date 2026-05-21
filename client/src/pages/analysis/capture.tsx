@@ -118,15 +118,16 @@ const CaptureAnalysisPage: FC = () => {
 
       <View className='capture__hero'>
         <View className='capture__hero-figure'>
-          <Text className='capture__hero-icon'>🏌️</Text>
           <View className='capture__hero-guide'>
-            <View className='capture__hero-crop' />
-            <Text className='capture__hero-hint'>
-              对准人物
-              {'\n'}
-              居中入画
-            </Text>
+            <View className='capture__hero-crop'>
+              <Text className='capture__hero-icon'>🏌️</Text>
+            </View>
           </View>
+          <Text className='capture__hero-hint'>
+            对准人物
+            {'\n'}
+            居中入画
+          </Text>
         </View>
       </View>
 

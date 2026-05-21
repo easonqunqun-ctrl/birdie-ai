@@ -176,7 +176,7 @@ def to_proxy_image_url(url: str | None) -> str | None:
         in:  http://192.168.130.37:9000/xiaoniao-videos/keyframes/ana_xxx/casting.jpg
         out: http://192.168.130.37:8000/v1/assets/image/keyframes/ana_xxx/casting.jpg
 
-    仅改写白名单前缀（keyframes/, thumbnails/）—— 与 backend `/v1/assets/image`
+    仅改写白名单前缀（keyframes/, thumbnails/, share/wxa/）—— 与 backend `/v1/assets/image`
     路由的安全白名单一致。**视频**（uploads/, skeleton/）改写见 `to_proxy_video_url`。
 
     幂等：如果 URL 已经是代理路径或非 MinIO URL（如 CDN、未来 COS 公开域），
@@ -190,7 +190,11 @@ def to_proxy_image_url(url: str | None) -> str | None:
     if not url.startswith(prefix):
         return url
     key = url[len(prefix):]
-    if not (key.startswith("keyframes/") or key.startswith("thumbnails/")):
+    if not (
+        key.startswith("keyframes/")
+        or key.startswith("thumbnails/")
+        or key.startswith("share/wxa/")
+    ):
         # 视频等其他对象走 to_proxy_video_url（见下文）
         return url
     api_base = settings.effective_api_public_base_url.rstrip("/")

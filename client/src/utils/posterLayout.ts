@@ -15,6 +15,37 @@ import type { AnalysisScoreLevel } from '@/types/analysis'
 export const POSTER_WIDTH = 750
 export const POSTER_HEIGHT = 1334
 
+/** 海报下半区版式（issues 左栏 + 小程序码右栏，避免 Y 坐标叠字） */
+export const POSTER_BOTTOM = {
+  marginX: 60,
+  /** 「主要问题」标题 Y（middle baseline）；须低于雷达图轴标签 */
+  issuesTop: 920,
+  issuesTitleGap: 48,
+  issuesLineH: 46,
+  issuesMax: 3,
+  /** 底部 CTA 区（扫码文案 + 小程序码）起点 */
+  ctaTop: 1102,
+  qrSize: 136,
+  footerY: POSTER_HEIGHT - 22,
+} as const
+
+/** 主要问题列表绘制后的预估底部 Y（供单测断言不与 CTA 重叠） */
+export function posterIssuesBottomY(issueCount: number): number {
+  const n = Math.min(Math.max(issueCount, 0), POSTER_BOTTOM.issuesMax)
+  if (n === 0) return POSTER_BOTTOM.issuesTop + 60
+  return (
+    POSTER_BOTTOM.issuesTop +
+    POSTER_BOTTOM.issuesTitleGap +
+    (n - 1) * POSTER_BOTTOM.issuesLineH +
+    28
+  )
+}
+
+/** CTA 区（含小程序码外框）预估底部 Y */
+export function posterCtaBottomY(): number {
+  return POSTER_BOTTOM.ctaTop + POSTER_BOTTOM.qrSize + 12
+}
+
 /** 与 app.scss 中 brand token 完全对齐；Canvas 用 HEX */
 export const POSTER_COLORS = {
   primary: '#1a237e',

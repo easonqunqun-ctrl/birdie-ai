@@ -66,6 +66,21 @@ def test_to_proxy_video_url_rewrites_when_db_has_internal_minio_host(monkeypatch
     )
 
 
+def test_to_proxy_image_url_rewrites_share_wxa(monkeypatch) -> None:
+    s = Settings(
+        APP_ENV="prod",
+        STORAGE_PROVIDER="minio",
+        MINIO_PUBLIC_ENDPOINT="https://api.example.com/minio",
+        API_PUBLIC_BASE_URL="https://api.example.com",
+        MINIO_BUCKET="bkt",
+    )
+    monkeypatch.setattr(svc, "settings", s)
+    raw = "https://api.example.com/minio/bkt/share/wxa/ana_1.png"
+    assert svc.to_proxy_image_url(raw) == (
+        "https://api.example.com/v1/assets/image/share/wxa/ana_1.png"
+    )
+
+
 def test_parse_video_range_suffix_and_open_ended():
     from app.api.v1 import assets as a
 

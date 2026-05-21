@@ -11,7 +11,7 @@
  */
 
 import { drawPoster, formatScore, POSTER_LEVEL_LABEL, type PosterCanvasContext } from '../posterCanvas'
-import type { PosterInput } from '../posterLayout'
+import { POSTER_BOTTOM, posterCtaBottomY, posterIssuesBottomY, type PosterInput } from '../posterLayout'
 
 type Call = { method: string; args: unknown[] }
 
@@ -107,6 +107,24 @@ describe('drawPoster · 正常场景', () => {
     const ctx = createMockCtx()
     drawPoster(ctx, baseInput, { wxaCodeImage: { fake: true }, thumbnailImage: null })
     expect(ctx.calls.some((c) => c.method === 'drawImage')).toBe(true)
+  })
+
+  it('主要问题区、CTA 区与页脚 Y 坐标不重叠', () => {
+    expect(posterIssuesBottomY(3)).toBeLessThan(POSTER_BOTTOM.ctaTop)
+    expect(posterCtaBottomY()).toBeLessThan(POSTER_BOTTOM.footerY - 28)
+    const ctx = createMockCtx()
+    drawPoster(ctx, baseInput)
+    const promoY = ctx.calls.find(
+      (c) => c.method === 'fillText' && c.args[0] === '扫码看完整报告',
+    )?.args[2] as number | undefined
+    expect(typeof promoY).toBe('number')
+    expect(promoY!).toBeGreaterThanOrEqual(POSTER_BOTTOM.ctaTop)
+  })
+
+  it('小程序码缺失时绘制占位说明而非空白灰块', () => {
+    const ctx = createMockCtx()
+    drawPoster(ctx, baseInput, { wxaCodeImage: null, thumbnailImage: null })
+    expect(fillTexts(ctx.calls)).toEqual(expect.arrayContaining(['扫码体验']))
   })
 })
 

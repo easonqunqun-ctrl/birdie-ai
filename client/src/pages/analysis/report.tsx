@@ -20,9 +20,9 @@
  *     不出现破图
  */
 
-import { FC, useEffect, useMemo, useState } from 'react'
+import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, Video, Image, Button, ScrollView } from '@tarojs/components'
-import Taro, { useRouter, useShareAppMessage } from '@tarojs/taro'
+import Taro, { useReady, useRouter, useShareAppMessage } from '@tarojs/taro'
 import { analysisService } from '@/services/analysisService'
 import { describePageLoadFailure, isRequestError } from '@/services/request'
 import { shareService, type PublicReport } from '@/services/shareService'
@@ -88,6 +88,22 @@ const ReportPage: FC = () => {
   const [syncingPlan, setSyncingPlan] = useState(false)
   /** 服务端生成的小程序码 PNG，用于分享卡片配图（O-11/O-12） */
   const [shareImageUrl, setShareImageUrl] = useState('')
+  /** 正文区 ScrollView 受控 scrollTop；跳帧时滚回顶部以便看到视频 */
+  const [bodyScrollTop, setBodyScrollTop] = useState<number | undefined>(undefined)
+  const [playbackSrc, setPlaybackSrc] = useState('')
+  const videoCtxRef = useRef<Taro.VideoContext | null>(null)
+  const scrollResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useReady(() => {
+    const page = Taro.getCurrentInstance().page ?? undefined
+    videoCtxRef.current = Taro.createVideoContext(VIDEO_ID, page)
+  })
+
+  useEffect(() => {
+    return () => {
+      if (scrollResetTimerRef.current) clearTimeout(scrollResetTimerRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     if (!analysisId) {
@@ -152,6 +168,10 @@ const ReportPage: FC = () => {
     }
   }, [report])
 
+  useEffect(() => {
+    setPlaybackSrc(report?.skeleton_video_url || report?.video_url || '')
+  }, [report?.skeleton_video_url, report?.video_url])
+
   // ---------------- 派生数据 ----------------
   const radarAxes: RadarAxis[] = useMemo(() => {
     if (!report?.phase_scores) return []
@@ -181,25 +201,39 @@ const ReportPage: FC = () => {
   const scoreLevel = report?.score_level ?? scoreLevelFromScore(report?.overall_score)
   const levelMeta = scoreLevel ? SCORE_LEVEL_META[scoreLevel] : null
 
-  const videoSrc = report?.skeleton_video_url || report?.video_url || ''
-
   // ---------------- 事件 ----------------
-  const seekTo = (seconds: number) => {
-    try {
-      const ctx = Taro.createVideoContext(VIDEO_ID)
-      ctx.seek(seconds)
-      ctx.play()
-    } catch {
-      // createVideoContext 在 H5 可能无此方法；静默兜底
+  const seekTo = useCallback((seconds: number) => {
+    // 视频区固定在 ScrollView 外；跳帧时把正文滚回顶部，让用户立刻看到画面变化
+    setBodyScrollTop(0)
+    if (scrollResetTimerRef.current) clearTimeout(scrollResetTimerRef.current)
+    scrollResetTimerRef.current = setTimeout(() => setBodyScrollTop(undefined), 320)
+
+    const runSeek = () => {
+      try {
+        const page = Taro.getCurrentInstance().page ?? undefined
+        const ctx = videoCtxRef.current ?? Taro.createVideoContext(VIDEO_ID, page)
+        videoCtxRef.current = ctx
+        ctx.seek(seconds)
+        ctx.play()
+      } catch {
+        Taro.showToast({ title: '视频跳转失败，请重试', icon: 'none', duration: 1800 })
+      }
     }
-  }
+
+    if (process.env.TARO_ENV === 'weapp') {
+      Taro.nextTick(runSeek)
+    } else {
+      runSeek()
+    }
+  }, [])
 
   // 倍速切换：Taro `<Video>` 的 TS 类型没暴露 playbackRate prop（但小程序底层支持），
   // 改走 VideoContext.playbackRate() 指令，避免用 as any 绕 TS。
   useEffect(() => {
     if (!report) return
     try {
-      Taro.createVideoContext(VIDEO_ID).playbackRate(rate)
+      const page = Taro.getCurrentInstance().page ?? undefined
+      Taro.createVideoContext(VIDEO_ID, page).playbackRate(rate)
     } catch {
       /* noop */
     }
@@ -214,6 +248,12 @@ const ReportPage: FC = () => {
     if (typeof timestamp === 'number') seekTo(timestamp)
   }
 
+  const handleVideoError = () => {
+    const fallback = report?.video_url || ''
+    if (fallback && playbackSrc !== fallback) {
+      setPlaybackSrc(fallback)
+    }
+  }
   const handleGoHome = () => Taro.reLaunch({ url: '/pages/index/index' })
   const handleShootAgain = () => Taro.reLaunch({ url: '/pages/analysis/capture' })
 
@@ -484,7 +524,7 @@ const ReportPage: FC = () => {
   const isSample = analysisId === 'sample'
 
   return (
-    <ScrollView scrollY className='report'>
+    <View className='report'>
       {isSample && (
         <View className='report__sample-banner'>
           <Text className='report__sample-banner-icon'>🎬</Text>
@@ -500,22 +540,22 @@ const ReportPage: FC = () => {
           </Text>
         </View>
       )}
-      {/* ==================== 1. 视频回放 ==================== */}
-      <View className='report__video-wrap'>
+      {/* 视频固定在 ScrollView 外，避免小程序 createVideoContext + 嵌套滚动失效 */}
+      <View id='report-video-anchor' className='report__video-wrap'>
         <View className='report__video-frame'>
           <Video
             id={VIDEO_ID}
             className='report__video'
-            src={videoSrc}
+            src={playbackSrc}
             controls
             showFullscreenBtn
             showCenterPlayBtn
             poster={report.thumbnail_url || undefined}
             initialTime={0}
+            onError={handleVideoError}
           />
         </View>
 
-        {/* 阶段色条（在 video 下方；点击跳帧） */}
         {report.phase_timestamps && (
           <View className='report__phasebar'>
             {PHASE_ORDER.map((key) => {
@@ -543,7 +583,6 @@ const ReportPage: FC = () => {
           </View>
         )}
 
-        {/* 倍速 */}
         <View className='report__rates'>
           <Text className='report__rates-label'>播放速度</Text>
           <View className='report__rates-group'>
@@ -565,7 +604,8 @@ const ReportPage: FC = () => {
         </View>
       </View>
 
-      {/* ==================== 2. 综合评分 ==================== */}
+      <ScrollView scrollY enableFlex scrollTop={bodyScrollTop} className='report__scroll'>
+      <View className='report__scroll-inner'>
       <View
         className='report__score-card'
         style={{
@@ -672,11 +712,7 @@ const ReportPage: FC = () => {
           <Text className='report__empty'>🎉 这一杆没有明显问题，继续保持！</Text>
         ) : (
           sortedIssues.map((iss) => (
-            <View
-              key={iss.type}
-              className='report__issue'
-              onClick={() => tapIssue(iss.key_frame_timestamp)}
-            >
+            <View key={iss.type} className='report__issue'>
               <View className='report__issue-head'>
                 <Text className='report__issue-name'>{iss.name}</Text>
                 <Text className={`report__severity report__severity--${iss.severity}`}>
@@ -692,9 +728,13 @@ const ReportPage: FC = () => {
               )}
               <Text className='report__issue-desc'>{iss.description}</Text>
               {typeof iss.key_frame_timestamp === 'number' && (
-                <Text className='report__issue-ts'>
+                <Button
+                  className='report__issue-ts-btn'
+                  plain
+                  onClick={() => tapIssue(iss.key_frame_timestamp)}
+                >
                   👆 点击跳转到 {iss.key_frame_timestamp.toFixed(1)}s 关键帧
-                </Text>
+                </Button>
               )}
             </View>
           ))
@@ -795,7 +835,9 @@ const ReportPage: FC = () => {
           返回首页
         </Button>
       </View>
-    </ScrollView>
+      </View>
+      </ScrollView>
+    </View>
   )
 }
 

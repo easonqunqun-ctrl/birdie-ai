@@ -12,7 +12,7 @@
 |----|------|------|------|
 | **U-1** | Celery beat + `expire_stale_pending_orders` | ✅ **通过** | beat 在线；近 30min 捕获 2 条派发；`PAYMENT_PENDING_ORDER_EXPIRE_MINUTES=120` |
 | **U-2** | 对象存储真桶 | ✅ **通过（MinIO）** | staging `STORAGE_PROVIDER=minio`；presign + bucket 列表 OK；COS 四元组未配 → 脚本跳过（生产切 COS 时再跑 `make check-cos-smoke`） |
-| **U-3** | HTTPS + 小程序合法域名 | ✅ **通过** | LE 证书至 2026-08-11；DNS → `1.13.198.172`；`/v1/health` 200；登记清单：`https://api.birdieai.cn`（request + upload） |
+| **U-3** | HTTPS + 小程序合法域名 | ✅ **通过** | LE 证书至 2026-08-11；DNS → `1.13.198.172`；`/v1/health` 200；登记清单：`https://api.birdieai.cn`（**request + uploadFile + downloadFile**，2026-05-21 产品确认；详见 [go-live-weapp-fool-checklist §1](./go-live-weapp-fool-checklist.md)） |
 | **U-4** | 支付/退款回调路径 | ✅ **通过** | notify 路径正确；refund 已由 NOTIFY 推导，**已显式写入 `.env.local`**；live POST 均 200（空 body 返回验签失败属预期） |
 | **U-5** | 部署形态 / Git 对齐 | ⚠️ **部分通过** | Git 已 `ff-only` 至 `cfa4f47`；运行中 backend/worker/beat 仍为 **docker commit 热更镜像**（sha256 无 tag）；关键热修代码已核验在容器内 |
 
@@ -80,7 +80,7 @@ docker exec xiaoniao-backend test -r /secrets/apiclient_key.pem && echo pem_ok
 |----|------|--------|
 | **U-5 正式 rebuild** | 将 sha256 热更镜像替换为 `docker compose up -d --build` 产物；CVM 历史有 buildx `futex_wait` 挂起风险，建议低峰 + 监控 | P1 运维 |
 | **U-2 COS 真桶** | 生产切 `STORAGE_PROVIDER=cos` 后跑 `COS_BUCKET=… make check-cos-smoke` | 生产前 |
-| **微信公众平台域名** | 脚本已输出登记清单；须人工登录 mp 保存 `https://api.birdieai.cn` | 发版前人工 |
+| **微信公众平台域名** | 已登记 `https://api.birdieai.cn`（request + uploadFile + **downloadFile**，2026-05-21 产品确认） | ✅ 已配置 |
 | **par-C2/C3 产品签字** | 会员过期 / 示例视频验收纪要 Draft 待复核 | Batch-F |
 
 ---

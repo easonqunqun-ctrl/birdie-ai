@@ -4,7 +4,21 @@
   max-width: 100%;
   overflow-x: hidden;
   min-height: 100vh;
-  padding: 24rpx 32rpx 80rpx;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 24rpx 32rpx 0;
+
+  &__scroll {
+    flex: 1;
+    height: 0;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  &__scroll-inner {
+    padding-bottom: 80rpx;
+  }
 
   /* ================= 通用状态 ================= */
   &--loading,
@@ -355,6 +369,7 @@
     margin-top: 32rpx;
     width: 100%;
     box-sizing: border-box;
+    align-items: stretch;
   }
 
   &__phase-item {
@@ -365,6 +380,7 @@
     flex: 1 1 calc(50% - 6rpx);
     max-width: calc(50% - 6rpx);
     min-width: 0;
+    min-height: 96rpx;
     padding: 16rpx 20rpx;
     background: var(--color-bg-subtle);
     border-radius: var(--radius-sm);
@@ -470,11 +486,22 @@
     line-height: 1.6;
   }
 
-  &__issue-ts {
-    display: block;
+  &__issue-ts-btn {
     margin-top: 12rpx;
-    font-size: 24rpx;
-    color: var(--color-primary);
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    line-height: 1.5 !important;
+    text-align: left !important;
+    font-size: 24rpx !important;
+    color: var(--color-primary) !important;
+    font-weight: 500 !important;
+    background: transparent !important;
+    border: none !important;
+
+    &::after {
+      border: none !important;
+    }
   }
 
   /* ================= 5. 训练建议 ================= */

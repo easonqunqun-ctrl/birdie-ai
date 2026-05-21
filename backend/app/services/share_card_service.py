@@ -8,7 +8,7 @@ from app.core.exceptions import BadRequestError
 from app.integrations.minio import MinioStorageClient
 from app.integrations.wechat_wxacode import fetch_wxacode_unlimited_png
 from app.models.user import User
-from app.services.analysis_service import _load_owned
+from app.services.analysis_service import _load_owned, to_proxy_image_url
 
 
 async def ensure_share_wxa_code_url(
@@ -24,7 +24,7 @@ async def ensure_share_wxa_code_url(
     await _load_owned(db, analysis_id, user, load_children=False)
     key = f"share/wxa/{analysis_id}.png"
     if storage.head_object(key):
-        return storage.get_object_url(key)
+        return to_proxy_image_url(storage.get_object_url(key)) or storage.get_object_url(key)
 
     scene = f"i={analysis_id}"
     if len(scene) > 32:
@@ -36,4 +36,4 @@ async def ensure_share_wxa_code_url(
         width=430,
     )
     storage.put_object_bytes(key=key, data=png, content_type="image/png")
-    return storage.get_object_url(key)
+    return to_proxy_image_url(storage.get_object_url(key)) or storage.get_object_url(key)

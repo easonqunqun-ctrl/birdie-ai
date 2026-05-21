@@ -19,8 +19,8 @@ router = APIRouter()
 
 logger = logging.getLogger(__name__)
 
-# 仅这两个前缀允许代理图片：与 ai-engine 写入 MinIO 时的 key 命名约定一致
-ALLOWED_IMAGE_PREFIXES: tuple[str, ...] = ("keyframes/", "thumbnails/")
+# 仅这三个前缀允许代理图片：与写入 MinIO 时的 key 命名约定一致
+ALLOWED_IMAGE_PREFIXES: tuple[str, ...] = ("keyframes/", "thumbnails/", "share/wxa/")
 
 ALLOWED_VIDEO_PREFIXES: tuple[str, ...] = ("uploads/", "skeleton/")
 

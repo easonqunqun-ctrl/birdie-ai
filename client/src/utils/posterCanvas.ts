@@ -15,6 +15,7 @@
 
 import type { AnalysisScoreLevel } from '@/types/analysis'
 import {
+  POSTER_BOTTOM,
   POSTER_COLORS,
   POSTER_HEIGHT,
   POSTER_WIDTH,
@@ -242,8 +243,9 @@ function drawRadar(
   accent: string,
 ): void {
   const centerX = POSTER_WIDTH / 2
-  const centerY = 720
-  const radius = 200
+  const centerY = 660
+  const radius = 175
+  const labelRadius = radius + 20
   const axisCount = phaseScores.length || 6
 
   ctx.lineWidth = 1
@@ -287,9 +289,9 @@ function drawRadar(
   }
 
   ctx.fillStyle = POSTER_COLORS.ink
-  ctx.font = '500 22px sans-serif'
+  ctx.font = '500 20px sans-serif'
   for (let i = 0; i < phaseLabels.length; i += 1) {
-    const anchor = axisLabelAnchor(centerX, centerY, radius + 28, i, phaseLabels.length)
+    const anchor = axisLabelAnchor(centerX, centerY, labelRadius, i, phaseLabels.length)
     ctx.textAlign = anchor.align
     ctx.textBaseline = anchor.baseline
     ctx.fillText(truncateLabel(phaseLabels[i] ?? '', 4), anchor.x, anchor.y)
@@ -301,37 +303,35 @@ function drawIssues(
   issues: string[],
   accent: string,
 ): number {
-  const top = 1000
-  const left = 60
-  const right = POSTER_WIDTH - 60
-  const lineH = 56
-  const maxLines = 3
+  const { marginX, issuesTop, issuesTitleGap, issuesLineH, issuesMax, qrSize } = POSTER_BOTTOM
+  const qrX = POSTER_WIDTH - marginX - qrSize
+  const textMaxWidth = qrX - marginX - 24
 
   ctx.fillStyle = POSTER_COLORS.ink
-  ctx.font = '700 30px sans-serif'
+  ctx.font = '700 36px sans-serif'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'middle'
-  ctx.fillText('主要问题', left, top)
+  ctx.fillText('主要问题', marginX, issuesTop)
 
-  const items = issues.slice(0, maxLines)
+  const items = issues.slice(0, issuesMax)
   for (let i = 0; i < items.length; i += 1) {
-    const y = top + 50 + i * lineH
+    const y = issuesTop + issuesTitleGap + i * issuesLineH
 
     ctx.fillStyle = accent
-    ctx.fillRect(left, y - 4, 8, 8)
+    ctx.fillRect(marginX, y - 5, 10, 10)
 
     ctx.fillStyle = POSTER_COLORS.inkSoft
-    ctx.font = '500 26px sans-serif'
+    ctx.font = '500 32px sans-serif'
     ctx.textAlign = 'left'
     ctx.textBaseline = 'middle'
-    const maxChars = 18
-    ctx.fillText(truncateLabel(items[i], maxChars), left + 28, y, right - left - 28)
+    const maxChars = 12
+    ctx.fillText(truncateLabel(items[i], maxChars), marginX + 32, y, textMaxWidth)
   }
 
   if (items.length === 0) {
     ctx.fillStyle = POSTER_COLORS.inkMuted
-    ctx.font = '500 26px sans-serif'
-    ctx.fillText('暂未识别到突出问题，继续保持！', left, top + 60)
+    ctx.font = '500 30px sans-serif'
+    ctx.fillText('暂未识别到突出问题，继续保持！', marginX, issuesTop + 64, textMaxWidth)
   }
 
   return items.length
@@ -340,44 +340,55 @@ function drawIssues(
 function drawWxaCode(
   ctx: PosterCanvasContext,
   wxaImage: unknown | null,
-  accent: string,
+  _accent: string,
 ): void {
-  const size = 200
-  const x = POSTER_WIDTH - size - 60
-  const y = POSTER_HEIGHT - size - 120
+  const { marginX, ctaTop, qrSize } = POSTER_BOTTOM
+  const x = POSTER_WIDTH - marginX - qrSize
+  const y = ctaTop
+  const dividerY = ctaTop - 14
+
+  ctx.strokeStyle = POSTER_COLORS.border
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(marginX, dividerY)
+  ctx.lineTo(POSTER_WIDTH - marginX, dividerY)
+  ctx.stroke()
 
   ctx.fillStyle = POSTER_COLORS.white
-  ctx.fillRect(x - 10, y - 10, size + 20, size + 20)
+  ctx.fillRect(x - 8, y - 8, qrSize + 16, qrSize + 16)
   ctx.lineWidth = 2
   ctx.strokeStyle = POSTER_COLORS.border
-  ctx.strokeRect?.(x - 10, y - 10, size + 20, size + 20)
+  ctx.strokeRect?.(x - 8, y - 8, qrSize + 16, qrSize + 16)
 
   if (wxaImage) {
-    ctx.drawImage(wxaImage, 0, 0, size, size, x, y, size, size)
+    ctx.drawImage(wxaImage, 0, 0, qrSize, qrSize, x, y, qrSize, qrSize)
   } else {
-    ctx.fillStyle = POSTER_COLORS.border
-    ctx.fillRect(x, y, size, size)
+    ctx.fillStyle = '#f3f4f6'
+    ctx.fillRect(x, y, qrSize, qrSize)
+    ctx.fillStyle = POSTER_COLORS.inkMuted
+    ctx.font = '500 26px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('扫码体验', x + qrSize / 2, y + qrSize / 2)
   }
 
-  ctx.fillStyle = POSTER_COLORS.ink
-  ctx.font = '600 28px sans-serif'
+  const textMidY = y + qrSize / 2
   ctx.textAlign = 'left'
-  ctx.textBaseline = 'top'
-  ctx.fillText('扫码看完整报告', 60, y + 20)
+  ctx.textBaseline = 'middle'
+
+  ctx.fillStyle = POSTER_COLORS.ink
+  ctx.font = '600 32px sans-serif'
+  ctx.fillText('扫码看完整报告', marginX, textMidY - 22)
 
   ctx.fillStyle = POSTER_COLORS.inkSoft
-  ctx.font = '400 24px sans-serif'
-  ctx.fillText('AI 私教 · 拍一段挥杆视频', 60, y + 70)
-
-  ctx.fillStyle = accent
-  ctx.font = '500 22px sans-serif'
-  ctx.fillText('打开「领翼golf」立刻挑战', 60, y + 120)
+  ctx.font = '400 28px sans-serif'
+  ctx.fillText('AI 私教 · 拍一段挥杆视频', marginX, textMidY + 22)
 }
 
 function drawFooter(ctx: PosterCanvasContext): void {
   ctx.fillStyle = POSTER_COLORS.inkMuted
-  ctx.font = '400 22px sans-serif'
+  ctx.font = '400 24px sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'bottom'
-  ctx.fillText('AI 仅供训练参考 · 实战以教练指导为准', POSTER_WIDTH / 2, POSTER_HEIGHT - 40)
+  ctx.fillText('AI 仅供训练参考 · 实战以教练指导为准', POSTER_WIDTH / 2, POSTER_BOTTOM.footerY)
 }

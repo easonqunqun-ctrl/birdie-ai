@@ -220,7 +220,7 @@ USE_DOCKER_COMPOSE_CVM_LAYER=1 bash infra/deploy/cvm-rebuild-backend.sh
 make client-build-weapp-prod
 ```
 
-公众平台 **服务器域名**：`request`（及 uploads）填 **`https://api.birdieai.cn`** 等真实主机，参见 `docs/release-notes/go-live-weapp-fool-checklist.md`。
+公众平台 **服务器域名**：`request` / `uploadFile` / **`downloadFile`** 均填 **`https://api.birdieai.cn`**（MinIO 经 nginx `/minio` 反代，与 API 同主机；分享海报小程序码亦走该 host），参见 [`docs/release-notes/go-live-weapp-fool-checklist.md`](./release-notes/go-live-weapp-fool-checklist.md)。
 
 ---
 
