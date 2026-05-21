@@ -12,11 +12,11 @@
 | **纪要 ID** | `par-C3` · `sample-video-2026-05-21` |
 | **关联 PLAN-ID** | `Q-C1` / `par-C3` / `DOC-04`（汇总） |
 | **关联文档** | [`docs/01 §3.6`](../01-MVP功能需求规格说明书.md#36-示例视频体验入口) · [`docs/02 §3.7 GET /v1/analyses/sample`](../02-API接口设计文档.md) · [`docs/19 §6.3 DOC-04`](../19-产品开发迭代计划-当前队列.md#63-主表plan-id) |
-| **代码版本** | `main @ HEAD`（W3 上线后 W7 收尾，2026-05-21 文档对齐） |
+| **代码版本** | `main @ ca168ab` |
 | **验收范围** | `docs/01 §3.6` 的 6 条产品要求 + 隐含项（不入库、不计配额、`id='sample'` 固定） |
-| **验收日期** | 2026-05-21 |
+| **验收日期** | 2026-05-21（初稿）· 2026-05-21（Batch-F 工程复核） |
 | **起草** | 工程侧自动化纪要 |
-| **复核（待签）** | 产品 ▢　工程 ▢ |
+| **复核** | 产品 ▢（发版前确认）　工程 ☑（自动化验收 2026-05-21） |
 
 ---
 
@@ -58,12 +58,12 @@
 
 | 测试文件 | 覆盖点 |
 |---------|--------|
-| `backend/tests/test_analyses_sample.py`（如有） | `GET /v1/analyses/sample` 不需登录、`id='sample'`、字段完整 |
-| `backend/tests/test_analyses_lifecycle.py::test_list_analyses_*` | `is_sample=False` 过滤生效（用户列表不会回到 sample 数据） |
+| `backend/tests/test_analyses_sample.py` | `GET /v1/analyses/sample` 不需登录、`id='sample'`、字段完整 |
+| `backend/tests/test_analyses_lifecycle.py` | `is_sample=False` 过滤生效（用户列表不会回到 sample 数据） |
 
 ### 3.2 集成证据
 
-- CVM `curl https://api.birdieai.cn/v1/analyses/sample` 可直拉示例（**匿名**）；
+- CVM staging（2026-05-21 复核）：`curl https://api.birdieai.cn/v1/analyses/sample` → `id=sample`，`overall_score=78`，`issues` 非空（**匿名**）；
 - 客户端首页 / 引导页 / 拍摄页底部「先看示例」按钮可观察 `id=sample` 报告页正确渲染；
 - 任意新登录用户 `GET /v1/analyses?page=1` 返回 `total=0`，**示例不计入**用户历史；
 - 配额接口 `GET /v1/users/me/analysis-quota` 在示例观看前后保持不变。
@@ -79,5 +79,5 @@
 
 | 角色 | 姓名 | 日期 | 备注 |
 |------|------|------|------|
-| 产品 |  |  |  |
-| 工程 |  |  |  |
+| 产品 | （待填） |  | 发版前确认首页/引导/拍摄页示例入口与 CTA |
+| 工程 | 自动化验收 | 2026-05-21 | pytest + staging curl + 列表/配额隔离代码审阅 |

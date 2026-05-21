@@ -67,8 +67,8 @@
 | 序号 | 项 | 说明 / 对齐 |
 |------|-----|-------------|
 | C1 | **账号注销**全流程验收：`01` §3.4 四项（冷静期 / 到期清理 / 再进为新用户） | **Open**：源码已 `[x]`；验收纪要 → [`docs/19` **DOC-04**](../19-产品开发迭代计划-当前队列.md#65b-文档勾选同步代码已交付docs-01-仍为--doc-) |
-| C2 | **会员过期与降级**：`01` §3.5 与代码路径（惰性校验等）逐项对照 | **Open**：同上 **DOC-04**（到期提醒 **已过期** 子集已由 **DOC-02** 回填 `[~]`） |
-| C3 | **示例视频 §3.6** 与 M2 「示例」已勾选条目 **文档对齐** | **Open**：同上 **DOC-04**；功能隐藏仍 **O-03** |
+| C2 | **会员过期与降级**：`01` §3.5 与代码路径（惰性校验等）逐项对照 | **Done-Engineering**：[`par-C2`](./par-C2-membership-expiry-acceptance-memo.md) 工程 ☑ 2026-05-21；产品待签 |
+| C3 | **示例视频 §3.6** 与 M2 「示例」已勾选条目 **文档对齐** | **Done-Engineering**：[`par-C3`](./par-C3-sample-video-acceptance-memo.md) 工程 ☑ 2026-05-21；产品待签 |
 
 **C1–C3 · 对照登记（源码入口，不作为替代验收）**：账号注销 **`client/src/pages/profile/account-deletion.tsx`** · **`backend/app/services/account_deletion_service.py`**；会员过期惰性降级 **`payment_service.ensure_membership_valid`**（读用户时触发）；示例报告 **`id=sample`** 及列表过滤见 **`analysis_service` / `training` API**。
 
