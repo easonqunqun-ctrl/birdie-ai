@@ -165,14 +165,13 @@ Authorization: Bearer <jwt_token>
 
 | 项目 | 说明 |
 |------|------|
-| 触发时机 | Celery Beat 任务 `xiaoniao.membership_pre_expiry_notify`（默认每日 **00:12** 上海时区日历）；当会员 `membership_expires_at` 与当日相差 **`MEMBERSHIP_PRE_EXPIRY_NOTIFY_DAYS`** 个自然日（默认 **3**）时下发 |
-| 前置 | 用户于会员页已对 `wx.requestSubscribeMessage` **第三项**模板授权（`TARO_APP_SUBSCRIBE_TMPL_IDS` 逗号分隔第 3 个 ID） |
-| 配置 | `WECHAT_SUBSCRIBE_MESSAGE_ENABLED`、`WECHAT_SUBSCRIBE_MEMBERSHIP_PRE_EXPIRE_TEMPLATE_ID`、`MEMBERSHIP_PRE_EXPIRY_NOTIFY_DAYS`（`≤0` 关闭任务）；部署栈须常驻 **celery beat**（与 `expire_stale_pending_orders` 同 `app/celery_app.py::beat_schedule`） |
-| 去重 | Redis key `sub:preexpiry:{user_id}:{expire_date}`，45 天 TTL，避免重复推送 |
+| 触发时机 | Celery Beat 任务 `xiaoniao.membership_pre_expiry_notify`（默认每日 **00:12** 上海时区日历）；当会员 `membership_expires_at` 与当日相差日历天数 ∈ **`MEMBERSHIP_PRE_EXPIRY_NOTIFY_DAYS`** 时下发（默认 **"3"**；多档 **"7,3,1"**） |
+| 前置 | 用户于会员页已对 `wx.requestSubscribeMessage` **第三项**模板授权（`TARO_APP_SUBSCRIBE_TMPL_IDS` 逗号分隔第 3 个 ID）。多档 = 用户须分别授权多次才有多条配额 |
+| 配置 | `WECHAT_SUBSCRIBE_MESSAGE_ENABLED`、`WECHAT_SUBSCRIBE_MEMBERSHIP_PRE_EXPIRE_TEMPLATE_ID`、`MEMBERSHIP_PRE_EXPIRY_NOTIFY_DAYS`（**csv** 列表；空 / "0" 关闭任务，最多 8 档防滥用）；部署栈须常驻 **celery beat**（与 `expire_stale_pending_orders` 同 `app/celery_app.py::beat_schedule`） |
+| 去重 | Redis key `sub:preexpiry:{user_id}:{expire_date}:{days}`，45 天 TTL；每档独立去重 |
 | 模板字段约定 | 与 §1.4.2 相同布局：**thing1**（「会员权益即将到期」）、**time2**（到期时间东八区）、**thing3**（行动短语） |
-| 失败策略 | 单用户失败仅 `pre_expiry_notify_user_failed` 日志，不阻断批任务 |
-
-> **产品余量**：`docs/01` §3.5 所述 **7 天 / 1 天** 多档提醒尚未实现；当前为可配置的 **单档 N 天**（默认 3）。
+| 失败策略 | 单用户失败仅 `pre_expiry_notify_user_failed`（含 `days`）日志，不阻断批任务 |
+| 配套：站内弹窗 | 客户端进入首页 / 会员中心若 `membership_expires_at - 今日 ∈ [1, 7]`，弹一次 modal 引导续费；用 `Storage` 按日期键去重；**不依赖订阅消息授权**，作为多档提醒的兜底通道 |
 
 ### 1.5 限流策略
 

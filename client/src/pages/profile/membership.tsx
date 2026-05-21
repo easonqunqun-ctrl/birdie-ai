@@ -6,6 +6,7 @@ import { describeIntermittentRequestFailure, describePageLoadFailure, isRequestE
 import { useUserStore } from '@/store/userStore'
 import { PAYMENT_ENABLED_FLAG, PAYMENT_MOCK_FLAG } from '@/constants/flags'
 import { SUBSCRIBE_TPL_MEMBERSHIP_EXPIRE, SUBSCRIBE_TPL_MEMBERSHIP_PRE_EXPIRE } from '@/constants/subscribeTemplates'
+import { useMembershipExpiringSoonModal } from '@/hooks/useMembershipExpiringSoonModal'
 import type { MembershipInfo } from '@/types/payment'
 import { track } from '@/utils/track'
 import type { Order, PlanOption, PlanType } from '@/types/payment'
@@ -47,6 +48,9 @@ const MembershipPage: FC = () => {
     fetchMe().catch(() => undefined)
     void refreshMembershipInfo()
   })
+
+  // 站内弹窗：剩余 [1, 7] 天且当日未弹过时引导续费（不依赖订阅消息授权，docs/02 §1.4.3 配套）
+  useMembershipExpiringSoonModal(memInfo)
 
   async function load() {
     setLoading(true)

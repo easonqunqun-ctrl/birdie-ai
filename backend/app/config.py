@@ -83,10 +83,12 @@ class Settings(BaseSettings):
     WECHAT_SUBSCRIBE_MINIPROGRAM_STATE: Literal["developer", "trial", "formal"] = "developer"
     # 须与客户端 TARO_APP_SUBSCRIBE_TMPL_IDS 第二项一致（会员到期提醒）
     WECHAT_SUBSCRIBE_MEMBERSHIP_EXPIRE_TEMPLATE_ID: str = ""
-    # 第三项：会员「即将到期」（日历剩余天数 = MEMBERSHIP_PRE_EXPIRY_NOTIFY_DAYS）预提醒
+    # 第三项：会员「即将到期」（日历剩余天数 ∈ MEMBERSHIP_PRE_EXPIRY_NOTIFY_DAYS）预提醒
     WECHAT_SUBSCRIBE_MEMBERSHIP_PRE_EXPIRE_TEMPLATE_ID: str = ""
-    # 在「到期日当天之前」的第 N 个日历日（按 Asia/Shanghai）尝试发第三模板（每日 Celery 扫一次）
-    MEMBERSHIP_PRE_EXPIRY_NOTIFY_DAYS: int = 3
+    # 「到期日当天之前」的第 N 个日历日（按 Asia/Shanghai）尝试发第三模板，每日 Celery 扫一次。
+    # 历史单档：``"3"``；多档（产品 §3.5 多档提醒）：``"7,3,1"``。空串 / `"0"` 关闭任务。
+    # 注意：每档独立 Redis 去重（key 含 days），同一用户 7/3/1 三档下用户须分别授权三次才有 3 次发送配额。
+    MEMBERSHIP_PRE_EXPIRY_NOTIFY_DAYS: str = "3"
 
     # ==================== 微信开放平台（App） ====================
     WECHAT_OPEN_APPID: str = ""

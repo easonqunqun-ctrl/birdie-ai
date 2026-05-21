@@ -35,10 +35,37 @@ def expire_stale_pending_orders_task() -> int:
     return n
 
 
+def _parse_notify_days(raw: str | int | None) -> list[int]:
+    """``"7,3,1"`` / ``"3"`` / ``3`` → 去重升序 ``[1, 3, 7]``；``""`` / ``"0"`` / ``None`` → ``[]``。
+
+    非整数 token 直接跳过；负数 / 零跳过；最多保留 8 档防滥用。
+    """
+    if raw is None:
+        return []
+    if isinstance(raw, int):
+        return [raw] if raw > 0 else []
+    out: set[int] = set()
+    for token in str(raw).split(","):
+        t = token.strip()
+        if not t:
+            continue
+        try:
+            n = int(t)
+        except ValueError:
+            continue
+        if n > 0:
+            out.add(n)
+    return sorted(out)[:8]
+
+
 async def _membership_pre_expiry_notify_async() -> int:
-    """会员「到期前 N 天」一次性订阅消息（上海日历与 `membership_expires_at` 对齐）。"""
-    n_days = int(settings.MEMBERSHIP_PRE_EXPIRY_NOTIFY_DAYS or 0)
-    if n_days <= 0:
+    """会员「到期前 N 天」一次性订阅消息（上海日历与 ``membership_expires_at`` 对齐）。
+
+    支持 ``MEMBERSHIP_PRE_EXPIRY_NOTIFY_DAYS`` 为 csv 多档（产品 §3.5）；每档独立 Redis 去重，
+    Redis key 形如 ``sub:preexpiry:{user_id}:{expire_date}:{days}`` —— 用户授权 N 次 = N 档配额。
+    """
+    days_list = _parse_notify_days(settings.MEMBERSHIP_PRE_EXPIRY_NOTIFY_DAYS)
+    if not days_list:
         return 0
     if not settings.WECHAT_SUBSCRIBE_MESSAGE_ENABLED:
         return 0
@@ -48,6 +75,7 @@ async def _membership_pre_expiry_notify_async() -> int:
     cn = ZoneInfo("Asia/Shanghai")
     now_utc = datetime.now(UTC)
     now_cn = now_utc.astimezone(cn)
+    days_set = set(days_list)
 
     async with AsyncSessionLocal() as db:
         stmt = select(User).where(
@@ -67,14 +95,14 @@ async def _membership_pre_expiry_notify_async() -> int:
             exp = exp.replace(tzinfo=UTC)
         exp_cn = exp.astimezone(cn)
         delta_days = (exp_cn.date() - now_cn.date()).days
-        if delta_days != n_days:
+        if delta_days not in days_set:
             continue
         if not payment_service.is_member(u, now=now_utc):
             continue
         oid = u.wechat_openid
         if not oid or not str(oid).strip():
             continue
-        rkey = f"sub:preexpiry:{u.id}:{exp_cn.date().isoformat()}"
+        rkey = f"sub:preexpiry:{u.id}:{exp_cn.date().isoformat()}:{delta_days}"
         ok = await redis.set(rkey, "1", nx=True, ex=86400 * 45)
         if not ok:
             continue
@@ -82,7 +110,12 @@ async def _membership_pre_expiry_notify_async() -> int:
             await send_membership_pre_expiry_notification(openid=oid, expires_at=exp)
             sent += 1
         except Exception as exc:
-            log.warning("pre_expiry_notify_user_failed", user_id=u.id, error=str(exc))
+            log.warning(
+                "pre_expiry_notify_user_failed",
+                user_id=u.id,
+                days=delta_days,
+                error=str(exc),
+            )
     return sent
 
 
