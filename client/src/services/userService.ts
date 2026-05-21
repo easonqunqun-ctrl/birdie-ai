@@ -50,8 +50,13 @@ export const userService = {
       typeof windowDays === 'number' && windowDays > 0
         ? `?window_days=${windowDays}`
         : ''
-    return http.get<{ points: { analysis_id: string; analyzed_at: string; overall_score: number }[] }>(
-      `/users/me/analysis-progress${qs}`,
-    )
+    return http.get<{
+      points: {
+        analysis_id: string
+        analyzed_at: string
+        overall_score: number
+        phase_scores?: Record<string, number> | null
+      }[]
+    }>(`/users/me/analysis-progress${qs}`)
   },
 }

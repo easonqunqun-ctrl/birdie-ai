@@ -311,6 +311,10 @@ class AnalysisProgressPoint(BaseModel):
     analysis_id: str
     analyzed_at: datetime
     overall_score: int
+    phase_scores: dict[str, int] | None = Field(
+        default=None,
+        description="六维阶段分扁平 map，如 setup→80；无六维数据时为 null",
+    )
 
 
 class AnalysisProgressResponse(BaseModel):

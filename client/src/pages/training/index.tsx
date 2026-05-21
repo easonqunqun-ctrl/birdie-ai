@@ -7,18 +7,21 @@
  *     - 有 plan → 顶部进度条 + 按日期分组的任务卡片列表
  *   点任务 → 展开 drill 详情（复用 `constants/drillLibrary.ts`） → 「完成」按钮
  *   打卡成功 → toast + 局部刷新任务状态 + 更新 store 中 `user.current_streak_days`
- *   进步曲线（会员）：`analysis-progress` 综合分横滑 + `practice-logs?month=` 本月打卡柱状图；非会员见锁定卡
+ *   进步曲线（会员）：统计大卡 + 综合/六维折线图 + practice_logs 本月柱状图；非会员见锁定卡
  */
 
 import { FC, useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, ScrollView, Text, View } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import EnvBadge from '@/components/EnvBadge'
+import ProgressLineChart from '@/components/ProgressLineChart'
+import '@/components/ProgressLineChart.scss'
 import { trainingService } from '@/services/trainingService'
 import { userService } from '@/services/userService'
 import { describeIntermittentRequestFailure, isRequestError } from '@/services/request'
 import { useUserStore } from '@/store/userStore'
 import { getDrillDetail } from '@/constants/drillLibrary'
+import { PHASE_COLOR, PHASE_LABEL, PHASE_ORDER, type SwingPhaseKey } from '@/constants/phaseLabels'
 import { PAYMENT_ENABLED_FLAG } from '@/constants/flags'
 import type {
   PracticeLogItem,
@@ -26,6 +29,13 @@ import type {
   TrainingTaskItem
 } from '@/types/training'
 import { switchToHome, toastTabNavigationFailure } from '@/utils/tabNav'
+import {
+  computeProgressStatCards,
+  formatDelta,
+  seriesForDimension,
+  type ProgressDimension,
+  type ProgressPoint,
+} from '@/utils/progressCurveStats'
 import './index.scss'
 
 const TrainingPage: FC = () => {
@@ -34,11 +44,11 @@ const TrainingPage: FC = () => {
   const [loading, setLoading] = useState(false)
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)
   const [submittingTaskId, setSubmittingTaskId] = useState<string | null>(null)
-  const [progressPoints, setProgressPoints] = useState<
-    { analysis_id: string; analyzed_at: string; overall_score: number }[]
-  >([])
+  const [progressPoints, setProgressPoints] = useState<ProgressPoint[]>([])
   /** 进步曲线时间窗：0=不按天截断（服务端全量至 max_points）；90=近 90 天 */
   const [progressWindowDays, setProgressWindowDays] = useState<0 | 90>(90)
+  /** 折线图维度：综合分或六维之一 */
+  const [chartDimension, setChartDimension] = useState<ProgressDimension>('overall')
   /** 本月各日打卡次数（仅会员拉取 practice_logs；用于柱状趋势） */
   const [practiceDaily, setPracticeDaily] = useState<
     { day: number; count: number; dateKey: string }[]
@@ -152,37 +162,94 @@ const TrainingPage: FC = () => {
     return Math.round((plan.completed_tasks / plan.total_tasks) * 100)
   }, [plan])
 
-  const shortAt = (iso: string) => {
-    const d = new Date(iso)
-    if (Number.isNaN(d.getTime())) return iso.slice(0, 10)
-    return `${d.getMonth() + 1}/${d.getDate()}`
-  }
-
   const practiceMaxCount = useMemo(
     () => Math.max(1, ...practiceDaily.map((d) => d.count)),
     [practiceDaily]
   )
 
+  const progressStats = useMemo(
+    () => computeProgressStatCards(progressPoints, user?.stats),
+    [progressPoints, user?.stats],
+  )
+
+  const chartSeries = useMemo(
+    () =>
+      seriesForDimension(progressPoints, chartDimension).map((p) => ({
+        value: p.value,
+        label: p.label,
+      })),
+    [progressPoints, chartDimension],
+  )
+
+  const chartAccent =
+    chartDimension === 'overall'
+      ? undefined
+      : PHASE_COLOR[chartDimension as SwingPhaseKey]
+
+  const dimensionOptions: { key: ProgressDimension; label: string }[] = useMemo(
+    () => [
+      { key: 'overall', label: '综合' },
+      ...PHASE_ORDER.map((k) => ({ key: k as ProgressDimension, label: PHASE_LABEL[k] })),
+    ],
+    [],
+  )
+
+  const statCardsInner =
+    progressPoints.length > 0 ? (
+      <View className='training__stat-grid'>
+        <View className='training__stat-card'>
+          <Text className='training__stat-value'>{progressStats.totalAnalyses}</Text>
+          <Text className='training__stat-label'>累计分析</Text>
+        </View>
+        <View className='training__stat-card'>
+          <Text className='training__stat-value'>{progressStats.totalPractices}</Text>
+          <Text className='training__stat-label'>累计练习</Text>
+        </View>
+        <View className='training__stat-card'>
+          <Text className='training__stat-value'>{progressStats.streakDays}</Text>
+          <Text className='training__stat-label'>连续打卡</Text>
+        </View>
+        <View className='training__stat-card'>
+          <Text className='training__stat-value training__stat-value--delta'>
+            {progressStats.bestImprovement
+              ? `${progressStats.bestImprovement.label} ${formatDelta(progressStats.bestImprovement.delta)}`
+              : formatDelta(progressStats.windowScoreDelta)}
+          </Text>
+          <Text className='training__stat-label'>
+            {progressStats.bestImprovement ? '最大改善维度' : '窗口内得分变化'}
+          </Text>
+        </View>
+      </View>
+    ) : null
+
   const scoreTrendInner =
     progressPoints.length > 0 ? (
       <>
-        <Text className='training__trend-title'>综合得分走势</Text>
-        <Text className='training__trend-hint'>历次分析综合分（按时间从早到晚）</Text>
-        <ScrollView
-          scrollX
-          className='training__trend-scroll'
-          showScrollbar={false}
-          enableFlex
-        >
-          <View className='training__trend-row'>
-            {progressPoints.map((p) => (
-              <View key={p.analysis_id} className='training__trend-chip'>
-                <Text className='training__trend-score'>{p.overall_score}</Text>
-                <Text className='training__trend-date'>{shortAt(p.analyzed_at)}</Text>
-              </View>
+        {statCardsInner}
+        <Text className='training__trend-title'>得分走势</Text>
+        <Text className='training__trend-hint'>
+          {chartDimension === 'overall'
+            ? '综合分随时间变化（0–100）'
+            : `${PHASE_LABEL[chartDimension as SwingPhaseKey]}维度变化`}
+        </Text>
+        <ScrollView scrollX className='training__dim-scroll' showScrollbar={false} enableFlex>
+          <View className='training__dim-row'>
+            {dimensionOptions.map((opt) => (
+              <Text
+                key={opt.key}
+                className={`training__dim-pill ${chartDimension === opt.key ? 'is-active' : ''}`}
+                onClick={() => setChartDimension(opt.key)}
+              >
+                {opt.label}
+              </Text>
             ))}
           </View>
         </ScrollView>
+        <ProgressLineChart
+          points={chartSeries}
+          accentColor={chartAccent}
+          canvasId='training-progress-line'
+        />
       </>
     ) : null
 

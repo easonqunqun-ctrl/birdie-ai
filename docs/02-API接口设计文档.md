@@ -1458,7 +1458,7 @@ GET /v1/users/me/analysis-progress?window_days=90
 |------|------|------|------|
 | window_days | int | 否 | 仅取最近 N 日历天内的点；不传或 `0` 表示不按天截断（仍受服务端 `max_points` 上限，默认 500） |
 
-**响应**：`data.points[]`，元素为 `analysis_id` + `analyzed_at` + `overall_score`（时间升序）。
+**响应**：`data.points[]`，元素为 `analysis_id` + `analyzed_at` + `overall_score` + `phase_scores`（可选，六维扁平 map，如 `{ "setup": 82, "backswing": 75, ... }`；时间升序）。
 
 ---
 

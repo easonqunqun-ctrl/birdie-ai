@@ -735,6 +735,19 @@ async def list_analyses(
 # ==================================================================
 # MVP 进步曲线数据（§6.1）
 # ==================================================================
+def _flatten_phase_scores(raw: dict | None) -> dict[str, int] | None:
+    """JSONB phase_scores → 扁平 int map（progress 接口专用，减小 payload）。"""
+    if not raw or not isinstance(raw, dict):
+        return None
+    out: dict[str, int] = {}
+    for key, val in raw.items():
+        if isinstance(val, dict) and val.get("score") is not None:
+            out[str(key)] = int(val["score"])
+        elif isinstance(val, (int, float)):
+            out[str(key)] = int(val)
+    return out or None
+
+
 async def get_user_analysis_progress(
     db: AsyncSession,
     user: User,
@@ -776,6 +789,7 @@ async def get_user_analysis_progress(
             analysis_id=r.id,
             analyzed_at=r.analyzed_at or r.created_at,
             overall_score=int(r.overall_score or 0),
+            phase_scores=_flatten_phase_scores(r.phase_scores),
         )
         for r in rows
     ]

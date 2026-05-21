@@ -117,32 +117,7 @@
     padding-bottom: 4rpx;
   }
 
-  &__trend-chip {
-    flex-shrink: 0;
-    min-width: 110rpx;
-    background: var(--color-bg-subtle);
-    border-radius: 16rpx;
-    padding: 18rpx 18rpx 14rpx;
-    text-align: center;
-  }
-
-  &__trend-score {
-    font-size: 38rpx;
-    font-weight: 800;
-    color: var(--color-primary);
-    display: block;
-    letter-spacing: -1rpx;
-    line-height: 1;
-  }
-
-  &__trend-date {
-    font-size: 28rpx;
-    color: var(--color-text-tertiary);
-    display: block;
-    margin-top: 8rpx;
-  }
-
-  /* ========== 进步曲线（会员）；内含 1～2 个 &__trend 卡片 ========== */
+  /* ========== 进步曲线（会员）；内含统计大卡 + 折线图 + 打卡柱 ========== */
   &__member-curve {
     width: 100%;
     margin-bottom: 16rpx;
@@ -189,6 +164,73 @@
     background: var(--color-bg-card);
     border: 1rpx solid var(--color-border);
     border-radius: 20rpx;
+  }
+
+  &__stat-grid {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 12rpx;
+    margin-bottom: 20rpx;
+  }
+
+  &__stat-card {
+    width: calc(50% - 6rpx);
+    box-sizing: border-box;
+    background: var(--color-bg-subtle);
+    border-radius: 16rpx;
+    padding: 18rpx 16rpx;
+    text-align: center;
+  }
+
+  &__stat-value {
+    font-size: 36rpx;
+    font-weight: 800;
+    color: var(--color-primary);
+    display: block;
+    line-height: 1.2;
+
+    &--delta {
+      font-size: 28rpx;
+      font-weight: 700;
+      color: var(--color-accent-mint);
+    }
+  }
+
+  &__stat-label {
+    font-size: 24rpx;
+    color: var(--color-text-tertiary);
+    display: block;
+    margin-top: 6rpx;
+  }
+
+  &__dim-scroll {
+    width: 100%;
+    margin-bottom: 12rpx;
+  }
+
+  &__dim-row {
+    display: flex;
+    flex-direction: row;
+    gap: 12rpx;
+    padding-bottom: 4rpx;
+  }
+
+  &__dim-pill {
+    flex-shrink: 0;
+    font-size: 24rpx;
+    padding: 8rpx 20rpx;
+    border-radius: 999rpx;
+    border: 1rpx solid var(--color-border);
+    color: var(--color-text-secondary);
+    background: var(--color-bg-subtle);
+
+    &.is-active {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+      font-weight: 700;
+      background: rgba(26, 35, 126, 0.06);
+    }
   }
 
   &__trend--in-curve {

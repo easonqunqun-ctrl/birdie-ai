@@ -1,0 +1,21 @@
+.progress-line-chart {
+  width: 100%;
+  position: relative;
+
+  &__canvas {
+    width: 100%;
+    height: 280rpx;
+    display: block;
+  }
+
+  &__empty {
+    height: 280rpx;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28rpx;
+    color: var(--color-text-tertiary);
+    background: var(--color-bg-subtle);
+    border-radius: 16rpx;
+  }
+}
