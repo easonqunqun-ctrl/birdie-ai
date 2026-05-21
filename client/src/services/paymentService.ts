@@ -1,5 +1,6 @@
 import type {
   AutoRenewResponse,
+  CancelAutoRenewResponse,
   CreateOrderResponse,
   MembershipInfo,
   Order,
@@ -52,5 +53,16 @@ export const paymentService = {
     return http.post<AutoRenewResponse>('/payments/auto-renew', {
       enabled,
     })
+  },
+  /**
+   * 关闭自动续费独立端点（docs/02 §6.5）。
+   *
+   * 与 `postAutoRenew(false)` 语义等价，但响应增加了 `expires_at`，
+   * 便于 UI 直接展示「已关闭自动续费，会员有效期至 YYYY-MM-DD」。
+   */
+  postCancelAutoRenew() {
+    return http.post<CancelAutoRenewResponse>(
+      '/payments/membership/cancel-auto-renew',
+    )
   },
 }

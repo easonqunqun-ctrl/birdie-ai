@@ -72,3 +72,9 @@ export interface AutoRenewResponse {
   auto_renew: boolean
   papay_sign: PapayMiniProgramSignPayload | null
 }
+
+/** POST /payments/membership/cancel-auto-renew （docs/02 §6.5） */
+export interface CancelAutoRenewResponse {
+  auto_renew: boolean
+  expires_at: string | null
+}

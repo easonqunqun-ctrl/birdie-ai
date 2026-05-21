@@ -95,6 +95,50 @@ const MembershipPage: FC = () => {
 
   async function handleAutoRenewChange(next: boolean) {
     if (memBusy) return
+    // 关闭路径：二次确认 + 调独立端点 `POST /v1/payments/membership/cancel-auto-renew`
+    // （docs/02 §6.5）。响应携带 expires_at，UI 可直接展示"会员有效期至 YYYY-MM-DD"。
+    if (!next && memInfo?.auto_renew) {
+      const confirmed = await new Promise<boolean>((resolve) => {
+        Taro.showModal({
+          title: '关闭自动续费？',
+          content:
+            '关闭后到期前不会再自动扣款。当前会员权益在有效期内继续可用，到期后回到免费版。',
+          confirmText: '关闭',
+          cancelText: '不关',
+          success: ({ confirm }) => resolve(confirm),
+        })
+      })
+      if (!confirmed) return
+      setMemBusy(true)
+      try {
+        const res = await paymentService.postCancelAutoRenew()
+        const expiry = res.expires_at
+          ? new Date(res.expires_at).toLocaleDateString('zh-CN')
+          : ''
+        Taro.showToast({
+          title: expiry ? `已关闭，会员至 ${expiry}` : '已关闭自动续费',
+          icon: 'success',
+        })
+        await refreshMembershipInfo()
+        await fetchMe()
+      } catch (e: unknown) {
+        if (isRequestError(e)) {
+          Taro.showToast({
+            title: (e.message || '关闭失败').slice(0, 220),
+            icon: 'none',
+          })
+        } else {
+          Taro.showToast({
+            title: describeIntermittentRequestFailure(e).toastTitle,
+            icon: 'none',
+          })
+        }
+      } finally {
+        setMemBusy(false)
+      }
+      return
+    }
+    // 开启路径 / 其他：沿用通用 toggle 接口（mock 模式直接落库；真实模式返回 papay 跳转参数）
     setMemBusy(true)
     try {
       const res = await paymentService.postAutoRenew(next)

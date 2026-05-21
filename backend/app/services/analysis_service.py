@@ -652,9 +652,23 @@ async def get_report(*, analysis_id: str, user: User, db: AsyncSession) -> Analy
 # ==================================================================
 # 3.5 GET /v1/analyses
 # ==================================================================
+# 免费用户能看到的历史报告条数上限（docs/01 §8.2）
+FREE_HISTORY_VISIBLE_LIMIT = 3
+
+
 async def list_analyses(
-    *, user: User, query: AnalysisListQuery, db: AsyncSession
-) -> tuple[list[AnalysisListItem], int]:
+    *,
+    user: User,
+    query: AnalysisListQuery,
+    db: AsyncSession,
+    free_user_cap: int | None = None,
+) -> tuple[list[AnalysisListItem], int, int | None]:
+    """返回 ``(items, total, capped_to)``.
+
+    ``free_user_cap``：若不为 ``None`` 且 ``user.membership_type=='free'``，
+    则只返回最近 N 条 items（``total`` 仍是 SQL 真实计数），路由层据此提示
+    "升级查看全部"。
+    """
     conds = [
         SwingAnalysis.user_id == user.id,
         SwingAnalysis.is_sample.is_(False),
@@ -670,15 +684,34 @@ async def list_analyses(
     total_stmt = select(func.count(SwingAnalysis.id)).where(and_(*conds))
     total = int((await db.execute(total_stmt)).scalar_one())
 
-    offset = (query.page - 1) * query.page_size
-    rows_stmt = (
-        select(SwingAnalysis)
-        .where(and_(*conds))
-        .order_by(SwingAnalysis.created_at.desc())
-        .offset(offset)
-        .limit(query.page_size)
+    apply_cap = (
+        free_user_cap is not None
+        and free_user_cap > 0
+        and user.membership_type == "free"
     )
-    rows = (await db.execute(rows_stmt)).scalars().all()
+
+    offset = (query.page - 1) * query.page_size
+    effective_limit = query.page_size
+    capped_to: int | None = None
+    if apply_cap:
+        # 仅在首页（page=1）截断；翻页对 free 用户返回空列表（前端会因 paywall 提示）
+        if query.page == 1:
+            effective_limit = min(query.page_size, free_user_cap)
+        else:
+            effective_limit = 0
+        capped_to = free_user_cap
+
+    rows: list[SwingAnalysis] = []
+    if effective_limit > 0:
+        rows_stmt = (
+            select(SwingAnalysis)
+            .where(and_(*conds))
+            .order_by(SwingAnalysis.created_at.desc())
+            .offset(offset)
+            .limit(effective_limit)
+        )
+        rows = list((await db.execute(rows_stmt)).scalars().all())
+
     items = [
         AnalysisListItem(
             id=r.id,
@@ -697,7 +730,7 @@ async def list_analyses(
         )
         for r in rows
     ]
-    return items, total
+    return items, total, capped_to
 
 
 # ==================================================================

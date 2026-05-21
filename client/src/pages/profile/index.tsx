@@ -212,6 +212,30 @@ const ProfilePage: FC = () => {
           </View>
           <View
             className='profile__menu-item'
+            onClick={() => Taro.navigateTo({ url: '/pages/profile/feedback' })}
+          >
+            <Text className='profile__menu-icon'>📮</Text>
+            <Text className='profile__menu-label'>意见反馈</Text>
+            <Text className='profile__menu-arrow'>›</Text>
+          </View>
+          <View
+            className='profile__menu-item'
+            onClick={() => Taro.navigateTo({ url: '/pages/profile/settings' })}
+          >
+            <Text className='profile__menu-icon'>⚙️</Text>
+            <Text className='profile__menu-label'>设置</Text>
+            <Text className='profile__menu-arrow'>›</Text>
+          </View>
+          <View
+            className='profile__menu-item'
+            onClick={() => Taro.navigateTo({ url: '/pages/profile/about' })}
+          >
+            <Text className='profile__menu-icon'>ℹ️</Text>
+            <Text className='profile__menu-label'>关于领翼golf</Text>
+            <Text className='profile__menu-arrow'>›</Text>
+          </View>
+          <View
+            className='profile__menu-item'
             onClick={() =>
               Taro.navigateTo({ url: '/pages/profile/account-deletion' })
             }

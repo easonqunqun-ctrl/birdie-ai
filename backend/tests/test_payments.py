@@ -512,3 +512,79 @@ async def test_apply_refund_stubbed_wechat(
     data = resp.json()["data"]
     assert data["order"]["status"] == "paid"
     assert data["wechat"]["status"] == "PROCESSING"
+
+
+# ==================== 关闭自动续费（docs/02 §6.5） ====================
+@pytest.mark.asyncio
+async def test_cancel_auto_renew_requires_auth(client: AsyncClient) -> None:
+    resp = await client.post("/v1/payments/membership/cancel-auto-renew")
+    assert resp.status_code == 401, resp.text
+
+
+@pytest.mark.asyncio
+async def test_cancel_auto_renew_turns_off_flag(
+    client: AsyncClient, auth_headers: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """mock 模式下先 enable auto_renew，再调 cancel 端点关闭，DB 持久化。"""
+    monkeypatch.setattr(settings, "WECHAT_PAY_MOCK_MODE", True)
+
+    # 先开启自动续费（mock 模式直接落库 True）
+    on = await client.post(
+        "/v1/payments/auto-renew", headers=auth_headers, json={"enabled": True}
+    )
+    assert on.status_code == 200, on.text
+    assert on.json()["data"]["auto_renew"] is True
+
+    # 调 cancel
+    off = await client.post(
+        "/v1/payments/membership/cancel-auto-renew", headers=auth_headers
+    )
+    assert off.status_code == 200, off.text
+    body = off.json()
+    assert body["code"] == 0
+    assert body["data"]["auto_renew"] is False
+    # 没买会员，expires_at 为 None；message 不应含到期日
+    assert "已关闭自动续费" in body["message"]
+
+    # 持久化校验
+    async with AsyncSessionLocal() as db:
+        me = (
+            await db.execute(
+                select(User).where(User.wechat_openid.is_not(None)).order_by(User.created_at.desc())
+            )
+        ).scalars().first()
+        assert me is not None
+        assert me.auto_renew is False
+
+
+@pytest.mark.asyncio
+async def test_cancel_auto_renew_message_includes_expiry(
+    client: AsyncClient, auth_headers: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """有 expires_at 的会员调 cancel，message 应含 YYYY-MM-DD."""
+    monkeypatch.setattr(settings, "WECHAT_PAY_MOCK_MODE", True)
+
+    # 下单 + mock-confirm 激活会员（拿到真实 expires_at）
+    create = (
+        await client.post(
+            "/v1/payments/orders", headers=auth_headers, json={"plan_type": "monthly"}
+        )
+    ).json()["data"]
+    order_id = create["order"]["id"]
+    await client.post(
+        f"/v1/payments/orders/{order_id}/mock-confirm", headers=auth_headers
+    )
+
+    # auto-renew 打开
+    await client.post(
+        "/v1/payments/auto-renew", headers=auth_headers, json={"enabled": True}
+    )
+
+    off = await client.post(
+        "/v1/payments/membership/cancel-auto-renew", headers=auth_headers
+    )
+    assert off.status_code == 200, off.text
+    body = off.json()
+    assert body["data"]["auto_renew"] is False
+    assert body["data"]["expires_at"] is not None
+    assert "已关闭自动续费，当前会员有效期至 " in body["message"]

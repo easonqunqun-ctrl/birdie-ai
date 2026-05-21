@@ -13,6 +13,8 @@ from app.integrations.minio import MinioStorageClient, get_minio_storage
 from app.models.user import User
 from app.schemas.analysis import (
     AnalysisListItem,
+    AnalysisListPage,
+    AnalysisListPaywall,
     AnalysisListQuery,
     AnalysisReportResponse,
     AnalysisStatusResponse,
@@ -24,8 +26,9 @@ from app.schemas.analysis import (
     UploadTokenRequest,
     UploadTokenResponse,
 )
-from app.schemas.base import APIResponse, PageData, ok, page_data
+from app.schemas.base import APIResponse, ok
 from app.services import analysis_service
+from app.services.analysis_service import FREE_HISTORY_VISIBLE_LIMIT
 from app.services.sample_fixture import build_sample_report
 from app.services.share_card_service import ensure_share_wxa_code_url
 
@@ -192,7 +195,12 @@ async def delete_analysis(
 @router.get(
     "",
     summary="获取分析历史列表",
-    response_model=APIResponse[PageData[AnalysisListItem]],
+    description=(
+        "免费用户（``membership_type='free'``）只会看到最近 "
+        f"{FREE_HISTORY_VISIBLE_LIMIT} 份；超出时返回 ``paywall`` 字段，"
+        "前端据此展示「升级会员查看全部 N 份」CTA。"
+    ),
+    response_model=APIResponse[AnalysisListPage],
 )
 async def list_analyses(
     page: int = Query(default=1, ge=1),
@@ -211,5 +219,29 @@ async def list_analyses(
         date_from=date_from,
         date_to=date_to,
     )
-    items, total = await analysis_service.list_analyses(user=user, query=query, db=db)
-    return ok(page_data(items, total=total, page=query.page, page_size=query.page_size))
+    items, total, capped_to = await analysis_service.list_analyses(
+        user=user,
+        query=query,
+        db=db,
+        free_user_cap=FREE_HISTORY_VISIBLE_LIMIT,
+    )
+    paywall: AnalysisListPaywall | None = None
+    if capped_to is not None and total > capped_to:
+        paywall = AnalysisListPaywall(capped_to=capped_to, total_count=total)
+    # 当前已返回数 + 上一页累计 ≥ 总数则 has_more=False；首页对 free 用户被截断也算到此。
+    delivered = (query.page - 1) * query.page_size + len(items)
+    if capped_to is not None:
+        # 免费用户：把"可见上限"当作 has_more 判定的真上限
+        has_more = delivered < min(total, capped_to)
+    else:
+        has_more = delivered < total
+    return ok(
+        AnalysisListPage(
+            items=items,
+            total=total,
+            page=query.page,
+            page_size=query.page_size,
+            has_more=has_more,
+            paywall=paywall,
+        )
+    )

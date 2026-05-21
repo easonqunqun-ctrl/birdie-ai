@@ -230,6 +230,30 @@
     color: var(--color-text-tertiary);
   }
 
+  /* =========== 免费用户付费墙 CTA =========== */
+  &__paywall {
+    margin: 32rpx 8rpx 16rpx;
+    padding: 36rpx 32rpx;
+    background: var(--color-primary-tint);
+    border-radius: var(--radius-md);
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16rpx;
+  }
+
+  &__paywall-title {
+    font-size: 32rpx;
+    font-weight: 600;
+    color: var(--color-primary);
+  }
+
+  &__paywall-desc {
+    font-size: 26rpx;
+    line-height: 1.6;
+    color: var(--color-text-secondary);
+  }
+
   /* =========== 按钮 =========== */
   &__btn {
     background: var(--color-primary) !important;

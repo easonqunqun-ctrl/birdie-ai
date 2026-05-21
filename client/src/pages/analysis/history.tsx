@@ -20,7 +20,8 @@ import { analysisService } from '@/services/analysisService'
 import { describeIntermittentRequestFailure, describePageLoadFailure } from '@/services/request'
 import { SCORE_LEVEL_META, scoreLevelFromScore } from '@/constants/scoreLevel'
 import { CLUB_TYPE_LABEL } from '@/types/analysis'
-import type { AnalysisListItem } from '@/types/analysis'
+import type { AnalysisListItem, AnalysisListPaywall } from '@/types/analysis'
+import { PAYMENT_ENABLED_FLAG } from '@/constants/flags'
 import './history.scss'
 
 const PAGE_SIZE = 20
@@ -41,6 +42,7 @@ const HistoryPage: FC = () => {
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [picked, setPicked] = useState<string[]>([])
+  const [paywall, setPaywall] = useState<AnalysisListPaywall | null>(null)
 
   useEffect(() => {
     if (compareMode && anchorId) {
@@ -72,6 +74,7 @@ const HistoryPage: FC = () => {
         setTotal(res.total)
         setPage(nextPage)
         setError(null)
+        setPaywall(res.paywall ?? null)
       } catch (e) {
         const { toastTitle } = describeIntermittentRequestFailure(e)
         if (mode === 'init') setError(describePageLoadFailure(e))
@@ -278,7 +281,26 @@ const HistoryPage: FC = () => {
           <Text>加载中…</Text>
         </View>
       )}
-      {!hasMore && (
+      {paywall && !compareMode && (
+        <View className='history__paywall'>
+          <Text className='history__paywall-title'>
+            还有 {Math.max(0, paywall.total_count - paywall.capped_to)} 份报告未展示
+          </Text>
+          <Text className='history__paywall-desc'>
+            免费用户最多查看最近 {paywall.capped_to} 份历史报告。开通会员后可查看全部
+            {paywall.total_count} 份，并解锁进步曲线、对比分析等能力。
+          </Text>
+          {PAYMENT_ENABLED_FLAG && (
+            <Button
+              className='history__btn history__btn--primary'
+              onClick={() => Taro.navigateTo({ url: '/pages/profile/membership' })}
+            >
+              升级会员查看全部
+            </Button>
+          )}
+        </View>
+      )}
+      {!hasMore && !paywall && (
         <View className='history__more'>
           <Text className='history__more-end'>— 没有更多了 —</Text>
         </View>

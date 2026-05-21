@@ -92,4 +92,18 @@ describe('paymentService', () => {
     sent = T.request.mock.calls[1][0]
     expect(sent.data).toEqual({ enabled: false })
   })
+
+  test('postCancelAutoRenew → POST /payments/membership/cancel-auto-renew', async () => {
+    T.request.mockResolvedValueOnce(
+      ok({ auto_renew: false, expires_at: '2027-04-14T10:38:00+08:00' }),
+    )
+    const res = await paymentService.postCancelAutoRenew()
+    const sent = T.request.mock.calls[0][0]
+    expect(sent.method).toBe('POST')
+    expect(sent.url).toContain('/payments/membership/cancel-auto-renew')
+    // 无 payload
+    expect(sent.data).toBeUndefined()
+    expect(res.auto_renew).toBe(false)
+    expect(res.expires_at).toBe('2027-04-14T10:38:00+08:00')
+  })
 })

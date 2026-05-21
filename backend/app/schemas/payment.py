@@ -108,3 +108,14 @@ class AutoRenewRequest(BaseModel):
 class AutoRenewResponse(BaseModel):
     auto_renew: bool
     papay_sign: PapayMiniProgramSignPayload | None = None
+
+
+class CancelAutoRenewResponse(BaseModel):
+    """``POST /v1/payments/membership/cancel-auto-renew`` 响应（docs/02 §6.5）.
+
+    关闭委托代扣（或仅写 ``auto_renew=False`` 当未签约 papay）后返回当前会员到期时间，
+    便于前端展示"已关闭自动续费，会员有效期至 YYYY-MM-DD"。
+    """
+
+    auto_renew: bool = False
+    expires_at: datetime | None = None

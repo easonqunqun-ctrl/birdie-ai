@@ -157,7 +157,23 @@ export interface AnalysisListItem {
   created_at: string
 }
 
-export type AnalysisListResponse = PageData<AnalysisListItem>
+/** 免费用户历史报告被截断时的元信息（与 backend AnalysisListPaywall 对齐）。 */
+export interface AnalysisListPaywall {
+  reason: 'free_user_history_limit' | string
+  /** 免费用户最多可见的份数（当前 3） */
+  capped_to: number
+  /** 用户实际拥有的真实总数（含被截断的） */
+  total_count: number
+}
+
+/**
+ * `GET /v1/analyses` 响应：在 PageData 上叠加 `paywall`。
+ *
+ * `paywall == null` 表示无截断（会员或免费用户报告数 ≤ capped_to）。
+ */
+export interface AnalysisListResponse extends PageData<AnalysisListItem> {
+  paywall?: AnalysisListPaywall | null
+}
 
 /* ==================== 前端校验常量 ==================== */
 export const VIDEO_CONSTRAINTS = {

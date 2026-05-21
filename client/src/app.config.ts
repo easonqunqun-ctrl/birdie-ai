@@ -25,7 +25,10 @@ export default defineAppConfig({
     'pages/profile/membership',
     'pages/profile/invitations',
     'pages/profile/chat-history',
-    'pages/profile/account-deletion'
+    'pages/profile/account-deletion',
+    'pages/profile/feedback',
+    'pages/profile/settings',
+    'pages/profile/about'
   ],
   /**
    * 说明：真机上 wx.request **单次等待完整响应**仍有约 60s 量级上限；

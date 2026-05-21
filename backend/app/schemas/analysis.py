@@ -193,6 +193,30 @@ class AnalysisListQuery(BaseModel):
     date_to: datetime | None = None
 
 
+class AnalysisListPaywall(BaseModel):
+    """免费用户的历史报告条数被截断时返回，提示前端展示升级 CTA（docs/01 §8.2）.
+
+    - ``capped_to``：免费用户能看到的最近 N 份（当前 N=3）
+    - ``total_count``：用户实际拥有的真实总数（含被截断的）
+    - ``reason``：``free_user_history_limit``，保留以便未来扩展（如配额型截断）
+    """
+
+    reason: str = "free_user_history_limit"
+    capped_to: int
+    total_count: int
+
+
+class AnalysisListPage(BaseModel):
+    """``GET /v1/analyses`` 的响应载荷：在通用 PageData 基础上叠加 ``paywall`` 元信息."""
+
+    items: list[AnalysisListItem]
+    total: int
+    page: int
+    page_size: int
+    has_more: bool
+    paywall: AnalysisListPaywall | None = None
+
+
 # ==================== 内部常量 ====================
 
 # 与 `tasks/analysis_tasks.py` 中装饰性阶段推进共用同一张时间表（从这里 import）。
@@ -297,6 +321,8 @@ __all__ = [
     "STAGE_ETA_SECONDS",
     "SWING_STAGE_TIMELINE",
     "AnalysisListItem",
+    "AnalysisListPage",
+    "AnalysisListPaywall",
     "AnalysisListQuery",
     "AnalysisProgressPoint",
     "AnalysisProgressResponse",

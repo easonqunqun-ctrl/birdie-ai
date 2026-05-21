@@ -9,6 +9,7 @@ from app.api.v1 import (
     chat,
     common,
     events,
+    feedback,
     invitations,
     payments,
     security,
@@ -40,3 +41,5 @@ api_router.include_router(
 # W8-T5：内容安全（视频首帧合规）+ 通用埋点 / 错误上报
 api_router.include_router(security.router, prefix="/security", tags=["内容安全"])
 api_router.include_router(events.router, prefix="/events", tags=["埋点"])
+# 意见反馈（docs/02 §2.6）
+api_router.include_router(feedback.router, prefix="/feedback", tags=["意见反馈"])

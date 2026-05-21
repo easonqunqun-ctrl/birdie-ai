@@ -38,6 +38,7 @@ from app.schemas.payment import (
     ApplyRefundResponse,
     AutoRenewRequest,
     AutoRenewResponse,
+    CancelAutoRenewResponse,
     CreateOrderRequest,
     CreateOrderResponse,
     MembershipInfo,
@@ -89,6 +90,40 @@ async def post_auto_renew(
             redirect_path=extra["redirect_path"],
         )
     return ok(AutoRenewResponse(auto_renew=user.auto_renew, papay_sign=papay))
+
+
+@router.post(
+    "/membership/cancel-auto-renew",
+    summary="关闭会员自动续费（docs/02 §6.5）",
+    response_model=APIResponse[CancelAutoRenewResponse],
+)
+async def cancel_auto_renew(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
+) -> APIResponse[CancelAutoRenewResponse]:
+    """关闭自动续费。语义与 ``POST /v1/payments/auto-renew {enabled:false}`` 等价，
+    单独提供独立端点是为了客户端 UI 调用清晰（"关闭自动续费"按钮 vs 通用 toggle）。
+    """
+    try:
+        await payment_service.apply_auto_renew(db, user, enabled=False, redis=redis)
+        await db.commit()
+        await db.refresh(user)
+    except AppException:
+        await db.rollback()
+        raise
+    return ok(
+        CancelAutoRenewResponse(
+            auto_renew=user.auto_renew,
+            expires_at=user.membership_expires_at,
+        ),
+        message=(
+            "已关闭自动续费"
+            if not user.membership_expires_at
+            else "已关闭自动续费，当前会员有效期至 "
+            f"{user.membership_expires_at.strftime('%Y-%m-%d')}"
+        ),
+    )
 
 
 @router.post(

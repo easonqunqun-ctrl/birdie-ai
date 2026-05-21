@@ -9,6 +9,7 @@ from app.models.analysis import (
 from app.models.base import Base
 from app.models.chat import ChatMessage, ChatQuota, ChatSession
 from app.models.event import Event
+from app.models.feedback import Feedback
 from app.models.invitation import Invitation
 from app.models.payment import Order, PaymentTransaction
 from app.models.share import ShareAction
@@ -25,6 +26,7 @@ __all__ = [
     "ChatSession",
     "Drill",
     "Event",
+    "Feedback",
     "Invitation",
     "Order",
     "PaymentTransaction",

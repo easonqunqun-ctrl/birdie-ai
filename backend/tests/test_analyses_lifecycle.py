@@ -415,6 +415,103 @@ async def test_list_analyses_pagination_and_filter(
     assert len(body3["items"]) == 1
     assert body3["has_more"] is True
 
+    # 免费用户 paywall：3 条以内不应有 paywall 字段
+    assert body["paywall"] is None
+
+
+@pytest.mark.asyncio
+async def test_list_analyses_paywall_caps_free_user_at_three(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    fake_minio: FakeMinioStorage,
+):
+    """免费用户拥有 4 条分析时：items 截断到 3，paywall.capped_to=3，total_count=4."""
+    for i in range(4):
+        t = await client.post(
+            "/v1/analyses/upload-token",
+            headers=auth_headers,
+            json={
+                "file_name": f"sw{i}.mp4",
+                "file_size": 1024 * 1024,
+                "file_type": "video/mp4",
+                "duration": 4.0,
+            },
+        )
+        token = t.json()["data"]
+        fake_minio.mark_uploaded(token["key"], size=1024 * 1024)
+        await client.post(
+            "/v1/analyses",
+            headers=auth_headers,
+            json={
+                "upload_id": token["upload_id"],
+                "camera_angle": "face_on",
+                "club_type": "driver",
+            },
+        )
+
+    r = await client.get("/v1/analyses?page=1&page_size=20", headers=auth_headers)
+    assert r.status_code == 200, r.text
+    body = r.json()["data"]
+    assert body["total"] == 4
+    assert len(body["items"]) == 3, "免费用户最多看 3 条"
+    assert body["paywall"] is not None
+    assert body["paywall"]["capped_to"] == 3
+    assert body["paywall"]["total_count"] == 4
+    assert body["paywall"]["reason"] == "free_user_history_limit"
+    assert body["has_more"] is False  # 已达免费上限
+
+
+@pytest.mark.asyncio
+async def test_list_analyses_paywall_skipped_for_member(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    fake_minio: FakeMinioStorage,
+):
+    """付费会员拥有 4 条分析时不应触发 paywall."""
+    from app.config import settings as _settings
+
+    # 先建 4 条
+    for i in range(4):
+        t = await client.post(
+            "/v1/analyses/upload-token",
+            headers=auth_headers,
+            json={
+                "file_name": f"m{i}.mp4",
+                "file_size": 1024 * 1024,
+                "file_type": "video/mp4",
+                "duration": 4.0,
+            },
+        )
+        token = t.json()["data"]
+        fake_minio.mark_uploaded(token["key"], size=1024 * 1024)
+        await client.post(
+            "/v1/analyses",
+            headers=auth_headers,
+            json={
+                "upload_id": token["upload_id"],
+                "camera_angle": "face_on",
+                "club_type": "driver",
+            },
+        )
+
+    # 升级到 monthly 会员
+    assert _settings.WECHAT_PAY_MOCK_MODE is True or True  # 测试环境就是 mock
+    create = (
+        await client.post(
+            "/v1/payments/orders", headers=auth_headers, json={"plan_type": "monthly"}
+        )
+    ).json()["data"]
+    await client.post(
+        f"/v1/payments/orders/{create['order']['id']}/mock-confirm",
+        headers=auth_headers,
+    )
+
+    r = await client.get("/v1/analyses?page=1&page_size=20", headers=auth_headers)
+    body = r.json()["data"]
+    assert body["total"] == 4
+    assert len(body["items"]) == 4, "会员应能看到全部"
+    assert body["paywall"] is None
+
 
 @pytest.mark.asyncio
 async def test_get_report_forbidden_for_other_user(
