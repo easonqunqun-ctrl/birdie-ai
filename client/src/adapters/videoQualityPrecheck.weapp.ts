@@ -234,3 +234,8 @@ export async function precheckVideoQualityWeapp(input: {
       (!thumbPath && !videoPath ? 'no_thumb' : undefined),
   }
 }
+
+// Taro 端分叉机制：weapp 编译时优先解析 `videoQualityPrecheck.weapp.ts`，base 文件被忽略；
+// services 层与 pages 都按统一名 `precheckVideoQuality` import，weapp 这边必须显式 re-export
+// 同名别名，否则在小程序运行时拿到 undefined → 触发 TypeError → 「开始分析」点击无反应。
+export const precheckVideoQuality = precheckVideoQualityWeapp

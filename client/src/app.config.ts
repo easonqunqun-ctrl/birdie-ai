@@ -76,5 +76,28 @@ export default defineAppConfig({
         selectedIconPath: 'assets/tab/profile_active.png'
       }
     ]
-  }
+  },
+  /**
+   * 隐私接口合规说明（避免后人再踩同一坑）：
+   *
+   * 1) `requiredPrivateInfos`：**只**接受位置类 8 个 API（chooseAddress / chooseLocation /
+   *    choosePoi / getFuzzyLocation / getLocation / onLocationChange /
+   *    startLocationUpdate / startLocationUpdateBackground）；写其它值会被开发者工具
+   *    静态校验拒绝。一期不取定位，整段不声明。
+   *
+   * 2) `permission`：**只**接受官方白名单（scope.userLocation / scope.userLocationBackground /
+   *    scope.userFuzzyLocation / scope.writePhotosAlbum / scope.werun / scope.bluetooth /
+   *    scope.invoice / scope.invoiceTitle / scope.workSubArea 等）；
+   *    `scope.camera` / `scope.record` 等运行时存在的 scope **不在** app.json 白名单里，
+   *    误写会触发开发者工具「无效的 app.json permission[xxx]」红字。
+   *    摄像头授权由 `chooseMedia` / `createCameraContext` 在运行时弹窗，不需要在此声明。
+   *
+   * 3) 媒体类合规真正落地的两处：
+   *    a) 代码运行时：`adapters/media.ts` 调 `ensurePrivacyAuthorized` → `wx.requirePrivacyAuthorize`
+   *    b) 公众平台：设置 → 服务内容声明 → 用户隐私保护指引，勾「摄像头」「上传图片视频」并提交审核
+   *
+   * 参考：
+   *  - https://developers.weixin.qq.com/miniprogram/dev/reference/configuration/app.html#requiredPrivateInfos
+   *  - https://developers.weixin.qq.com/miniprogram/dev/reference/configuration/app.html#permission
+   */
 })

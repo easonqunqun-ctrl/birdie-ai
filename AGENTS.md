@@ -46,12 +46,13 @@ UI/            UI 原型 HTML 与生成图（仅参考，勿当源码）
 
 ## 3. 视觉规范（硬性约束）
 
-**三色体系：深绿 + 白 + 金**（详见《产品设计白皮书》§7.2）。
+**四色体系：靛蓝 + 白 + 金 + 点缀绿**（详见《产品设计白皮书》§7.2，**以 `client/src/app.scss` CSS 变量为权威源**）。
 
-- 深绿定调、白承载信息、金小面积点缀（会员/成就/关键数据）。
-- **严禁**：荧光绿、浅薄荷绿、Tailwind 默认 emerald 作为主品牌色。
-- **严禁**：在业务页面 SCSS / TSX 里硬编码品牌相关 HEX；**一律走 `client/src/app.scss` 里的 CSS 变量**（如 `var(--color-primary)`、`var(--color-gold)`）。
-- 语义色（success / warning / error）仅用于状态提示与图表，不覆盖品牌主色。
+- 主色 `--color-primary: #1a237e`（冷靛蓝）定调；白承载信息；金 `--color-gold: #c9a227` 小面积点缀（会员/成就/关键数据）；点缀绿 `--color-accent-mint: #00d084` 仅用于「成长 / 完成 / 上行」语义。
+- **严禁**：荧光绿、浅薄荷绿、Tailwind 默认 emerald、Material 深绿等作为主品牌色；金色不得用作主 CTA 填充。
+- **严禁**：在业务页面 SCSS / TSX 里硬编码品牌相关 HEX；**一律走 `client/src/app.scss` 里的 CSS 变量**（`var(--color-primary)` / `var(--color-gold)` / `var(--gradient-hero)` 等）。
+- **TabBar / SVG / `app.config.ts`** 等不支持 CSS 变量的场合可硬编码，但 HEX 必须与白皮书 §7.2.1 表完全一致。
+- 语义色（success / warning / error / amber / info）仅用于状态提示与图表，不覆盖品牌主色。
 
 ---
 

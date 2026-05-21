@@ -2,11 +2,11 @@
  * 评分分级 UI 映射
  *
  * 与 `backend/app/schemas/analysis.py::score_level()` 严格对齐（5 档）：
- *   excellent (≥90)   — 金色  — 专业水准
- *   great     (≥80)   — 深绿  — 进阶
- *   good      (≥70)   — 蓝色  — 良好
- *   fair      (≥60)   — 橙色  — 及格但有改进空间
- *   needs_improvement (<60) — 红色 — 需要重点改进
+ *   excellent (≥90)   — 金 `var(--color-gold)`            — 专业水准
+ *   great     (≥80)   — 靛蓝主色 `var(--color-primary)`   — 进阶
+ *   good      (≥70)   — 信息蓝 `#3b82f6`                  — 良好
+ *   fair      (≥60)   — 橙 `var(--color-warning)`         — 及格但有改进空间
+ *   needs_improvement (<60) — 红 `var(--color-error)`     — 需要重点改进
  *
  * 色值不直接用 HEX，而是用 CSS 变量；保持和 app.scss Design Tokens 同源。
  */

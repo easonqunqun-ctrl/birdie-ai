@@ -31,6 +31,37 @@ function resolveApiBaseUrl(): string {
 
 const resolvedApiBaseUrl = resolveApiBaseUrl()
 
+/**
+ * 构建标识：git short hash + 编译时间 + 当前 TARO_APP_ENV。
+ * 注入到 `BUILD_MARKER` define 常量，在 src/app.tsx 启动日志打印。
+ * 用于真机/体验版 console 一眼区分体验版到底是哪次代码（之前硬编码字符串导致全员误判）。
+ *
+ * 失败时退回 'unknown'，不阻塞构建。
+ */
+function resolveBuildMarker(): string {
+  let gitHash = 'nogit'
+  let dirty = false
+  try {
+
+    const { execSync } = require('child_process')
+    gitHash = String(execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }))
+      .trim()
+      .slice(0, 12) || 'nogit'
+    const porcelain = String(
+      execSync('git status --porcelain', { stdio: ['ignore', 'pipe', 'ignore'] }),
+    ).trim()
+    dirty = porcelain.length > 0
+  } catch {
+    gitHash = 'nogit'
+  }
+  const buildTime = new Date().toISOString().slice(0, 16).replace('T', ' ')
+  const env = String(process.env.TARO_APP_ENV || 'local')
+  const hashTag = dirty ? `${gitHash}+dirty` : gitHash
+  return `${env}@${hashTag} built ${buildTime} UTC`
+}
+
+const resolvedBuildMarker = resolveBuildMarker()
+
 const config: UserConfigExport = {
   projectName: 'xiaoniao-ai',
   date: '2026-4-18',
@@ -60,6 +91,8 @@ const config: UserConfigExport = {
     /** 供业务代码替代 `process.env.TARO_ENV`（懒加载 chunk 内 process 可能未注入） */
     TARO_BUILD_TARGET: JSON.stringify(process.env.TARO_ENV || ''),
     WECHAT_OPEN_APPID: JSON.stringify(process.env.TARO_APP_WECHAT_OPEN_APPID || ''),
+    /** 启动日志水印：每次 build 自动刷新；不要在业务代码里手写字符串。 */
+    BUILD_MARKER: JSON.stringify(resolvedBuildMarker),
   },
   copy: {
     patterns: [

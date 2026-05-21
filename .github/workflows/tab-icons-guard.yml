@@ -1,0 +1,73 @@
+# TabBar 图标回归守护：跑 `scripts/gen_tab_icons.py` 后断言 PNG 与 commit 完全一致。
+# 防止以下漂移：
+#   1. 改了脚本（颜色 / 形状 / 超采样参数）但忘了重生成 PNG
+#   2. 改了 PNG（手 P 图）但脚本未同步
+#   3. 误改 `app.config.ts` 的 selectedColor / color 后图标色与文字色脱节
+name: tab-icons-guard
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    paths:
+      - "scripts/gen_tab_icons.py"
+      - "client/src/assets/tab/**"
+      - "client/src/app.config.ts"
+      - ".github/workflows/tab-icons-guard.yml"
+
+jobs:
+  regen-and-diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Regenerate icons
+        run: python3 scripts/gen_tab_icons.py
+
+      - name: Assert PNG bit-exact unchanged
+        run: |
+          set -e
+          if ! git diff --quiet --exit-code client/src/assets/tab/; then
+            echo "::error::PNG 与 gen_tab_icons.py 输出不一致。请本地跑 'python3 scripts/gen_tab_icons.py' 并提交。"
+            git --no-pager diff --stat client/src/assets/tab/
+            exit 1
+          fi
+          echo "OK: PNG 与脚本输出 bit-exact 一致"
+
+      - name: Assert icon color tokens stay in sync with app.config.ts
+        run: |
+          set -e
+          # 提取 app.config.ts 里的 tabBar.color / selectedColor
+          CFG_COLOR=$(grep -E "color:\s*'#" client/src/app.config.ts | head -1 | grep -oE "'#[0-9a-fA-F]{6}'" | tr -d "'")
+          CFG_SELECTED=$(grep -E "selectedColor:\s*'#" client/src/app.config.ts | head -1 | grep -oE "'#[0-9a-fA-F]{6}'" | tr -d "'")
+          # 提取 gen_tab_icons.py 里的 FILL_DEFAULT / FILL_ACTIVE
+          SCRIPT_DEFAULT=$(python3 -c "
+          import re, pathlib
+          src = pathlib.Path('scripts/gen_tab_icons.py').read_text()
+          m = re.search(r'FILL_DEFAULT[^=]*=\s*\(0x([0-9a-fA-F]{2}),\s*0x([0-9a-fA-F]{2}),\s*0x([0-9a-fA-F]{2})\)', src)
+          print('#' + (m.group(1) + m.group(2) + m.group(3)).lower())
+          ")
+          SCRIPT_ACTIVE=$(python3 -c "
+          import re, pathlib
+          src = pathlib.Path('scripts/gen_tab_icons.py').read_text()
+          m = re.search(r'FILL_ACTIVE[^=]*=\s*\(0x([0-9a-fA-F]{2}),\s*0x([0-9a-fA-F]{2}),\s*0x([0-9a-fA-F]{2})\)', src)
+          print('#' + (m.group(1) + m.group(2) + m.group(3)).lower())
+          ")
+          echo "app.config.ts: color=$CFG_COLOR  selectedColor=$CFG_SELECTED"
+          echo "gen_tab_icons.py: FILL_DEFAULT=$SCRIPT_DEFAULT  FILL_ACTIVE=$SCRIPT_ACTIVE"
+          # 用 tr 大小写规整，兼容老 bash；HEX 通常已是小写，仅保险用
+          to_lower() { echo "$1" | tr '[:upper:]' '[:lower:]'; }
+          if [ "$(to_lower "$CFG_COLOR")" != "$(to_lower "$SCRIPT_DEFAULT")" ]; then
+            echo "::error::tabBar.color ($CFG_COLOR) ≠ FILL_DEFAULT ($SCRIPT_DEFAULT)"
+            exit 1
+          fi
+          if [ "$(to_lower "$CFG_SELECTED")" != "$(to_lower "$SCRIPT_ACTIVE")" ]; then
+            echo "::error::tabBar.selectedColor ($CFG_SELECTED) ≠ FILL_ACTIVE ($SCRIPT_ACTIVE)"
+            exit 1
+          fi
+          echo "OK: 图标色与 app.config.ts 完全同步"

@@ -27,6 +27,12 @@ declare const SUBSCRIBE_TEMPLATES: string
 declare const TARO_BUILD_TARGET: string
 /** 微信开放平台移动 AppID（RN `registerApp`；小程序构建可为空字符串） */
 declare const WECHAT_OPEN_APPID: string
+/**
+ * 启动日志水印：`<env>@<git-short-hash> built <UTC>`。
+ * 由 client/config/index.ts 在 build 时通过 defineConstants 注入；
+ * 业务代码请勿手写字符串，否则真机会再次出现"代码已更新但 marker 不变"的误导。
+ */
+declare const BUILD_MARKER: string
 
 /**
  * 微信小程序全局对象；Taro 类型定义默认不注入 `wx`（走 Taro.xxx 封装），

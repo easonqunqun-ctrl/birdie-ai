@@ -8,13 +8,16 @@ import { flushTrack, track, trackError } from '@/utils/track'
 import './app.scss'
 
 declare const API_BASE_URL: string
+declare const BUILD_MARKER: string
 
 class App extends Component<PropsWithChildren> {
   componentDidMount() {
+    // 由 client/config/index.ts 在 build 时注入，格式: `<env>@<git-short-hash> built <UTC>`。
+    // 体验版控制台看到的是真实那次构建的标识；若与当前预期不符，请重新 build:weapp + 上传。
     console.log(
       '%c[BUILD-MARKER]',
       'color:#062;font-weight:bold',
-      'dist@2026-05-18 waiting-lg+spin report-no-delbtn | 若非此串请：`cd client && pnpm dev:weapp` 后预览，或用「详情→清缓存」',
+      typeof BUILD_MARKER === 'string' ? BUILD_MARKER : 'unknown',
     )
 
     if (TARO_BUILD_TARGET === 'weapp' && typeof API_BASE_URL === 'string') {

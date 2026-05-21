@@ -168,3 +168,28 @@ docs/release-notes/W8-evidence/source-media/*
 infra/test/certs/*.pem
 infra/test/certs/server.crt
 infra/test/certs/server.key
+
+# ==================== 凭据 / 账号本（仅本地查阅，绝不提交） ====================
+# 团队成员把 AppSecret / 商户号 / 云账号密码 / API key 等放这里
+# 例如：「帐号相关.xlsx」「账号.md」「credentials.*」、本地 .env 备份等
+#
+# 命名约定（pattern 必须收紧到具体扩展名，避免误伤
+#   credentialsService.ts / passwordSecretsHelper.ts 这类合法源码）：
+#  - 任何包含「帐号 / 账号」字样的文件（含中文：基本只可能是凭据本）
+#  - `secrets/` 目录下的所有内容（建议把所有本地敏感备份放进去）
+#  - `credentials.*` / `secrets.*` 等 + 受限扩展名（md / txt / csv / xlsx / xls / json /
+#    yml / yaml / env / pem / p8 / key / pfx），其余命名（如 .ts / .tsx / .py）按源码处理
+帐号*
+账号*
+credentials.{md,txt,csv,xlsx,xls,json,yml,yaml,env,pem,p8,key,pfx}
+*-credentials.{md,txt,csv,xlsx,xls,json,yml,yaml,env,pem,p8,key,pfx}
+*_credentials.{md,txt,csv,xlsx,xls,json,yml,yaml,env,pem,p8,key,pfx}
+secrets.{md,txt,csv,xlsx,xls,json,yml,yaml,env,pem,p8,key,pfx}
+*-secrets.{md,txt,csv,xlsx,xls,json,yml,yaml,env,pem,p8,key,pfx}
+*_secrets.{md,txt,csv,xlsx,xls,json,yml,yaml,env,pem,p8,key,pfx}
+secrets/
+# 服务器 .env 本地备份（防止 cvm-*.env / .env.cvm.* 之类被误提交）
+*.env.cvm
+*.env.cvm.*
+cvm-*.env*
+.env.cvm*
