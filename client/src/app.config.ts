@@ -16,6 +16,7 @@ export default defineAppConfig({
     'pages/analysis/params',
     'pages/analysis/waiting',
     'pages/analysis/report',
+    'pages/analysis/poster',
     'pages/analysis/history',
     'pages/analysis/compare',
     'pages/coach/index',
@@ -103,4 +104,10 @@ export default defineAppConfig({
    *  - https://developers.weixin.qq.com/miniprogram/dev/reference/configuration/app.html#requiredPrivateInfos
    *  - https://developers.weixin.qq.com/miniprogram/dev/reference/configuration/app.html#permission
    */
+  permission: {
+    /** Q-C1 分享海报：保存到相册时弹的授权说明文案 */
+    'scope.writePhotosAlbum': {
+      desc: '将挥杆报告海报保存到您的相册，便于分享到朋友圈',
+    },
+  },
 })

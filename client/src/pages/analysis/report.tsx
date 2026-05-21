@@ -287,6 +287,19 @@ const ReportPage: FC = () => {
       .catch(() => undefined)
   }
 
+  /**
+   * 生成分享海报（Q-C1）。
+   *
+   * 只允许本人 + 完整报告时跳，公开版/示例不显示按钮。
+   */
+  const handleGoPoster = () => {
+    if (!analysisId || analysisId === 'sample') return
+    if (!report) return
+    Taro.navigateTo({
+      url: `/pages/analysis/poster?id=${encodeURIComponent(analysisId)}`,
+    }).catch(() => undefined)
+  }
+
   /** 公开报告下 CTA：引导非本人访问者去首页体验 */
   const handleCtaTryMine = () => {
     if (currentUserToken) {
@@ -762,6 +775,17 @@ const ReportPage: FC = () => {
           💬 问 AI 教练
         </Button>
       </View>
+
+      {report && analysisId !== 'sample' && (
+        <View className='report__footer'>
+          <Button
+            className='report__footer-btn'
+            onClick={handleGoPoster}
+          >
+            🖼 生成分享海报
+          </Button>
+        </View>
+      )}
 
       <View className='report__actions'>
         <Button className='report__btn report__btn--primary' onClick={handleShootAgain}>
