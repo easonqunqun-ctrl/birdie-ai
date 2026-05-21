@@ -12,7 +12,6 @@ from app.core.redis import get_redis
 from app.integrations.minio import MinioStorageClient, get_minio_storage
 from app.models.user import User
 from app.schemas.analysis import (
-    AnalysisListItem,
     AnalysisListPage,
     AnalysisListPaywall,
     AnalysisListQuery,
@@ -229,12 +228,13 @@ async def list_analyses(
     if capped_to is not None and total > capped_to:
         paywall = AnalysisListPaywall(capped_to=capped_to, total_count=total)
     # 当前已返回数 + 上一页累计 ≥ 总数则 has_more=False；首页对 free 用户被截断也算到此。
+    # 免费用户：把"可见上限"当作 has_more 判定的真上限。
     delivered = (query.page - 1) * query.page_size + len(items)
-    if capped_to is not None:
-        # 免费用户：把"可见上限"当作 has_more 判定的真上限
-        has_more = delivered < min(total, capped_to)
-    else:
-        has_more = delivered < total
+    has_more = (
+        delivered < min(total, capped_to)
+        if capped_to is not None
+        else delivered < total
+    )
     return ok(
         AnalysisListPage(
             items=items,

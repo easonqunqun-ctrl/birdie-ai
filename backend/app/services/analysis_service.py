@@ -695,10 +695,9 @@ async def list_analyses(
     capped_to: int | None = None
     if apply_cap:
         # 仅在首页（page=1）截断；翻页对 free 用户返回空列表（前端会因 paywall 提示）
-        if query.page == 1:
-            effective_limit = min(query.page_size, free_user_cap)
-        else:
-            effective_limit = 0
+        effective_limit = (
+            min(query.page_size, free_user_cap) if query.page == 1 else 0
+        )
         capped_to = free_user_cap
 
     rows: list[SwingAnalysis] = []
