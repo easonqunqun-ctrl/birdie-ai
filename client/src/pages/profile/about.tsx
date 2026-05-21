@@ -4,10 +4,15 @@ import Taro from '@tarojs/taro'
 import { CLIENT_VERSION } from '@/constants/version'
 import './about.scss'
 
+declare const APP_ENV: string
+
+const ICP_FILING = '京ICP备2026023735号'
+
 const AboutPage: FC = () => {
   const buildMarker = useMemo(() => {
     return typeof BUILD_MARKER === 'string' ? BUILD_MARKER : 'unknown'
   }, [])
+  const showBuildMarker = APP_ENV !== 'production'
 
   const goTerms = () => {
     Taro.navigateTo({ url: '/pages/legal/terms' }).catch(() => undefined)
@@ -19,6 +24,16 @@ const AboutPage: FC = () => {
     Taro.navigateTo({ url: '/pages/profile/feedback' }).catch(() => undefined)
   }
 
+  // 给最终用户隐藏构建水印，但保留长按版本号显示一次（debug 友好）
+  const onVersionLongPress = () => {
+    Taro.showModal({
+      title: '构建信息',
+      content: buildMarker,
+      showCancel: false,
+      confirmText: '我知道了',
+    }).catch(() => undefined)
+  }
+
   return (
     <View className='about'>
       <View className='about__brand'>
@@ -27,21 +42,23 @@ const AboutPage: FC = () => {
       </View>
 
       <View className='about__meta'>
-        <View className='about__row'>
+        <View className='about__row' onLongPress={onVersionLongPress}>
           <Text className='about__label'>版本</Text>
           <Text className='about__value'>v{CLIENT_VERSION}</Text>
         </View>
-        <View className='about__row'>
-          <Text className='about__label'>构建标识</Text>
-          <Text className='about__value about__value--mono'>{buildMarker}</Text>
-        </View>
+        {showBuildMarker && (
+          <View className='about__row'>
+            <Text className='about__label'>构建标识</Text>
+            <Text className='about__value about__value--mono'>{buildMarker}</Text>
+          </View>
+        )}
         <View className='about__row'>
           <Text className='about__label'>主体</Text>
           <Text className='about__value'>领翼智能</Text>
         </View>
         <View className='about__row'>
           <Text className='about__label'>ICP 备案</Text>
-          <Text className='about__value about__value--muted'>申请中</Text>
+          <Text className='about__value'>{ICP_FILING}</Text>
         </View>
       </View>
 

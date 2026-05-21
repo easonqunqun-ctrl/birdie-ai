@@ -514,6 +514,51 @@ async def test_apply_refund_stubbed_wechat(
     assert data["wechat"]["status"] == "PROCESSING"
 
 
+# ==================== sync-from-wechat：真实模式 stub 查单 ====================
+@pytest.mark.asyncio
+async def test_sync_from_wechat_success_marks_paid(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """非 mock 路径下，`query_transaction_by_out_trade_no` 返回 SUCCESS → 订单转 paid。
+
+    这个测试同时回归了 ``WechatPayV3Context.query_transaction_by_out_trade_no``
+    必须存在的契约——历史 bug 是 service 调用了不存在的方法，触发 AttributeError
+    被兜底成"签名或商户证书配置异常"，客户端付款成功后查单一直报错。
+    """
+    from app.integrations import wechat_pay_v3 as wxpay
+
+    create = (
+        await client.post(
+            "/v1/payments/orders", headers=auth_headers, json={"plan_type": "monthly"}
+        )
+    ).json()["data"]
+    order_id = create["order"]["id"]
+    amount_cents = int(create["order"]["amount"])
+
+    monkeypatch.setattr(settings, "WECHAT_PAY_MOCK_MODE", False)
+
+    class _StubCtx:
+        async def query_transaction_by_out_trade_no(self, out_trade_no: str):
+            assert out_trade_no == order_id
+            return {
+                "trade_state": "SUCCESS",
+                "transaction_id": "4200001234202611210000000001",
+                "amount": {"total": amount_cents, "currency": "CNY"},
+            }
+
+    monkeypatch.setattr(wxpay, "get_wechat_pay_v3", lambda: _StubCtx())
+
+    resp = await client.post(
+        f"/v1/payments/orders/{order_id}/sync-from-wechat", headers=auth_headers
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["code"] == 0
+    assert body["data"]["order"]["status"] == "paid"
+
+
 # ==================== 关闭自动续费（docs/02 §6.5） ====================
 @pytest.mark.asyncio
 async def test_cancel_auto_renew_requires_auth(client: AsyncClient) -> None:

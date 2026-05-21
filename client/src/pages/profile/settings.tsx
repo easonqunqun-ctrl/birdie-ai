@@ -6,12 +6,15 @@ import { storage } from '@/utils/storage'
 import { CLIENT_VERSION } from '@/constants/version'
 import './settings.scss'
 
+declare const APP_ENV: string
+
 const SettingsPage: FC = () => {
   const { token, logout } = useUserStore()
 
   const buildMarker = useMemo(() => {
     return typeof BUILD_MARKER === 'string' ? BUILD_MARKER : 'unknown'
   }, [])
+  const showBuildMarker = APP_ENV !== 'production'
 
   const handleReplayGuide = () => {
     Taro.showModal({
@@ -104,15 +107,17 @@ const SettingsPage: FC = () => {
         </View>
       </View>
 
-      <View className='settings__group'>
-        <Text className='settings__group-title'>构建</Text>
-        <View className='settings__row settings__row--static'>
-          <Text className='settings__row-label'>构建标识</Text>
-          <Text className='settings__row-value settings__row-value--mono'>
-            {buildMarker}
-          </Text>
+      {showBuildMarker && (
+        <View className='settings__group'>
+          <Text className='settings__group-title'>构建</Text>
+          <View className='settings__row settings__row--static'>
+            <Text className='settings__row-label'>构建标识</Text>
+            <Text className='settings__row-value settings__row-value--mono'>
+              {buildMarker}
+            </Text>
+          </View>
         </View>
-      </View>
+      )}
 
       {token ? (
         <View className='settings__actions'>

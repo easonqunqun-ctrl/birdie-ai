@@ -247,6 +247,21 @@ class WechatPayV3Context:
         r = await self._http_post(path, payload)
         return r.get("prepay_id", "")
 
+    async def query_transaction_by_out_trade_no(
+        self,
+        out_trade_no: str,
+    ) -> dict[str, Any]:
+        """按商户订单号查单：``GET /v3/pay/transactions/out-trade-no/{no}?mchid={mchid}``.
+
+        返回明文 JSON（trade_state / transaction_id / amount.total 等）。
+        注意：签名必须包含 query string（含 mchid），否则微信侧 401。
+        """
+        from urllib.parse import quote
+
+        encoded_no = quote(out_trade_no, safe="")
+        path = f"/v3/pay/transactions/out-trade-no/{encoded_no}?mchid={self.mchid}"
+        return await self._http_get(path)
+
     async def papay_pre_entrust_mini_program(
         self,
         *,
