@@ -61,7 +61,9 @@ const HistoryPage: FC = () => {
     }
   }, [compareMode])
 
-  const hasMore = items.length < total
+  // 注意：paywall 命中时（免费用户已达可见上限）后端 has_more=false 且返回 items=空，
+  // 必须把 paywall 也算进截断条件，否则 useReachBottom 会无限触发空 loadMore。
+  const hasMore = !paywall && items.length < total
 
   const fetchPage = useCallback(
     async (nextPage: number, mode: 'init' | 'refresh' | 'more') => {
