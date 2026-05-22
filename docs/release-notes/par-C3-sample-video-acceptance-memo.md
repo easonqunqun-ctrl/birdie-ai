@@ -7,16 +7,18 @@
 
 ## 0. 元信息
 
-| 字段 | 值 |
-|------|----|
-| **纪要 ID** | `par-C3` · `sample-video-2026-05-21` |
-| **关联 PLAN-ID** | `Q-C1` / `par-C3` / `DOC-04`（汇总） |
-| **关联文档** | [`docs/01 §3.6`](../01-MVP功能需求规格说明书.md#36-示例视频体验入口) · [`docs/02 §3.7 GET /v1/analyses/sample`](../02-API接口设计文档.md) · [`docs/19 §6.3 DOC-04`](../19-产品开发迭代计划-当前队列.md#63-主表plan-id) |
-| **代码版本** | `main @ ca168ab` |
-| **验收范围** | `docs/01 §3.6` 的 6 条产品要求 + 隐含项（不入库、不计配额、`id='sample'` 固定） |
-| **验收日期** | 2026-05-21（初稿）· 2026-05-21（Batch-F 工程复核） |
-| **起草** | 工程侧自动化纪要 |
-| **复核** | 产品 ▢（发版前确认）　工程 ☑（自动化验收 2026-05-21） |
+
+| 字段             | 值                                                                                                                                                                                 |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **纪要 ID**      | `par-C3` · `sample-video-2026-05-21`                                                                                                                                              |
+| **关联 PLAN-ID** | `Q-C1` / `par-C3` / `DOC-04`（汇总）                                                                                                                                                  |
+| **关联文档**       | `[docs/01 §3.6](../01-MVP功能需求规格说明书.md#36-示例视频体验入口)` · `[docs/02 §3.7 GET /v1/analyses/sample](../02-API接口设计文档.md)` · `[docs/19 §6.3 DOC-04](../19-产品开发迭代计划-当前队列.md#63-主表plan-id)` |
+| **代码版本**       | `main @ ca168ab`                                                                                                                                                                  |
+| **验收范围**       | `docs/01 §3.6` 的 6 条产品要求 + 隐含项（不入库、不计配额、`id='sample'` 固定）                                                                                                                         |
+| **验收日期**       | 2026-05-21（初稿）· 2026-05-21（Batch-F 工程复核）                                                                                                                                          |
+| **起草**         | 工程侧自动化纪要                                                                                                                                                                          |
+| **复核**         | 产品 ▢（发版前确认） 工程 ☑（自动化验收 2026-05-21）                                                                                                                                                |
+
 
 ---
 
@@ -37,13 +39,15 @@
 
 ### 2.1 接口与代码路径
 
-| 端点 / 文件 | 角色 |
-|-------------|------|
-| `GET /v1/analyses/sample` | 匿名可访问，返回固定示例 JSON，不入库 |
-| `backend/app/api/v1/analyses.py` `get_sample_analysis` | FastAPI 路由（鉴权 `optional`，便于未来埋点） |
+
+| 端点 / 文件                                                          | 角色                                                |
+| ---------------------------------------------------------------- | ------------------------------------------------- |
+| `GET /v1/analyses/sample`                                        | 匿名可访问，返回固定示例 JSON，不入库                             |
+| `backend/app/api/v1/analyses.py` `get_sample_analysis`           | FastAPI 路由（鉴权 `optional`，便于未来埋点）                  |
 | `backend/app/services/sample_fixture.py` `build_sample_report()` | 构造一份固定示例报告（阶段评分、issue、drill、video / skeleton url） |
-| `backend/app/models/analysis.py::SwingAnalysis.is_sample` | 真实库内若有"示例"性质记录则置 `True`，与用户记录隔离（防 list 误回 sample） |
-| `client/src/pages/analysis/report.tsx` | 收到 `id='sample'` 时顶部展示「示例报告」徽章 + 替换 CTA 文案 |
+| `backend/app/models/analysis.py::SwingAnalysis.is_sample`        | 真实库内若有"示例"性质记录则置 `True`，与用户记录隔离（防 list 误回 sample） |
+| `client/src/pages/analysis/report.tsx`                           | 收到 `id='sample'` 时顶部展示「示例报告」徽章 + 替换 CTA 文案        |
+
 
 ### 2.2 数据隔离
 
@@ -56,10 +60,12 @@
 
 ### 3.1 自动化测试
 
-| 测试文件 | 覆盖点 |
-|---------|--------|
-| `backend/tests/test_analyses_sample.py` | `GET /v1/analyses/sample` 不需登录、`id='sample'`、字段完整 |
-| `backend/tests/test_analyses_lifecycle.py` | `is_sample=False` 过滤生效（用户列表不会回到 sample 数据） |
+
+| 测试文件                                       | 覆盖点                                               |
+| ------------------------------------------ | ------------------------------------------------- |
+| `backend/tests/test_analyses_sample.py`    | `GET /v1/analyses/sample` 不需登录、`id='sample'`、字段完整 |
+| `backend/tests/test_analyses_lifecycle.py` | `is_sample=False` 过滤生效（用户列表不会回到 sample 数据）        |
+
 
 ### 3.2 集成证据
 
@@ -77,7 +83,10 @@
 
 ## 4. 签字栏
 
-| 角色 | 姓名 | 日期 | 备注 |
-|------|------|------|------|
-| 产品 | （待填） |  | 发版前确认首页/引导/拍摄页示例入口与 CTA |
-| 工程 | 自动化验收 | 2026-05-21 | pytest + staging curl + 列表/配额隔离代码审阅 |
+
+| 角色  | 姓名    | 日期         | 备注                                  |
+| --- | ----- | ---------- | ----------------------------------- |
+| 产品  | 陈     | 2026。5.22  | 发版前确认首页/引导/拍摄页示例入口与 CTA             |
+| 工程  | 自动化验收 | 2026-05-21 | pytest + staging curl + 列表/配额隔离代码审阅 |
+
+
