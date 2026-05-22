@@ -1,4 +1,7 @@
-import { linesForQualityWarnings } from '@/constants/qualityWarnings'
+import {
+  linesForQualityWarnings,
+  QUALITY_WARNING_IMPACT_FOOTNOTE,
+} from '@/constants/qualityWarnings'
 
 describe('linesForQualityWarnings', () => {
   test('空/null → []', () => {
@@ -22,5 +25,9 @@ describe('linesForQualityWarnings', () => {
 
   test('空字符串 code 被跳过', () => {
     expect(linesForQualityWarnings(['low_light', '', '  '])).toHaveLength(1)
+  })
+
+  test('QUALITY_WARNING_IMPACT_FOOTNOTE 非空', () => {
+    expect(QUALITY_WARNING_IMPACT_FOOTNOTE).toMatch(/结果可能受影响/)
   })
 })

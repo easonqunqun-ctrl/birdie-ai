@@ -37,6 +37,7 @@ import Taro, { useDidHide, useDidShow, useRouter } from '@tarojs/taro'
 import { analysisService } from '@/services/analysisService'
 import { describeIntermittentRequestFailure, isRequestError } from '@/services/request'
 import { useAnalysisStore } from '@/store/analysisStore'
+import { describeAnalysisFailure } from '@/constants/analysisEngineErrors'
 import { SUBSCRIBE_TPL_ANALYSIS_DONE } from '@/constants/subscribeTemplates'
 import { SWING_TIPS, pickStartIndex } from '@/constants/swingTips'
 import type {
@@ -336,22 +337,39 @@ const WaitingPageInner: FC = () => {
 
   if (status?.status === 'failed') {
     const err = status.error
+    const failureCopy = describeAnalysisFailure(err)
     return (
       <View className='waiting waiting--failed'>
         <Text className='waiting__failed-icon'>😣</Text>
-        <Text className='waiting__failed-title'>分析失败</Text>
-        <Text className='waiting__failed-msg'>
-          {err?.message || '抱歉，这次分析没能完成，请重新拍摄一次。'}
-        </Text>
+        <Text className='waiting__failed-title'>{failureCopy.title}</Text>
+        <Text className='waiting__failed-msg'>{failureCopy.message}</Text>
+        {failureCopy.hint && (
+          <View className='waiting__failed-hint'>
+            <Text className='waiting__failed-hint-title'>拍摄建议</Text>
+            <Text className='waiting__failed-hint-text'>{failureCopy.hint}</Text>
+          </View>
+        )}
+        {err?.code != null && (
+          <Text className='waiting__failed-code'>错误码 {err.code}</Text>
+        )}
         {err?.quota_refunded && (
           <Text className='waiting__failed-refund'>✅ 本次已退回分析次数</Text>
         )}
         <View className='waiting__failed-actions'>
-          <Button className='waiting__btn waiting__btn--primary' onClick={handleRetryShoot}>
-            重新拍摄
-          </Button>
-          <Button className='waiting__btn waiting__btn--ghost' onClick={handleGoHome}>
-            去首页
+          {failureCopy.reshootRecommended ? (
+            <Button className='waiting__btn waiting__btn--primary' onClick={handleRetryShoot}>
+              重新拍摄
+            </Button>
+          ) : (
+            <Button className='waiting__btn waiting__btn--primary' onClick={handleGoHome}>
+              稍后再试
+            </Button>
+          )}
+          <Button
+            className='waiting__btn waiting__btn--ghost'
+            onClick={failureCopy.reshootRecommended ? handleGoHome : handleRetryShoot}
+          >
+            {failureCopy.reshootRecommended ? '去首页' : '重新拍摄'}
           </Button>
         </View>
       </View>

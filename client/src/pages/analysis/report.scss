@@ -305,6 +305,16 @@
     }
   }
 
+  &__quality-warnings-foot {
+    display: block;
+    margin-top: 12rpx;
+    padding-top: 12rpx;
+    border-top: 1rpx solid var(--color-warning);
+    font-size: 24rpx;
+    line-height: 1.5;
+    color: var(--color-text-tertiary);
+  }
+
   /* ================= 视频元信息 ================= */
   &__meta {
     display: flex;

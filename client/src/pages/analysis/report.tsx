@@ -40,7 +40,7 @@ import {
 } from '@/constants/phaseLabels'
 import { CAMERA_ANGLE_LABEL, CLUB_TYPE_LABEL } from '@/types/analysis'
 import type { AnalysisReportResponse, PhaseWindow } from '@/types/analysis'
-import { linesForQualityWarnings } from '@/constants/qualityWarnings'
+import { linesForQualityWarnings, QUALITY_WARNING_IMPACT_FOOTNOTE } from '@/constants/qualityWarnings'
 import RadarChart, { RadarAxis } from '@/components/RadarChart'
 import '@/components/RadarChart.scss'
 import './report.scss'
@@ -485,6 +485,7 @@ const ReportPage: FC = () => {
                 {line}
               </Text>
             ))}
+            <Text className='report__quality-warnings-foot'>{QUALITY_WARNING_IMPACT_FOOTNOTE}</Text>
           </View>
         )}
 
@@ -672,6 +673,7 @@ const ReportPage: FC = () => {
               {line}
             </Text>
           ))}
+          <Text className='report__quality-warnings-foot'>{QUALITY_WARNING_IMPACT_FOOTNOTE}</Text>
         </View>
       )}
 

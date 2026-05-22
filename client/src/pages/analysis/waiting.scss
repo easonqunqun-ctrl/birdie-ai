@@ -271,6 +271,40 @@ page {
     color: var(--color-on-primary, #ffffff);
   }
 
+  &__failed-hint {
+    width: 100%;
+    max-width: 640px;
+    margin-bottom: 16px;
+    padding: 16px 20px;
+    border-radius: var(--radius-sm);
+    background: rgba(239, 68, 68, 0.12);
+    border: 1rpx solid var(--color-error);
+  }
+
+  &__failed-hint-title {
+    display: block;
+    font-size: 28px;
+    font-weight: 600;
+    color: #ffb4b4;
+    margin-bottom: 8px;
+  }
+
+  &__failed-hint-text {
+    display: block;
+    font-size: 26px;
+    line-height: 1.5;
+    color: var(--color-on-primary, #ffffff);
+    opacity: 0.9;
+  }
+
+  &__failed-code {
+    display: block;
+    font-size: 24px;
+    opacity: 0.55;
+    margin-bottom: 12px;
+    color: var(--color-on-primary, #ffffff);
+  }
+
   &__failed-refund {
     display: block;
     padding: 12px 20px;

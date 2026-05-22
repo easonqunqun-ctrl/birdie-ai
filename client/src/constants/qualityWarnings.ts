@@ -7,6 +7,10 @@ export const QUALITY_WARNING_COPY: Record<string, string> = {
   camera_shake: '画面抖动略大，可能影响追踪精度。建议固定机位或使用三脚架后再拍。',
 }
 
+/** O-10：软警告存在时报告页统一脚注（docs/01 §4.4） */
+export const QUALITY_WARNING_IMPACT_FOOTNOTE =
+  '以上问题未阻断分析，但结果可能受影响。建议在光线充足、机位稳定处重拍以获得更准确的分数。'
+
 export function linesForQualityWarnings(codes: string[] | null | undefined): string[] {
   if (!codes?.length) return []
   const lines: string[] = []
