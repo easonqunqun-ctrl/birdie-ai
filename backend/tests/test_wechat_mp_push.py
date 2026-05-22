@@ -71,3 +71,18 @@ async def test_mp_push_unknown_event_returns_success(
     body = resp.json()
     assert body["ErrCode"] == 0
     assert body["ErrMsg"] == "ignored"
+
+
+@pytest.mark.asyncio
+async def test_mp_push_post_rejects_bad_signature(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "WECHAT_MP_PUSH_TOKEN", "push_token_test")
+    resp = await client.post(
+        "/v1/wechat/mp-push",
+        params={"signature": "bad", "timestamp": "1", "nonce": "2"},
+        content='{"Event":"subscribe"}',
+        headers={"content-type": "application/json"},
+    )
+    assert resp.status_code == 403

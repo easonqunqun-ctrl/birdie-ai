@@ -1,7 +1,7 @@
 /**
  * Tab 页到期弹窗：进入时拉 membership 再交给 `useMembershipExpiringSoonModal`。
  *
- * 用于首页 / 训练 Tab（Q-B1 余量 · v1.0.4）；会员页仍自行维护 memInfo state。
+ * 用于首页 / 训练 / 教练 Tab（Q-B1 余量 · v1.0.4+）；会员页仍自行维护 memInfo state。
  */
 
 import { useCallback, useEffect, useState } from 'react'
