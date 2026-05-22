@@ -35,7 +35,13 @@ interface CanvasNodeLike {
   width: number
   height: number
   getContext: (type: '2d') => PosterCanvasContext & { scale: (x: number, y: number) => void }
-  createImage: () => { src: string; onload: (() => void) | null; onerror: ((e: unknown) => void) | null }
+  createImage: () => {
+    src: string
+    width?: number
+    height?: number
+    onload: (() => void) | null
+    onerror: ((e: unknown) => void) | null
+  }
 }
 
 function resolveCanvasNode(): Promise<CanvasNodeLike> {
@@ -99,7 +105,11 @@ async function loadImageToCanvas(
     const info = await Taro.getImageInfo({ src: localPath })
     return await new Promise((resolve) => {
       const img = canvas.createImage()
-      img.onload = () => resolve(img)
+      img.onload = () => {
+        if (!img.width && info.width > 0) img.width = info.width
+        if (!img.height && info.height > 0) img.height = info.height
+        resolve(img)
+      }
       img.onerror = () => resolve(null)
       img.src = info.path
     })

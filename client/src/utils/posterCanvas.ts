@@ -19,6 +19,7 @@ import {
   POSTER_COLORS,
   POSTER_HEIGHT,
   POSTER_WIDTH,
+  POSTER_WXA_CODE_SRC_SIZE,
   PosterInput,
   axisLabelAnchor,
   deriveLevel,
@@ -337,6 +338,15 @@ function drawIssues(
   return items.length
 }
 
+/** 读取 Canvas Image 自然尺寸；缺省时与 POSTER_WXA_CODE_SRC_SIZE 对齐 */
+function readImageNaturalSize(image: unknown): { width: number; height: number } {
+  const img = image as { width?: number; height?: number }
+  const width = Number(img?.width)
+  const height = Number(img?.height)
+  if (width > 0 && height > 0) return { width, height }
+  return { width: POSTER_WXA_CODE_SRC_SIZE, height: POSTER_WXA_CODE_SRC_SIZE }
+}
+
 function drawWxaCode(
   ctx: PosterCanvasContext,
   wxaImage: unknown | null,
@@ -361,7 +371,9 @@ function drawWxaCode(
   ctx.strokeRect?.(x - 8, y - 8, qrSize + 16, qrSize + 16)
 
   if (wxaImage) {
-    ctx.drawImage(wxaImage, 0, 0, qrSize, qrSize, x, y, qrSize, qrSize)
+    const { width: srcW, height: srcH } = readImageNaturalSize(wxaImage)
+    // 必须用整图做源区域；若只裁左上角 qrSize×qrSize，430 码会只剩白边 + 右下角图案
+    ctx.drawImage(wxaImage, 0, 0, srcW, srcH, x, y, qrSize, qrSize)
   } else {
     ctx.fillStyle = '#f3f4f6'
     ctx.fillRect(x, y, qrSize, qrSize)

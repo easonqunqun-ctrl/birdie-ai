@@ -15,6 +15,12 @@ import type { AnalysisScoreLevel } from '@/types/analysis'
 export const POSTER_WIDTH = 750
 export const POSTER_HEIGHT = 1334
 
+/**
+ * 分享海报小程序码 PNG 边长（px）。
+ * 须与 backend `share_card_service.ensure_share_wxa_code_url` → `fetch_wxacode_unlimited_png(width=…)` 一致。
+ */
+export const POSTER_WXA_CODE_SRC_SIZE = 430
+
 /** 海报下半区版式（issues 左栏 + 小程序码右栏，避免 Y 坐标叠字） */
 export const POSTER_BOTTOM = {
   marginX: 60,

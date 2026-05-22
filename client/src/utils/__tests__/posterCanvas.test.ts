@@ -11,7 +11,7 @@
  */
 
 import { drawPoster, formatScore, POSTER_LEVEL_LABEL, type PosterCanvasContext } from '../posterCanvas'
-import { POSTER_BOTTOM, posterCtaBottomY, posterIssuesBottomY, type PosterInput } from '../posterLayout'
+import { POSTER_BOTTOM, POSTER_WIDTH, POSTER_WXA_CODE_SRC_SIZE, posterCtaBottomY, posterIssuesBottomY, type PosterInput } from '../posterLayout'
 
 type Call = { method: string; args: unknown[] }
 
@@ -103,10 +103,34 @@ describe('drawPoster · 正常场景', () => {
     }
   })
 
-  it('有 wxa 图片时调 drawImage 渲染小程序码', () => {
+  it('有 wxa 图片时用整图尺寸 drawImage（避免只裁左上角导致码偏右下）', () => {
     const ctx = createMockCtx()
-    drawPoster(ctx, baseInput, { wxaCodeImage: { fake: true }, thumbnailImage: null })
-    expect(ctx.calls.some((c) => c.method === 'drawImage')).toBe(true)
+    const fakeImg = { fake: true, width: POSTER_WXA_CODE_SRC_SIZE, height: POSTER_WXA_CODE_SRC_SIZE }
+    drawPoster(ctx, baseInput, { wxaCodeImage: fakeImg, thumbnailImage: null })
+    const draw = ctx.calls.find((c) => c.method === 'drawImage')
+    expect(draw).toBeDefined()
+    const qrX = POSTER_WIDTH - POSTER_BOTTOM.marginX - POSTER_BOTTOM.qrSize
+    expect(draw!.args).toEqual([
+      fakeImg,
+      0,
+      0,
+      POSTER_WXA_CODE_SRC_SIZE,
+      POSTER_WXA_CODE_SRC_SIZE,
+      qrX,
+      POSTER_BOTTOM.ctaTop,
+      POSTER_BOTTOM.qrSize,
+      POSTER_BOTTOM.qrSize,
+    ])
+  })
+
+  it('wxa 图片缺少 width/height 时回退 POSTER_WXA_CODE_SRC_SIZE', () => {
+    const ctx = createMockCtx()
+    const fakeImg = { fake: true }
+    drawPoster(ctx, baseInput, { wxaCodeImage: fakeImg, thumbnailImage: null })
+    const draw = ctx.calls.find((c) => c.method === 'drawImage')
+    expect(draw).toBeDefined()
+    expect(draw!.args[3]).toBe(POSTER_WXA_CODE_SRC_SIZE)
+    expect(draw!.args[4]).toBe(POSTER_WXA_CODE_SRC_SIZE)
   })
 
   it('主要问题区、CTA 区与页脚 Y 坐标不重叠', () => {
