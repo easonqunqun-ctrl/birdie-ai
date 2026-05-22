@@ -1,9 +1,11 @@
 /**
  * 练习示范视频库（drill_id → 演示视频）
  *
- * 素材 key 与 CVM MinIO `samples/` 前缀一致，经 `{API}/v1/assets/…` 同源代理播放。
+ * 素材 key 与 CVM MinIO `samples/drills/` 一致，经 `{API}/v1/assets/…` 同源代理播放。
+ * 源视频清单与 Mixkit 授权见 `scripts/drill-demo-videos/manifest.json`。
  */
 
+import { getDrillDetail } from '@/constants/drillLibrary'
 import { buildAssetImageUrl, buildAssetVideoUrl } from '@/utils/assetUrls'
 
 export interface DrillVideoDetail {
@@ -14,35 +16,42 @@ export interface DrillVideoDetail {
   duration_seconds?: number
 }
 
-const SAMPLE_VIDEO_KEY = 'samples/swing_demo.mp4'
-const SAMPLE_POSTER_KEY = 'samples/swing_demo_thumb.jpg'
+/** 与 drillLibrary / mock_pipeline 同步的 13 个 drill，均有独立示范片 */
+export const DRILL_VIDEO_IDS = [
+  'drill_towel_arm',
+  'drill_impact_bag',
+  'drill_half_swing',
+  'drill_inside_path',
+  'drill_wall_butt',
+  'drill_hip_rotation',
+  'drill_mirror_spine',
+  'drill_weight_shift',
+  'drill_backswing_stop',
+  'drill_shoulder_turn',
+  'drill_plane_board',
+  'drill_alignment_stick',
+  'drill_grip_checkpoint',
+] as const
 
-const SAMPLE_VIDEO_URL = buildAssetVideoUrl(SAMPLE_VIDEO_KEY)
-const SAMPLE_POSTER_URL = buildAssetImageUrl(SAMPLE_POSTER_KEY)
+function drillVideoKey(drillId: string): string {
+  return `samples/drills/${drillId}.mp4`
+}
 
-const DRILL_VIDEOS: DrillVideoDetail[] = [
-  {
-    drill_id: 'drill_towel_arm',
-    title: '毛巾夹臂练习示范',
-    video_url: SAMPLE_VIDEO_URL,
-    poster_url: SAMPLE_POSTER_URL,
-    duration_seconds: 45,
-  },
-  {
-    drill_id: 'drill_hip_rotation',
-    title: '髋部旋转练习示范',
-    video_url: SAMPLE_VIDEO_URL,
-    poster_url: SAMPLE_POSTER_URL,
-    duration_seconds: 52,
-  },
-  {
-    drill_id: 'drill_half_swing',
-    title: '半挥杆节奏练习示范',
-    video_url: SAMPLE_VIDEO_URL,
-    poster_url: SAMPLE_POSTER_URL,
-    duration_seconds: 38,
-  },
-]
+function drillPosterKey(drillId: string): string {
+  return `samples/drills/${drillId}_thumb.jpg`
+}
+
+function buildDrillVideoDetail(drillId: string): DrillVideoDetail {
+  const drill = getDrillDetail(drillId)
+  return {
+    drill_id: drillId,
+    title: `${drill.name}示范`,
+    video_url: buildAssetVideoUrl(drillVideoKey(drillId)),
+    poster_url: buildAssetImageUrl(drillPosterKey(drillId)),
+  }
+}
+
+const DRILL_VIDEOS: DrillVideoDetail[] = DRILL_VIDEO_IDS.map(buildDrillVideoDetail)
 
 const VIDEO_MAP: Record<string, DrillVideoDetail> = DRILL_VIDEOS.reduce(
   (acc, item) => {

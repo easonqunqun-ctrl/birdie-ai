@@ -1,14 +1,16 @@
 import {
+  DRILL_VIDEO_IDS,
   getDrillVideoDetail,
   resolveVideoCardDetail,
 } from '@/constants/drillVideoLibrary'
 
 describe('drillVideoLibrary', () => {
-  it('三大 heuristic drill 均有同源代理视频', () => {
-    for (const id of ['drill_towel_arm', 'drill_hip_rotation', 'drill_half_swing']) {
+  it('13 个 drill 均有独立同源代理视频', () => {
+    expect(DRILL_VIDEO_IDS).toHaveLength(13)
+    for (const id of DRILL_VIDEO_IDS) {
       const detail = getDrillVideoDetail(id)
-      expect(detail?.video_url).toContain('/assets/video/samples/swing_demo.mp4')
-      expect(detail?.poster_url).toContain('/assets/image/samples/swing_demo_thumb.jpg')
+      expect(detail?.video_url).toContain(`/assets/video/samples/drills/${id}.mp4`)
+      expect(detail?.poster_url).toContain(`/assets/image/samples/drills/${id}_thumb.jpg`)
     }
   })
 
