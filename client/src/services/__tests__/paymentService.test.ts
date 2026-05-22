@@ -46,6 +46,16 @@ describe('paymentService', () => {
     expect(T.showToast).not.toHaveBeenCalled()
   })
 
+  test('createOrder with wx_login_code when wxLoginCode provided', async () => {
+    T.request.mockResolvedValueOnce(ok({ order_id: 'o2', mock_mode: false }))
+    await paymentService.createOrder('monthly', 'wx-code-abc')
+    const sent = T.request.mock.calls[0][0]
+    expect(sent.data).toEqual({
+      plan_type: 'monthly',
+      wx_login_code: 'wx-code-abc',
+    })
+  })
+
   test('mockConfirm → POST /payments/orders/:id/mock-confirm', async () => {
     T.request.mockResolvedValueOnce(ok({ id: 'o1', status: 'paid' }))
     await paymentService.mockConfirm('o1')

@@ -21,8 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.core.exceptions import AppException, BadRequestError, ConflictError, NotFoundError, ThirdPartyError
 from app.core.security import new_id
-from app.integrations import wechat_pay_v3
-from app.integrations import wechat_xpay
+from app.integrations import wechat_pay_v3, wechat_xpay
 from app.integrations.wechat import code2session
 from app.models.analysis import AnalysisQuota
 from app.models.chat import ChatQuota
