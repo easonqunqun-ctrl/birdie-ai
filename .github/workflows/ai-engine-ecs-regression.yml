@@ -32,7 +32,7 @@ jobs:
         run: uv sync --group dev
 
       - name: ECS v1 regression tests
-        run: uv run pytest tests/test_ecs_regression.py -v --tb=short
+        run: uv run pytest tests/test_ecs_regression.py tests/test_skeleton_fps.py -v --tb=short
 
       - name: Ruff (ecs + pipeline lazy imports)
-        run: uv run ruff check app/ecs/ app/pipeline/__init__.py tests/test_ecs_regression.py tests/ecs/
+        run: uv run ruff check app/ecs/ app/pipeline/__init__.py app/pipeline/visualize.py tests/test_ecs_regression.py tests/test_skeleton_fps.py tests/ecs/

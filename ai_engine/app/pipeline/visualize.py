@@ -43,6 +43,11 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("ai_engine.visualize")
 
+# O-07：微信小程序 / WebView 流畅播放下限（docs/01 §4.3）
+MIN_SKELETON_PLAYBACK_FPS = 24.0
+# 与 preprocess 归一化目标一致
+DEFAULT_SKELETON_OUTPUT_FPS = 30.0
+
 # 绘制风格（统一一份，便于调）
 _LANDMARK_COLOR = (0, 255, 0)  # BGR：绿色 = 关键点
 _CONNECTION_COLOR = (0, 200, 255)  # BGR：橙色 = 骨骼连线
@@ -72,6 +77,98 @@ class VisualizeArtifacts:
     skeleton_video_path: Path | None
     keyframes_paths: dict[str, Path]
     pose_data_path: Path | None
+
+
+@dataclass(frozen=True)
+class VideoStreamProbe:
+    """ffprobe 抽样的视频流信息（用于 O-07 FPS 验收）。"""
+
+    fps: float
+    frame_count: int | None
+    codec: str | None
+
+
+def parse_ffprobe_fps(raw: str) -> float:
+    """解析 ffprobe `avg_frame_rate` / `r_frame_rate`（如 `30000/1001`）。"""
+    text = (raw or "").strip()
+    if not text or text == "0/0":
+        return 0.0
+    if "/" in text:
+        num, den = text.split("/", 1)
+        den_f = float(den)
+        if den_f <= 0:
+            return 0.0
+        return float(num) / den_f
+    try:
+        return float(text)
+    except ValueError:
+        return 0.0
+
+
+def resolve_skeleton_output_fps(
+    *,
+    container_fps: float | None,
+    pose_fps: float | None,
+) -> float:
+    """决定骨骼叠加 mp4 的编码帧率；保证 ≥ MIN_SKELETON_PLAYBACK_FPS。"""
+    candidate = container_fps if container_fps and container_fps > 0 else None
+    if candidate is None and pose_fps and pose_fps > 0:
+        candidate = float(pose_fps)
+    if candidate is None or candidate <= 0:
+        candidate = DEFAULT_SKELETON_OUTPUT_FPS
+
+    if candidate < MIN_SKELETON_PLAYBACK_FPS:
+        return MIN_SKELETON_PLAYBACK_FPS
+    # 归一化管线目标 30fps；接近 30 时对齐，避免 29.97 漂移
+    if candidate >= 28.0:
+        return DEFAULT_SKELETON_OUTPUT_FPS
+    return float(candidate)
+
+
+def probe_video_stream(path: Path | str) -> VideoStreamProbe | None:
+    """用 ffprobe 读取视频流 fps / 帧数 / 编码；失败返回 None。"""
+    target = Path(path)
+    if not target.exists():
+        return None
+    cmd = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "stream=avg_frame_rate,nb_frames,codec_name",
+        "-of",
+        "json",
+        str(target),
+    ]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=15, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if proc.returncode != 0:
+        return None
+    try:
+        import json
+
+        payload = json.loads(proc.stdout or "{}")
+        streams = payload.get("streams") or []
+        if not streams:
+            return None
+        stream = streams[0]
+        fps = parse_ffprobe_fps(str(stream.get("avg_frame_rate") or stream.get("r_frame_rate") or ""))
+        nb_raw = stream.get("nb_frames")
+        frame_count = int(nb_raw) if nb_raw not in (None, "N/A") else None
+        codec = stream.get("codec_name")
+        return VideoStreamProbe(fps=fps, frame_count=frame_count, codec=str(codec) if codec else None)
+    except (ValueError, TypeError, json.JSONDecodeError):
+        return None
+
+
+def skeleton_playback_fps_ok(probe: VideoStreamProbe | None) -> bool:
+    if probe is None or probe.fps <= 0:
+        return False
+    return probe.fps + 1e-3 >= MIN_SKELETON_PLAYBACK_FPS
 
 
 # ============================================================
@@ -159,7 +256,11 @@ def render_skeleton_video(
 
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = cap.get(cv2.CAP_PROP_FPS) or pose_result.fps or 30.0
+    container_fps = cap.get(cv2.CAP_PROP_FPS) or 0.0
+    output_fps = resolve_skeleton_output_fps(
+        container_fps=container_fps if container_fps > 0 else None,
+        pose_fps=pose_result.fps,
+    )
 
     if width <= 0 or height <= 0:
         cap.release()
@@ -183,7 +284,7 @@ def render_skeleton_video(
         "-f", "rawvideo",
         "-pix_fmt", "bgr24",
         "-s", f"{width}x{height}",
-        "-r", f"{fps:.3f}",
+        "-r", f"{output_fps:.3f}",
         "-i", "-",
         "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2",
         "-c:v", "libx264",
@@ -236,11 +337,25 @@ def render_skeleton_video(
             log.warning("ffmpeg_encode_failed", extra={"rc": rc, "stderr": stderr[-500:]})
             return None
 
+        probe = probe_video_stream(output_path)
+        if not skeleton_playback_fps_ok(probe):
+            log.warning(
+                "skeleton_fps_below_min",
+                extra={
+                    "output": str(output_path),
+                    "probed_fps": probe.fps if probe else None,
+                    "min_fps": MIN_SKELETON_PLAYBACK_FPS,
+                    "encoded_fps": output_fps,
+                },
+            )
+
         log.info(
             "skeleton_video_rendered",
             extra={
                 "output": str(output_path),
                 "frames": frame_idx,
+                "encoded_fps": output_fps,
+                "probed_fps": probe.fps if probe else None,
                 "size_bytes": output_path.stat().st_size if output_path.exists() else 0,
             },
         )

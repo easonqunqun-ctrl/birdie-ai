@@ -172,6 +172,10 @@ const ReportPage: FC = () => {
     setPlaybackSrc(report?.skeleton_video_url || report?.video_url || '')
   }, [report?.skeleton_video_url, report?.video_url])
 
+  const usingSkeletonPlayback = Boolean(
+    report?.skeleton_video_url && playbackSrc === report.skeleton_video_url,
+  )
+
   // ---------------- 派生数据 ----------------
   const radarAxes: RadarAxis[] = useMemo(() => {
     if (!report?.phase_scores) return []
@@ -565,6 +569,9 @@ const ReportPage: FC = () => {
       {/* 视频固定在 ScrollView 外，避免小程序 createVideoContext + 嵌套滚动失效 */}
       <View id='report-video-anchor' className='report__video-wrap'>
         <View className='report__video-frame'>
+          {usingSkeletonPlayback && (
+            <Text className='report__video-badge'>骨骼叠加回放</Text>
+          )}
           <Video
             id={VIDEO_ID}
             className='report__video'

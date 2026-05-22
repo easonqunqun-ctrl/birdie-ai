@@ -15,10 +15,13 @@ import pytest
 
 from app.pipeline.diagnose import DiagnosedIssue
 from app.pipeline.visualize import (
+    MIN_SKELETON_PLAYBACK_FPS,
     dump_pose_parquet,
     extract_issue_keyframes,
     extract_keyframe,
+    probe_video_stream,
     render_skeleton_video,
+    skeleton_playback_fps_ok,
 )
 from tests.conftest import HAS_CV2, HAS_FFMPEG, needs_cv2, needs_ffmpeg
 
@@ -110,6 +113,11 @@ def test_render_skeleton_video_smoke(synthetic_pose_result, tmp_path: Path) -> N
         capture_output=True, text=True,
     )
     assert "h264" in probe.stdout.lower()
+
+    stream_probe = probe_video_stream(out)
+    assert stream_probe is not None
+    assert skeleton_playback_fps_ok(stream_probe)
+    assert stream_probe.fps + 1e-3 >= MIN_SKELETON_PLAYBACK_FPS
 
 
 def test_render_skeleton_video_missing_input_returns_none(synthetic_pose_result, tmp_path: Path) -> None:

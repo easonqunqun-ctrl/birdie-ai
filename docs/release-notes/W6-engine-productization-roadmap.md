@@ -14,7 +14,7 @@
 ## 未完 · 队列
 
 1. **上报链闭环**：后端 / Celery 默认分析任务在非 mock 时切 **real_pipeline**，失败回退策略与 SLA 记入 Runbook。
-2. **骨架视频 FPS**：实测 `overlay_pose=true` 成片的有效帧间隔；不达标时降采样或缩短叠加长度（白皮 ≥24fps）。
+2. **骨架视频 FPS**：`render_skeleton_video` 经 `resolve_skeleton_output_fps` 保证编码 ≥24fps，成片经 ffprobe 验收（**v1.2.3** ✅）；真机流畅度抽测仍 ⏳
 3. **质量门与 MVP §4.3**：告警型问题透传到报告文案；阻断策略与产品经理拍板后对 `01` Checkbox 核销。
 4. **`docs/20` 已入库可执行项**：验收见 [`docs/01` §4.5](../01-MVP功能需求规格说明书.md#45-ai-引擎产品力对齐-docs20)；排期 **ENG-01～ENG-06** 见 [`docs/19` §6.3](../19-产品开发迭代计划-当前队列.md#63-主表plan-id)。
 
