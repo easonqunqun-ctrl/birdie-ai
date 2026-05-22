@@ -13,18 +13,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from app.errors import PipelineError, PoorQualityError, PreprocessError
+from app.errors import PipelineError, PreprocessError
 from app.pipeline.preprocess import (
     MAX_DURATION_SEC,
-    MAX_FRAME_LOSS_RATIO,
-    MAX_LOW_CLARITY_FRAME_RATIO,
-    MIN_CLARITY_SCORE,
     MIN_DURATION_SEC,
-    MIN_QUALITY_SCORE,
-    MIN_STABILITY_HARD_BLOCK,
     _ffprobe,
     _materialize_input,
     _quick_scan_quality,
+    enforce_quality_gates,
     quality_warnings_from_scan,
 )
 
@@ -67,7 +63,7 @@ def run_precheck(
         stats = _quick_scan_quality(source_path, max_elapsed_sec=max_scan_sec)
         scan_elapsed_ms = int((time.perf_counter() - scan_t0) * 1000)
 
-        _enforce_quality_gates(stats)
+        enforce_quality_gates(stats)
         warnings = quality_warnings_from_scan(stats)
 
         elapsed_ms = int((time.perf_counter() - t0) * 1000)
@@ -90,42 +86,3 @@ def run_precheck(
         )
     finally:
         shutil.rmtree(work_dir, ignore_errors=True)
-
-
-def _enforce_quality_gates(stats) -> None:
-    if stats.clarity_score < MIN_CLARITY_SCORE:
-        raise PoorQualityError(
-            f"clarity_score={stats.clarity_score:.1f} < {MIN_CLARITY_SCORE}",
-            user_message="视频画面过于模糊，请在光线充足的环境下重拍",
-        )
-    if stats.frame_loss_ratio > MAX_FRAME_LOSS_RATIO:
-        raise PoorQualityError(
-            f"frame_loss_ratio={stats.frame_loss_ratio:.2%}",
-            user_message="视频解码异常，请重新上传",
-        )
-    if stats.low_clarity_frame_ratio > MAX_LOW_CLARITY_FRAME_RATIO:
-        raise PoorQualityError(
-            f"low_clarity_frame_ratio={stats.low_clarity_frame_ratio:.1%}",
-            user_message="视频清晰度不稳定，请在光线充足、对焦清晰的环境下重拍",
-        )
-    if stats.stability_score < MIN_STABILITY_HARD_BLOCK:
-        raise PoorQualityError(
-            f"stability_score={stats.stability_score:.2f}",
-            user_message="画面抖动过大，请固定机位或使用三脚架后重拍",
-        )
-    quality_score = _composite_quality_score(stats)
-    if quality_score < MIN_QUALITY_SCORE:
-        raise PoorQualityError(
-            f"quality_score={quality_score:.2f} < {MIN_QUALITY_SCORE}",
-            user_message="视频质量不足，请改善光线与机位后重拍",
-        )
-
-
-def _composite_quality_score(stats) -> float:
-    import numpy as np
-
-    clarity_component = min(stats.clarity_score / MIN_CLARITY_SCORE, 2.0) / 2.0
-    stability_component = stats.stability_score
-    frame_loss_penalty = max(0.0, 1.0 - stats.frame_loss_ratio / MAX_FRAME_LOSS_RATIO)
-    score = 0.5 * clarity_component + 0.3 * stability_component + 0.2 * frame_loss_penalty
-    return float(np.clip(score, 0.0, 1.0))

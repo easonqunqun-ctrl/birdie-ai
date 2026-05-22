@@ -136,6 +136,60 @@ def quality_warnings_from_scan(stats: _ScanStats) -> list[str]:
     return codes
 
 
+def composite_quality_score(
+    stats: _ScanStats,
+    *,
+    min_clarity: float = MIN_CLARITY_SCORE,
+    max_frame_loss: float = MAX_FRAME_LOSS_RATIO,
+) -> float:
+    """综合 quality_score 0–1；与 preprocess / precheck 共用。"""
+    clarity_component = min(stats.clarity_score / min_clarity, 2.0) / 2.0
+    stability_component = stats.stability_score
+    frame_loss_penalty = max(0.0, 1.0 - stats.frame_loss_ratio / max_frame_loss)
+    score = 0.5 * clarity_component + 0.3 * stability_component + 0.2 * frame_loss_penalty
+    return float(np.clip(score, 0.0, 1.0))
+
+
+def enforce_quality_gates(
+    stats: _ScanStats,
+    *,
+    min_clarity: float = MIN_CLARITY_SCORE,
+    max_frame_loss: float = MAX_FRAME_LOSS_RATIO,
+    min_quality_score: float = MIN_QUALITY_SCORE,
+) -> None:
+    """硬门槛：不过关抛 PoorQualityError（50102）。precheck 与 preprocess 共用。"""
+    if stats.clarity_score < min_clarity:
+        raise PoorQualityError(
+            f"clarity_score={stats.clarity_score:.1f} < {min_clarity}",
+            user_message="视频画面过于模糊，请在光线充足的环境下重拍",
+        )
+    if stats.frame_loss_ratio > max_frame_loss:
+        raise PoorQualityError(
+            f"frame_loss_ratio={stats.frame_loss_ratio:.2%} > {max_frame_loss:.0%}",
+            user_message="视频解码异常，请重新上传",
+        )
+    if stats.low_clarity_frame_ratio > MAX_LOW_CLARITY_FRAME_RATIO:
+        raise PoorQualityError(
+            f"low_clarity_frame_ratio={stats.low_clarity_frame_ratio:.1%}",
+            user_message="视频清晰度不稳定，请在光线充足、对焦清晰的环境下重拍",
+        )
+    if stats.stability_score < MIN_STABILITY_HARD_BLOCK:
+        raise PoorQualityError(
+            f"stability_score={stats.stability_score:.2f}",
+            user_message="画面抖动过大，请固定机位或使用三脚架后重拍",
+        )
+    quality_score = composite_quality_score(
+        stats,
+        min_clarity=min_clarity,
+        max_frame_loss=max_frame_loss,
+    )
+    if quality_score < min_quality_score:
+        raise PoorQualityError(
+            f"quality_score={quality_score:.2f} < {min_quality_score}",
+            user_message="视频质量不足，请改善光线与机位后重拍",
+        )
+
+
 # ============================================================
 # 主入口
 # ============================================================
@@ -191,11 +245,11 @@ def preprocess_video(
     stats = _scan_quality(normalized_path)
 
     # 5. 综合 quality_score：简单加权平均到 [0, 1]
-    clarity_component = min(stats.clarity_score / min_clarity, 2.0) / 2.0  # 0-1，clip 到 min 的 2 倍
-    stability_component = stats.stability_score  # 已经归一化到 0-1
-    frame_loss_penalty = max(0.0, 1.0 - stats.frame_loss_ratio / max_frame_loss)
-    quality_score = 0.5 * clarity_component + 0.3 * stability_component + 0.2 * frame_loss_penalty
-    quality_score = float(np.clip(quality_score, 0.0, 1.0))
+    quality_score = composite_quality_score(
+        stats,
+        min_clarity=min_clarity,
+        max_frame_loss=max_frame_loss,
+    )
 
     result = PreprocessResult(
         normalized_video_path=normalized_path,
@@ -211,32 +265,12 @@ def preprocess_video(
         low_clarity_frame_ratio=stats.low_clarity_frame_ratio,
     )
 
-    # 6. 质量门
-    if stats.clarity_score < min_clarity:
-        raise PoorQualityError(
-            f"clarity_score={stats.clarity_score:.1f} < {min_clarity}",
-            user_message="视频画面过于模糊，请在光线充足的环境下重拍",
-        )
-    if stats.frame_loss_ratio > max_frame_loss:
-        raise PoorQualityError(
-            f"frame_loss_ratio={stats.frame_loss_ratio:.2%} > {max_frame_loss:.0%}",
-            user_message="视频解码异常，请重新上传",
-        )
-    if stats.low_clarity_frame_ratio > MAX_LOW_CLARITY_FRAME_RATIO:
-        raise PoorQualityError(
-            f"low_clarity_frame_ratio={stats.low_clarity_frame_ratio:.1%}",
-            user_message="视频清晰度不稳定，请在光线充足、对焦清晰的环境下重拍",
-        )
-    if stats.stability_score < MIN_STABILITY_HARD_BLOCK:
-        raise PoorQualityError(
-            f"stability_score={stats.stability_score:.2f}",
-            user_message="画面抖动过大，请固定机位或使用三脚架后重拍",
-        )
-    if quality_score < MIN_QUALITY_SCORE:
-        raise PoorQualityError(
-            f"quality_score={quality_score:.2f} < {MIN_QUALITY_SCORE}",
-            user_message="视频质量不足，请改善光线与机位后重拍",
-        )
+    # 6. 质量门（与 precheck 共用 enforce_quality_gates）
+    enforce_quality_gates(
+        stats,
+        min_clarity=min_clarity,
+        max_frame_loss=max_frame_loss,
+    )
 
     return result
 

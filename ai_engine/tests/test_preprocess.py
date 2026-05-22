@@ -130,6 +130,23 @@ def test_quality_warnings_from_scan_codes() -> None:
     assert quality_warnings_from_scan(stats) == ["low_light", "camera_shake"]
 
 
+def test_enforce_quality_gates_delegates_to_shared_helper() -> None:
+    from app.pipeline.preprocess import MIN_STABILITY_HARD_BLOCK, _ScanStats, enforce_quality_gates
+
+    stats = _ScanStats(
+        fps=30.0,
+        num_frames=30,
+        width=720,
+        height=1280,
+        clarity_score=200.0,
+        stability_score=MIN_STABILITY_HARD_BLOCK - 0.01,
+        frame_loss_ratio=0.0,
+        low_clarity_frame_ratio=0.0,
+    )
+    with pytest.raises(PoorQualityError):
+        enforce_quality_gates(stats)
+
+
 # ============================================================
 # 第 2 层：合成视频质量门（需要 ffmpeg + opencv）
 # ============================================================
