@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# 下载 Mixkit 免版权高尔夫素材 → 生成封面 → 上传 CVM MinIO samples/drills/
+# 下载 Mixkit 免版权高尔夫素材 → 转码（720p / faststart / ≤15s）→ 上传 CVM MinIO samples/drills/
 #
 # 用法：
 #   bash scripts/drill-demo-videos/sync-to-minio.sh              # 本地下载 MP4（缓存 .cache/）
-#   bash scripts/drill-demo-videos/sync-to-minio.sh --upload     # scp + 远端 ffmpeg 封面 + mc 写入 MinIO
-#   bash scripts/drill-demo-videos/sync-to-minio.sh --remote     # 直接在 CVM 下载并写入 MinIO（推荐）
+#   bash scripts/drill-demo-videos/sync-to-minio.sh --upload     # scp + 远端转码 + mc 写入 MinIO
+#   bash scripts/drill-demo-videos/sync-to-minio.sh --remote     # CVM 下载 + 转码 + 写入 MinIO
+#   bash scripts/drill-demo-videos/sync-to-minio.sh --recompress # 仅对 MinIO 已有 MP4 重新转码（修卡顿）
 #
-# 依赖：curl、python3；封面需 ffmpeg（--upload 在 CVM 上执行，--remote 亦同）
+# 依赖：curl、python3；转码/封面需 CVM 上 xiaoniao-ai-engine（ffmpeg）
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -15,6 +16,8 @@ MANIFEST="${HERE}/manifest.json"
 BUCKET="${MINIO_BUCKET:-xiaoniao-videos-test}"
 DEPLOY_HOST="${DEPLOY_HOST:-ubuntu@1.13.198.172}"
 SSH_KEY="${DEPLOY_SSH_KEY:-$HOME/.ssh/id_ed25519_birdie_golf}"
+ENGINE="${DRILL_FFMPEG_CONTAINER:-xiaoniao-ai-engine}"
+MINIO="${DRILL_MINIO_CONTAINER:-xiaoniao-minio}"
 MODE="${1:-download}"
 
 require() {
@@ -45,6 +48,120 @@ for item in json.load(open(sys.argv[1], encoding="utf-8"))["items"]:
 PY
 }
 
+read_manifest_ids() {
+  python3 - "${MANIFEST}" <<'PY'
+import json, sys
+for item in json.load(open(sys.argv[1], encoding="utf-8"))["items"]:
+    print(item["drill_id"])
+PY
+}
+
+remote_python() {
+  scp -i "${SSH_KEY}" -o StrictHostKeyChecking=accept-new \
+    "${MANIFEST}" "${DEPLOY_HOST}:/tmp/drill-demo-manifest.json" >/dev/null
+  ssh -i "${SSH_KEY}" "${DEPLOY_HOST}" \
+    BUCKET="${BUCKET}" ENGINE="${ENGINE}" MINIO="${MINIO}" DRILL_SYNC_MODE="${MODE}" \
+    bash -s <<'REMOTE'
+set -euo pipefail
+WORKDIR="/tmp/drill-demo-sync"
+mkdir -p "${WORKDIR}"
+MANIFEST="/tmp/drill-demo-manifest.json"
+
+python3 - "${MANIFEST}" <<'PY'
+import json, os, subprocess, sys
+
+manifest_path = sys.argv[1]
+mode = os.environ["DRILL_SYNC_MODE"]
+bucket = os.environ["BUCKET"]
+engine = os.environ["ENGINE"]
+minio = os.environ["MINIO"]
+workdir = "/tmp/drill-demo-sync"
+manifest = json.load(open(manifest_path, encoding="utf-8"))
+
+SCALE = "scale='min(720,iw)':-2"
+FFMPEG_ARGS = [
+    "-t", "15",
+    "-vf", SCALE,
+    "-c:v", "libx264", "-profile:v", "main", "-pix_fmt", "yuv420p",
+    "-crf", "20", "-preset", "fast",
+    "-maxrate", "2500k", "-bufsize", "5000k",
+    "-movflags", "+faststart",
+    "-an",
+]
+
+
+def transcode_on_engine(host_src: str, host_dst: str, tag: str) -> None:
+    in_c = f"/tmp/{tag}_in.mp4"
+    out_c = f"/tmp/{tag}_out.mp4"
+    subprocess.check_call(["docker", "cp", host_src, f"{engine}:{in_c}"])
+    subprocess.check_call(["docker", "exec", engine, "ffmpeg", "-y", "-loglevel", "error", "-i", in_c, *FFMPEG_ARGS, out_c])
+    subprocess.check_call(["docker", "cp", f"{engine}:{out_c}", host_dst])
+    subprocess.check_call(["docker", "exec", engine, "rm", "-f", in_c, out_c])
+
+
+def thumb_from_video(host_mp4: str, host_jpg: str, tag: str) -> None:
+    in_c = f"/tmp/{tag}_v.mp4"
+    out_c = f"/tmp/{tag}_t.jpg"
+    subprocess.check_call(["docker", "cp", host_mp4, f"{engine}:{in_c}"])
+    subprocess.check_call([
+        "docker", "exec", engine, "ffmpeg", "-y", "-loglevel", "error",
+        "-ss", "0.5", "-i", in_c, "-vframes", "1", "-q:v", "3", out_c,
+    ])
+    subprocess.check_call(["docker", "cp", f"{engine}:{out_c}", host_jpg])
+    subprocess.check_call(["docker", "exec", engine, "rm", "-f", in_c, out_c])
+
+
+def upload_pair(drill_id: str, host_mp4: str, host_jpg: str) -> None:
+    subprocess.check_call(["docker", "cp", host_mp4, f"{minio}:/tmp/{drill_id}.mp4"])
+    subprocess.check_call(["docker", "cp", host_jpg, f"{minio}:/tmp/{drill_id}_thumb.jpg"])
+    subprocess.check_call([
+        "docker", "exec", minio, "mc", "cp", f"/tmp/{drill_id}.mp4",
+        f"local/{bucket}/samples/drills/{drill_id}.mp4",
+    ])
+    subprocess.check_call([
+        "docker", "exec", minio, "mc", "cp", f"/tmp/{drill_id}_thumb.jpg",
+        f"local/{bucket}/samples/drills/{drill_id}_thumb.jpg",
+    ])
+    subprocess.check_call([
+        "docker", "exec", minio, "rm", "-f",
+        f"/tmp/{drill_id}.mp4", f"/tmp/{drill_id}_thumb.jpg",
+    ])
+
+
+def process_item(item: dict, source: str) -> None:
+    drill_id = item["drill_id"]
+    raw_mp4 = f"{workdir}/{drill_id}_raw.mp4"
+    out_mp4 = f"{workdir}/{drill_id}.mp4"
+    out_jpg = f"{workdir}/{drill_id}_thumb.jpg"
+
+    if source == "mixkit":
+        mixkit_id = item["mixkit_id"]
+        res = item["resolution"]
+        url = f"https://assets.mixkit.co/videos/{mixkit_id}/{mixkit_id}-{res}.mp4"
+        subprocess.check_call(["curl", "-fsSL", url, "-o", raw_mp4])
+    else:
+        subprocess.check_call([
+            "docker", "exec", minio, "mc", "cp",
+            f"local/{bucket}/samples/drills/{drill_id}.mp4",
+            f"/tmp/{drill_id}_pull.mp4",
+        ])
+        subprocess.check_call(["docker", "cp", f"{minio}:/tmp/{drill_id}_pull.mp4", raw_mp4])
+        subprocess.check_call(["docker", "exec", minio, "rm", "-f", f"/tmp/{drill_id}_pull.mp4"])
+
+    transcode_on_engine(raw_mp4, out_mp4, drill_id)
+    thumb_from_video(out_mp4, out_jpg, f"{drill_id}_thumb")
+    upload_pair(drill_id, out_mp4, out_jpg)
+    print(f"ok {drill_id} {os.path.getsize(out_mp4) // 1024}KiB")
+
+
+source = "minio" if mode == "--recompress" else "mixkit"
+for item in manifest["items"]:
+    process_item(item, source)
+PY
+rm -f "${MANIFEST}"
+REMOTE
+}
+
 download_item() {
   local drill_id="$1" mixkit_id="$2" resolution="$3"
   local out_mp4="${CACHE}/${drill_id}.mp4"
@@ -65,83 +182,54 @@ upload_item() {
   local drill_id="$1"
   local out_mp4="${CACHE}/${drill_id}.mp4"
   local remote_mp4="/tmp/drill-upload-${drill_id}.mp4"
-  local remote_jpg="/tmp/drill-upload-${drill_id}_thumb.jpg"
 
   if [[ ! -s "${out_mp4}" ]]; then
     echo "缺少本地文件: ${out_mp4}，请先运行无参下载" >&2
     exit 1
   fi
 
-  say "上传 ${drill_id} → MinIO ${BUCKET}/samples/drills/"
+  say "上传 ${drill_id}（远端转码）→ MinIO ${BUCKET}/samples/drills/"
   scp -i "${SSH_KEY}" -o StrictHostKeyChecking=accept-new \
     "${out_mp4}" "${DEPLOY_HOST}:${remote_mp4}"
 
   ssh -i "${SSH_KEY}" "${DEPLOY_HOST}" bash -s <<EOF
 set -euo pipefail
-docker cp "${remote_mp4}" xiaoniao-ai-engine:/tmp/${drill_id}.mp4
-docker exec xiaoniao-ai-engine ffmpeg -y -loglevel error -ss 0.5 -i /tmp/${drill_id}.mp4 -vframes 1 -q:v 3 /tmp/${drill_id}_thumb.jpg
-docker cp xiaoniao-ai-engine:/tmp/${drill_id}_thumb.jpg "${remote_jpg}"
-docker exec xiaoniao-ai-engine rm -f /tmp/${drill_id}.mp4 /tmp/${drill_id}_thumb.jpg
-docker cp "${remote_mp4}" xiaoniao-minio:/tmp/${drill_id}.mp4
-docker cp "${remote_jpg}" xiaoniao-minio:/tmp/${drill_id}_thumb.jpg
-docker exec xiaoniao-minio mc cp /tmp/${drill_id}.mp4 "local/${BUCKET}/samples/drills/${drill_id}.mp4"
-docker exec xiaoniao-minio mc cp /tmp/${drill_id}_thumb.jpg "local/${BUCKET}/samples/drills/${drill_id}_thumb.jpg"
-docker exec xiaoniao-minio rm -f /tmp/${drill_id}.mp4 /tmp/${drill_id}_thumb.jpg
-rm -f "${remote_mp4}" "${remote_jpg}"
-EOF
-}
-
-remote_sync_all() {
-  say "在 ${DEPLOY_HOST} 上直接下载并写入 MinIO"
-  scp -i "${SSH_KEY}" -o StrictHostKeyChecking=accept-new \
-    "${MANIFEST}" "${DEPLOY_HOST}:/tmp/drill-demo-manifest.json"
-
-  ssh -i "${SSH_KEY}" "${DEPLOY_HOST}" bash -s <<EOF
-set -euo pipefail
-export BUCKET="${BUCKET}"
-MANIFEST="/tmp/drill-demo-manifest.json"
 WORKDIR="/tmp/drill-demo-sync"
 mkdir -p "\${WORKDIR}"
-python3 - "\${MANIFEST}" <<'PY'
-import json, subprocess, sys, os
-manifest = json.load(open(sys.argv[1], encoding="utf-8"))
-bucket = os.environ["BUCKET"]
-engine = "xiaoniao-ai-engine"
-minio = "xiaoniao-minio"
-for item in manifest["items"]:
-    drill_id = item["drill_id"]
-    mixkit_id = item["mixkit_id"]
-    res = item["resolution"]
-    url = f"https://assets.mixkit.co/videos/{mixkit_id}/{mixkit_id}-{res}.mp4"
-    mp4 = f"/tmp/drill-demo-sync/{drill_id}.mp4"
-    jpg = f"/tmp/drill-demo-sync/{drill_id}_thumb.jpg"
-    in_mp4 = f"/tmp/{drill_id}.mp4"
-    in_jpg = f"/tmp/{drill_id}_thumb.jpg"
-    subprocess.check_call(["curl", "-fsSL", url, "-o", mp4])
-    subprocess.check_call(["docker", "cp", mp4, f"{engine}:{in_mp4}"])
-    subprocess.check_call([
-        "docker", "exec", engine, "ffmpeg", "-y", "-loglevel", "error",
-        "-ss", "0.5", "-i", in_mp4, "-vframes", "1", "-q:v", "3", in_jpg,
-    ])
-    subprocess.check_call(["docker", "cp", f"{engine}:{in_jpg}", jpg])
-    subprocess.check_call(["docker", "cp", mp4, f"{minio}:/tmp/{drill_id}.mp4"])
-    subprocess.check_call(["docker", "cp", jpg, f"{minio}:/tmp/{drill_id}_thumb.jpg"])
-    subprocess.check_call([
-        "docker", "exec", minio, "mc", "cp", f"/tmp/{drill_id}.mp4",
-        f"local/{bucket}/samples/drills/{drill_id}.mp4",
-    ])
-    subprocess.check_call([
-        "docker", "exec", minio, "mc", "cp", f"/tmp/{drill_id}_thumb.jpg",
-        f"local/{bucket}/samples/drills/{drill_id}_thumb.jpg",
-    ])
-    subprocess.check_call([
-        "docker", "exec", minio, "rm", "-f",
-        f"/tmp/{drill_id}.mp4", f"/tmp/{drill_id}_thumb.jpg",
-    ])
-    subprocess.check_call(["docker", "exec", engine, "rm", "-f", in_mp4, in_jpg])
-    print(f"ok {drill_id}")
+cp "${remote_mp4}" "\${WORKDIR}/${drill_id}_raw.mp4"
+python3 - <<'PY'
+import json, os, subprocess
+drill_id = "${drill_id}"
+bucket = "${BUCKET}"
+engine = "${ENGINE}"
+minio = "${MINIO}"
+workdir = "/tmp/drill-demo-sync"
+raw = f"{workdir}/{drill_id}_raw.mp4"
+out = f"{workdir}/{drill_id}.mp4"
+jpg = f"{workdir}/{drill_id}_thumb.jpg"
+tag = drill_id
+scale = "scale='min(720,iw)':-2"
+args = ["-t","15","-vf",scale,"-c:v","libx264","-profile:v","main","-pix_fmt","yuv420p","-crf","20","-preset","fast","-maxrate","2500k","-bufsize","5000k","-movflags","+faststart","-an"]
+in_c = f"/tmp/{tag}_in.mp4"
+out_c = f"/tmp/{tag}_out.mp4"
+subprocess.check_call(["docker","cp",raw,f"{engine}:{in_c}"])
+subprocess.check_call(["docker","exec",engine,"ffmpeg","-y","-loglevel","error","-i",in_c,*args,out_c])
+subprocess.check_call(["docker","cp",f"{engine}:{out_c}",out])
+subprocess.check_call(["docker","exec",engine,"rm","-f",in_c,out_c])
+in_v = f"/tmp/{tag}_v.mp4"
+out_t = f"/tmp/{tag}_t.jpg"
+subprocess.check_call(["docker","cp",out,f"{engine}:{in_v}"])
+subprocess.check_call(["docker","exec",engine,"ffmpeg","-y","-loglevel","error","-ss","0.5","-i",in_v,"-vframes","1","-q:v","3",out_t])
+subprocess.check_call(["docker","cp",f"{engine}:{out_t}",jpg])
+subprocess.check_call(["docker","exec",engine,"rm","-f",in_v,out_t])
+subprocess.check_call(["docker","cp",out,f"{minio}:/tmp/{drill_id}.mp4"])
+subprocess.check_call(["docker","cp",jpg,f"{minio}:/tmp/{drill_id}_thumb.jpg"])
+subprocess.check_call(["docker","exec",minio,"mc","cp",f"/tmp/{drill_id}.mp4",f"local/{bucket}/samples/drills/{drill_id}.mp4"])
+subprocess.check_call(["docker","exec",minio,"mc","cp",f"/tmp/{drill_id}_thumb.jpg",f"local/{bucket}/samples/drills/{drill_id}_thumb.jpg"])
+subprocess.check_call(["docker","exec",minio,"rm","-f",f"/tmp/{drill_id}.mp4",f"/tmp/{drill_id}_thumb.jpg"])
+print(f"ok {drill_id} {os.path.getsize(out)//1024}KiB")
 PY
-rm -f "\${MANIFEST}"
+rm -f "${remote_mp4}"
 EOF
 }
 
@@ -151,14 +239,19 @@ case "${MODE}" in
       [[ -z "${drill_id}" ]] && continue
       download_item "${drill_id}" "${mixkit_id}" "${resolution}"
     done < <(read_manifest_rows)
-    while IFS=$'\t' read -r drill_id _ _; do
+    while IFS= read -r drill_id; do
       [[ -z "${drill_id}" ]] && continue
       upload_item "${drill_id}"
-    done < <(read_manifest_rows)
+    done < <(read_manifest_ids)
     say "全部上传完成"
     ;;
-  --remote)
-    remote_sync_all
+  --remote | --recompress)
+    if [[ "${MODE}" == "--recompress" ]]; then
+      say "重新转码 MinIO 已有示范片（720p / faststart / ≤15s）"
+    else
+      say "在 ${DEPLOY_HOST} 下载 + 转码 + 写入 MinIO"
+    fi
+    remote_python
     say "远端同步完成"
     ;;
   *)
@@ -166,6 +259,6 @@ case "${MODE}" in
       [[ -z "${drill_id}" ]] && continue
       download_item "${drill_id}" "${mixkit_id}" "${resolution}"
     done < <(read_manifest_rows)
-    say "本地 MP4 缓存于 ${CACHE}；推荐: bash $0 --remote"
+    say "本地 MP4 缓存于 ${CACHE}；推荐: bash $0 --remote 或 --recompress"
     ;;
 esac
