@@ -1,0 +1,91 @@
+.video-card {
+  margin-top: 16rpx;
+  padding: 24rpx;
+  border-radius: var(--radius-md, 20rpx);
+  background: var(--color-bg-card, #fff);
+  border: 2rpx solid var(--color-border, #e5e7eb);
+  box-shadow: 0 4rpx 12rpx rgba(26, 35, 126, 0.06);
+
+  &__head {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 12rpx;
+    margin-bottom: 16rpx;
+  }
+
+  &__badge {
+    font-size: 22rpx;
+    font-weight: 600;
+    color: var(--color-primary);
+    background: rgba(26, 35, 126, 0.08);
+    padding: 6rpx 16rpx;
+    border-radius: 999rpx;
+    flex-shrink: 0;
+  }
+
+  &__title {
+    font-size: 28rpx;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    flex: 1;
+  }
+
+  &__preview {
+    position: relative;
+    width: 100%;
+    height: 320rpx;
+    border-radius: 16rpx;
+    overflow: hidden;
+    background: rgba(26, 35, 126, 0.06);
+  }
+
+  &__poster {
+    width: 100%;
+    height: 100%;
+
+    &--placeholder {
+      background: linear-gradient(
+        135deg,
+        rgba(26, 35, 126, 0.12),
+        rgba(57, 73, 171, 0.08)
+      );
+    }
+  }
+
+  &__play-mask {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(13, 22, 87, 0.28);
+  }
+
+  &__play-icon {
+    font-size: 48rpx;
+    color: #fff;
+    line-height: 1;
+  }
+
+  &__play-label {
+    margin-top: 8rpx;
+    font-size: 24rpx;
+    color: #fff;
+  }
+
+  &__player {
+    width: 100%;
+    height: 320rpx;
+    border-radius: 16rpx;
+    overflow: hidden;
+  }
+
+  &__hint-note {
+    display: block;
+    margin-top: 12rpx;
+    font-size: 22rpx;
+    color: var(--color-text-secondary);
+  }
+}

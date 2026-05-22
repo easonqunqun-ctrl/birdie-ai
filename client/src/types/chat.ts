@@ -33,10 +33,20 @@ export interface AnalysisCardAttachment {
   [key: string]: unknown
 }
 
+export interface VideoCardAttachment {
+  type: 'video_card'
+  drill_id?: string
+  title?: string
+  video_url?: string
+  poster_url?: string
+  [key: string]: unknown
+}
+
 export type MessageAttachment =
   | DrillCardAttachment
   | ImageAttachment
   | AnalysisCardAttachment
+  | VideoCardAttachment
   // 前向兼容：后端未来新增其它 type 时前端不会立即报类型错
   | { type: string; [key: string]: unknown }
 

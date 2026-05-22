@@ -6,8 +6,8 @@
 - M3-T2：同一批 schema 不变，send_message 升级为 SSE 流式（不再返回 Pydantic，而是
   `StreamingResponse(text/event-stream)`），但**落库后的 Message 结构保持一致**。
 
-T1 阶段的 `MessageAttachment` 只支持 `image` 和 `drill_card` 两种类型；`analysis_card`
-按 docs/13 §2.2 明确挂 W7。
+T1 阶段的 `MessageAttachment` 支持 `image` / `drill_card` / `analysis_card` / `video_card`；
+`video_card` 与 `drill_card` 成对由 heuristic 触发（v1.1.1）；用户侧图片上传仍挂 W7。
 """
 
 from __future__ import annotations
@@ -26,6 +26,8 @@ class MessageAttachment(BaseModel):
 
     - ``image``：图片；T1 只保留字段，实际图片上传接口在 W7 做。
     - ``drill_card``：训练练习卡片；M3-T2 起 LLM 回复中 heuristic 命中后插入。
+    - ``video_card``：练习示范视频；v1.1.1 起与 ``drill_card`` 成对插入。
+    - ``analysis_card``：历史分析报告卡片；前端 v1.1.0 渲染，后端 structured 输出仍 W7 余量。
 
     为了让前端可按 ``type`` 做类型分支，这里放宽到 extra="allow" —— 不同类型的附件
     有不同的字段（drill_card 有 `drill_id` / `name`；image 有 `url`），各自自描述。
@@ -33,7 +35,7 @@ class MessageAttachment(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    type: Literal["image", "drill_card", "analysis_card"]
+    type: Literal["image", "drill_card", "analysis_card", "video_card"]
 
 
 # ==================== 4.6 GET /v1/chat/quick-questions ====================

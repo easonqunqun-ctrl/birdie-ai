@@ -277,6 +277,30 @@ def _detect_drill_attachments(reply_text: str) -> list[dict]:
     return attachments
 
 
+def _video_cards_for_drills(drill_attachments: list[dict]) -> list[dict]:
+    """与 drill_card 成对插入 video_card（v1.1.1）。"""
+    videos: list[dict] = []
+    for att in drill_attachments:
+        if att.get("type") != "drill_card":
+            continue
+        drill_id = att.get("drill_id")
+        if not drill_id:
+            continue
+        videos.append(
+            {
+                "type": "video_card",
+                "drill_id": drill_id,
+                "title": f"{att.get('name', '练习')}示范",
+            }
+        )
+    return videos
+
+
+def _detect_reply_attachments(reply_text: str) -> list[dict]:
+    drills = _detect_drill_attachments(reply_text)
+    return drills + _video_cards_for_drills(drills)
+
+
 async def _build_llm_messages(
     *,
     db: AsyncSession,
@@ -370,7 +394,7 @@ async def _finalize_success(
     usage: dict[str, int] | None,
 ) -> ChatMessage:
     """LLM 成功后：落 assistant_message + 更新 session 元信息."""
-    attachments = _detect_drill_attachments(reply_text)
+    attachments = _detect_reply_attachments(reply_text)
     assistant_msg = ChatMessage(
         id=new_id("msg"),
         session_id=session.id,
@@ -567,7 +591,7 @@ async def stream_message(
 
     # ====== 成功路径 ======
     # attachments 先算出来，并在落库前通过 attachment 事件推送给前端
-    attachments = _detect_drill_attachments(partial)
+    attachments = _detect_reply_attachments(partial)
     for att in attachments:
         yield {"type": "attachment", "attachment": att}
 

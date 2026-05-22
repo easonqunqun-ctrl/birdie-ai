@@ -1048,7 +1048,7 @@ data: {"assistant_message_id": "msg_asst_001", "content": "根据你最近 3 次
 |------|----------|------|
 | `message_start` | `user_message_id`, `assistant_message_id`, `user_message{...}` | 回复开始，后端已把用户消息落库并扣减配额，同时**预留** assistant 消息 id（尚未落库）；前端据此替换乐观气泡 id |
 | `content_delta` | `delta` | 文本增量，按 LLM token-level 推送 |
-| `attachment` | `attachment{type,drill_id,name,description,duration_minutes,steps,...}` | 目前仅 `drill_card` 类型，由后端启发式关键字触发（M3-T2 `_detect_drill_attachments`） |
+| `attachment` | `attachment{type,drill_id,name,...}` 或 `video_card{drill_id,title}` | `drill_card` / `video_card` 由后端启发式关键字触发（`_detect_reply_attachments`）；`analysis_card` 由 LLM/后续结构化输出 |
 | `message_end` | `assistant_message_id`, `content`（完整文本）, `attachments[]`, `quota_remaining`（-1 表示无限）, `usage{prompt_tokens, completion_tokens}` | 回复结束，assistant 消息已落库 |
 | `error` | `code`（`50106`）, `message`（用户可见）, `detail`（排查用） | 生成过程出错；后端已退还本轮配额，但 `message_start` 之前落库的 user 消息保留（前端可保留气泡） |
 

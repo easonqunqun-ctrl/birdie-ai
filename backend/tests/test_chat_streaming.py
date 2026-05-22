@@ -124,12 +124,16 @@ async def test_drill_card_attachment_detected(
     events = await _collect_sse(client, sid, "怎么练", auth_headers)
 
     attachments = [d["attachment"] for n, d in events if n == "attachment"]
-    drill_ids = [a["drill_id"] for a in attachments]
+    drill_ids = [a["drill_id"] for a in attachments if a["type"] == "drill_card"]
     assert "drill_hip_rotation" in drill_ids
     assert "drill_towel_arm" in drill_ids
 
     end = next(d for n, d in events if n == "message_end")
-    assert len(end["attachments"]) == 2
+    assert len(end["attachments"]) == 4
+    types = [a["type"] for a in end["attachments"]]
+    assert types == ["drill_card", "video_card", "drill_card", "video_card"]
+    video_ids = [a["drill_id"] for a in end["attachments"] if a["type"] == "video_card"]
+    assert video_ids == ["drill_towel_arm", "drill_hip_rotation"]
 
 
 # ==================== 4. LLM error → error 事件 + 配额退回 ====================

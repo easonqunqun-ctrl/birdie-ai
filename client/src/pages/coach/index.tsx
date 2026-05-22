@@ -22,6 +22,7 @@ import type { BaseEventOrig } from '@tarojs/components'
 import Taro, { useDidShow, useRouter } from '@tarojs/taro'
 import DrillCard from '@/components/DrillCard'
 import AnalysisCard from '@/components/AnalysisCard'
+import VideoCard from '@/components/VideoCard'
 import EnvBadge from '@/components/EnvBadge'
 import { BRAND_LOGO } from '@/constants/brandAssets'
 import {
@@ -42,6 +43,8 @@ import type {
   DisplayChatMessage,
   DrillCardAttachment,
   AnalysisCardAttachment,
+  VideoCardAttachment,
+  MessageAttachment,
   QuickQuestionItem,
 } from '@/types/chat'
 import { describeIntermittentRequestFailure } from '@/services/request'
@@ -574,6 +577,41 @@ interface BubbleProps {
   onRetry?: () => void
 }
 
+function renderMessageAttachment(
+  attachment: MessageAttachment,
+  key: string,
+): JSX.Element | null {
+  switch (attachment.type) {
+    case 'drill_card':
+      return (
+        <DrillCard
+          key={key}
+          attachment={attachment as DrillCardAttachment}
+        />
+      )
+    case 'video_card':
+      return (
+        <VideoCard
+          key={key}
+          attachment={attachment as VideoCardAttachment}
+        />
+      )
+    case 'analysis_card':
+      return (
+        <AnalysisCard
+          key={key}
+          attachment={attachment as AnalysisCardAttachment}
+        />
+      )
+    default:
+      return (
+        <View key={key} className='coach__attachment-placeholder'>
+          <Text>（暂不支持的附件类型，请升级 App）</Text>
+        </View>
+      )
+  }
+}
+
 const MessageBubble: FC<BubbleProps> = ({
   message,
   isWelcome,
@@ -595,16 +633,6 @@ const MessageBubble: FC<BubbleProps> = ({
         .filter(Boolean)
         .join(' '),
     [isUser, isWelcome, message.streaming, message.errored],
-  )
-
-  const drillAttachments = (message.attachments || []).filter(
-    (a): a is DrillCardAttachment => a.type === 'drill_card',
-  )
-  const analysisAttachments = (message.attachments || []).filter(
-    (a): a is AnalysisCardAttachment => a.type === 'analysis_card',
-  )
-  const otherAttachments = (message.attachments || []).filter(
-    (a) => a.type !== 'drill_card' && a.type !== 'analysis_card',
   )
 
   return (
@@ -638,17 +666,10 @@ const MessageBubble: FC<BubbleProps> = ({
               <Text className='coach__cursor'>▎</Text>
             )}
           </View>
-          {!isUser && drillAttachments.map((att, i) => (
-            <DrillCard key={`${message.id}-drill-${i}`} attachment={att} />
-          ))}
-          {!isUser && analysisAttachments.map((att, i) => (
-            <AnalysisCard key={`${message.id}-analysis-${i}`} attachment={att} />
-          ))}
-          {!isUser && otherAttachments.length > 0 && (
-            <View className='coach__attachment-placeholder'>
-              <Text>（暂不支持的附件类型，请升级 App）</Text>
-            </View>
-          )}
+          {!isUser &&
+            (message.attachments || []).map((att, i) =>
+              renderMessageAttachment(att, `${message.id}-att-${i}`),
+            )}
           {onRetry && (
             <View className='coach__retry-row' onClick={onRetry}>
               <Text>↻ 点击重试</Text>
