@@ -2,6 +2,7 @@ import {
   computeProgressStatCards,
   findBestPhaseImprovement,
   formatDelta,
+  formatProgressNarrative,
   seriesForDimension,
   shortChartDate,
   type ProgressPoint,
@@ -111,5 +112,19 @@ describe('formatDelta', () => {
     [null, '—'],
   ])('formatDelta(%s) → %s', (input, expected) => {
     expect(formatDelta(input as number | null)).toBe(expected)
+  })
+})
+
+describe('formatProgressNarrative', () => {
+  it('优先输出最佳维度改善', () => {
+    const cards = computeProgressStatCards(BASE_POINTS, null)
+    expect(formatProgressNarrative(cards, BASE_POINTS)).toBe(
+      '近 3 次分析中，站位提升 +15 分',
+    )
+  })
+
+  it('单点或无改善时返回 null', () => {
+    const cards = computeProgressStatCards([BASE_POINTS[0]], null)
+    expect(formatProgressNarrative(cards, [BASE_POINTS[0]])).toBeNull()
   })
 })

@@ -1,6 +1,6 @@
 import { FC, useEffect, useState } from 'react'
 import { View, Text, Button } from '@tarojs/components'
-import Taro, { useShareAppMessage } from '@tarojs/taro'
+import Taro, { useShareAppMessage, useShareTimeline } from '@tarojs/taro'
 import {
   invitationService,
   type InvitationItem,
@@ -8,6 +8,10 @@ import {
 } from '@/services/invitationService'
 import { describePageLoadFailure } from '@/services/request'
 import { BRAND_SHARE_COVER } from '@/constants/brandAssets'
+import {
+  groupInvitationsByRewardTier,
+  INVITE_REWARD_DAYS_PER_TIER,
+} from '@/utils/invitationRewardTiers'
 import './invitations.scss'
 
 /**
@@ -52,12 +56,15 @@ const InvitationsPage: FC = () => {
     return {
       title: '用领翼golf 看你挥杆哪里不对，我们一起进步',
       path: `/pages/login/index?invite_code=${code}`,
-      // P2-B2：用品牌图替代页面截屏，避免：
-      //   1) 截屏被分享时把"我的邀请码 / 已邀请列表"完整暴露
-      //   2) 截屏在 loading / 滚动到一半时被采到，画面糟糕
       imageUrl: BRAND_SHARE_COVER
     }
   })
+
+  useShareTimeline(() => ({
+    title: '领翼golf · 邀请球友一起练挥杆',
+    query: info?.invite_code ? `invite_code=${info.invite_code}` : '',
+    imageUrl: BRAND_SHARE_COVER,
+  }))
 
   const handleCopy = () => {
     if (!info?.invite_code) return
@@ -96,6 +103,8 @@ const InvitationsPage: FC = () => {
       (info.valid_count / Math.max(info.next_reward_at, 1)) * 100
     )
   )
+
+  const inviteSections = groupInvitationsByRewardTier(list)
 
   return (
     <View className='invitations'>
@@ -148,37 +157,63 @@ const InvitationsPage: FC = () => {
       </View>
 
       <View className='invitations__list'>
-        <Text className='invitations__list-title'>邀请记录（{list.length}）</Text>
+        <Text className='invitations__list-title'>奖励分档（每 5 人 +{INVITE_REWARD_DAYS_PER_TIER} 天会员）</Text>
+        {inviteSections.tiers.map((tier) => (
+          <View key={tier.tierIndex} className='invitations__tier'>
+            <View className='invitations__tier-head'>
+              <Text className='invitations__tier-title'>{tier.rangeLabel}</Text>
+              <Text className='invitations__tier-meta'>
+                {tier.validItems.length}/{5} 人
+                {tier.isComplete ? ' · 已满档' : ''}
+                {tier.rewardGranted ? ' · 已发奖' : ''}
+              </Text>
+            </View>
+            {tier.validItems.length === 0 ? (
+              <Text className='invitations__tier-empty'>本档暂无有效邀请</Text>
+            ) : (
+              tier.validItems.map((item) => (
+                <View key={item.id} className='invitations__item invitations__item--nested'>
+                  <View className='invitations__item-main'>
+                    <Text className='invitations__item-name'>
+                      {item.invitee_nickname_masked}
+                    </Text>
+                    <Text className='invitations__item-date'>
+                      {new Date(item.created_at).toLocaleDateString()}
+                    </Text>
+                  </View>
+                  <Text className='invitations__badge invitations__badge--valid'>
+                    有效邀请
+                  </Text>
+                </View>
+              ))
+            )}
+          </View>
+        ))}
+        {inviteSections.pendingRegistered.length > 0 ? (
+          <View className='invitations__tier invitations__tier--pending'>
+            <Text className='invitations__tier-title'>待完成首次分析</Text>
+            {inviteSections.pendingRegistered.map((item) => (
+              <View key={item.id} className='invitations__item invitations__item--nested'>
+                <View className='invitations__item-main'>
+                  <Text className='invitations__item-name'>
+                    {item.invitee_nickname_masked}
+                  </Text>
+                  <Text className='invitations__item-date'>
+                    {new Date(item.created_at).toLocaleDateString()}
+                  </Text>
+                </View>
+                <Text className='invitations__badge invitations__badge--registered'>
+                  已注册
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
         {list.length === 0 ? (
           <View className='invitations__empty'>
             <Text>还没有邀请记录，试试分享给球友吧</Text>
           </View>
-        ) : (
-          list.map((item) => (
-            <View key={item.id} className='invitations__item'>
-              <View className='invitations__item-main'>
-                <Text className='invitations__item-name'>
-                  {item.invitee_nickname_masked}
-                </Text>
-                <Text className='invitations__item-date'>
-                  {new Date(item.created_at).toLocaleDateString()}
-                </Text>
-              </View>
-              <View className='invitations__item-status'>
-                <Text
-                  className={`invitations__badge invitations__badge--${item.status}`}
-                >
-                  {item.status === 'valid' ? '有效邀请' : '已注册'}
-                </Text>
-                {item.bonus_granted && (
-                  <Text className='invitations__badge invitations__badge--bonus'>
-                    🎁 已发奖
-                  </Text>
-                )}
-              </View>
-            </View>
-          ))
-        )}
+        ) : null}
       </View>
     </View>
   )

@@ -22,7 +22,7 @@
 
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, Video, Image, Button, ScrollView } from '@tarojs/components'
-import Taro, { useReady, useRouter, useShareAppMessage } from '@tarojs/taro'
+import Taro, { useReady, useRouter, useShareAppMessage, useShareTimeline } from '@tarojs/taro'
 import { analysisService } from '@/services/analysisService'
 import { describePageLoadFailure, isRequestError } from '@/services/request'
 import { shareService, type PublicReport } from '@/services/shareService'
@@ -307,6 +307,27 @@ const ReportPage: FC = () => {
     return {
       title,
       path: `/pages/analysis/report?id=${analysisId}&from_share=1`,
+      imageUrl:
+        shareImageUrl ||
+        report?.thumbnail_url ||
+        publicReport?.thumbnail_url ||
+        '',
+    }
+  })
+
+  useShareTimeline(() => {
+    const score = report?.overall_score ?? publicReport?.overall_score
+    const clubLabel = report
+      ? CLUB_TYPE_LABEL[report.club_type]
+      : publicReport
+        ? CLUB_TYPE_LABEL[publicReport.club_type as keyof typeof CLUB_TYPE_LABEL] ?? '挥杆'
+        : '挥杆'
+    const title = score
+      ? `我的${clubLabel}挥杆 ${score} 分 · 领翼golf`
+      : '领翼golf 挥杆 AI 分析报告'
+    return {
+      title,
+      query: analysisId ? `id=${analysisId}&from_share=1` : '',
       imageUrl:
         shareImageUrl ||
         report?.thumbnail_url ||

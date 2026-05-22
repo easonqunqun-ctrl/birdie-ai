@@ -16,7 +16,7 @@
 
 import { FC, useCallback, useEffect, useRef, useState } from 'react'
 import { Button, Canvas, Image, Text, View } from '@tarojs/components'
-import Taro, { useReady, useRouter, useShareAppMessage } from '@tarojs/taro'
+import Taro, { useReady, useRouter, useShareAppMessage, useShareTimeline } from '@tarojs/taro'
 import { analysisService } from '@/services/analysisService'
 import { shareService } from '@/services/shareService'
 import { describePageLoadFailure } from '@/services/request'
@@ -287,6 +287,21 @@ const PosterPage: FC = () => {
     return {
       title,
       path: `/pages/analysis/report?id=${analysisId}&from_share=1`,
+      imageUrl: posterTempPath || report?.thumbnail_url || '',
+    }
+  })
+
+  useShareTimeline(() => {
+    const score = report?.overall_score
+    const clubLabel = report
+      ? CLUB_TYPE_LABEL[report.club_type as ClubType] || '挥杆'
+      : '挥杆'
+    const title = score
+      ? `我的${clubLabel}挥杆 ${score} 分 · 领翼golf`
+      : '领翼golf 挥杆 AI 分析报告'
+    return {
+      title,
+      query: analysisId ? `id=${analysisId}&from_share=1` : '',
       imageUrl: posterTempPath || report?.thumbnail_url || '',
     }
   })

@@ -230,4 +230,47 @@
       color: #d39e00;
     }
   }
+
+  &__tiers {
+    margin-top: 24px;
+  }
+
+  &__tier {
+    background: var(--color-bg-card);
+    border-radius: var(--radius-lg);
+    padding: 32px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-sm);
+
+    &--pending {
+      margin-top: 8px;
+    }
+  }
+
+  &__tier-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    gap: 16px;
+  }
+
+  &__tier-title {
+    font-size: 34rpx;
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
+
+  &__tier-meta {
+    font-size: 30rpx;
+    color: var(--color-text-secondary);
+    flex-shrink: 0;
+  }
+
+  &__tier-empty {
+    display: block;
+    font-size: 32rpx;
+    color: var(--color-text-secondary);
+    padding: 16px 0;
+  }
 }

@@ -8,4 +8,5 @@ export default definePageConfig({
    * Canvas 渲染靠按钮触发，避免误触造成卡顿。
    */
   enablePullDownRefresh: false,
+  enableShareTimeline: true,
 })

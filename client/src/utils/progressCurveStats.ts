@@ -114,3 +114,18 @@ export function formatDelta(delta: number | null | undefined): string {
   if (delta > 0) return `+${delta}`
   return String(delta)
 }
+
+/** ENG-05 余量：训练页进步曲线下方一句纵向叙事 */
+export function formatProgressNarrative(
+  stats: ProgressStatCards,
+  points: ProgressPoint[],
+): string | null {
+  if (points.length < 2) return null
+  if (stats.bestImprovement && stats.bestImprovement.delta > 0) {
+    return `近 ${points.length} 次分析中，${stats.bestImprovement.label}提升 ${formatDelta(stats.bestImprovement.delta)} 分`
+  }
+  if (stats.windowScoreDelta !== null && stats.windowScoreDelta !== 0) {
+    return `窗口内综合分 ${formatDelta(stats.windowScoreDelta)}（较最早一次同类型分析）`
+  }
+  return null
+}

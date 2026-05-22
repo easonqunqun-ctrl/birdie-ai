@@ -14,6 +14,8 @@ import { FC, useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, ScrollView, Text, View } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import EnvBadge from '@/components/EnvBadge'
+import PracticeCalendar from '@/components/PracticeCalendar'
+import '@/components/PracticeCalendar.scss'
 import ProgressLineChart from '@/components/ProgressLineChart'
 import '@/components/ProgressLineChart.scss'
 import { trainingService } from '@/services/trainingService'
@@ -33,10 +35,19 @@ import { switchToHome, toastTabNavigationFailure } from '@/utils/tabNav'
 import {
   computeProgressStatCards,
   formatDelta,
+  formatProgressNarrative,
   seriesForDimension,
   type ProgressDimension,
   type ProgressPoint,
 } from '@/utils/progressCurveStats'
+import {
+  aggregatePracticeCounts,
+  buildPracticeCalendarGrid,
+  localDateKey,
+  monthKeyNow,
+  shiftMonthKey,
+  type PracticeCalendarGrid,
+} from '@/utils/practiceCalendarLayout'
 import './index.scss'
 
 const TrainingPage: FC = () => {
@@ -58,6 +69,10 @@ const TrainingPage: FC = () => {
     { day: number; count: number; dateKey: string }[]
   >([])
   const [practiceMonthTotal, setPracticeMonthTotal] = useState(0)
+  const [practiceMonthKey, setPracticeMonthKey] = useState(() => monthKeyNow())
+  const [practiceCalendar, setPracticeCalendar] = useState<PracticeCalendarGrid>(() =>
+    buildPracticeCalendarGrid(monthKeyNow(), new Map()),
+  )
 
   const load = useCallback(async () => {
     if (!token) return
@@ -112,19 +127,24 @@ const TrainingPage: FC = () => {
     if (!useUserStore.getState().user?.is_member) {
       setPracticeDaily([])
       setPracticeMonthTotal(0)
+      setPracticeCalendar(buildPracticeCalendarGrid(practiceMonthKey, new Map()))
       return
     }
-    const monthKey = monthKeyNow()
     try {
-      const logs = await trainingService.listPracticeLogs(monthKey)
-      const daily = buildDailyCounts(monthKey, logs)
+      const logs = await trainingService.listPracticeLogs(practiceMonthKey)
+      const counts = aggregatePracticeCounts(logs)
+      const daily = buildDailyCounts(practiceMonthKey, logs)
       setPracticeDaily(daily)
       setPracticeMonthTotal(logs.length)
+      setPracticeCalendar(
+        buildPracticeCalendarGrid(practiceMonthKey, counts, localDateKey()),
+      )
     } catch {
       setPracticeDaily([])
       setPracticeMonthTotal(0)
+      setPracticeCalendar(buildPracticeCalendarGrid(practiceMonthKey, new Map()))
     }
-  }, [token])
+  }, [token, practiceMonthKey])
 
   useEffect(() => {
     if (!initialized) {
@@ -159,6 +179,11 @@ const TrainingPage: FC = () => {
     if (!token || !user?.is_member) return
     void loadProgress()
   }, [token, user?.is_member, progressWindowDays, loadProgress])
+
+  useEffect(() => {
+    if (!token || !user?.is_member) return
+    void loadPracticeCurve()
+  }, [token, user?.is_member, practiceMonthKey, loadPracticeCurve])
 
   const grouped = useMemo(() => groupByDate(plan?.tasks ?? []), [plan])
   const progressPercent = useMemo(() => {
@@ -226,6 +251,28 @@ const TrainingPage: FC = () => {
       </View>
     ) : null
 
+  const progressNarrative = useMemo(
+    () => formatProgressNarrative(progressStats, progressPoints),
+    [progressStats, progressPoints],
+  )
+
+  const canGoNextPracticeMonth = practiceMonthKey < monthKeyNow()
+
+  const practiceCalendarInner = user?.is_member ? (
+    <View className='training__calendar-wrap'>
+      <Text className='training__trend-title'>打卡月历</Text>
+      <PracticeCalendar
+        grid={practiceCalendar}
+        canGoNext={canGoNextPracticeMonth}
+        onPrevMonth={() => setPracticeMonthKey((k) => shiftMonthKey(k, -1))}
+        onNextMonth={() => {
+          if (!canGoNextPracticeMonth) return
+          setPracticeMonthKey((k) => shiftMonthKey(k, 1))
+        }}
+      />
+    </View>
+  ) : null
+
   const scoreTrendInner =
     progressPoints.length > 0 ? (
       <>
@@ -254,6 +301,9 @@ const TrainingPage: FC = () => {
           accentColor={chartAccent}
           canvasId='training-progress-line'
         />
+        {progressNarrative ? (
+          <Text className='training__progress-narrative'>{progressNarrative}</Text>
+        ) : null}
       </>
     ) : null
 
@@ -330,11 +380,16 @@ const TrainingPage: FC = () => {
           全部
         </Text>
       </View>
-      {scoreTrendInner || practiceBarsInner ? (
+      {scoreTrendInner || practiceCalendarInner || practiceBarsInner ? (
         <>
           {scoreTrendInner ? (
             <View className='training__trend training__trend--in-curve'>
               {scoreTrendInner}
+            </View>
+          ) : null}
+          {practiceCalendarInner ? (
+            <View className='training__trend training__trend--in-curve training__trend--calendar'>
+              {practiceCalendarInner}
             </View>
           ) : null}
           {practiceBarsInner ? (
@@ -597,12 +652,6 @@ function formatDayLabel(d: string) {
     dateObj.getDay()
   ]
   return `${Number(m)}月${Number(day)}日 ${wk}`
-}
-
-/** 当前本地年月 `YYYY-MM`（与 `/users/me/practice-logs?month=` 一致） */
-function monthKeyNow(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
 /** 将 practice_logs 聚合成「当月每日次数」，含打卡为 0 的日期（柱状图横轴） */

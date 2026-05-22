@@ -1,0 +1,50 @@
+.analysis-card {
+  margin-top: 16rpx;
+  padding: 24rpx;
+  border-radius: var(--radius-md, 20rpx);
+  background: var(--color-bg-card, #fff);
+  border: 2rpx solid var(--color-border, #e5e7eb);
+  box-shadow: 0 4rpx 12rpx rgba(26, 35, 126, 0.06);
+
+  &__head {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12rpx;
+  }
+
+  &__badge {
+    font-size: 22rpx;
+    font-weight: 600;
+    color: var(--color-primary);
+    background: rgba(26, 35, 126, 0.08);
+    padding: 6rpx 16rpx;
+    border-radius: 999rpx;
+  }
+
+  &__score {
+    font-size: 36rpx;
+    font-weight: 800;
+    color: var(--color-primary);
+
+    &--muted {
+      font-size: 28rpx;
+      font-weight: 600;
+    }
+  }
+
+  &__hint {
+    font-size: 26rpx;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+  }
+
+  &__cta {
+    display: block;
+    margin-top: 12rpx;
+    font-size: 26rpx;
+    font-weight: 600;
+    color: var(--color-primary-soft, #3949ab);
+  }
+}

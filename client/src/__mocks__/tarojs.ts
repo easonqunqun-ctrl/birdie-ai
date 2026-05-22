@@ -136,6 +136,7 @@ const Taro = {
   useRouter: jest.fn(() => ({ params: {} })),
   useLoad: jest.fn(),
   useShareAppMessage: jest.fn(),
+  useShareTimeline: jest.fn(),
 
   // ===== 占位（业务代码 typeof 检查后才调用，这里不实现也不会炸）=====
   arrayBufferToBase64: jest.fn((b: ArrayBuffer) => Buffer.from(b).toString('base64')),
@@ -153,6 +154,7 @@ export const useDidHide = Taro.useDidHide
 export const useRouter = Taro.useRouter
 export const useLoad = Taro.useLoad
 export const useShareAppMessage = Taro.useShareAppMessage
+export const useShareTimeline = Taro.useShareTimeline
 export const eventCenter = Taro.eventCenter
 export const ENV_TYPE = Taro.ENV_TYPE
 export const getCurrentInstance = Taro.getCurrentInstance

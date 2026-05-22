@@ -21,6 +21,7 @@ import { Button, Image, Input, ScrollView, Text, View } from '@tarojs/components
 import type { BaseEventOrig } from '@tarojs/components'
 import Taro, { useDidShow, useRouter } from '@tarojs/taro'
 import DrillCard from '@/components/DrillCard'
+import AnalysisCard from '@/components/AnalysisCard'
 import EnvBadge from '@/components/EnvBadge'
 import { BRAND_LOGO } from '@/constants/brandAssets'
 import {
@@ -40,6 +41,7 @@ import {
 import type {
   DisplayChatMessage,
   DrillCardAttachment,
+  AnalysisCardAttachment,
   QuickQuestionItem,
 } from '@/types/chat'
 import { describeIntermittentRequestFailure } from '@/services/request'
@@ -598,8 +600,11 @@ const MessageBubble: FC<BubbleProps> = ({
   const drillAttachments = (message.attachments || []).filter(
     (a): a is DrillCardAttachment => a.type === 'drill_card',
   )
+  const analysisAttachments = (message.attachments || []).filter(
+    (a): a is AnalysisCardAttachment => a.type === 'analysis_card',
+  )
   const otherAttachments = (message.attachments || []).filter(
-    (a) => a.type !== 'drill_card',
+    (a) => a.type !== 'drill_card' && a.type !== 'analysis_card',
   )
 
   return (
@@ -635,6 +640,9 @@ const MessageBubble: FC<BubbleProps> = ({
           </View>
           {!isUser && drillAttachments.map((att, i) => (
             <DrillCard key={`${message.id}-drill-${i}`} attachment={att} />
+          ))}
+          {!isUser && analysisAttachments.map((att, i) => (
+            <AnalysisCard key={`${message.id}-analysis-${i}`} attachment={att} />
           ))}
           {!isUser && otherAttachments.length > 0 && (
             <View className='coach__attachment-placeholder'>

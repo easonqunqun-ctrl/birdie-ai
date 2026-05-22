@@ -128,7 +128,8 @@ cd client && pnpm build:weapp:prod:check
 | 版本 | 状态 | 备注 |
 |------|------|------|
 | **1.0.3** | 已提审 | MVP 主链路 + Batch-A～F |
-| **1.0.4** | 开发中 | 到期弹窗扩散、版本号对齐；见 [`v1.0.4-plus-roadmap.md`](./v1.0.4-plus-roadmap.md) |
+| **1.0.4** | 已交付 | 到期弹窗扩散、版本号对齐 |
+| **1.1.0** | 开发中 | 打卡月历、朋友圈分享、analysis_card、邀请分档；见 [`v1.0.4-plus-roadmap.md`](./v1.0.4-plus-roadmap.md) |
 
 ---
 
