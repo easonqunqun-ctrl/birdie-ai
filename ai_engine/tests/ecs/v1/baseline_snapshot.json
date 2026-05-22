@@ -1,0 +1,46 @@
+{
+  "version": "v1-ci-stub",
+  "clips": {
+    "ci_teaching_ideal": {
+      "overall": 45,
+      "phase_scores": {
+        "setup": 0,
+        "backswing": 23,
+        "top": 96,
+        "downswing": 30,
+        "impact": 87,
+        "follow_through": 53
+      },
+      "class": "teaching",
+      "pose_profile": "ideal_swing"
+    },
+    "ci_top_amateur_early_ext": {
+      "overall": 45,
+      "phase_scores": {
+        "setup": 0,
+        "backswing": 23,
+        "top": 96,
+        "downswing": 30,
+        "impact": 87,
+        "follow_through": 53
+      },
+      "class": "top_amateur",
+      "pose_profile": "early_extension_swing"
+    },
+    "ci_dispute_sway": {
+      "overall": 38,
+      "phase_scores": {
+        "setup": 43,
+        "backswing": 23,
+        "top": 96,
+        "downswing": 30,
+        "impact": 0,
+        "follow_through": 53
+      },
+      "class": "dispute",
+      "pose_profile": "sway_swing"
+    }
+  },
+  "generated_at": "2026-05-22",
+  "git_hint": "ENG-04 v1.2.2 baseline"
+}

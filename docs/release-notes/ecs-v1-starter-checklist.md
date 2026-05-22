@@ -53,7 +53,7 @@
 
 - [ ] **评审例会**：**双周**周三 19:00，60 分钟；纪要落档（模板见 [`docs/09` §8.5](../09-运营支撑文档.md#85-争议周更纪要模板eng-06)）。
 - [ ] 例会议程固定 4 段：① 新增样本快速过 · ② 争议样例结论 · ③ 漂移指标周看板 · ④ 下双周 backlog。
-- [ ] **快照对比门禁**：每次 `ai_engine` 主分支合并前，对 ECS 子集跑回归，输出每条样本的 6 维 / overall 与上一基线的 delta。
+- [x] **快照对比门禁**：每次 `ai_engine` 主分支合并前，对 ECS 子集跑回归，输出每条样本的 6 维 / overall 与上一基线的 delta —— **v1.2.2 CI stub**：[`ecs-v1-ci-regression.md`](./ecs-v1-ci-regression.md) + `tests/test_ecs_regression.py` + `.github/workflows/ai-engine-ecs-regression.yml`（合成 Pose，非授权素材）
 - [ ] **门禁口径**（v1，可在评审例会调整）：
   - 单条 overall delta > **±5** → 标黄，需算法说明
   - 单维 delta > **±8** → 标黄
@@ -77,6 +77,6 @@
 - [ ] §1 ～ §3 全部前置项可在台账中 grep 到
 - [ ] §2 标签字段全部进入 ECS 元数据表
 - [ ] §4 第一次例会已开（哪怕只有 5 条样本）
-- [ ] §4 门禁脚本至少能在 CI 跑出一份对比报表（即使全部 PASS）
+- [~] §4 门禁脚本至少能在 CI 跑出一份对比报表（即使全部 PASS）—— **v1.2.2 CI stub** ✅；授权样本满编后替换 manifest 并恢复 teaching ≥80 硬门禁
 
 未满足时 ECS 仍可**只读**，但不得对外宣称「已用于回归」。

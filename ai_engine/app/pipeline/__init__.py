@@ -49,25 +49,6 @@ from app.pipeline.pose import (
     PoseResult,
     estimate_poses,
 )
-from app.pipeline.preprocess import (
-    MAX_DURATION_SEC,
-    MAX_FRAME_LOSS_RATIO,
-    MIN_CLARITY_SCORE,
-    MIN_DURATION_SEC,
-    TARGET_FPS,
-    TARGET_SHORT_SIDE,
-    PreprocessResult,
-    preprocess_video,
-)
-from app.pipeline.real_pipeline import run_real_analysis
-from app.pipeline.recommend import recommend
-from app.pipeline.visualize import (
-    VisualizeArtifacts,
-    dump_pose_parquet,
-    extract_issue_keyframes,
-    extract_keyframe,
-    render_skeleton_video,
-)
 from app.pipeline.scoring import (
     score_all_phases,
     score_feature,
@@ -75,6 +56,43 @@ from app.pipeline.scoring import (
     score_phase,
     weakest_phase,
 )
+
+# 重依赖（preprocess / real_pipeline / visualize / recommend→schemas）延迟导入，
+# 避免 ECS 回归等仅需 scoring 子链路的场景拉起 cv2 / pydantic / minio。
+_LAZY_EXPORTS: dict[str, tuple[str, str]] = {
+    "MAX_DURATION_SEC": ("app.pipeline.preprocess", "MAX_DURATION_SEC"),
+    "MAX_FRAME_LOSS_RATIO": ("app.pipeline.preprocess", "MAX_FRAME_LOSS_RATIO"),
+    "MIN_CLARITY_SCORE": ("app.pipeline.preprocess", "MIN_CLARITY_SCORE"),
+    "MIN_DURATION_SEC": ("app.pipeline.preprocess", "MIN_DURATION_SEC"),
+    "TARGET_FPS": ("app.pipeline.preprocess", "TARGET_FPS"),
+    "TARGET_SHORT_SIDE": ("app.pipeline.preprocess", "TARGET_SHORT_SIDE"),
+    "PreprocessResult": ("app.pipeline.preprocess", "PreprocessResult"),
+    "preprocess_video": ("app.pipeline.preprocess", "preprocess_video"),
+    "run_real_analysis": ("app.pipeline.real_pipeline", "run_real_analysis"),
+    "recommend": ("app.pipeline.recommend", "recommend"),
+    "VisualizeArtifacts": ("app.pipeline.visualize", "VisualizeArtifacts"),
+    "dump_pose_parquet": ("app.pipeline.visualize", "dump_pose_parquet"),
+    "extract_issue_keyframes": ("app.pipeline.visualize", "extract_issue_keyframes"),
+    "extract_keyframe": ("app.pipeline.visualize", "extract_keyframe"),
+    "render_skeleton_video": ("app.pipeline.visualize", "render_skeleton_video"),
+}
+
+
+def __getattr__(name: str):
+    target = _LAZY_EXPORTS.get(name)
+    if target is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module_path, attr = target
+    import importlib
+
+    mod = importlib.import_module(module_path)
+    val = getattr(mod, attr)
+    globals()[name] = val
+    return val
+
+
+def __dir__() -> list[str]:
+    return sorted(list(globals().keys()) + list(_LAZY_EXPORTS.keys()))
 
 __all__ = [
     # constants

@@ -2,7 +2,7 @@
         backend-shell backend-logs backend-test backend-test-smoke backend-lint backend-migrate backend-revision \
         backend-celery-logs backend-celery-shell \
         ai-shell ai-logs ai-engine-test ai-engine-test-local ai-engine-lint ai-engine-smoke \
-        ai-engine-synth-fixtures \
+        ai-engine-ecs-regression ai-engine-synth-fixtures \
         client-install client-bootstrap-rn-shell client-dev-weapp client-dev-rn-ios client-dev-rn-android \
         client-build-weapp client-build-weapp-prod client-build-rn client-tsc client-check-rn \
         client-test client-test-watch client-test-coverage client-test-ci \
@@ -46,6 +46,7 @@ help:
 	@echo "  make ai-engine-test-local     在宿主机 ai_engine/ 目录下 uv run pytest"
 	@echo "  make ai-engine-lint           ruff check ai_engine/app"
 	@echo "  make ai-engine-synth-fixtures 生成合成测试视频（需要本机装 ffmpeg）"
+	@echo "  make ai-engine-ecs-regression   ENG-04 ECS v1 CI 回归单测（宿主机 uv）"
 	@echo ""
 	@echo "  ===== 客户端（Taro 双端） ====="
 	@echo "  make client-install         安装客户端依赖"
@@ -223,6 +224,9 @@ ai-engine-lint:
 
 ai-engine-synth-fixtures:
 	@bash ai_engine/tests/fixtures/generate_synthetic.sh
+
+ai-engine-ecs-regression:
+	cd ai_engine && uv run pytest tests/test_ecs_regression.py -v --tb=short
 
 # W6-T5：真实引擎 smoke（直接 curl /analyze 跑 bouncing_box，验证不崩 + 错误码正确）。
 # 用于 CI 保护：任何让 pipeline 彻底跑不起来的改动都会在这里露馅。

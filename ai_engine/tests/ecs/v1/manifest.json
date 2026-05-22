@@ -1,0 +1,24 @@
+{
+  "version": "v1-ci-stub",
+  "description": "ENG-04 CI 回归子集：合成 Pose 配置，非授权顶尖素材；用于 scoring 漂移门禁 smoke。",
+  "clips": [
+    {
+      "ecs_clip_id": "ci_teaching_ideal",
+      "class": "teaching",
+      "pose_profile": "ideal_swing",
+      "notes": "Synthetic ideal swing; teaching 标杆 overall 须 ≥80"
+    },
+    {
+      "ecs_clip_id": "ci_top_amateur_early_ext",
+      "class": "top_amateur",
+      "pose_profile": "early_extension_swing",
+      "notes": "Synthetic early extension variant"
+    },
+    {
+      "ecs_clip_id": "ci_dispute_sway",
+      "class": "dispute",
+      "pose_profile": "sway_swing",
+      "notes": "Synthetic sway variant; dispute 类不参与百分位"
+    }
+  ]
+}
