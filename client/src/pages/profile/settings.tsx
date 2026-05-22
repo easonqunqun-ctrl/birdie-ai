@@ -23,7 +23,7 @@ const SettingsPage: FC = () => {
       success: ({ confirm }) => {
         if (!confirm) return
         try {
-          Taro.removeStorageSync('analysis_guide_seen')
+          storage.clearAnalysisGuideSeen()
           Taro.showToast({ title: '已重置，下次拍摄时展示', icon: 'success' })
         } catch {
           Taro.showToast({ title: '重置失败', icon: 'none' })

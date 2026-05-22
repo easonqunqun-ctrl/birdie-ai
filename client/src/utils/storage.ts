@@ -48,6 +48,9 @@ export const storage = {
   markAnalysisGuideSeen(): void {
     Taro.setStorageSync(ANALYSIS_GUIDE_SEEN_KEY, '1')
   },
+  clearAnalysisGuideSeen(): void {
+    Taro.removeStorageSync(ANALYSIS_GUIDE_SEEN_KEY)
+  },
 
   /**
    * 读取用户同意的协议记录。

@@ -40,6 +40,12 @@ describe('storage · 分析引导标记', () => {
     storage.markAnalysisGuideSeen()
     expect(storage.hasSeenAnalysisGuide()).toBe(true)
   })
+
+  test('clearAnalysisGuideSeen 清除后恢复 false', () => {
+    storage.markAnalysisGuideSeen()
+    storage.clearAnalysisGuideSeen()
+    expect(storage.hasSeenAnalysisGuide()).toBe(false)
+  })
 })
 
 describe('storage · 用户协议同意（合规底线）', () => {

@@ -20,6 +20,7 @@ import { trainingService } from '@/services/trainingService'
 import { userService } from '@/services/userService'
 import { describeIntermittentRequestFailure, isRequestError } from '@/services/request'
 import { useUserStore } from '@/store/userStore'
+import { useMembershipExpiringSoonModalOnShow } from '@/hooks/useMembershipExpiringSoonModalOnShow'
 import { getDrillDetail } from '@/constants/drillLibrary'
 import { PHASE_COLOR, PHASE_LABEL, PHASE_ORDER, type SwingPhaseKey } from '@/constants/phaseLabels'
 import { PAYMENT_ENABLED_FLAG } from '@/constants/flags'
@@ -40,6 +41,9 @@ import './index.scss'
 
 const TrainingPage: FC = () => {
   const { user, token, initialized, bootstrap, fetchMe } = useUserStore()
+
+  useMembershipExpiringSoonModalOnShow(!!token)
+
   const [plan, setPlan] = useState<TrainingPlanDetail | null>(null)
   const [loading, setLoading] = useState(false)
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)

@@ -123,8 +123,18 @@ cd client && pnpm build:weapp:prod:check
 
 ---
 
+## 发版记录（体验版 / 提审）
+
+| 版本 | 状态 | 备注 |
+|------|------|------|
+| **1.0.3** | 已提审 | MVP 主链路 + Batch-A～F |
+| **1.0.4** | 开发中 | 到期弹窗扩散、版本号对齐；见 [`v1.0.4-plus-roadmap.md`](./v1.0.4-plus-roadmap.md) |
+
+---
+
 ## 相关文档
 
+- [**`v1.0.4-plus-roadmap.md`**](./v1.0.4-plus-roadmap.md)（post-1.0.3 版本计划）
 - [**`infra/deploy/README.md`**](../../infra/deploy/README.md)（Let's Encrypt：`issue-le-cert` / `renew-le-cert`）  
 - [**`docs/17-W9任务拆分.md`**](../17-W9任务拆分.md)  
 - [**`docs/release-notes/W9-tencent-cloud-purchase-list.md`**](./W9-tencent-cloud-purchase-list.md)  

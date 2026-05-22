@@ -3,6 +3,7 @@ import { View, Text, Button, Image } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import EnvBadge from '@/components/EnvBadge'
 import { useUserStore } from '@/store/userStore'
+import { useMembershipExpiringSoonModalOnShow } from '@/hooks/useMembershipExpiringSoonModalOnShow'
 import { switchToCoach, switchToProfile, toastTabNavigationFailure } from '@/utils/tabNav'
 import { analysisService } from '@/services/analysisService'
 import { deferReLaunch } from '@/utils/deferNavigation'
@@ -16,6 +17,8 @@ import './index.scss'
 const HomePage: FC = () => {
   const { user, token, initialized, bootstrap, fetchMe } = useUserStore()
   const [recent, setRecent] = useState<AnalysisListItem[]>([])
+
+  useMembershipExpiringSoonModalOnShow(!!token)
 
   const loadRecent = useCallback(async () => {
     try {

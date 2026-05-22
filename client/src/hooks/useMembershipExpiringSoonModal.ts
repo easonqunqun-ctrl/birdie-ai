@@ -7,7 +7,7 @@
  * - 触发窗口 `[1, MAX_WINDOW_DAYS]` 天（默认 [1, 7]，覆盖产品 §3.5 的 7/3/1 三档预期与其他临界日）。
  * - **每日仅弹一次**：localStorage 按 `expires_at` 的日期键去重；当日点过即使重启小程序也不再弹。
  * - 函数纯逻辑、易于 jest：`shouldShowExpiringSoonModal()` 不依赖 Taro / Date.now 间接传入。
- * - 调用层：`pages/index/index.tsx` / `pages/profile/membership.tsx` 拉到 membership 后调用 hook。
+ * - 调用层：`pages/index/index.tsx` / `pages/training/index.tsx` / `pages/profile/membership.tsx` 拉到 membership 后调用 hook。
  */
 
 import { useEffect, useRef } from 'react'
