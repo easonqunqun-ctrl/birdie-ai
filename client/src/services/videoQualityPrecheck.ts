@@ -1,5 +1,6 @@
 import Taro from '@tarojs/taro'
 import { precheckVideoQuality } from '@/adapters/videoQualityPrecheck'
+import { linesForQualityBlocks } from '@/constants/qualityBlockers'
 import { linesForQualityWarnings } from '@/constants/qualityWarnings'
 
 /**
@@ -20,6 +21,18 @@ export async function confirmQualityWarningsIfNeeded(
     cancelText: '重新拍摄',
   })
   return confirm
+}
+
+/** 硬阻断：仅允许返回重拍，不提供继续上传 */
+export async function showQualityBlockModal(blockCodes: string[]): Promise<void> {
+  if (!blockCodes.length) return
+  const lines = linesForQualityBlocks(blockCodes)
+  await Taro.showModal({
+    title: '无法开始分析',
+    content: lines.join('\n\n'),
+    showCancel: false,
+    confirmText: '重新拍摄',
+  })
 }
 
 export { precheckVideoQuality }

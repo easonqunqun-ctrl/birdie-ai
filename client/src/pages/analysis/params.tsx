@@ -18,7 +18,9 @@ import { describeIntermittentRequestFailure, isRequestError } from '@/services/r
 import {
   confirmQualityWarningsIfNeeded,
   precheckVideoQuality,
+  showQualityBlockModal,
 } from '@/services/videoQualityPrecheck'
+import { linesForQualityBlocks } from '@/constants/qualityBlockers'
 import { linesForQualityWarnings } from '@/constants/qualityWarnings'
 import { useAnalysisStore } from '@/store/analysisStore'
 import { useUserStore } from '@/store/userStore'
@@ -80,6 +82,7 @@ const AnalysisParamsPage: FC = () => {
     'idle' | 'quality' | 'checking' | 'signing' | 'uploading' | 'creating'
   >('idle')
   const [qualityWarnings, setQualityWarnings] = useState<string[]>([])
+  const [qualityBlocks, setQualityBlocks] = useState<string[]>([])
   const [qualityChecking, setQualityChecking] = useState(false)
 
   const setCurrent = useAnalysisStore((s) => s.setCurrent)
@@ -97,6 +100,7 @@ const AnalysisParamsPage: FC = () => {
   useEffect(() => {
     if (!thumbTempFilePath) {
       setQualityWarnings([])
+      setQualityBlocks([])
       setQualityChecking(false)
       return
     }
@@ -108,7 +112,10 @@ const AnalysisParamsPage: FC = () => {
       durationSec: duration,
     })
       .then((r) => {
-        if (!cancelled) setQualityWarnings(r.warnings)
+        if (!cancelled) {
+          setQualityBlocks(r.blocks)
+          setQualityWarnings(r.warnings)
+        }
       })
       .finally(() => {
         if (!cancelled) setQualityChecking(false)
@@ -121,6 +128,11 @@ const AnalysisParamsPage: FC = () => {
   const qualityHintLines = useMemo(
     () => linesForQualityWarnings(qualityWarnings),
     [qualityWarnings],
+  )
+
+  const qualityBlockLines = useMemo(
+    () => linesForQualityBlocks(qualityBlocks),
+    [qualityBlocks],
   )
 
   const overLimit = useMemo(() => {
@@ -139,17 +151,25 @@ const AnalysisParamsPage: FC = () => {
     setSubmitting(true)
     try {
       setPhase('quality')
+      let blockCodes = qualityBlocks
       let warnCodes = qualityWarnings
-      if (!warnCodes.length && thumbTempFilePath) {
+      if (!blockCodes.length && !warnCodes.length && thumbTempFilePath) {
         Taro.showLoading({ title: '检查拍摄质量' })
         const pre = await precheckVideoQuality({
           thumbTempFilePath,
           videoTempFilePath: tempFilePath,
           durationSec: duration,
         })
+        blockCodes = pre.blocks
         warnCodes = pre.warnings
+        setQualityBlocks(pre.blocks)
         setQualityWarnings(pre.warnings)
         Taro.hideLoading()
+      }
+      if (blockCodes.length) {
+        await showQualityBlockModal(blockCodes)
+        Taro.redirectTo({ url: '/pages/analysis/capture' })
+        return
       }
       if (warnCodes.length) {
         const proceed = await confirmQualityWarningsIfNeeded(warnCodes)
@@ -271,7 +291,7 @@ const AnalysisParamsPage: FC = () => {
     }
   }
 
-  const disabled = submitting || !!overLimit
+  const disabled = submitting || !!overLimit || qualityBlocks.length > 0
 
   return (
     <View className='params'>
@@ -282,9 +302,20 @@ const AnalysisParamsPage: FC = () => {
         </Text>
         {overLimit && <Text className='params__summary-error'>⚠ {overLimit}</Text>}
         {qualityChecking && (
-          <Text className='params__summary-hint'>正在检查拍摄质量…</Text>
+          <Text className='params__summary-hint'>正在检查拍摄质量（5 秒内）…</Text>
         )}
-        {!qualityChecking && qualityHintLines.length > 0 && (
+        {!qualityChecking && qualityBlockLines.length > 0 && (
+          <View className='params__quality-block'>
+            <Text className='params__quality-block-title'>无法开始分析</Text>
+            {qualityBlockLines.map((line) => (
+              <Text key={line} className='params__quality-block-line'>
+                {line}
+              </Text>
+            ))}
+            <Text className='params__quality-block-foot'>请返回重新拍摄后再试。</Text>
+          </View>
+        )}
+        {!qualityChecking && qualityBlockLines.length === 0 && qualityHintLines.length > 0 && (
           <View className='params__quality-warn'>
             <Text className='params__quality-warn-title'>拍摄质量提示</Text>
             {qualityHintLines.map((line) => (

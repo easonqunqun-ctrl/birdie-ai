@@ -1,20 +1,24 @@
 /**
  * O-08 子集：上传前客户端质量预检（启发式，非引擎真检）。
- * 机器码与 `ai_engine` / `qualityWarnings.ts` 对齐；无缩略图时 fail-open。
+ * v1.2.0：5s 硬超时 + 阻断/警告分级（对齐 preprocess 硬/软阈值量级）。
  */
+
+/** 与 docs/01 §4.4「5 秒内完成」对齐；超时 fail-open，不阻断上传 */
+export const PRECHECK_HARD_TIMEOUT_MS = 5000
 
 export interface ThumbFrameMetrics {
   meanLuminance: number
   laplacianVariance: number
 }
 
-/** 与 `ai_engine/app/pipeline/preprocess.py` 软阈值同量级，按首帧缩略图缩放 */
+/** 与 `ai_engine/app/pipeline/preprocess.py` 硬/软阈值同量级，按首帧缩略图缩放 */
 export const CLIENT_PRECHECK_THRESHOLDS = {
+  MEAN_LUMINANCE_BLOCK: 35,
+  LAPLACIAN_VAR_BLOCK: 18,
+  STABILITY_SCORE_BLOCK: 0.18,
   MEAN_LUMINANCE_LOW_LIGHT: 78,
   LAPLACIAN_VAR_VERY_BLURRY: 42,
-  /** 对齐 `preprocess._WARN_LOW_STABILITY_BELOW` */
   STABILITY_SCORE_CAMERA_SHAKE: 0.42,
-  /** 对齐 `preprocess._scan_quality`：mean_diff/30 → stability */
   STABILITY_MEAN_DIFF_SCALE: 30,
 } as const
 
@@ -22,14 +26,42 @@ const SHAKE_SAMPLE_MAX_SIDE = 64
 
 export interface VideoQualityPrecheckResult {
   warnings: string[]
+  blocks: string[]
   skipped?: boolean
-  reason?: 'no_thumb' | 'unsupported_platform' | 'analysis_failed' | 'no_video_decoder'
+  reason?:
+    | 'no_thumb'
+    | 'unsupported_platform'
+    | 'analysis_failed'
+    | 'no_video_decoder'
+    | 'timeout'
+  timedOut?: boolean
+  elapsedMs?: number
   metrics?: ThumbFrameMetrics
-  /** 视频前段多帧启发式稳像分 0–1（越大越稳） */
   shakeStabilityScore?: number
 }
 
+export function blockingCodesFromThumbMetrics(m: ThumbFrameMetrics): string[] {
+  if (m.meanLuminance < CLIENT_PRECHECK_THRESHOLDS.MEAN_LUMINANCE_BLOCK) {
+    return ['too_dark']
+  }
+  if (
+    m.laplacianVariance < CLIENT_PRECHECK_THRESHOLDS.LAPLACIAN_VAR_BLOCK &&
+    m.meanLuminance < 90
+  ) {
+    return ['too_blurry']
+  }
+  return []
+}
+
+export function blockingCodesFromStabilityScore(stabilityScore: number): string[] {
+  if (stabilityScore < CLIENT_PRECHECK_THRESHOLDS.STABILITY_SCORE_BLOCK) {
+    return ['too_shaky']
+  }
+  return []
+}
+
 export function warningCodesFromThumbMetrics(m: ThumbFrameMetrics): string[] {
+  if (blockingCodesFromThumbMetrics(m).length > 0) return []
   const codes: string[] = []
   const dark =
     m.meanLuminance < CLIENT_PRECHECK_THRESHOLDS.MEAN_LUMINANCE_LOW_LIGHT ||
@@ -45,10 +77,51 @@ export function stabilityScoreFromMeanDiff(meanDiff: number): number {
 }
 
 export function warningCodesFromStabilityScore(stabilityScore: number): string[] {
+  if (blockingCodesFromStabilityScore(stabilityScore).length > 0) return []
   if (stabilityScore < CLIENT_PRECHECK_THRESHOLDS.STABILITY_SCORE_CAMERA_SHAKE) {
     return ['camera_shake']
   }
   return []
+}
+
+/** 汇总 thumb + shake 为 blocks / warnings 两档（互斥：已阻断不再给软警告） */
+export function classifyVideoQualityPrecheck(input: {
+  thumbMetrics?: ThumbFrameMetrics
+  shakeStabilityScore?: number | null
+}): { blocks: string[]; warnings: string[] } {
+  const blockGroups: string[][] = []
+  const warnGroups: string[][] = []
+
+  if (input.thumbMetrics) {
+    blockGroups.push(blockingCodesFromThumbMetrics(input.thumbMetrics))
+    warnGroups.push(warningCodesFromThumbMetrics(input.thumbMetrics))
+  }
+  if (input.shakeStabilityScore != null) {
+    blockGroups.push(blockingCodesFromStabilityScore(input.shakeStabilityScore))
+    warnGroups.push(warningCodesFromStabilityScore(input.shakeStabilityScore))
+  }
+
+  const blocks = mergeQualityWarningCodes(...blockGroups)
+  const warnings =
+    blocks.length > 0 ? [] : mergeQualityWarningCodes(...warnGroups)
+  return { blocks, warnings }
+}
+
+export async function withPrecheckTimeout<T>(
+  task: Promise<T>,
+  timeoutMs: number = PRECHECK_HARD_TIMEOUT_MS,
+): Promise<{ result: T | null; timedOut: boolean }> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      task.then((result) => ({ result, timedOut: false as const })),
+      new Promise<{ result: null; timedOut: true }>((resolve) => {
+        timer = setTimeout(() => resolve({ result: null, timedOut: true }), timeoutMs)
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
 }
 
 export function mergeQualityWarningCodes(...groups: string[][]): string[] {

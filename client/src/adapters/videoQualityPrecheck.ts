@@ -20,5 +20,5 @@ export async function precheckVideoQuality(_input: {
   videoTempFilePath?: string
   durationSec?: number
 }): Promise<VideoQualityPrecheckResult> {
-  return { warnings: [], skipped: true, reason: 'unsupported_platform' }
+  return { warnings: [], blocks: [], skipped: true, reason: 'unsupported_platform' }
 }

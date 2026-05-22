@@ -10,6 +10,9 @@
  */
 
 import {
+  blockingCodesFromStabilityScore,
+  blockingCodesFromThumbMetrics,
+  classifyVideoQualityPrecheck,
   CLIENT_PRECHECK_THRESHOLDS,
   downscaleRgbaToGray,
   earlyShakeSamplePositionsSec,
@@ -17,10 +20,12 @@ import {
   meanAbsDiffGray,
   mergeQualityWarningCodes,
   metricsFromRgba,
+  PRECHECK_HARD_TIMEOUT_MS,
   stabilityScoreFromGrayFrames,
   stabilityScoreFromMeanDiff,
   warningCodesFromStabilityScore,
   warningCodesFromThumbMetrics,
+  withPrecheckTimeout,
 } from '@/utils/videoQualityPrecheck'
 
 describe('warningCodesFromThumbMetrics · 暗光判定', () => {
@@ -251,5 +256,127 @@ describe('metricsFromRgba', () => {
     const m = metricsFromRgba(rgba, w, h)
     expect(m.laplacianVariance).toBeGreaterThan(0)
     expect(m.meanLuminance).toBeCloseTo(127.5, 0)
+  })
+})
+
+describe('blockingCodesFromThumbMetrics · 硬阻断', () => {
+  test('极暗 → too_dark', () => {
+    expect(
+      blockingCodesFromThumbMetrics({
+        meanLuminance: CLIENT_PRECHECK_THRESHOLDS.MEAN_LUMINANCE_BLOCK - 1,
+        laplacianVariance: 200,
+      }),
+    ).toEqual(['too_dark'])
+  })
+
+  test('刚好等于亮度阻断阈值不算暗', () => {
+    expect(
+      blockingCodesFromThumbMetrics({
+        meanLuminance: CLIENT_PRECHECK_THRESHOLDS.MEAN_LUMINANCE_BLOCK,
+        laplacianVariance: 200,
+      }),
+    ).toEqual([])
+  })
+
+  test('偏暗且极糊 → too_blurry', () => {
+    expect(
+      blockingCodesFromThumbMetrics({
+        meanLuminance: 80,
+        laplacianVariance: CLIENT_PRECHECK_THRESHOLDS.LAPLACIAN_VAR_BLOCK - 1,
+      }),
+    ).toEqual(['too_blurry'])
+  })
+
+  test('亮度 >= 90 时极糊不阻断（白天对焦糊）', () => {
+    expect(
+      blockingCodesFromThumbMetrics({
+        meanLuminance: 95,
+        laplacianVariance: CLIENT_PRECHECK_THRESHOLDS.LAPLACIAN_VAR_BLOCK - 1,
+      }),
+    ).toEqual([])
+  })
+})
+
+describe('blockingCodesFromStabilityScore', () => {
+  test('稳像分 < 阻断阈值 → too_shaky', () => {
+    expect(
+      blockingCodesFromStabilityScore(
+        CLIENT_PRECHECK_THRESHOLDS.STABILITY_SCORE_BLOCK - 0.01,
+      ),
+    ).toEqual(['too_shaky'])
+  })
+
+  test('稳像分 >= 阻断阈值 → 空', () => {
+    expect(
+      blockingCodesFromStabilityScore(CLIENT_PRECHECK_THRESHOLDS.STABILITY_SCORE_BLOCK),
+    ).toEqual([])
+  })
+})
+
+describe('classifyVideoQualityPrecheck · 阻断/警告互斥', () => {
+  test('仅软警告', () => {
+    expect(
+      classifyVideoQualityPrecheck({
+        thumbMetrics: {
+          meanLuminance: CLIENT_PRECHECK_THRESHOLDS.MEAN_LUMINANCE_LOW_LIGHT - 1,
+          laplacianVariance: 200,
+        },
+        shakeStabilityScore: CLIENT_PRECHECK_THRESHOLDS.STABILITY_SCORE_CAMERA_SHAKE - 0.01,
+      }),
+    ).toEqual({
+      blocks: [],
+      warnings: ['low_light', 'camera_shake'],
+    })
+  })
+
+  test('有阻断时清空软警告', () => {
+    expect(
+      classifyVideoQualityPrecheck({
+        thumbMetrics: {
+          meanLuminance: CLIENT_PRECHECK_THRESHOLDS.MEAN_LUMINANCE_BLOCK - 1,
+          laplacianVariance: 200,
+        },
+        shakeStabilityScore: CLIENT_PRECHECK_THRESHOLDS.STABILITY_SCORE_CAMERA_SHAKE - 0.01,
+      }),
+    ).toEqual({
+      blocks: ['too_dark'],
+      warnings: [],
+    })
+  })
+
+  test('thumb 与 shake 阻断合并去重', () => {
+    expect(
+      classifyVideoQualityPrecheck({
+        thumbMetrics: {
+          meanLuminance: 80,
+          laplacianVariance: 10,
+        },
+        shakeStabilityScore: 0.05,
+      }),
+    ).toEqual({
+      blocks: ['too_blurry', 'too_shaky'],
+      warnings: [],
+    })
+  })
+})
+
+describe('withPrecheckTimeout', () => {
+  test('任务在时限内完成 → 返回结果', async () => {
+    const { result, timedOut } = await withPrecheckTimeout(Promise.resolve('ok'), 100)
+    expect(result).toBe('ok')
+    expect(timedOut).toBe(false)
+  })
+
+  test('任务超时 → result=null + timedOut=true', async () => {
+    const slow = new Promise<string>((resolve) => {
+      setTimeout(() => resolve('late'), 50)
+    })
+    const { result, timedOut } = await withPrecheckTimeout(slow, 10)
+    expect(result).toBeNull()
+    expect(timedOut).toBe(true)
+  })
+
+  test('默认超时 = PRECHECK_HARD_TIMEOUT_MS', () => {
+    expect(PRECHECK_HARD_TIMEOUT_MS).toBe(5000)
   })
 })

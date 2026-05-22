@@ -1,19 +1,19 @@
 import Taro from '@tarojs/taro'
 import {
+  classifyVideoQualityPrecheck,
   earlyShakeSamplePositionsSec,
   grayFromRgbaFrame,
   mergeQualityWarningCodes,
   metricsFromRgba,
+  PRECHECK_HARD_TIMEOUT_MS,
   stabilityScoreFromGrayFrames,
-  warningCodesFromStabilityScore,
-  warningCodesFromThumbMetrics,
+  withPrecheckTimeout,
   type VideoQualityPrecheckResult,
 } from '@/utils/videoQualityPrecheck'
 
 const SAMPLE_MAX_SIDE = 128
 const DECODER_START_MS = 12_000
 const DECODER_SEEK_MS = 2_500
-const SHAKE_ANALYSIS_MS = 5_000
 
 interface DecodedFrame {
   data: Uint8ClampedArray
@@ -40,6 +40,7 @@ function getVideoDecoderFactory(): (() => WxVideoDecoder) | null {
 
 async function analyzeThumbPath(thumbPath: string): Promise<{
   warnings: string[]
+  blocks: string[]
   metrics: ReturnType<typeof metricsFromRgba>
 } | null> {
   const info = await Taro.getImageInfo({ src: thumbPath })
@@ -64,7 +65,8 @@ async function analyzeThumbPath(thumbPath: string): Promise<{
   ctx.drawImage(img, 0, 0, w, h)
   const imageData = ctx.getImageData(0, 0, w, h)
   const metrics = metricsFromRgba(imageData.data, w, h)
-  return { warnings: warningCodesFromThumbMetrics(metrics), metrics }
+  const classified = classifyVideoQualityPrecheck({ thumbMetrics: metrics })
+  return { ...classified, metrics }
 }
 
 function startDecoder(decoder: WxVideoDecoder, source: string): Promise<void> {
@@ -153,28 +155,21 @@ async function sampleEarlyGrayFrames(
 async function analyzeVideoShake(
   videoPath: string,
   durationSec: number,
-): Promise<{ stabilityScore: number | null; warnings: string[] }> {
+): Promise<{ stabilityScore: number | null; warnings: string[]; blocks: string[] }> {
   const grays = await sampleEarlyGrayFrames(videoPath, durationSec)
   const stabilityScore = stabilityScoreFromGrayFrames(grays)
   if (stabilityScore == null) {
-    return { stabilityScore: null, warnings: [] }
+    return { stabilityScore: null, warnings: [], blocks: [] }
   }
+  const classified = classifyVideoQualityPrecheck({ shakeStabilityScore: stabilityScore })
   return {
     stabilityScore,
-    warnings: warningCodesFromStabilityScore(stabilityScore),
+    warnings: classified.warnings,
+    blocks: classified.blocks,
   }
 }
 
-function withShakeTimeout<T>(p: Promise<T>): Promise<T | null> {
-  return Promise.race([
-    p,
-    new Promise<null>((resolve) => {
-      setTimeout(() => resolve(null), SHAKE_ANALYSIS_MS)
-    }),
-  ])
-}
-
-export async function precheckVideoQualityWeapp(input: {
+async function precheckVideoQualityWeappInner(input: {
   thumbTempFilePath?: string
   videoTempFilePath?: string
   durationSec?: number
@@ -184,6 +179,7 @@ export async function precheckVideoQualityWeapp(input: {
   const durationSec = input.durationSec ?? 0
 
   let thumbWarnings: string[] = []
+  let thumbBlocks: string[] = []
   let metrics: VideoQualityPrecheckResult['metrics']
 
   if (thumbPath) {
@@ -191,6 +187,7 @@ export async function precheckVideoQualityWeapp(input: {
       const thumb = await analyzeThumbPath(thumbPath)
       if (thumb) {
         thumbWarnings = thumb.warnings
+        thumbBlocks = thumb.blocks
         metrics = thumb.metrics
       }
     } catch {
@@ -199,6 +196,7 @@ export async function precheckVideoQualityWeapp(input: {
   }
 
   let shakeWarnings: string[] = []
+  let shakeBlocks: string[] = []
   let shakeStabilityScore: number | undefined
   let shakeSkippedReason: VideoQualityPrecheckResult['reason']
 
@@ -206,36 +204,65 @@ export async function precheckVideoQualityWeapp(input: {
     if (!getVideoDecoderFactory()) {
       shakeSkippedReason = 'no_video_decoder'
     } else {
-      const shakeResult = await withShakeTimeout(analyzeVideoShake(videoPath, durationSec))
-      if (shakeResult === null) {
-        shakeSkippedReason = 'analysis_failed'
-      } else {
+      try {
+        const shakeResult = await analyzeVideoShake(videoPath, durationSec)
         shakeWarnings = shakeResult.warnings
+        shakeBlocks = shakeResult.blocks
         if (shakeResult.stabilityScore != null) {
           shakeStabilityScore = shakeResult.stabilityScore
         }
+      } catch {
+        shakeSkippedReason = 'analysis_failed'
       }
     }
   }
 
-  const warnings = mergeQualityWarningCodes(thumbWarnings, shakeWarnings)
+  const blocks = mergeQualityWarningCodes(thumbBlocks, shakeBlocks)
+  const warnings =
+    blocks.length > 0
+      ? []
+      : mergeQualityWarningCodes(thumbWarnings, shakeWarnings)
 
   if (!thumbPath && !videoPath) {
-    return { warnings: [], skipped: true, reason: 'no_thumb' }
+    return { warnings: [], blocks: [], skipped: true, reason: 'no_thumb' }
   }
 
   return {
     warnings,
+    blocks,
     metrics,
     shakeStabilityScore,
-    skipped: warnings.length === 0 && !!shakeSkippedReason && !thumbPath,
+    skipped: warnings.length === 0 && blocks.length === 0 && !!shakeSkippedReason && !thumbPath,
     reason:
       shakeSkippedReason ||
       (!thumbPath && !videoPath ? 'no_thumb' : undefined),
   }
 }
 
-// Taro 端分叉机制：weapp 编译时优先解析 `videoQualityPrecheck.weapp.ts`，base 文件被忽略；
-// services 层与 pages 都按统一名 `precheckVideoQuality` import，weapp 这边必须显式 re-export
-// 同名别名，否则在小程序运行时拿到 undefined → 触发 TypeError → 「开始分析」点击无反应。
+export async function precheckVideoQualityWeapp(input: {
+  thumbTempFilePath?: string
+  videoTempFilePath?: string
+  durationSec?: number
+}): Promise<VideoQualityPrecheckResult> {
+  const started = Date.now()
+  const { result, timedOut } = await withPrecheckTimeout(
+    precheckVideoQualityWeappInner(input),
+    PRECHECK_HARD_TIMEOUT_MS,
+  )
+  const elapsedMs = Date.now() - started
+
+  if (timedOut || !result) {
+    return {
+      warnings: [],
+      blocks: [],
+      skipped: true,
+      timedOut: true,
+      elapsedMs,
+      reason: 'timeout',
+    }
+  }
+
+  return { ...result, elapsedMs, timedOut: false }
+}
+
 export const precheckVideoQuality = precheckVideoQualityWeapp
