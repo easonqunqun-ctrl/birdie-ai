@@ -147,6 +147,23 @@ function friendlyNetworkMessage(raw: string, requestUrl?: string): string {
     return '请求超时，请检查网络与接口是否可达'
   }
 
+  if (
+    lower.includes('getaddrinfo') ||
+    lower.includes('enotfound') ||
+    lower.includes('nodename nor servname') ||
+    lower.includes('dns')
+  ) {
+    return '无法解析服务器地址，请检查网络或 API 域名配置'
+  }
+
+  if (lower.includes('abort') || lower.includes('cancel')) {
+    return '请求已取消'
+  }
+
+  if (lower.includes('interrupted') || lower.includes('connection reset')) {
+    return '网络连接中断，请稍后重试'
+  }
+
   if (lower.includes('fail') && (lower.includes('connect') || lower.includes('connection'))) {
     return '无法连接服务器，请确认域名解析与防火墙'
   }
@@ -319,6 +336,27 @@ export function describeIntermittentRequestFailure(e: unknown): {
     /** 静默请求或未走 `request()` 自动 toast：与业务信封文案对齐 */
     if (e.kind === 'business') {
       const t = e.message?.trim() || '请求失败'
+      if (e.code === 40007) {
+        return {
+          fatalMessage: t,
+          toastTitle: t.length <= 220 ? t : '今日对话次数已用完',
+        }
+      }
+      if (e.code === 40009) {
+        return {
+          fatalMessage: '发送太频繁，请稍后再试',
+          toastTitle: '发送太频繁，请稍后再试',
+        }
+      }
+      if (e.code === 40017) {
+        return { fatalMessage: t, toastTitle: t.length <= 220 ? t : '内容不符合规范' }
+      }
+      if (e.code === 50106) {
+        return {
+          fatalMessage: t || 'AI 教练暂时不可用，请稍后再试',
+          toastTitle: t || 'AI 教练暂时不可用',
+        }
+      }
       return { fatalMessage: t, toastTitle: t }
     }
     if (e.kind === 'http_server_error') {

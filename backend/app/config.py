@@ -124,6 +124,21 @@ class Settings(BaseSettings):
     # 委托代扣签约结果通知 URL（HTTPS，可与支付 notify 不同路径）；须登记到商户平台
     WECHAT_PAY_PAPAY_NOTIFY_URL: str = ""
 
+    # ==================== 微信小程序虚拟支付（xpay） ====================
+    # iOS 虚拟会员须走 wx.requestVirtualPayment；审核通过后在 mp 后台配置道具与 appKey
+    WECHAT_XPAY_ENABLED: bool = False
+    WECHAT_XPAY_OFFER_ID: str = ""
+    WECHAT_XPAY_APP_KEY: str = ""
+    WECHAT_XPAY_SANDBOX_APP_KEY: str = ""
+    # 0 现网 1 沙箱（须与 appKey 成对）
+    WECHAT_XPAY_ENV: int = 0
+    WECHAT_XPAY_PRODUCT_MONTHLY: str = ""
+    WECHAT_XPAY_PRODUCT_YEARLY: str = ""
+
+    # 小程序消息推送（接收 xpay_goods_deliver_notify 等 Event）
+    WECHAT_MP_PUSH_TOKEN: str = ""
+    WECHAT_MP_PUSH_ENCODING_AES_KEY: str = ""
+
     # ==================== 苹果内购 ====================
     APPLE_BUNDLE_ID: str = "com.xiaoniaoai.app"
     APPLE_SHARED_SECRET: str = ""

@@ -143,6 +143,26 @@ REFUSAL_HINTS: tuple[str, ...] = (
 )
 
 
+def topic_boundary_refusal_for(category: TopicCategory) -> str | None:
+    """非高尔夫/敏感话题的固定引导文案；GOLF 返回 None（走 LLM）。"""
+    if category == TopicCategory.GOLF:
+        return None
+    messages = {
+        TopicCategory.OFF_TOPIC: (
+            "我是高尔夫AI教练，这个问题超出了我的专长，不过高尔夫方面的问题随时可以问我。"
+        ),
+        TopicCategory.MEDICAL: (
+            "如果你感到疼痛或不适，建议先咨询医生或运动康复师。"
+            "我可以推荐一些安全的热身动作，或帮你看看挥杆里有没有可能加重负担的地方。"
+        ),
+        TopicCategory.GAMBLING: (
+            "我无法协助与赌球或博彩相关的内容。"
+            "想聊聊球场练习、选杆或挥杆技术的话，随时问我。"
+        ),
+    }
+    return messages[category]
+
+
 def reply_matches_refusal_hint(reply: str) -> bool:
     """FakeLLM / 回归用：拒答回复是否含引导回高尔夫的提示."""
     body = (reply or "").strip()

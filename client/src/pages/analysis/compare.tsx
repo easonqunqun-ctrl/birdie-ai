@@ -36,6 +36,10 @@ function clubAngleLine(r: AnalysisReportResponse): string {
   return `${club} · ${angle}`
 }
 
+function issueNameSet(r: AnalysisReportResponse): Set<string> {
+  return new Set(r.issues.map((i) => i.name))
+}
+
 const ComparePage: FC = () => {
   const router = useRouter()
   const { left = '', right = '' } = router.params as { left?: string; right?: string }
@@ -93,10 +97,23 @@ const ComparePage: FC = () => {
     })
   }, [earlier, later])
 
+  const issueDiff = useMemo(() => {
+    if (!earlier || !later) {
+      return { resolved: [] as string[], newly: [] as string[] }
+    }
+    const before = issueNameSet(earlier)
+    const after = issueNameSet(later)
+    const resolved = [...before].filter((n) => !after.has(n))
+    const newly = [...after].filter((n) => !before.has(n))
+    return { resolved, newly }
+  }, [earlier, later])
+
   if (loading) {
     return (
       <View className='compare'>
-        <Text>加载对比数据…</Text>
+        <View className='compare__loading'>
+          <Text className='compare__loading-text'>加载对比数据…</Text>
+        </View>
       </View>
     )
   }
@@ -121,6 +138,10 @@ const ComparePage: FC = () => {
       : scoreDelta > 0
         ? `较晚一次比较早一次高 ${scoreDelta} 分。`
         : `较晚一次比较早一次低 ${Math.abs(scoreDelta)} 分。`
+  const deltaTone =
+    scoreDelta > 0 ? 'up' : scoreDelta < 0 ? 'down' : 'flat'
+  const deltaBadge =
+    scoreDelta === 0 ? '持平' : scoreDelta > 0 ? `+${scoreDelta}` : `${scoreDelta}`
 
   const levelE = scoreLevelFromScore(earlier.overall_score)
   const levelL = scoreLevelFromScore(later.overall_score)
@@ -132,9 +153,24 @@ const ComparePage: FC = () => {
 
   return (
     <ScrollView scrollY className='compare'>
+      <View className='compare__inner'>
       <View className='compare__head'>
         <Text className='compare__title'>历史报告对比</Text>
         <Text className='compare__hint'>按分析时间：左为较早 · 右为较晚</Text>
+      </View>
+
+      <View className={`compare__summary compare__summary--${deltaTone}`}>
+        <Text className='compare__summary-badge'>{deltaBadge}</Text>
+        <View className='compare__summary-texts'>
+          <Text className='compare__summary-title'>综合分变化</Text>
+          <Text className='compare__summary-body'>{deltaLabel}</Text>
+          {typeof later.score_change === 'number' && (
+            <Text className='compare__summary-meta'>
+              较晚报告标注：较上一次 {later.score_change >= 0 ? '+' : ''}
+              {later.score_change} 分
+            </Text>
+          )}
+        </View>
       </View>
 
       <View className='compare__row'>
@@ -162,9 +198,31 @@ const ComparePage: FC = () => {
         </View>
       </View>
 
-      <View className='compare__delta'>
-        <Text>{deltaLabel}</Text>
-      </View>
+      {(issueDiff.resolved.length > 0 || issueDiff.newly.length > 0) && (
+        <View className='compare__section'>
+          <Text className='compare__section-title'>问题变化</Text>
+          {issueDiff.resolved.length > 0 && (
+            <View className='compare__diff-block compare__diff-block--resolved'>
+              <Text className='compare__diff-tag'>已缓解 · {issueDiff.resolved.length} 项</Text>
+              {issueDiff.resolved.map((name) => (
+                <Text key={name} className='compare__diff-item'>
+                  · {name}
+                </Text>
+              ))}
+            </View>
+          )}
+          {issueDiff.newly.length > 0 && (
+            <View className='compare__diff-block compare__diff-block--new'>
+              <Text className='compare__diff-tag'>新出现 · {issueDiff.newly.length} 项</Text>
+              {issueDiff.newly.map((name) => (
+                <Text key={name} className='compare__diff-item'>
+                  · {name}
+                </Text>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
 
       {phaseRows.length > 0 && (
         <View className='compare__section'>
@@ -264,6 +322,7 @@ const ComparePage: FC = () => {
         >
           返回
         </Button>
+      </View>
       </View>
     </ScrollView>
   )

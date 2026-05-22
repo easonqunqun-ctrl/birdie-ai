@@ -23,10 +23,13 @@ export const paymentService = {
   listPlans() {
     return http.get<PlanOption[]>('/payments/plans')
   },
-  createOrder(planType: PlanType) {
+  createOrder(planType: PlanType, wxLoginCode?: string) {
     return http.post<CreateOrderResponse>(
       '/payments/orders',
-      { plan_type: planType },
+      {
+        plan_type: planType,
+        ...(wxLoginCode ? { wx_login_code: wxLoginCode } : {}),
+      },
       { silent: true },
     )
   },

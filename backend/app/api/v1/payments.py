@@ -137,7 +137,12 @@ async def create_order(
     db: AsyncSession = Depends(get_db),
 ) -> APIResponse[CreateOrderResponse]:
     try:
-        order, prepay = await payment_service.create_order(db, user, payload.plan_type)
+        order, prepay = await payment_service.create_order(
+            db,
+            user,
+            payload.plan_type,
+            wx_login_code=payload.wx_login_code,
+        )
         await db.commit()
         await db.refresh(order)
     except AppException:
@@ -173,6 +178,7 @@ async def create_order(
             order=OrderResponse.model_validate(order),
             prepay_params=prepay,
             mock_mode=settings.WECHAT_PAY_MOCK_MODE,
+            virtual_pay_enabled=payment_service.virtual_pay_enabled(),
         )
     except ValidationError as e:
         logger.exception(
@@ -437,6 +443,7 @@ async def get_membership(
             expires_at=user.membership_expires_at,
             days_remaining=payment_service.days_remaining(user),
             auto_renew=user.auto_renew,
+            virtual_pay_enabled=payment_service.virtual_pay_enabled(),
             papay_contract_id=user.papay_contract_id,
         )
     )

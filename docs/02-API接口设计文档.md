@@ -1015,6 +1015,8 @@ POST /v1/chat/sessions/{session_id}/messages
 }
 ```
 
+**P-02 话题边界（v1.2.9+）**：服务端在扣减对话配额前对用户输入做轻量分类。命中 **非高尔夫 / 医疗伤病 / 赌球博彩** 时，直接返回固定引导文案（同步 JSON 或 SSE 单帧 `content_delta`），**不调用 LLM、不消耗当日对话配额**。高尔夫相关问题仍走 LLM + 配额扣减。
+
 **响应方式**：Server-Sent Events（SSE）
 
 - **默认流式**：`Accept: text/event-stream`（或不带 `Accept`）→ 下述 SSE 序列
@@ -1728,6 +1730,76 @@ POST /v1/payments/orders/{order_id}/mock-refund?reason=<可选>
 ```
 
 **需认证**；语义：对已 **`paid`** 订单记账 **`refunded`**、写 **`payment_transactions`** 类型 **`refund`**，并将会员降级回 **free**（与生产「微信退款 + 退款回调」链路尚未对接；本接口服务于联调 / 冒烟）。
+
+---
+
+### 6.7 微信小程序虚拟支付（xpay，iOS 合规）
+
+> 详单与运维步骤见 [`docs/release-notes/wechat-xpay-runbook.md`](../release-notes/wechat-xpay-runbook.md)。
+
+**开关**：`WECHAT_XPAY_ENABLED=true` 且 `WECHAT_PAY_MOCK_MODE=false` 时，小程序 **不再** 走 JSAPI `wx.requestPayment`，改走 `wx.requestVirtualPayment`（道具直购 `short_series_goods`）。
+
+#### 创建订单（扩展）
+
+```
+POST /v1/payments/orders
+```
+
+**请求体**（在原有 `plan_type` 基础上）：
+
+```json
+{
+  "plan_type": "monthly | yearly",
+  "wx_login_code": "wx.login() 临时 code（虚拟支付必填）"
+}
+```
+
+**成功响应 `data.prepay_params`（virtual）**：
+
+```json
+{
+  "mock": false,
+  "payment_method": "virtual",
+  "sign_data": "{\"offerId\":\"…\",\"buyQuantity\":1,\"env\":0,\"currencyType\":\"CNY\",\"productId\":\"…\",\"goodsPrice\":3900,\"outTradeNo\":\"ord_…\",\"attach\":\"monthly\"}",
+  "pay_sig": "…",
+  "signature": "…",
+  "mode": "short_series_goods"
+}
+```
+
+前端调用：
+
+```javascript
+wx.requestVirtualPayment({
+  signData: prepay_params.sign_data,
+  paySig: prepay_params.pay_sig,
+  signature: prepay_params.signature,
+  mode: 'short_series_goods',
+})
+```
+
+`data.virtual_pay_enabled=true` 表示当前服务端已启用虚拟支付。
+
+#### 发货推送（微信 → 后端）
+
+```
+POST /v1/wechat/mp-push
+```
+
+**微信服务器调用**（小程序后台 **开发管理 → 消息推送** 配置 URL）。  
+Event=`xpay_goods_deliver_notify` 时：验签 → 按 `OutTradeNo` 激活会员 → 响应 `{"ErrCode":0,"ErrMsg":"success"}`。
+
+#### 查单补偿（客户端）
+
+```
+POST /v1/payments/orders/{order_id}/sync-from-wechat
+```
+
+虚拟支付模式下改为调用微信 `/xpay/query_order`；订单 `status ∈ {2,3,4}` 时执行与发货推送相同的到账逻辑。
+
+#### 自动续费限制
+
+`WECHAT_XPAY_ENABLED=true` 时 **`POST /v1/payments/auto-renew` 开启** 返回 `40098`（委托代扣与 iOS 虚拟支付规则不兼容，须手动续费）。
 
 ---
 

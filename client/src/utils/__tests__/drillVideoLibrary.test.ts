@@ -11,6 +11,7 @@ describe('drillVideoLibrary', () => {
       const detail = getDrillVideoDetail(id)
       expect(detail?.video_url).toContain(`/assets/video/samples/drills/${id}.mp4`)
       expect(detail?.poster_url).toContain(`/assets/image/samples/drills/${id}_thumb.jpg`)
+      expect(detail?.title).toContain('动作参考')
     }
   })
 

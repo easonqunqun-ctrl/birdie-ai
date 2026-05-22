@@ -246,4 +246,34 @@ describe('describeIntermittentRequestFailure / describePageLoadFailure', () => {
     expect(fatalMessage).toContain('网络似乎不太稳定')
     expect(toastTitle).toBe('网络异常，请稍后重试')
   })
+
+  test('business 40007 → 配额文案', () => {
+    const e = new RequestError('business', '今日对话次数已用完', { code: 40007 })
+    expect(describeIntermittentRequestFailure(e).toastTitle).toBe('今日对话次数已用完')
+  })
+
+  test('business 40009 → 限流文案', () => {
+    const e = new RequestError('business', 'too fast', { code: 40009 })
+    expect(describeIntermittentRequestFailure(e).toastTitle).toBe('发送太频繁，请稍后再试')
+  })
+
+  test('network DNS 失败 → 解析提示', async () => {
+    T.request.mockRejectedValueOnce({ errMsg: 'request:fail getaddrinfo ENOTFOUND api.example.com' })
+    try {
+      await request({ url: '/x' })
+      fail('should throw')
+    } catch (e) {
+      expect((e as RequestError).message).toMatch(/解析/)
+    }
+  })
+
+  test('network 连接中断 → 中断提示', async () => {
+    T.request.mockRejectedValueOnce({ errMsg: 'request:fail connection reset by peer' })
+    try {
+      await request({ url: '/x' })
+      fail('should throw')
+    } catch (e) {
+      expect((e as RequestError).message).toMatch(/中断/)
+    }
+  })
 })

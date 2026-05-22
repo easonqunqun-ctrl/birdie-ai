@@ -22,6 +22,8 @@ from app.config import settings
 from app.core.exceptions import AppException, BadRequestError, ConflictError, NotFoundError, ThirdPartyError
 from app.core.security import new_id
 from app.integrations import wechat_pay_v3
+from app.integrations import wechat_xpay
+from app.integrations.wechat import code2session
 from app.models.analysis import AnalysisQuota
 from app.models.chat import ChatQuota
 from app.models.payment import Order, PaymentTransaction
@@ -66,8 +68,22 @@ def list_plans() -> list[PlanOption]:
     ]
 
 
+def virtual_pay_enabled() -> bool:
+    """非 mock 且显式开启 xpay 时，小程序走虚拟支付而非 JSAPI。"""
+    return bool(
+        getattr(settings, "WECHAT_XPAY_ENABLED", False)
+        and not settings.WECHAT_PAY_MOCK_MODE
+    )
+
+
 # ==================== 下单 ====================
-async def create_order(db: AsyncSession, user: User, plan_type: str) -> tuple[Order, PrepayParams]:
+async def create_order(
+    db: AsyncSession,
+    user: User,
+    plan_type: str,
+    *,
+    wx_login_code: str | None = None,
+) -> tuple[Order, PrepayParams]:
     """创建订单 + 返回 prepay 参数（mock 模式下仅含 mock=True）."""
     if plan_type not in PLAN_PRICING:
         raise BadRequestError(code=40001, message=f"不支持的套餐：{plan_type}")
@@ -89,11 +105,74 @@ async def create_order(db: AsyncSession, user: User, plan_type: str) -> tuple[Or
     await db.refresh(order)
 
     if settings.WECHAT_PAY_MOCK_MODE:
-        prepay = PrepayParams(mock=True)
+        prepay = PrepayParams(mock=True, payment_method="mock")
+    elif virtual_pay_enabled():
+        prepay = await _create_xpay_virtual_prepay(
+            db, order, user, wx_login_code=wx_login_code
+        )
     else:
         prepay = await _create_wechat_prepay(db, order, user)
 
     return order, prepay
+
+
+async def _create_xpay_virtual_prepay(
+    db: AsyncSession,
+    order: Order,
+    user: User,
+    *,
+    wx_login_code: str | None,
+) -> PrepayParams:
+    """虚拟支付：组装 signData + paySig + signature 供 wx.requestVirtualPayment。"""
+    if not (wx_login_code and wx_login_code.strip()):
+        raise BadRequestError(
+            code=40015,
+            message="虚拟支付需要微信登录凭证，请重试",
+        )
+    if not (user.wechat_openid and user.wechat_openid.strip()):
+        raise BadRequestError(
+            code=40014,
+            message="需在微信内使用小程序完成支付，无法获取 openid",
+        )
+
+    try:
+        session = await code2session(wx_login_code.strip())
+    except AppException:
+        raise
+    except Exception as e:
+        logger.exception("xpay_code2session_failed", error=str(e), order_id=order.id)
+        raise ThirdPartyError(message="微信登录失败，请重试", detail=str(e)) from e
+
+    if session.openid != user.wechat_openid:
+        raise BadRequestError(
+            code=40016,
+            message="微信账号与当前登录用户不一致，请重新登录",
+        )
+
+    try:
+        params = wechat_xpay.build_virtual_prepay_params(
+            out_trade_no=order.id,
+            plan_type=order.plan_type,
+            goods_price_cents=order.amount,
+            session_key=session.session_key,
+        )
+    except (RuntimeError, BadRequestError):
+        raise
+    except Exception as e:
+        logger.exception("xpay_build_prepay_failed", error=str(e), order_id=order.id)
+        raise ThirdPartyError(message="虚拟支付签名失败", detail=str(e)) from e
+
+    order.wechat_prepay_id = f"xpay:{order.plan_type}"
+    await db.flush()
+
+    return PrepayParams(
+        mock=False,
+        payment_method="virtual",
+        sign_data=params["sign_data"],
+        pay_sig=params["pay_sig"],
+        signature=params["signature"],
+        mode=params["mode"],
+    )
 
 
 async def _create_wechat_prepay(db: AsyncSession, order: Order, user: User) -> PrepayParams:
@@ -138,7 +217,9 @@ async def _create_wechat_prepay(db: AsyncSession, order: Order, user: User) -> P
     order.wechat_prepay_id = prepay_id
     await db.flush()
     try:
-        return ctx.build_miniprogram_prepay(prepay_id)
+        return ctx.build_miniprogram_prepay(prepay_id).model_copy(
+            update={"payment_method": "jsapi", "mock": False}
+        )
     except Exception as e:
         logger.exception(
             "wechat_build_miniprogram_prepay_failed",
@@ -423,6 +504,9 @@ async def sync_pending_order_from_wechat(
     if order.status != "pending":
         raise PaymentNotAllowedError(message=f"仅待支付订单可同步，当前 {order.status}")
 
+    if virtual_pay_enabled():
+        return await _sync_pending_order_from_xpay(db, order, user)
+
     try:
         ctx = wechat_pay_v3.get_wechat_pay_v3()
     except (RuntimeError, ValueError, OSError) as e:
@@ -474,6 +558,116 @@ async def sync_pending_order_from_wechat(
     )
     await db.refresh(order)
     return True, order, "synced_from_wechat"
+
+
+async def _sync_pending_order_from_xpay(
+    db: AsyncSession,
+    order: Order,
+    user: User,
+) -> tuple[bool, Order, str]:
+    if not (user.wechat_openid and user.wechat_openid.strip()):
+        raise BadRequestError(code=40014, message="缺少 openid，无法查单")
+
+    try:
+        data = await wechat_xpay.query_order(
+            openid=user.wechat_openid.strip(),
+            order_id=order.id,
+        )
+    except ThirdPartyError:
+        raise
+    except Exception as e:
+        logger.exception("xpay_query_order_unexpected", error=str(e), order_id=order.id)
+        raise ThirdPartyError(message="虚拟支付查单失败", detail=str(e)) from e
+
+    if not wechat_xpay.is_xpay_order_paid(data):
+        wx_order = data.get("order") if isinstance(data.get("order"), dict) else {}
+        st = wx_order.get("status", "UNKNOWN")
+        return False, order, f"xpay_status={st}"
+
+    wx_order = data.get("order") if isinstance(data.get("order"), dict) else {}
+    paid_fee = wx_order.get("paid_fee")
+    if paid_fee is not None and int(paid_fee) != order.amount:
+        raise BadRequestError(code=40091, message="虚拟支付订单金额与本系统订单不一致，已拒绝入账")
+
+    await db.refresh(order)
+    if order.status == "paid":
+        return False, order, "already_paid"
+
+    u = await db.get(User, order.user_id)
+    if u is None:
+        raise NotFoundError(code=40402, message="用户不存在")
+
+    txn_id = str(
+        wx_order.get("wxpay_order_id")
+        or wx_order.get("channel_order_id")
+        or wx_order.get("wx_order_id")
+        or "xpay_sync"
+    )
+
+    await _mark_paid(
+        db,
+        order,
+        u,
+        transaction_id=txn_id,
+        notify_data={"source": "xpay_query_order", "raw_keys": list(wx_order.keys())[:20]},
+    )
+    await db.refresh(order)
+    return True, order, "synced_from_xpay"
+
+
+async def process_xpay_goods_deliver_notify(
+    db: AsyncSession,
+    payload: dict[str, Any],
+) -> tuple[bool, str]:
+    """处理 xpay_goods_deliver_notify 消息推送（用户已支付，需发货/激活会员）。"""
+    if not virtual_pay_enabled():
+        return False, "xpay_not_enabled"
+
+    out_no = str(payload.get("OutTradeNo") or payload.get("out_trade_no") or "").strip()
+    if not out_no:
+        return False, "missing_out_trade_no"
+
+    order = await db.get(Order, out_no)
+    if order is None:
+        return False, "order_not_found"
+
+    if order.status == "paid":
+        return True, "already_paid_idempotent"
+
+    if order.status != "pending":
+        return False, f"unexpected_status_{order.status}"
+
+    goods = payload.get("GoodsInfo") or payload.get("goods_info") or {}
+    if isinstance(goods, dict):
+        actual = goods.get("ActualPrice") or goods.get("actual_price")
+        if actual is not None and int(actual) != order.amount:
+            return False, "amount_mismatch"
+
+    open_id = str(payload.get("OpenId") or payload.get("openid") or "").strip()
+    user = await db.get(User, order.user_id)
+    if user is None:
+        return False, "user_not_found"
+    if open_id and user.wechat_openid and open_id != user.wechat_openid:
+        return False, "openid_mismatch"
+
+    wx_pay = payload.get("WeChatPayInfo") or payload.get("we_chat_pay_info") or {}
+    txn_id = "xpay_deliver"
+    if isinstance(wx_pay, dict):
+        txn_id = str(
+            wx_pay.get("TransactionId")
+            or wx_pay.get("transaction_id")
+            or wx_pay.get("MchOrderNo")
+            or txn_id
+        )
+
+    await _mark_paid(
+        db,
+        order,
+        user,
+        transaction_id=txn_id,
+        notify_data={"source": "xpay_goods_deliver_notify", "event_keys": list(payload.keys())[:20]},
+    )
+    return True, "ok"
 
 
 def refund_out_no_for_order(order_id: str) -> str:
@@ -727,6 +921,12 @@ async def apply_auto_renew(
         user.auto_renew = True
         await db.flush()
         return None
+
+    if virtual_pay_enabled():
+        raise BadRequestError(
+            code=40098,
+            message="虚拟支付模式下暂不支持委托代扣自动续费，请手动续费",
+        )
 
     if not (user.wechat_openid and user.wechat_openid.strip()):
         raise BadRequestError(

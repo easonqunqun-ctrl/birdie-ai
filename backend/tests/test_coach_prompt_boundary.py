@@ -53,6 +53,15 @@ def test_off_topic_eval_fixture_meets_accuracy_floor() -> None:
     assert accuracy >= 0.85, f"P-02 eval accuracy {accuracy:.2%} below floor"
 
 
+def test_topic_boundary_refusal_messages() -> None:
+    from app.services.chat_topic_boundary import topic_boundary_refusal_for
+
+    assert topic_boundary_refusal_for(TopicCategory.GOLF) is None
+    assert "专长" in (topic_boundary_refusal_for(TopicCategory.OFF_TOPIC) or "")
+    assert "医生" in (topic_boundary_refusal_for(TopicCategory.MEDICAL) or "")
+    assert "赌球" in (topic_boundary_refusal_for(TopicCategory.GAMBLING) or "")
+
+
 @pytest.mark.asyncio
 async def test_fake_llm_can_simulate_refusal_for_regression(
     use_fake_llm: FakeLLMClient,

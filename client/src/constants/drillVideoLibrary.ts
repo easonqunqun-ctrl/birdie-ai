@@ -41,11 +41,14 @@ function drillPosterKey(drillId: string): string {
   return `samples/drills/${drillId}_thumb.jpg`
 }
 
+/** 示范视频卡片标题后缀（素材为通用参考片段，非专属教程） */
+export const DRILL_VIDEO_TITLE_SUFFIX = ' · 动作参考'
+
 function buildDrillVideoDetail(drillId: string): DrillVideoDetail {
   const drill = getDrillDetail(drillId)
   return {
     drill_id: drillId,
-    title: `${drill.name}示范`,
+    title: `${drill.name}${DRILL_VIDEO_TITLE_SUFFIX}`,
     video_url: buildAssetVideoUrl(drillVideoKey(drillId)),
     poster_url: buildAssetImageUrl(drillPosterKey(drillId)),
   }

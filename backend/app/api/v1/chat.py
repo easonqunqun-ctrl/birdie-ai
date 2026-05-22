@@ -253,16 +253,24 @@ async def send_message(
         return ok(result, message="发送成功")
 
     # SSE 流式：**先**做权限/配额/落 user_msg（任何 4xx 在开流前就抛出）
-    session, user_msg, quota, llm_messages = await chat_service.prepare_turn(
+    prepared = await chat_service.prepare_turn(
         db=db, user=user, session_id=session_id, content=payload.content
     )
-    gen = chat_service.stream_message(
-        session=session,
-        user_msg=user_msg,
-        quota=quota,
-        llm_messages=llm_messages,
-        db=db,
-    )
+    if prepared.boundary_assistant is not None:
+        gen = chat_service.stream_boundary_reply(
+            session=prepared.session,
+            user_msg=prepared.user_msg,
+            assistant_msg=prepared.boundary_assistant,
+            quota=prepared.quota,
+        )
+    else:
+        gen = chat_service.stream_message(
+            session=prepared.session,
+            user_msg=prepared.user_msg,
+            quota=prepared.quota,
+            llm_messages=prepared.llm_messages,
+            db=db,
+        )
     ping_sec = float(os.getenv("SSE_IDLE_PING_SECONDS", "22"))
     if ping_sec > 0:
         gen = _with_idle_ping(gen, ping_seconds=ping_sec)

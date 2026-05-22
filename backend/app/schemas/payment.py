@@ -22,20 +22,28 @@ class PlanOption(BaseModel):
 
 class CreateOrderRequest(BaseModel):
     plan_type: PlanType
+    # 虚拟支付：须 fresh wx.login() code，服务端 code2session 取 session_key 签 signature
+    wx_login_code: str | None = None
 
 
 class PrepayParams(BaseModel):
-    """客户端 wx.requestPayment 入参。mock 模式下仅含 `mock=True`."""
+    """客户端支付入参。mock / jsapi / virtual 三选一。"""
 
     model_config = ConfigDict(extra="allow")
 
     mock: bool = False
-    # 真实模式下（W8 接入后）以下字段会填值：
+    payment_method: Literal["mock", "jsapi", "virtual"] = "mock"
+    # JSAPI（wx.requestPayment）
     time_stamp: str | None = None
     nonce_str: str | None = None
     package: str | None = None
     sign_type: str | None = None
     pay_sign: str | None = None
+    # 虚拟支付（wx.requestVirtualPayment，mode=short_series_goods）
+    sign_data: str | None = None
+    pay_sig: str | None = None
+    signature: str | None = None
+    mode: str | None = None
 
 
 class OrderResponse(BaseModel):
@@ -58,6 +66,10 @@ class CreateOrderResponse(BaseModel):
     prepay_params: PrepayParams
     mock_mode: bool = Field(
         description="后端 WECHAT_PAY_MOCK_MODE 值，方便前端决定走 wx.requestPayment 还是直接 confirm",
+    )
+    virtual_pay_enabled: bool = Field(
+        default=False,
+        description="WECHAT_XPAY_ENABLED 且非 mock；客户端应走 wx.requestVirtualPayment",
     )
 
 
@@ -87,6 +99,10 @@ class MembershipInfo(BaseModel):
     expires_at: datetime | None
     days_remaining: int  # 会员剩余天数；非会员为 0
     auto_renew: bool
+    virtual_pay_enabled: bool = Field(
+        default=False,
+        description="小程序是否启用虚拟支付（启用时委托代扣自动续费不可用）",
+    )
     papay_contract_id: str | None = Field(
         default=None,
         description="微信委托代扣签约成功后的 contract_id；未签约为 null",

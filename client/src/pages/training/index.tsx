@@ -18,12 +18,15 @@ import PracticeCalendar from '@/components/PracticeCalendar'
 import '@/components/PracticeCalendar.scss'
 import ProgressLineChart from '@/components/ProgressLineChart'
 import '@/components/ProgressLineChart.scss'
+import VideoCard from '@/components/VideoCard'
+import '@/components/VideoCard.scss'
 import { trainingService } from '@/services/trainingService'
 import { userService } from '@/services/userService'
 import { describeIntermittentRequestFailure, isRequestError } from '@/services/request'
 import { useUserStore } from '@/store/userStore'
 import { useMembershipExpiringSoonModalOnShow } from '@/hooks/useMembershipExpiringSoonModalOnShow'
 import { getDrillDetail } from '@/constants/drillLibrary'
+import { getDrillVideoDetail } from '@/constants/drillVideoLibrary'
 import { PHASE_COLOR, PHASE_LABEL, PHASE_ORDER, type SwingPhaseKey } from '@/constants/phaseLabels'
 import { PAYMENT_ENABLED_FLAG } from '@/constants/flags'
 import type {
@@ -547,6 +550,7 @@ const TrainingPage: FC = () => {
           </View>
           {tasks.map((task) => {
             const drill = getDrillDetail(task.drill_id)
+            const drillVideo = getDrillVideoDetail(task.drill_id)
             const isExpanded = expandedTaskId === task.id
             const isDone = task.status === 'completed'
             return (
@@ -577,6 +581,17 @@ const TrainingPage: FC = () => {
 
                 {isExpanded && (
                   <View className='training__task-body'>
+                    {drillVideo && (
+                      <View className='training__task-video'>
+                        <VideoCard
+                          attachment={{
+                            type: 'video_card',
+                            drill_id: task.drill_id,
+                            title: drillVideo.title,
+                          }}
+                        />
+                      </View>
+                    )}
                     <Text className='training__task-desc'>
                       {drill.description}
                     </Text>

@@ -2,6 +2,7 @@ import { FC, useEffect, useMemo, useState } from 'react'
 import { View, Text, Button, ScrollView, Switch } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { paymentService } from '@/services/paymentService'
+import { requestWechatPayment } from '@/adapters/payment'
 import { describeIntermittentRequestFailure, describePageLoadFailure, isRequestError } from '@/services/request'
 import { useUserStore } from '@/store/userStore'
 import { PAYMENT_ENABLED_FLAG, PAYMENT_MOCK_FLAG } from '@/constants/flags'
@@ -178,7 +179,16 @@ const MembershipPage: FC = () => {
     if (submitting) return
     setSubmitting(true)
     try {
-      const res = await paymentService.createOrder(selected)
+      let wxLoginCode: string | undefined
+      if (TARO_BUILD_TARGET === 'weapp' && !PAYMENT_MOCK_FLAG) {
+        const lr = await Taro.login()
+        if (!lr.code) {
+          Taro.showToast({ title: '微信登录失败，请重试', icon: 'none' })
+          return
+        }
+        wxLoginCode = lr.code
+      }
+      const res = await paymentService.createOrder(selected, wxLoginCode)
       // 必须与后端 `CreateOrderResponse.mock_mode` 一致：编译期 PAYMENT_MOCK 默认 true，
       // 若此处再用 PAYMENT_MOCK_FLAG「或」进来，会在服务端已关闭模拟支付时仍走 mockConfirm → 40013。
       if (res.mock_mode) {
@@ -199,17 +209,10 @@ const MembershipPage: FC = () => {
         await paymentService.mockConfirm(res.order.id)
       } else {
         const pp = res.prepay_params
-        if (!pp.time_stamp || !pp.nonce_str || !pp.package || !pp.pay_sign) {
-          Taro.showToast({ title: '支付参数异常，请重试', icon: 'none' })
-          return
-        }
         try {
-          await Taro.requestPayment({
-            timeStamp: pp.time_stamp,
-            nonceStr: pp.nonce_str,
-            package: pp.package,
-            signType: (pp.sign_type || 'RSA') as 'RSA',
-            paySign: pp.pay_sign
+          await requestWechatPayment({
+            ...pp,
+            payment_method: pp.payment_method || (res.virtual_pay_enabled ? 'virtual' : 'jsapi'),
           })
         } catch (payErr: unknown) {
           const m = (payErr as { errMsg?: string })?.errMsg || ''
@@ -217,7 +220,7 @@ const MembershipPage: FC = () => {
             Taro.showToast({ title: '已取消', icon: 'none' })
           } else {
             const fromWx =
-              m.replace(/^requestPayment:fail\s*/i, '').trim() || ''
+              m.replace(/^request(Virtual)?Payment:fail\s*/i, '').trim() || ''
             const title =
               fromWx.length > 0 && fromWx.length <= 220
                 ? fromWx
@@ -335,7 +338,7 @@ const MembershipPage: FC = () => {
         <Text className='membership__hero-sub'>{headlineSub}</Text>
       </View>
 
-      {user?.is_member && PAYMENT_ENABLED_FLAG && (
+      {user?.is_member && PAYMENT_ENABLED_FLAG && !memInfo?.virtual_pay_enabled && (
         <View className='membership__renew-card'>
           <View className='membership__renew-row'>
             <View className='membership__renew-texts'>
@@ -430,7 +433,9 @@ const MembershipPage: FC = () => {
         <Text className='membership__cta-hint'>
           {PAYMENT_MOCK_FLAG
             ? '联调构建默认开启模拟开关：真实下单仍以服务端为准（关闭后端模拟时将拉起微信支付）'
-            : '将通过微信支付完成'}
+            : memInfo?.virtual_pay_enabled
+              ? '将通过小程序虚拟支付完成（iOS 合规）'
+              : '将通过微信支付完成'}
         </Text>
       </View>
 

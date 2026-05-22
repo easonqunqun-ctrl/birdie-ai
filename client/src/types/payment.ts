@@ -20,11 +20,16 @@ export interface PlanOption {
 
 export interface PrepayParams {
   mock: boolean
+  payment_method?: 'mock' | 'jsapi' | 'virtual'
   time_stamp?: string
   nonce_str?: string
   package?: string
   sign_type?: string
   pay_sign?: string
+  sign_data?: string
+  pay_sig?: string
+  signature?: string
+  mode?: string
 }
 
 export interface Order {
@@ -44,6 +49,7 @@ export interface CreateOrderResponse {
   order: Order
   prepay_params: PrepayParams
   mock_mode: boolean
+  virtual_pay_enabled?: boolean
 }
 
 /** POST /payments/orders/{id}/sync-from-wechat */
@@ -59,6 +65,7 @@ export interface MembershipInfo {
   expires_at: string | null
   days_remaining: number
   auto_renew: boolean
+  virtual_pay_enabled?: boolean
   papay_contract_id?: string | null
 }
 

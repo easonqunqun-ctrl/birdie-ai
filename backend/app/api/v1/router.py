@@ -16,6 +16,7 @@ from app.api.v1 import (
     shares,
     training,
     users,
+    wechat_push,
 )
 
 api_router = APIRouter()
@@ -28,6 +29,7 @@ api_router.include_router(users.router, prefix="/users", tags=["用户"])
 api_router.include_router(analyses.router, prefix="/analyses", tags=["分析"])
 api_router.include_router(chat.router, prefix="/chat", tags=["AI 对话"])
 api_router.include_router(payments.router, prefix="/payments", tags=["支付"])
+api_router.include_router(wechat_push.router, prefix="/wechat", tags=["微信推送"])
 # /me/orders、/me/membership、/me/training-plan、/me/practice-logs 挂 /users/me 下（集中聚合）
 api_router.include_router(payments.me_router, prefix="/users/me", tags=["支付"])
 api_router.include_router(training.router, prefix="/training-plan", tags=["训练"])

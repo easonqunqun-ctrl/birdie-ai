@@ -229,6 +229,32 @@ def audit_production_config(settings: Settings) -> tuple[list[str], list[str]]:
     return errors, warns
 
 
+def audit_wechat_xpay_enabled(settings: Settings) -> list[str]:
+    """``WECHAT_XPAY_ENABLED=true`` 且非 mock 时虚拟支付必填项。"""
+    errors: list[str] = []
+    if not getattr(settings, "WECHAT_XPAY_ENABLED", False):
+        return errors
+    if settings.WECHAT_PAY_MOCK_MODE:
+        return errors
+
+    if not (getattr(settings, "WECHAT_XPAY_OFFER_ID", "") or "").strip():
+        errors.append("WECHAT_XPAY_OFFER_ID 为空")
+    if not (getattr(settings, "WECHAT_XPAY_APP_KEY", "") or "").strip():
+        errors.append("WECHAT_XPAY_APP_KEY 为空（现网 appKey）")
+    if not (getattr(settings, "WECHAT_XPAY_PRODUCT_MONTHLY", "") or "").strip():
+        errors.append("WECHAT_XPAY_PRODUCT_MONTHLY 为空")
+    if not (getattr(settings, "WECHAT_XPAY_PRODUCT_YEARLY", "") or "").strip():
+        errors.append("WECHAT_XPAY_PRODUCT_YEARLY 为空")
+    if not (getattr(settings, "WECHAT_MP_PUSH_TOKEN", "") or "").strip():
+        errors.append(
+            "WECHAT_MP_PUSH_TOKEN 为空（须与 mp 消息推送 Token 一致，接收 xpay_goods_deliver_notify）",
+        )
+    env = int(getattr(settings, "WECHAT_XPAY_ENV", 0) or 0)
+    if env == 1 and not (getattr(settings, "WECHAT_XPAY_SANDBOX_APP_KEY", "") or "").strip():
+        errors.append("WECHAT_XPAY_ENV=1 但 WECHAT_XPAY_SANDBOX_APP_KEY 为空")
+    return errors
+
+
 def startup_production_guards(logger, settings: Settings) -> None:
     if os.getenv("SKIP_PRODUCTION_GUARD", "").strip().lower() in {"1", "true", "yes"}:
         logger.warning(
@@ -242,6 +268,8 @@ def startup_production_guards(logger, settings: Settings) -> None:
     pay_errs: list[str] = []
     if settings.APP_ENV in {"staging", "prod"} and not settings.WECHAT_PAY_MOCK_MODE:
         pay_errs = audit_wechat_pay_real_mode(settings)
+        if getattr(settings, "WECHAT_XPAY_ENABLED", False):
+            pay_errs.extend(audit_wechat_xpay_enabled(settings))
 
     for w in warns:
         logger.warning("production_config_audit", severity="warn", detail=w)
