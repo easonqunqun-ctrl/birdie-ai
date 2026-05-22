@@ -10,6 +10,7 @@ from app.errors import PoorQualityError
 from app.pipeline.preprocess import (
     MIN_STABILITY_HARD_BLOCK,
     _ScanStats,
+    _scan_stats_from_samples,
     composite_quality_score,
     enforce_quality_gates,
 )
@@ -29,6 +30,23 @@ def test_composite_quality_score_clamps() -> None:
         low_clarity_frame_ratio=0.0,
     )
     assert composite_quality_score(stats) >= 0.5
+
+
+def test_quick_scan_partial_sample_does_not_inflate_frame_loss() -> None:
+    """precheck 只采样部分帧；不得把 CAP_PROP_FRAME_COUNT 与采样数之差当成解码丢帧。"""
+    stats = _scan_stats_from_samples(
+        fps=30.0,
+        width=1080,
+        height=1920,
+        total_frames_hint=300,
+        read_ok=25,
+        read_fail=0,
+        clarity_values=[200.0] * 25,
+        diff_values=[5.0] * 24,
+        partial_scan=True,
+    )
+    assert stats.frame_loss_ratio == 0.0
+    enforce_quality_gates(stats)
 
 
 def test_enforce_quality_gates_blocks_low_stability() -> None:

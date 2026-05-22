@@ -528,6 +528,7 @@ def _quick_scan_quality(video_path: Path, *, max_elapsed_sec: float = 5.0) -> _S
         read_fail=read_fail,
         clarity_values=clarity_values,
         diff_values=diff_values,
+        partial_scan=True,
     )
 
 
@@ -608,12 +609,19 @@ def _scan_stats_from_samples(
     read_fail: int,
     clarity_values: list[float],
     diff_values: list[float],
+    partial_scan: bool = False,
 ) -> _ScanStats:
     num_frames = read_ok
     total_read_attempts = read_ok + read_fail
     frame_loss_ratio = read_fail / max(total_read_attempts, 1) if total_read_attempts > 0 else 0.0
 
-    if total_frames_hint > num_frames > 0 and total_frames_hint > 2 * num_frames:
+    # 全量扫描：OpenCV 报告的帧数与实际读到的帧数严重不符 → 视为解码丢帧。
+    # precheck 快速扫描只采样部分帧（≤5s 预算），不得把「未扫完」当成丢帧。
+    if (
+        not partial_scan
+        and total_frames_hint > num_frames > 0
+        and total_frames_hint > 2 * num_frames
+    ):
         frame_loss_ratio = max(frame_loss_ratio, 1 - num_frames / total_frames_hint)
 
     clarity_score = float(np.mean(clarity_values)) if clarity_values else 0.0
