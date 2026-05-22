@@ -60,3 +60,19 @@ def test_ecs_v1_ci_regression_matches_baseline() -> None:
     )
     assert report.level in {"pass", "yellow"}
     assert_regression_pass(report)
+
+
+def test_ecs_v1_teaching_floor_passes_after_calibration() -> None:
+    """v1.2.4：标定后 teaching 标杆须 ≥80（真实 teaching_overall_floor）。"""
+    root = default_ecs_v1_dir()
+    manifest = load_manifest(root / "manifest.json")
+    baseline = load_baseline_snapshot(root / "baseline_snapshot.json")
+    report = run_regression(
+        manifest=manifest,
+        baseline=baseline,
+        build_pose=build_pose_profile,
+        config=EcsDriftGateConfig(teaching_overall_floor=80.0),
+    )
+    ideal = report.current["ci_teaching_ideal"]
+    assert ideal.overall >= 80
+    assert report.level in {"pass", "yellow"}

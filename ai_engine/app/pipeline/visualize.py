@@ -348,6 +348,11 @@ def render_skeleton_video(
                     "encoded_fps": output_fps,
                 },
             )
+            try:
+                output_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            return None
 
         log.info(
             "skeleton_video_rendered",

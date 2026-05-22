@@ -41,6 +41,12 @@ import {
 import { CAMERA_ANGLE_LABEL, CLUB_TYPE_LABEL } from '@/types/analysis'
 import type { AnalysisReportResponse, PhaseWindow } from '@/types/analysis'
 import { linesForQualityWarnings, QUALITY_WARNING_IMPACT_FOOTNOTE } from '@/constants/qualityWarnings'
+import {
+  canTogglePlaybackSource,
+  defaultPlaybackMode,
+  resolveReportPlaybackSrc,
+  type VideoPlaybackMode,
+} from '@/utils/reportPlayback'
 import RadarChart, { RadarAxis } from '@/components/RadarChart'
 import '@/components/RadarChart.scss'
 import './report.scss'
@@ -90,6 +96,7 @@ const ReportPage: FC = () => {
   const [shareImageUrl, setShareImageUrl] = useState('')
   /** 正文区 ScrollView 受控 scrollTop；跳帧时滚回顶部以便看到视频 */
   const [bodyScrollTop, setBodyScrollTop] = useState<number | undefined>(undefined)
+  const [playbackMode, setPlaybackMode] = useState<VideoPlaybackMode>('skeleton')
   const [playbackSrc, setPlaybackSrc] = useState('')
   const videoCtxRef = useRef<Taro.VideoContext | null>(null)
   const scrollResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -168,13 +175,20 @@ const ReportPage: FC = () => {
     }
   }, [report])
 
-  useEffect(() => {
-    setPlaybackSrc(report?.skeleton_video_url || report?.video_url || '')
-  }, [report?.skeleton_video_url, report?.video_url])
+  const showPlaybackSourceToggle = report ? canTogglePlaybackSource(report) : false
 
-  const usingSkeletonPlayback = Boolean(
-    report?.skeleton_video_url && playbackSrc === report.skeleton_video_url,
-  )
+  useEffect(() => {
+    if (!report) return
+    setPlaybackMode(defaultPlaybackMode(report))
+  }, [report?.id, report?.skeleton_video_url])
+
+  useEffect(() => {
+    if (!report) {
+      setPlaybackSrc('')
+      return
+    }
+    setPlaybackSrc(resolveReportPlaybackSrc(report, playbackMode))
+  }, [report, playbackMode])
 
   // ---------------- 派生数据 ----------------
   const radarAxes: RadarAxis[] = useMemo(() => {
@@ -253,10 +267,15 @@ const ReportPage: FC = () => {
   }
 
   const handleVideoError = () => {
-    const fallback = report?.video_url || ''
-    if (fallback && playbackSrc !== fallback) {
-      setPlaybackSrc(fallback)
+    if (playbackMode === 'skeleton' && report?.video_url) {
+      setPlaybackMode('original')
+      Taro.showToast({ title: '骨骼片加载失败，已切换原片', icon: 'none', duration: 2000 })
     }
+  }
+
+  const handlePlaybackModeChange = (mode: VideoPlaybackMode) => {
+    if (mode === playbackMode) return
+    setPlaybackMode(mode)
   }
   const handleGoHome = () => Taro.reLaunch({ url: '/pages/index/index' })
   const handleShootAgain = () => Taro.reLaunch({ url: '/pages/analysis/capture' })
@@ -569,9 +588,6 @@ const ReportPage: FC = () => {
       {/* 视频固定在 ScrollView 外，避免小程序 createVideoContext + 嵌套滚动失效 */}
       <View id='report-video-anchor' className='report__video-wrap'>
         <View className='report__video-frame'>
-          {usingSkeletonPlayback && (
-            <Text className='report__video-badge'>骨骼叠加回放</Text>
-          )}
           <Video
             id={VIDEO_ID}
             className='report__video'
@@ -609,6 +625,36 @@ const ReportPage: FC = () => {
                 </View>
               )
             })}
+          </View>
+        )}
+
+        {showPlaybackSourceToggle && (
+          <View className='report__rates report__rates--source'>
+            <Text className='report__rates-label'>画面</Text>
+            <View className='report__rates-group'>
+              <View
+                className={[
+                  'report__rate',
+                  playbackMode === 'original' ? 'report__rate--active' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                onClick={() => handlePlaybackModeChange('original')}
+              >
+                <Text>原片</Text>
+              </View>
+              <View
+                className={[
+                  'report__rate',
+                  playbackMode === 'skeleton' ? 'report__rate--active' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                onClick={() => handlePlaybackModeChange('skeleton')}
+              >
+                <Text>骨骼叠加</Text>
+              </View>
+            </View>
           </View>
         )}
 

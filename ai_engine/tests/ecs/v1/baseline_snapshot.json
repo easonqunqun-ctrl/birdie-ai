@@ -1,46 +1,59 @@
 {
-  "version": "v1-ci-stub",
+  "version": "v1-calibrated-stub",
   "clips": {
     "ci_teaching_ideal": {
-      "overall": 45,
+      "overall": 86,
       "phase_scores": {
-        "setup": 0,
-        "backswing": 23,
-        "top": 96,
-        "downswing": 30,
-        "impact": 87,
-        "follow_through": 53
+        "setup": 94,
+        "backswing": 77,
+        "top": 99,
+        "downswing": 77,
+        "impact": 88,
+        "follow_through": 91
       },
       "class": "teaching",
       "pose_profile": "ideal_swing"
     },
-    "ci_top_amateur_early_ext": {
-      "overall": 45,
+    "ci_amateur_solid": {
+      "overall": 80,
       "phase_scores": {
-        "setup": 0,
-        "backswing": 23,
-        "top": 96,
-        "downswing": 30,
-        "impact": 87,
-        "follow_through": 53
+        "setup": 94,
+        "backswing": 77,
+        "top": 50,
+        "downswing": 77,
+        "impact": 97,
+        "follow_through": 91
+      },
+      "class": "top_amateur",
+      "pose_profile": "amateur_solid"
+    },
+    "ci_top_amateur_early_ext": {
+      "overall": 86,
+      "phase_scores": {
+        "setup": 94,
+        "backswing": 77,
+        "top": 99,
+        "downswing": 77,
+        "impact": 88,
+        "follow_through": 91
       },
       "class": "top_amateur",
       "pose_profile": "early_extension_swing"
     },
     "ci_dispute_sway": {
-      "overall": 38,
+      "overall": 78,
       "phase_scores": {
-        "setup": 43,
-        "backswing": 23,
-        "top": 96,
-        "downswing": 30,
-        "impact": 0,
-        "follow_through": 53
+        "setup": 41,
+        "backswing": 77,
+        "top": 99,
+        "downswing": 77,
+        "impact": 85,
+        "follow_through": 91
       },
       "class": "dispute",
       "pose_profile": "sway_swing"
     }
   },
   "generated_at": "2026-05-22",
-  "git_hint": "ENG-04 v1.2.2 baseline"
+  "git_hint": "regenerate via scripts/generate_ecs_baseline.py"
 }

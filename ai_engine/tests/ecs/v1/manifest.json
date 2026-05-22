@@ -1,12 +1,18 @@
 {
-  "version": "v1-ci-stub",
-  "description": "ENG-04 CI 回归子集：合成 Pose 配置，非授权顶尖素材；用于 scoring 漂移门禁 smoke。",
+  "version": "v1-calibrated-stub",
+  "description": "ENG-04 v1.2.4：合成 Pose 标定集（非授权顶尖素材）；scoring 标尺已按 MediaPipe 2D 侧向全身对齐。",
   "clips": [
     {
       "ecs_clip_id": "ci_teaching_ideal",
       "class": "teaching",
       "pose_profile": "ideal_swing",
-      "notes": "Synthetic ideal swing; teaching 标杆 overall 须 ≥80"
+      "notes": "Synthetic ideal swing; teaching 标杆 overall ≥80"
+    },
+    {
+      "ecs_clip_id": "ci_amateur_solid",
+      "class": "top_amateur",
+      "pose_profile": "amateur_solid",
+      "notes": "Synthetic solid amateur; overall ~80"
     },
     {
       "ecs_clip_id": "ci_top_amateur_early_ext",

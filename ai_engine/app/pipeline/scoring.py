@@ -75,14 +75,14 @@ def score_phase(features: dict[str, float], phase: str) -> int:
     total = 0.0
     for meta in phase_feats:
         if meta["name"] not in features:
-            # 缺失记 0 分，不跳过——否则权重和 < 1 会夸大分数
-            continue
-        s = score_feature(
-            features[meta["name"]],
-            meta["ideal_min"],
-            meta["ideal_max"],
-            meta["tolerance"],
-        )
+            s = 0
+        else:
+            s = score_feature(
+                features[meta["name"]],
+                meta["ideal_min"],
+                meta["ideal_max"],
+                meta["tolerance"],
+            )
         total += s * meta["weight"]
     return int(round(total))
 
