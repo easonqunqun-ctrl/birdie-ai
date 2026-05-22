@@ -1,9 +1,10 @@
 /**
  * 练习示范视频库（drill_id → 演示视频）
  *
- * 生产环境仅 trust ``drill_id`` 本地库 lookup；``video_url`` 直传仅供测试/后续 COS 白名单素材。
- * 视频 URL 与 backend `sample_fixture.SAMPLE_VIDEO_URL` 同源占位，后续可换 COS 真素材。
+ * 素材 key 与 CVM MinIO `samples/` 前缀一致，经 `{API}/v1/assets/…` 同源代理播放。
  */
+
+import { buildAssetImageUrl, buildAssetVideoUrl } from '@/utils/assetUrls'
 
 export interface DrillVideoDetail {
   drill_id: string
@@ -13,10 +14,11 @@ export interface DrillVideoDetail {
   duration_seconds?: number
 }
 
-const SAMPLE_VIDEO_URL =
-  'https://xiaoniao-assets.oss-cn-hangzhou.aliyuncs.com/samples/swing_demo.mp4'
-const SAMPLE_POSTER_URL =
-  'https://xiaoniao-assets.oss-cn-hangzhou.aliyuncs.com/samples/swing_demo_thumb.jpg'
+const SAMPLE_VIDEO_KEY = 'samples/swing_demo.mp4'
+const SAMPLE_POSTER_KEY = 'samples/swing_demo_thumb.jpg'
+
+const SAMPLE_VIDEO_URL = buildAssetVideoUrl(SAMPLE_VIDEO_KEY)
+const SAMPLE_POSTER_URL = buildAssetImageUrl(SAMPLE_POSTER_KEY)
 
 const DRILL_VIDEOS: DrillVideoDetail[] = [
   {

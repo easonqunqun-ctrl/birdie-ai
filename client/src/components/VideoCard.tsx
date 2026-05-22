@@ -4,6 +4,7 @@
 
 import { FC, useState } from 'react'
 import { View, Text, Video, Image } from '@tarojs/components'
+import Taro from '@tarojs/taro'
 import type { VideoCardAttachment } from '@/types/chat'
 import { resolveVideoCardDetail } from '@/constants/drillVideoLibrary'
 import './VideoCard.scss'
@@ -15,10 +16,16 @@ export interface VideoCardProps {
 export const VideoCard: FC<VideoCardProps> = ({ attachment }) => {
   const detail = resolveVideoCardDetail(attachment)
   const [playing, setPlaying] = useState(false)
+  const [posterBroken, setPosterBroken] = useState(false)
 
   if (!detail) return null
 
-  const poster = detail.poster_url || attachment.poster_url
+  const poster = posterBroken ? undefined : (detail.poster_url || attachment.poster_url)
+
+  const handleVideoError = () => {
+    setPlaying(false)
+    Taro.showToast({ title: '示范视频加载失败', icon: 'none', duration: 2000 })
+  }
 
   return (
     <View className='video-card'>
@@ -35,6 +42,7 @@ export const VideoCard: FC<VideoCardProps> = ({ attachment }) => {
           showCenterPlayBtn
           objectFit='contain'
           onEnded={() => setPlaying(false)}
+          onError={handleVideoError}
         />
       ) : (
         <View className='video-card__preview' onClick={() => setPlaying(true)}>
@@ -43,6 +51,7 @@ export const VideoCard: FC<VideoCardProps> = ({ attachment }) => {
               className='video-card__poster'
               src={poster}
               mode='aspectFill'
+              onError={() => setPosterBroken(true)}
             />
           ) : (
             <View className='video-card__poster video-card__poster--placeholder' />

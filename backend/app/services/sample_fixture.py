@@ -23,6 +23,7 @@ from __future__ import annotations
 import os
 from datetime import UTC, datetime
 
+from app.config import settings
 from app.schemas.analysis import (
     AnalysisReportResponse,
     IssueItem,
@@ -34,14 +35,20 @@ from app.schemas.analysis import (
 
 SAMPLE_ANALYSIS_ID = "sample"
 
-# 允许通过环境变量替换素材 URL（发布时换成真实运营上传的素材）
+
+def _default_sample_asset_url(kind: str, key: str) -> str:
+    base = settings.API_PUBLIC_BASE_URL.rstrip("/")
+    return f"{base}/v1/assets/{kind}/{key}"
+
+
+# 允许通过环境变量替换素材 URL；默认走 API 同源代理（微信合法域名）
 SAMPLE_VIDEO_URL = os.environ.get(
     "SAMPLE_VIDEO_URL",
-    "https://xiaoniao-assets.oss-cn-hangzhou.aliyuncs.com/samples/swing_demo.mp4",
+    _default_sample_asset_url("video", "samples/swing_demo.mp4"),
 )
 SAMPLE_THUMBNAIL_URL = os.environ.get(
     "SAMPLE_THUMBNAIL_URL",
-    "https://xiaoniao-assets.oss-cn-hangzhou.aliyuncs.com/samples/swing_demo_thumb.jpg",
+    _default_sample_asset_url("image", "samples/swing_demo_thumb.jpg"),
 )
 
 # 固定创建时间：截图稳定性 > 真实性
