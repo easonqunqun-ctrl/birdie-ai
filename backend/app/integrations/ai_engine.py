@@ -52,6 +52,30 @@ class AIEngineClient:
             )
             return data
 
+    async def precheck(
+        self,
+        *,
+        analysis_id: str,
+        video_url: str,
+    ) -> dict:
+        payload = {
+            "analysis_id": analysis_id,
+            "video_url": video_url,
+        }
+        log.info("ai_engine_precheck_start", analysis_id=analysis_id, base_url=self.base_url)
+        timeout = float(getattr(settings, "AI_ENGINE_PRECHECK_TIMEOUT", 20) or 20)
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(f"{self.base_url}/precheck", json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+            log.info(
+                "ai_engine_precheck_done",
+                analysis_id=analysis_id,
+                status=data.get("status"),
+                scan_elapsed_ms=data.get("scan_elapsed_ms"),
+            )
+            return data
+
 
 _default_client: AIEngineClient | None = None
 

@@ -2,8 +2,36 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 from httpx import AsyncClient
+
+
+async def _collect_sse(
+    client: AsyncClient,
+    session_id: str,
+    content: str,
+    headers: dict[str, str],
+) -> list[tuple[str, dict]]:
+    async with client.stream(
+        "POST",
+        f"/v1/chat/sessions/{session_id}/messages",
+        json={"content": content},
+        headers={**headers, "Accept": "text/event-stream"},
+    ) as resp:
+        assert resp.status_code == 200, await resp.aread()
+        events: list[tuple[str, dict]] = []
+        event_name = ""
+        async for line in resp.aiter_lines():
+            if line.startswith("event: "):
+                event_name = line[len("event: ") :].strip()
+            elif line.startswith("data: "):
+                data = json.loads(line[len("data: ") :])
+                events.append((event_name, data))
+            elif line == "":
+                event_name = ""
+        return events
 
 
 @pytest.mark.asyncio
@@ -82,3 +110,30 @@ async def test_golf_message_still_consumes_quota(
 
     me_after = (await client.get("/v1/users/me", headers=auth_headers)).json()["data"]
     assert me_after["quota"]["chat_remaining_today"] == remaining_before - 1
+
+
+@pytest.mark.asyncio
+async def test_off_topic_sse_returns_boundary_without_consuming_quota(
+    client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
+    session = (
+        await client.post("/v1/chat/sessions", json={}, headers=auth_headers)
+    ).json()["data"]["session_id"]
+    me_before = (await client.get("/v1/users/me", headers=auth_headers)).json()["data"]
+    remaining_before = me_before["quota"]["chat_remaining_today"]
+
+    events = await _collect_sse(
+        client,
+        session,
+        "比特币还能涨吗",
+        auth_headers,
+    )
+    event_names = [name for name, _ in events]
+    assert event_names[0] == "message_start"
+    assert event_names[-1] == "message_end"
+    end = events[-1][1]
+    assert "专长" in end["content"]
+    assert end["quota_remaining"] == remaining_before
+
+    me_after = (await client.get("/v1/users/me", headers=auth_headers)).json()["data"]
+    assert me_after["quota"]["chat_remaining_today"] == remaining_before

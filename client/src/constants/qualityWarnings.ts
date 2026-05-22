@@ -5,6 +5,8 @@
 export const QUALITY_WARNING_COPY: Record<string, string> = {
   low_light: '光线偏暗，关键点检测可能不够稳。建议在光线充足处侧向全身拍摄后重试。',
   camera_shake: '画面抖动略大，可能影响追踪精度。建议固定机位或使用三脚架后再拍。',
+  partial_occlusion: '部分时段身体关键点被遮挡，追踪可能不完整。请确保侧向全身入镜、避免他人或物体遮挡。',
+  low_pose_confidence: '姿态关键点置信度偏低，分数可能波动。建议在光线充足、背景简洁处重拍。',
 }
 
 /** O-10：软警告存在时报告页统一脚注（docs/01 §4.4） */

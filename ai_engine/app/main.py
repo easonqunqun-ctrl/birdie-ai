@@ -11,7 +11,7 @@ from app import __version__
 from app.config import settings
 from app.errors import PipelineError
 from app.mock_pipeline import run_mock_analysis
-from app.schemas import AnalyzeRequest, AnalyzeResult
+from app.schemas import AnalyzeRequest, AnalyzeResult, PrecheckRequest, PrecheckResult
 
 
 def _setup_logging() -> None:
@@ -102,3 +102,40 @@ async def analyze(req: AnalyzeRequest) -> AnalyzeResult:
         overall_score=result.overall_score,
     )
     return result
+
+
+@app.post(
+    "/precheck",
+    summary="上传后快速质量预检（O-08）",
+    response_model=PrecheckResult,
+)
+async def precheck(req: PrecheckRequest) -> PrecheckResult:
+    """5s 扫描预算内的画质/抖动硬门槛；不跑 pose / 评分。"""
+    log.info("precheck_start", analysis_id=req.analysis_id, video_url=req.video_url)
+    if settings.AI_ENGINE_MOCK_MODE:
+        return PrecheckResult(
+            analysis_id=req.analysis_id,
+            status="passed",
+            quality_warnings=[],
+            elapsed_ms=0,
+            scan_elapsed_ms=0,
+        )
+    from app.pipeline.precheck import run_precheck
+
+    result = run_precheck(analysis_id=req.analysis_id, video_url=req.video_url)
+    log.info(
+        "precheck_done",
+        analysis_id=req.analysis_id,
+        status=result.status,
+        elapsed_ms=result.elapsed_ms,
+        scan_elapsed_ms=result.scan_elapsed_ms,
+    )
+    return PrecheckResult(
+        analysis_id=result.analysis_id,
+        status=result.status,
+        quality_warnings=result.quality_warnings,
+        error_code=result.error_code,
+        error_message=result.error_message,
+        elapsed_ms=result.elapsed_ms,
+        scan_elapsed_ms=result.scan_elapsed_ms,
+    )

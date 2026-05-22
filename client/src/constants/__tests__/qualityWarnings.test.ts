@@ -16,6 +16,12 @@ describe('linesForQualityWarnings', () => {
     expect(linesForQualityWarnings(['camera_shake'])).toEqual([
       expect.stringMatching(/抖动/),
     ])
+    expect(linesForQualityWarnings(['partial_occlusion'])).toEqual([
+      expect.stringMatching(/遮挡/),
+    ])
+    expect(linesForQualityWarnings(['low_pose_confidence'])).toEqual([
+      expect.stringMatching(/置信度/),
+    ])
   })
 
   test('未知 code → 兜底模板', () => {

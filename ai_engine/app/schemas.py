@@ -73,3 +73,18 @@ class AnalyzeResult(BaseModel):
         default_factory=list,
         description="非阻断质量提示 machine codes，如 low_light / camera_shake",
     )
+
+
+class PrecheckRequest(BaseModel):
+    analysis_id: str = Field(..., description="后端分配的分析 ID")
+    video_url: str = Field(..., description="视频文件 URL（COS/MinIO）")
+
+
+class PrecheckResult(BaseModel):
+    analysis_id: str
+    status: Literal["passed", "blocked"]
+    quality_warnings: list[str] = Field(default_factory=list)
+    error_code: int | None = None
+    error_message: str | None = None
+    elapsed_ms: int = 0
+    scan_elapsed_ms: int = 0

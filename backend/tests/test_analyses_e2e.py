@@ -130,8 +130,40 @@ async def test_e2e_engine_failed_refunds_quota(
     me_after = (await client.get("/v1/users/me", headers=auth_headers)).json()["data"]
     assert me_after["quota"]["analysis_remaining"] == before
 
-    # ai_engine 只被调一次（failed 不走重试）
+    # ai_engine analyze 只被调一次（failed 不走重试）
     assert use_fake_ai_engine.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_e2e_precheck_blocked_skips_full_analyze(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    fake_minio: FakeMinioStorage,
+    use_fake_ai_engine: FakeAIEngine,
+):
+    """O-08：precheck blocked → failed + 退配额，且不调用 /analyze。"""
+    me_before = (await client.get("/v1/users/me", headers=auth_headers)).json()["data"]
+    before = me_before["quota"]["analysis_remaining"]
+
+    use_fake_ai_engine.set_mode(
+        "precheck_blocked",
+        error_code=50102,
+        error_message="画面抖动过大，请固定机位或使用三脚架后重拍",
+    )
+    aid = await _create_analysis(client, auth_headers, fake_minio)
+    await _run_swing_analysis_async(aid)
+
+    s = (await client.get(f"/v1/analyses/{aid}/status", headers=auth_headers)).json()["data"]
+    assert s["status"] == "failed"
+    assert s["error"]["code"] == 50102
+    assert "抖动" in s["error"]["message"]
+    assert s["error"]["quota_refunded"] is True
+
+    me_after = (await client.get("/v1/users/me", headers=auth_headers)).json()["data"]
+    assert me_after["quota"]["analysis_remaining"] == before
+    assert use_fake_ai_engine.call_count == 0
+    assert any(c.get("method") == "precheck" for c in use_fake_ai_engine.calls)
+    assert not any(c.get("method") == "analyze" for c in use_fake_ai_engine.calls)
 
 
 @pytest.mark.asyncio

@@ -70,7 +70,7 @@ class FakeAIEngine:
     """
 
     def __init__(self) -> None:
-        self.mode: Literal["ok", "engine_failed", "timeout", "flaky"] = "ok"
+        self.mode: Literal["ok", "engine_failed", "timeout", "flaky", "precheck_blocked"] = "ok"
         self.error_code: int = 50101
         self.error_message: str = "分析失败"
         self.succeed_on_attempt: int = 1
@@ -79,7 +79,7 @@ class FakeAIEngine:
 
     def set_mode(
         self,
-        mode: Literal["ok", "engine_failed", "timeout", "flaky"],
+        mode: Literal["ok", "engine_failed", "timeout", "flaky", "precheck_blocked"],
         *,
         error_code: int = 50101,
         error_message: str = "分析失败",
@@ -107,6 +107,7 @@ class FakeAIEngine:
         self._call_count += 1
         self.calls.append(
             {
+                "method": "analyze",
                 "analysis_id": analysis_id,
                 "video_url": video_url,
                 "camera_angle": camera_angle,
@@ -127,6 +128,37 @@ class FakeAIEngine:
             }
         # ok: 返回一组稳定的假结果
         return _build_ok_result(analysis_id, video_url, club_type)
+
+    async def precheck(
+        self,
+        *,
+        analysis_id: str,
+        video_url: str,
+    ) -> dict:
+        self.calls.append(
+            {
+                "method": "precheck",
+                "analysis_id": analysis_id,
+                "video_url": video_url,
+            }
+        )
+        if self.mode == "precheck_blocked":
+            return {
+                "analysis_id": analysis_id,
+                "status": "blocked",
+                "quality_warnings": [],
+                "error_code": self.error_code,
+                "error_message": self.error_message,
+                "elapsed_ms": 120,
+                "scan_elapsed_ms": 80,
+            }
+        return {
+            "analysis_id": analysis_id,
+            "status": "passed",
+            "quality_warnings": [],
+            "elapsed_ms": 50,
+            "scan_elapsed_ms": 40,
+        }
 
 
 def _build_ok_result(analysis_id: str, video_url: str, club_type: str) -> dict:

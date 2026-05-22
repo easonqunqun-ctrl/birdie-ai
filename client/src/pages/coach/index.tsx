@@ -32,6 +32,7 @@ import {
   type CoachPendingContext,
 } from '@/utils/tabNav'
 import { PAYMENT_ENABLED_FLAG } from '@/constants/flags'
+import { useMembershipExpiringSoonModalOnShow } from '@/hooks/useMembershipExpiringSoonModalOnShow'
 import { useUserStore } from '@/store/userStore'
 import {
   chatErrorCause,
@@ -60,6 +61,8 @@ const CoachPage: FC = () => {
   const token = useUserStore((s) => s.token)
   const initialized = useUserStore((s) => s.initialized)
   const bootstrapUser = useUserStore((s) => s.bootstrap)
+
+  useMembershipExpiringSoonModalOnShow(!!token)
 
   const {
     currentSessionId,

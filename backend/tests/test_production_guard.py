@@ -8,6 +8,7 @@ from app.config import Settings
 from app.core.production_guard import (
     audit_production_config,
     audit_wechat_pay_real_mode,
+    audit_wechat_xpay_enabled,
     startup_production_guards,
 )
 
@@ -182,4 +183,57 @@ def test_startup_prod_combines_general_and_pay_errors() -> None:
     )
     kw["WECHAT_PAY_MCH_SERIAL"] = "SERIAL1"
     with pytest.raises(RuntimeError, match="生产门禁"):
+        startup_production_guards(_SilentLogger(), Settings(**kw))
+
+
+def _xpay_aligned_kw() -> dict:
+    kw = _prod_aligned_minio_kw()
+    kw.update({
+        "WECHAT_PAY_MOCK_MODE": False,
+        "WECHAT_XPAY_ENABLED": True,
+        "WECHAT_XPAY_OFFER_ID": "offer123",
+        "WECHAT_XPAY_APP_KEY": "app_key_prod",
+        "WECHAT_XPAY_SANDBOX_APP_KEY": "app_key_sandbox",
+        "WECHAT_XPAY_ENV": 0,
+        "WECHAT_XPAY_PRODUCT_MONTHLY": "prod_monthly",
+        "WECHAT_XPAY_PRODUCT_YEARLY": "prod_yearly",
+        "WECHAT_MP_PUSH_TOKEN": "mp_push_token",
+        "WECHAT_PAY_MCH_ID": "1900000109",
+        "WECHAT_PAY_MCH_SERIAL": "SERIALOK01",
+        "WECHAT_PAY_API_V3_KEY": "a" * 32,
+        "WECHAT_PAY_NOTIFY_URL": "https://api.example.com/v1/payments/wechat/notify",
+        "WECHAT_PAY_PRIVATE_KEY_PEM": (
+            "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQ\n-----END PRIVATE KEY-----\n"
+        ),
+    })
+    return kw
+
+
+def test_audit_wechat_xpay_disabled_returns_empty() -> None:
+    s = Settings(**_prod_aligned_minio_kw())
+    assert audit_wechat_xpay_enabled(s) == []
+
+
+def test_audit_wechat_xpay_enabled_requires_offer_and_products() -> None:
+    kw = _xpay_aligned_kw()
+    kw["WECHAT_XPAY_OFFER_ID"] = ""
+    kw["WECHAT_XPAY_PRODUCT_YEARLY"] = ""
+    errs = audit_wechat_xpay_enabled(Settings(**kw))
+    assert any("WECHAT_XPAY_OFFER_ID" in e for e in errs)
+    assert any("WECHAT_XPAY_PRODUCT_YEARLY" in e for e in errs)
+
+
+def test_audit_wechat_xpay_sandbox_requires_sandbox_app_key() -> None:
+    kw = _xpay_aligned_kw()
+    kw["WECHAT_XPAY_ENV"] = 1
+    kw["WECHAT_XPAY_SANDBOX_APP_KEY"] = ""
+    errs = audit_wechat_xpay_enabled(Settings(**kw))
+    assert any("SANDBOX" in e for e in errs)
+
+
+def test_startup_staging_raises_when_xpay_enabled_incomplete() -> None:
+    kw = _xpay_aligned_kw()
+    kw["APP_ENV"] = "staging"
+    kw["WECHAT_MP_PUSH_TOKEN"] = ""
+    with pytest.raises(RuntimeError, match="WECHAT_MP_PUSH_TOKEN"):
         startup_production_guards(_SilentLogger(), Settings(**kw))

@@ -35,7 +35,7 @@ from app.pipeline.constants import PHASE_LABELS
 from app.pipeline.diagnose import diagnose
 from app.pipeline.features import extract_features
 from app.pipeline.phases import segment_phases
-from app.pipeline.pose import estimate_poses
+from app.pipeline.pose import estimate_poses, quality_warnings_from_pose
 from app.pipeline.preprocess import preprocess_video, quality_warnings_from_preprocess
 from app.pipeline.recommend import recommend
 from app.pipeline.scoring import score_all_phases, score_overall, weakest_phase
@@ -73,7 +73,6 @@ async def run_real_analysis(req: AnalyzeRequest) -> AnalyzeResult:
     # 1. 预处理（下载 + 转码 + 质量门）
     pre = preprocess_video(req.video_url)
     fps = pre.fps
-    quality_warnings = quality_warnings_from_preprocess(pre)
     log.info(
         "preprocess_done",
         extra={
@@ -86,6 +85,10 @@ async def run_real_analysis(req: AnalyzeRequest) -> AnalyzeResult:
 
     # 2. 姿态估计
     pose_result = estimate_poses(pre.normalized_video_path)
+    quality_warnings = _merge_quality_warnings(
+        quality_warnings_from_preprocess(pre),
+        quality_warnings_from_pose(pose_result),
+    )
     log.info(
         "pose_done",
         extra={
@@ -202,6 +205,19 @@ async def run_real_analysis(req: AnalyzeRequest) -> AnalyzeResult:
         duration_ms=duration_ms,
         quality_warnings=quality_warnings,
     )
+
+
+def _merge_quality_warnings(*groups: list[str]) -> list[str]:
+    seen: set[str] = set()
+    merged: list[str] = []
+    for group in groups:
+        for code in group:
+            c = str(code).strip()
+            if not c or c in seen:
+                continue
+            seen.add(c)
+            merged.append(c)
+    return merged
 
 
 # ============================================================

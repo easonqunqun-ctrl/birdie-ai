@@ -130,13 +130,26 @@ Authorization: Bearer <jwt_token>
 | 50001 | 服务内部错误 | 未预期的服务端异常 |
 | 50100 | AI 引擎不可达 | Celery worker 连 AI 引擎超时/连接失败，耗尽 3 次重试后终态失败（backend 侧 transport 级失败，W6-T6 起启用） |
 | 50101 | 视频预处理失败 | ffmpeg 解码失败 / 视频文件下载失败 / 转码异常（W6-T1 真实触发；对应 `ai_engine.PreprocessError`） |
-| 50102 | 视频画质不足 | 拉普拉斯方差 < 50 表明严重模糊，或分辨率/码率不达标（W6-T1 质量门真实触发；对应 `ai_engine.PoorQualityError`） |
+| 50102 | 视频画质不足 | 拉普拉斯/clarity 硬门槛、低清晰度帧占比、极端抖动、综合 `quality_score`（W6-T1 + **v1.2.12 Batch-D** `POST /precheck` 早失败；对应 `ai_engine.PoorQualityError`） |
 | 50103 | 未检测到人体 | MediaPipe 全帧未识别到人体，或有效帧占比 < 70%（W6-T1 真实触发；对应 `ai_engine.NoPersonError`） |
 | 50104 | 未检测到挥杆 | 检测到人体但关键点序列不满足挥杆速度曲线特征（静止 / 走路 / 其它运动）（W6-T2 真实触发；对应 `ai_engine.NoSwingError`） |
 | 50105 | AI 引擎内部异常 | MediaPipe 模型加载失败 / 推理异常（运维级问题，非用户可修复）（W6-T1 兜底触发；对应 `ai_engine.PoseModelError`） |
 | 50106 | AI 对话服务异常 | LLM 服务不可用（M3-T2 启用；M2 时曾误写为 50105） |
 
 > **50100 vs 50101-50105 的区分**：50100 是 backend → ai_engine 的 **transport 级**失败（HTTP 超时 / 连接错误，用户的视频可能完全没事，只是后端链路挂了）；50101-50105 是 ai_engine 返回的 **业务级**失败（视频本身有问题）。二者都会退回该次配额（`quota_refunded=true`）。
+
+#### 1.3.1 AI Engine 内部 · `POST /precheck`（O-08，v1.2.12）
+
+> **非 C 端 REST**：由 Celery `run_swing_analysis` 在调用 `POST /analyze` 前先请求 `{AI_ENGINE_URL}/precheck`。
+
+| 字段 | 说明 |
+|------|------|
+| 请求体 | `{ "analysis_id": "ana_xxx", "video_url": "https://..." }` |
+| 成功 | `{ "status": "passed", "quality_warnings": ["low_light", ...], "elapsed_ms": N, "scan_elapsed_ms": M }` — `scan_elapsed_ms` 为源视频采样扫描耗时（预算 ≤5s，不含网络下载） |
+| 阻断 | `{ "status": "blocked", "error_code": 50102, "error_message": "..." }` — backend 直接落库 `failed` + 退配额，**不**再调 `/analyze` |
+| mock | `AI_ENGINE_MOCK_MODE=true` 时恒返回 `passed` |
+
+`quality_warnings` machine codes 与 §3.4 `quality_warnings` 列一致（含 v1.2.12 新增 `partial_occlusion` / `low_pose_confidence`）。
 | 50201 | 微信服务异常 | 微信 API 调用失败 |
 | 50202 | 支付服务异常 | 微信支付接口异常 |
 | 50203 | 存储服务异常 | COS 上传/读取失败 |

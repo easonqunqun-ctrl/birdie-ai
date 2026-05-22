@@ -45,6 +45,7 @@ def test_preprocess_result_dataclass_shape() -> None:
         stability_score=0.9,
         frame_loss_ratio=0.0,
         quality_score=0.85,
+        low_clarity_frame_ratio=0.0,
     )
     assert result.is_quality_ok is True
 
@@ -59,6 +60,7 @@ def test_preprocess_result_dataclass_shape() -> None:
         stability_score=0.1,
         frame_loss_ratio=0.5,
         quality_score=0.2,
+        low_clarity_frame_ratio=1.0,
     )
     assert poor.is_quality_ok is False
 
@@ -110,6 +112,22 @@ def test_prefer_internal_minio_download_url_no_bucket_marker_unchanged() -> None
         _prefer_internal_minio_download_url(raw, bucket="xiaoniao-videos", internal_endpoint="http://minio:9000")
         == raw
     )
+
+
+def test_quality_warnings_from_scan_codes() -> None:
+    from app.pipeline.preprocess import _ScanStats, quality_warnings_from_scan
+
+    stats = _ScanStats(
+        fps=30.0,
+        num_frames=90,
+        width=720,
+        height=1280,
+        clarity_score=100.0,
+        stability_score=0.35,
+        frame_loss_ratio=0.0,
+        low_clarity_frame_ratio=0.1,
+    )
+    assert quality_warnings_from_scan(stats) == ["low_light", "camera_shake"]
 
 
 # ============================================================

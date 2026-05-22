@@ -242,3 +242,42 @@ def estimate_poses(
         num_frames=num_frames,
         fps=fps,
     )
+
+
+# 非阻断：核心关键点可见度偏低（仍通过 valid_ratio 硬门槛）
+_WARN_LOW_CORE_VISIBILITY_BELOW = 0.55
+_WARN_LOW_MEAN_CONFIDENCE_BELOW = 0.65
+
+_CORE_SWING_LANDMARKS = (
+    LANDMARK_LEFT_SHOULDER,
+    LANDMARK_RIGHT_SHOULDER,
+    LANDMARK_LEFT_ELBOW,
+    LANDMARK_RIGHT_ELBOW,
+    LANDMARK_LEFT_WRIST,
+    LANDMARK_RIGHT_WRIST,
+    LANDMARK_LEFT_HIP,
+    LANDMARK_RIGHT_HIP,
+    LANDMARK_LEFT_KNEE,
+    LANDMARK_RIGHT_KNEE,
+    LANDMARK_LEFT_ANKLE,
+    LANDMARK_RIGHT_ANKLE,
+)
+
+
+def quality_warnings_from_pose(pose: PoseResult) -> list[str]:
+    """姿态层软警告（O-10）；硬阻断仍由 NoPersonError 承担（O-09）。"""
+    codes: list[str] = []
+    if pose.num_frames <= 0 or not pose.valid_mask.any():
+        return codes
+
+    core_vis = pose.visibility[:, _CORE_SWING_LANDMARKS]
+    valid_core = core_vis[pose.valid_mask]
+    if valid_core.size > 0:
+        mean_core = float(valid_core.mean())
+        if mean_core < _WARN_LOW_CORE_VISIBILITY_BELOW:
+            codes.append("partial_occlusion")
+    if pose.mean_confidence < _WARN_LOW_MEAN_CONFIDENCE_BELOW:
+        codes.append("low_pose_confidence")
+    return codes
+
+

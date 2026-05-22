@@ -164,6 +164,8 @@ class Settings(BaseSettings):
     # 排队），ai_engine 真实引擎 CPU 预算 30s（preprocess 5 + pose 12 + 其它 13），
     # 留 2x buffer = 60s。降下来可以更快感知到挂死任务，触发 _mark_failed + 退配额。
     AI_ENGINE_TIMEOUT: int = 60
+    # O-08：引擎快速预检（含下载 + ≤5s 扫描）；默认略大于全量 analyze
+    AI_ENGINE_PRECHECK_TIMEOUT: int = 20
     # backend 不直接消费这个变量（只在 ai_engine 容器内决定走 mock or real），
     # 留在这里仅为 .env.local 校验完整性 + 便于将来 backend 侧加 fallback 逻辑
     AI_ENGINE_MOCK_MODE: bool = False

@@ -52,6 +52,15 @@ from app.errors import PoorQualityError, PreprocessError
 # 取 80 作为"勉强可用"门槛，为 MVP 期留一点 tolerance
 MIN_CLARITY_SCORE = 80.0
 
+# 综合 quality_score 硬门槛（0–1）；与 docstring 第 5 点对齐
+MIN_QUALITY_SCORE = 0.5
+
+# 低清晰度帧占比上限（docs/14 W6 质量门）
+MAX_LOW_CLARITY_FRAME_RATIO = 0.30
+
+# 极端抖动硬阻断（O-09；介于 warn 阈值 0.42 与「完全不可用」之间）
+MIN_STABILITY_HARD_BLOCK = 0.12
+
 # 帧丢失比例上限（读帧失败 / 总帧数）。正常视频应该 < 1%。
 MAX_FRAME_LOSS_RATIO = 0.1
 
@@ -90,6 +99,7 @@ class PreprocessResult:
     stability_score: float
     frame_loss_ratio: float
     quality_score: float  # 综合分 0-1，用于 `is_quality_ok`
+    low_clarity_frame_ratio: float = 0.0
 
     @property
     def is_quality_ok(self) -> bool:
@@ -103,10 +113,25 @@ _WARN_LOW_STABILITY_BELOW = 0.42  # stability_score ∈ [0,1]，低于此提示�
 
 def quality_warnings_from_preprocess(pre: PreprocessResult) -> list[str]:
     """机器可读 warning code，供报告页与 analytics；与产品文案映射在前端完成。"""
+    return quality_warnings_from_scan(
+        _ScanStats(
+            fps=pre.fps,
+            num_frames=pre.num_frames,
+            width=pre.width,
+            height=pre.height,
+            clarity_score=pre.clarity_score,
+            stability_score=pre.stability_score,
+            frame_loss_ratio=pre.frame_loss_ratio,
+            low_clarity_frame_ratio=pre.low_clarity_frame_ratio,
+        )
+    )
+
+
+def quality_warnings_from_scan(stats: _ScanStats) -> list[str]:
     codes: list[str] = []
-    if pre.clarity_score < _WARN_LOW_CLARITY_BELOW:
+    if stats.clarity_score < _WARN_LOW_CLARITY_BELOW:
         codes.append("low_light")
-    if pre.stability_score < _WARN_LOW_STABILITY_BELOW:
+    if stats.stability_score < _WARN_LOW_STABILITY_BELOW:
         codes.append("camera_shake")
     return codes
 
@@ -183,6 +208,7 @@ def preprocess_video(
         stability_score=stats.stability_score,
         frame_loss_ratio=stats.frame_loss_ratio,
         quality_score=quality_score,
+        low_clarity_frame_ratio=stats.low_clarity_frame_ratio,
     )
 
     # 6. 质量门
@@ -195,6 +221,21 @@ def preprocess_video(
         raise PoorQualityError(
             f"frame_loss_ratio={stats.frame_loss_ratio:.2%} > {max_frame_loss:.0%}",
             user_message="视频解码异常，请重新上传",
+        )
+    if stats.low_clarity_frame_ratio > MAX_LOW_CLARITY_FRAME_RATIO:
+        raise PoorQualityError(
+            f"low_clarity_frame_ratio={stats.low_clarity_frame_ratio:.1%}",
+            user_message="视频清晰度不稳定，请在光线充足、对焦清晰的环境下重拍",
+        )
+    if stats.stability_score < MIN_STABILITY_HARD_BLOCK:
+        raise PoorQualityError(
+            f"stability_score={stats.stability_score:.2f}",
+            user_message="画面抖动过大，请固定机位或使用三脚架后重拍",
+        )
+    if quality_score < MIN_QUALITY_SCORE:
+        raise PoorQualityError(
+            f"quality_score={quality_score:.2f} < {MIN_QUALITY_SCORE}",
+            user_message="视频质量不足，请改善光线与机位后重拍",
         )
 
     return result
@@ -385,6 +426,75 @@ class _ScanStats:
     clarity_score: float
     stability_score: float
     frame_loss_ratio: float
+    low_clarity_frame_ratio: float
+
+
+def _quick_scan_quality(video_path: Path, *, max_elapsed_sec: float = 5.0) -> _ScanStats:
+    """源视频快速采样扫描（不 ffmpeg 转码），供 O-08 precheck。"""
+    import time
+
+    import cv2
+
+    t0 = time.perf_counter()
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        raise PreprocessError(f"OpenCV 无法打开：{video_path}")
+
+    fps = cap.get(cv2.CAP_PROP_FPS) or 0.0
+    total_frames_hint = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+
+    stride = max(1, total_frames_hint // 40) if total_frames_hint > 0 else 1
+    clarity_values: list[float] = []
+    diff_values: list[float] = []
+    prev_gray = None
+    read_ok = 0
+    read_fail = 0
+    frame_idx = 0
+
+    try:
+        while True:
+            if time.perf_counter() - t0 > max_elapsed_sec:
+                break
+            ret, frame = cap.read()
+            if not ret:
+                break
+            frame_idx += 1
+            if stride > 1 and (frame_idx - 1) % stride != 0:
+                continue
+
+            if frame is None or frame.size == 0:
+                read_fail += 1
+                continue
+            read_ok += 1
+
+            h, w = frame.shape[:2]
+            if min(h, w) > 320:
+                scale = 320 / min(h, w)
+                frame = cv2.resize(frame, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            lap_var = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+            clarity_values.append(lap_var)
+
+            if prev_gray is not None:
+                diff = float(np.mean(np.abs(gray.astype(np.int16) - prev_gray.astype(np.int16))))
+                diff_values.append(diff)
+            prev_gray = gray
+    finally:
+        cap.release()
+
+    return _scan_stats_from_samples(
+        fps=fps,
+        width=width,
+        height=height,
+        total_frames_hint=total_frames_hint,
+        read_ok=read_ok,
+        read_fail=read_fail,
+        clarity_values=clarity_values,
+        diff_values=diff_values,
+    )
 
 
 def _scan_quality(video_path: Path) -> _ScanStats:
@@ -442,17 +552,43 @@ def _scan_quality(video_path: Path) -> _ScanStats:
     finally:
         cap.release()
 
+    return _scan_stats_from_samples(
+        fps=fps,
+        width=width,
+        height=height,
+        total_frames_hint=total_frames_hint,
+        read_ok=read_ok,
+        read_fail=read_fail,
+        clarity_values=clarity_values,
+        diff_values=diff_values,
+    )
+
+
+def _scan_stats_from_samples(
+    *,
+    fps: float,
+    width: int,
+    height: int,
+    total_frames_hint: int,
+    read_ok: int,
+    read_fail: int,
+    clarity_values: list[float],
+    diff_values: list[float],
+) -> _ScanStats:
     num_frames = read_ok
     total_read_attempts = read_ok + read_fail
     frame_loss_ratio = read_fail / max(total_read_attempts, 1) if total_read_attempts > 0 else 0.0
 
-    # 如果 ffprobe 报的帧数比实际多很多（偶发 container 元数据错），用实际读到的算 loss
     if total_frames_hint > num_frames > 0 and total_frames_hint > 2 * num_frames:
         frame_loss_ratio = max(frame_loss_ratio, 1 - num_frames / total_frames_hint)
 
     clarity_score = float(np.mean(clarity_values)) if clarity_values else 0.0
+    low_clarity_frame_ratio = (
+        sum(1 for v in clarity_values if v < MIN_CLARITY_SCORE) / max(len(clarity_values), 1)
+        if clarity_values
+        else 1.0
+    )
 
-    # 稳像归一化：diff 越小越稳。以 30.0 作为"剧烈抖动"上限
     mean_diff = float(np.mean(diff_values)) if diff_values else 0.0
     stability_score = float(max(0.0, 1.0 - min(mean_diff / 30.0, 1.0)))
 
@@ -464,6 +600,7 @@ def _scan_quality(video_path: Path) -> _ScanStats:
         clarity_score=clarity_score,
         stability_score=stability_score,
         frame_loss_ratio=frame_loss_ratio,
+        low_clarity_frame_ratio=float(low_clarity_frame_ratio),
     )
 
 

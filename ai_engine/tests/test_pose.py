@@ -146,3 +146,31 @@ def test_real_video_keypoints_in_normalized_range(real_video_path: Path, tmp_pat
     in_range_y = ((valid_kp[..., 1] >= -0.1) & (valid_kp[..., 1] <= 1.1)).mean()
     assert in_range_x > 0.95
     assert in_range_y > 0.95
+
+
+def test_quality_warnings_from_pose_codes() -> None:
+    from app.pipeline.pose import PoseResult, quality_warnings_from_pose
+
+    keypoints = np.zeros((10, 33, 3), dtype=np.float32)
+    visibility = np.full((10, 33), 0.8, dtype=np.float32)
+    visibility[:, 11:17] = 0.45
+    valid_mask = visibility.mean(axis=1) >= 0.5
+    pose = PoseResult(
+        keypoints=keypoints,
+        visibility=visibility,
+        valid_mask=valid_mask,
+        num_frames=10,
+        fps=30.0,
+    )
+    codes = quality_warnings_from_pose(pose)
+    assert "partial_occlusion" in codes
+
+    low_conf_vis = np.full((10, 33), 0.58, dtype=np.float32)
+    low_conf_pose = PoseResult(
+        keypoints=keypoints,
+        visibility=low_conf_vis,
+        valid_mask=np.ones(10, dtype=bool),
+        num_frames=10,
+        fps=30.0,
+    )
+    assert "low_pose_confidence" in quality_warnings_from_pose(low_conf_pose)

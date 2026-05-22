@@ -133,6 +133,20 @@ async def _run_swing_analysis_async(analysis_id: str) -> None:
         for attempt in range(MAX_AI_ENGINE_RETRIES + 1):
             try:
                 client = get_ai_engine()
+                precheck = await client.precheck(
+                    analysis_id=analysis_id,
+                    video_url=meta["video_url"],
+                )
+                if precheck.get("status") == "blocked":
+                    raw_code = precheck.get("error_code")
+                    engine_result = {
+                        "status": "failed",
+                        "error_code": raw_code
+                        if isinstance(raw_code, int) and 50100 <= raw_code <= 50199
+                        else 50102,
+                        "error_message": precheck.get("error_message") or "视频质量不足",
+                    }
+                    break
                 engine_result = await client.analyze(
                     analysis_id=analysis_id,
                     video_url=meta["video_url"],
