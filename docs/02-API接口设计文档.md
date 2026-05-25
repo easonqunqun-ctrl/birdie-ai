@@ -2228,4 +2228,190 @@ POST /v1/events
 
 ---
 
+## 十一、二期接口骨架（v0.1 草案）
+
+> 来源：[`docs/22-二期开发迭代计划.md`](22-二期开发迭代计划.md) §六 DOC-22-01 + [`docs/21-二期产品需求规划.md`](21-二期产品需求规划.md) v0.2.1
+>
+> **状态**：v0.1 **骨架草案**。各模块进入 Phase 2.X 开发前由产品 + 后端 +  前端三方走一次最小回顾，再补完请求 / 响应 / 错误码细节。
+>
+> **不破坏一期**：本节所有接口都是**新增路径**（独立路由前缀），**不**修改一期已上线接口；现有路径下若需新增字段，按约定走 nullable + 默认值，不破坏一期客户端。
+>
+> **命名约定**：
+> - 教练侧用 `/v1/coach/*`（双账号体系下，coach 身份切换通过同一 JWT 的 `role_claim`）
+> - 画像 2.0 用 `/v1/users/me/profile-v2`（与一期 `/v1/users/me` 共存）
+> - 课程体系用 `/v1/courses/*`
+> - 职业球手对比用 `/v1/pros/*`
+> - 约球用 `/v1/meetup/*`
+
+### 11.1 M7 V2 · 既有接口字段增量
+
+> 不新增 endpoint，向 §3.3 / §3.4 现有响应**追加字段**；一期客户端不消费即可忽略。
+
+| 接口 | 新增响应字段 | 与 docs/03 §8.1 对应列 |
+|------|------------|----------------------|
+| `GET /v1/analyses/{id}/status` | `engine_version`, `analysis_mode`, `engine_warnings[]` | engine_version / analysis_mode / engine_warnings |
+| `GET /v1/analyses/{id}` (报告详情) | `engine_version`, `analysis_mode`, `camera_angle_offset_deg`, `analysis_confidence`, `new_features`, `club_category`（应用层从一期 `club_type` 派生，不入库） | 同上 + analysis_confidence + new_features_payload；**`club_type` 复用一期既有字段，响应中维持原名** |
+| `POST /v1/analyses` (创建任务) | 请求新增可选字段 `mode` (`full_swing`/`putting`/`chipping`)，默认 `full_swing`；**`club_type` 仍按一期 §3.2 必填字段使用** | analysis_mode |
+
+`new_features` 响应 schema（与 docs/03 §9.1 对应）：
+
+```json
+{
+  "tempo": {"ratio": 2.8, "consistency": 0.82, "score": 80},
+  "pressure_shift": {"score": 78, "narrative": "下杆重心转移略显迟缓"},
+  "kinematic_sequence": {"score": 82, "narrative": "下盘启动正确"},
+  "head_stability": {"score": 91, "narrative": "头部位置稳定"}
+}
+```
+
+错误码新增：
+
+| 码 | 触发 |
+|---|------|
+| 50120 | 视频编码格式不支持（HEVC 转码失败 / 10-bit HDR 转码失败等） |
+| 50121 | 慢动作元数据识别失败 |
+| 50122 | 多挥杆候选超过上限（>5 段）|
+| 50123 | mode 与 club_type 不匹配（如 putter + full_swing） |
+
+### 11.2 M8 教练工作台 `/v1/coach/*`
+
+| Method | Path | 用途 |
+|--------|------|------|
+| POST | `/v1/coach/profile/apply` | 申请成为教练（资质材料上传 + 个人简介） |
+| GET  | `/v1/coach/profile/me` | 教练查看自己资料 + 审核进度 |
+| PUT  | `/v1/coach/profile/me` | 更新简介 / 专长 |
+| POST | `/v1/coach/students/invite` | 教练向用户发起绑定邀请（按 user_id 或邀请码） |
+| POST | `/v1/coach/students/{relation_id}/accept` | 任一方接受（双向 opt-in） |
+| POST | `/v1/coach/students/{relation_id}/end` | 任一方解除关系 |
+| GET  | `/v1/coach/students` | 教练学员列表 + 活跃度 + 进度 |
+| GET  | `/v1/coach/students/{student_id}/dashboard` | 单学员详情看板 |
+| POST | `/v1/coach/analyses/{analysis_id}/annotations` | 教练在学员报告上加批注（语音 / 文字 / 涂鸦） |
+| GET  | `/v1/coach/analyses/{analysis_id}/annotations` | 列出教练批注 |
+| DELETE | `/v1/coach/annotations/{annotation_id}` | 教练或学员撤回批注 |
+| POST | `/v1/coach/tasks/assign` | 派发作业（drill_id 或自定义视频，到指定学员） |
+| GET  | `/v1/coach/tasks` | 教练已派发的作业列表 + 完成度 |
+| POST | `/v1/coach/sessions/recap` | 一节课多学员综合报告（LLM 自动生成 + 教练编辑） |
+| POST | `/v1/coach/sessions/{recap_id}/export-pdf` | 导出 PDF 链接（带教练账号水印） |
+
+学员侧补充：
+
+| Method | Path | 用途 |
+|--------|------|------|
+| GET  | `/v1/users/me/coach` | 当前用户绑定的教练（最多 1 位活跃） |
+| GET  | `/v1/users/me/coach/annotations` | 当前用户所有报告上的教练批注汇总 |
+| PUT  | `/v1/users/me/coach/{relation_id}/visibility` | 字段级可见性控制（画像哪些字段允许教练看） |
+
+错误码新增：
+
+| 码 | 触发 |
+|---|------|
+| 40310 | 当前账号不是已审核教练 |
+| 40311 | 教练资质审核被驳回 |
+| 40312 | 师生关系不存在 / 已结束 |
+| 40313 | 学员未授权教练查看此字段 |
+| 40314 | 教练批注音频时长超过 30s |
+| 42910 | 教练每日批注配额（防滥发，默认 200） |
+
+### 11.3 M9 画像 2.0 `/v1/users/me/profile-v2`
+
+| Method | Path | 用途 |
+|--------|------|------|
+| GET  | `/v1/users/me/profile-v2` | 取完整画像（含装备 / 差点 / 偏好 / 常去球馆） |
+| PUT  | `/v1/users/me/profile-v2` | 部分更新（PATCH 语义；按字段隐私授权位检查） |
+| POST | `/v1/users/me/clubs` | 新增一支 club（最多 14） |
+| PUT  | `/v1/users/me/clubs/{id}` | 更新装备 |
+| DELETE | `/v1/users/me/clubs/{id}` | 删除装备 |
+| GET  | `/v1/users/me/clubs` | 装备清单（含自评 yardage） |
+
+请求 / 响应字段与 docs/03 §8.3 一一对应。
+
+### 11.4 M10 短杆 & 推杆
+
+复用 `POST /v1/analyses` 的 `mode` 字段（详 §11.1）；额外提供：
+
+| Method | Path | 用途 |
+|--------|------|------|
+| GET  | `/v1/users/me/yardage-book` | 个人 yardage book |
+| PUT  | `/v1/users/me/yardage-book` | 用户主动修订 |
+
+### 11.5 M11 课程体系 `/v1/courses/*`
+
+| Method | Path | 用途 |
+|--------|------|------|
+| GET  | `/v1/courses` | 课程列表（按 stage 分组，自动按用户进度返回当前 stage） |
+| GET  | `/v1/courses/{course_id}` | 课程详情 + 含的 lessons 列表 |
+| GET  | `/v1/lessons/{lesson_id}` | 单节课详情 + 关联 drill / pro_clip |
+| POST | `/v1/lessons/{lesson_id}/attempt` | 提交阶段考核（关联一条 swing_analyses，引擎评分通过则升阶） |
+| GET  | `/v1/users/me/course-progress` | 用户学习进度 + 已通过节数 + 当前 stage |
+| GET  | `/v1/users/me/certificates` | 用户证书列表 |
+| POST | `/v1/users/me/certificates/{cert_id}/share-card` | 证书生成海报（复用 M5 海报合成） |
+
+### 11.6 M12 职业球手对比 `/v1/pros/*`
+
+| Method | Path | 用途 |
+|--------|------|------|
+| GET  | `/v1/pros/players` | 球手列表（支持 ?gender, ?height_range, ?nationality, ?style_tag 筛选） |
+| GET  | `/v1/pros/players/{player_id}` | 球手详情 + 关联 clips |
+| GET  | `/v1/pros/clips/{clip_id}` | 单条挥杆 clip 详情 + 标注 + features_snapshot |
+| GET  | `/v1/pros/topics` | 专题列表（含每周精选 banner） |
+| GET  | `/v1/pros/topics/{topic_id}` | 专题详情 |
+| POST | `/v1/pros/match` | 给一条 swing_analysis，返回最匹配的球手 + clip + 差距维度 |
+| GET  | `/v1/pros/match/history` | 当前用户历史匹配记录 |
+| POST | `/v1/users/me/pros/favorites` | 收藏一条 clip |
+| DELETE | `/v1/users/me/pros/favorites/{clip_id}` | 取消收藏 |
+| POST | `/v1/users/me/pros/favorites/{clip_id}/try-it` | "想试试看"→ 自动生成一条 training_task |
+| GET  | `/v1/users/me/pros/favorites` | 已收藏列表 |
+
+错误码新增：
+
+| 码 | 触发 |
+|---|------|
+| 40404 | clip 已下架或被撤稿（公开镜头权利方申诉响应） |
+| 40320 | 专题 / clip 为会员独占 |
+
+### 11.7 M13 球友约球 `/v1/meetup/*`
+
+| Method | Path | 用途 |
+|--------|------|------|
+| GET  | `/v1/meetup/venues` | 场地列表（?city, ?type, ?keyword） |
+| POST | `/v1/meetup/venues` | UGC 提交新场地（走运营审核） |
+| POST | `/v1/meetup/venues/{venue_id}/report` | 举报场地（地址错误 / 已关闭等） |
+| POST | `/v1/meetup/match` | 根据时段 / 场地 / 偏好返回 3-5 个候选球友（脱敏） |
+| POST | `/v1/meetup/invitations` | 发起约球邀请 |
+| POST | `/v1/meetup/invitations/{id}/accept` | 接受 → 生成一次性微信群链接 token |
+| POST | `/v1/meetup/invitations/{id}/decline` | 拒绝 |
+| POST | `/v1/meetup/invitations/{id}/cancel` | 取消（发起人） |
+| GET  | `/v1/meetup/invitations` | 当前用户的发起 / 接收列表 |
+| GET  | `/v1/meetup/qr/{token}.png` | 一次性 QR 码（接受后才生效，过期自动失效） |
+| POST | `/v1/meetup/feedbacks` | 约球后互评（rating + tags + comment） |
+| GET  | `/v1/meetup/feedbacks/me` | 我收到的评价（用于个人信用积分） |
+| POST | `/v1/meetup/events` | 创建自助小型挑战赛 |
+| POST | `/v1/meetup/events/{id}/join` | 报名参赛 |
+| POST | `/v1/meetup/events/{id}/submit-score` | 上传成绩 + 成绩单图 |
+| GET  | `/v1/meetup/events` | 公开赛事列表 |
+
+错误码新增：
+
+| 码 | 触发 |
+|---|------|
+| 40330 | 用户未授权位置信息（无法做就近匹配） |
+| 40331 | 用户信用积分低于阈值（不可发起邀请） |
+| 40332 | 14 岁以下用户不开放约球 |
+| 40333 | 未通过手机号实名验证 |
+| 42920 | 邀请每日上限触达（免费 5 / 会员 10） |
+| 42921 | 连续被拒 ≥3 次进入 24h 冷却期 |
+| 40404 | 邀请已过期 / 已被对方撤回 / 已被风控关闭 |
+
+### 11.8 灰度策略 / 通用规约
+
+| 项 | 规约 |
+|----|------|
+| **M7 V2 灰度** | 通过 `engine_version` 字段（详 §11.1）；服务端按用户 ID 哈希分桶 5% → 25% → 50% → 100%；V1 兜底保留 ≥6 个月 |
+| **教练 / 学员双视图** | 同一 JWT 内 `role_claim ∈ ['user','coach']`；切换角色由前端调 `POST /v1/auth/role-switch` 重发 JWT（短期）或在 header 加 `X-Role: coach`（长期） |
+| **配额** | 教练角色下不消费 analysis_quota / chat_quota（与 docs/03 §3.2 / §3.3 约定一致）|
+| **隐私** | 涉及位置 / 联系方式的接口必须先校验 `user_profiles_v2.privacy_payload` 同意位；详 docs/06 §M13 |
+| **限流** | M13 写接口默认 60 次 / 小时；M8 教练侧批注 200 次 / 日；M12 收藏不限 |
+
+---
+
 *文档完*
