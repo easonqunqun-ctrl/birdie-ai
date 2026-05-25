@@ -73,7 +73,6 @@ export const VideoCard: FC<VideoCardProps> = ({ attachment }) => {
             poster={poster}
             controls
             showCenterPlayBtn
-            showLoading
             objectFit='contain'
             onEnded={() => {
               setPlaying(false)
