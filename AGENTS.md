@@ -145,5 +145,5 @@ make backend-migrate
 - 数据库字段不明 → `docs/03-数据库设计文档.md`。
 - **分析报告软删除**何时算「可发版」、发布顺序与 R2 backlog → [`docs/release-notes/analysis-soft-delete-release-pattern.md`](docs/release-notes/analysis-soft-delete-release-pattern.md)。
 - **体验版一轮测试**（自动化 + 微信侧 Smoke）→ [`docs/release-notes/experience-version-smoke-runbook.md`](docs/release-notes/experience-version-smoke-runbook.md)。
-- **二期 kickoff 启动包入口**（66 篇 SOP 总索引，按 Wave / 模块 / PR 编号查询）→ [`docs/release-notes/p2-66-kickoff-index.md`](docs/release-notes/p2-66-kickoff-index.md)；遇到具体 `P2-MX-NN` 任务时，先翻索引找对应 kickoff，再读 [`docs/23 §三~§十`](docs/23-二期可编码规格说明书.md)（待 #20 合并后生效）真源。
+- **二期 kickoff 启动包入口**（67 篇 SOP 总索引，按 Wave / 模块 / PR 编号查询）→ [`docs/release-notes/p2-67-kickoff-index.md`](docs/release-notes/p2-67-kickoff-index.md)；遇到具体 `P2-MX-NN` 任务时，先翻索引找对应 kickoff，再读 [`docs/23 §三~§十`](docs/23-二期可编码规格说明书.md)（待 #20 合并后生效）真源。
 - 仍不明 → **停下来问用户**，不要臆测实现。
