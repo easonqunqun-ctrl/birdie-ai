@@ -108,7 +108,7 @@ export const VideoCard: FC<VideoCardProps> = ({ attachment }) => {
           </View>
         </View>
       )}
-      <Text className='video-card__hint-note'>开源高尔夫素材示范，专属教学片陆续更新</Text>
+      <Text className='video-card__hint-note'>动作示范片段，请配合文字步骤练习</Text>
     </View>
   )
 }
