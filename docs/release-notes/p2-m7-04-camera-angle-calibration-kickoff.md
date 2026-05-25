@@ -1,6 +1,6 @@
 # P2-M7-04 · 机位独立标尺 · 启动包（W17 起跑）
 
-> 版本：v0.1（2026-05-25）
+> 版本：v0.1.1（2026-05-25）
 > 状态：启动输入稿
 > 适用范围：二期 Phase 2.1 期间，face_on / dtl 双套评分标尺 + 机位偏角检测与补偿
 > 上游真源（待 PR #20 合并后生效）：[`docs/23 §3.4 · P2-M7-04 · 机位独立标尺`](../23-二期可编码规格说明书.md#34-p2-m7-04--机位独立标尺face_on--dtl-双套)
@@ -17,7 +17,7 @@
 - 一期 `camera_angle` **用户自选但未参与评分**的现状与痛点
 - 双套 `PHASE_WEIGHTS_BY_ANGLE` + 双套 `ideal` 范围 v0.1 草案（W19 编码用；W21 ECS 标定后替换）
 - 机位检测 / 偏角度量 / 光流补偿模块边界
-- ECS v2 验证集要求（AC-2）与合成偏角测试集（AC-1）
+- ECS v2 验证集要求（AC-2）与物理偏角测试集（AC-1）
 - W17-W24 周计划 + 与 P2-M7-06 / P2-M7-14 分工
 
 ### 1.2 边界（**不**做项）
@@ -78,7 +78,7 @@ constants.PHASE_WEIGHTS（单套）+ FEATURES ideal（单套）→ score_overall
 
 | FR | 现状 | 缺口 |
 | --- | --- | --- |
-| FR-1 机位自动检测 `{face_on, dtl, oblique}` | ❌ 无 | 新增 `camera_angle.py` |
+| FR-1 机位自动检测 `{face_on, dtl, oblique}` | ❌ 无 | 新增 `camera_angle.py`（API 层统一 `down_the_line`，见 §3.2.1） |
 | FR-2 输出 `camera_angle_offset_deg` | ❌ 无 DB 列 / 无响应字段 | migration 0007 + pipeline 写入 |
 | FR-3 双套 `PHASE_WEIGHTS_BY_ANGLE` | ❌ 单套 | §4.1 v0.1 草案 |
 | FR-4 偏角 ≤15° 光流补偿；>15° 降 confidence | ❌ 无 | `optical_flow_warp.py` + hook |
@@ -96,7 +96,7 @@ constants.PHASE_WEIGHTS（单套）+ FEATURES ideal（单套）→ score_overall
 | 光流补偿 | `ai_engine/app/pipeline/optical_flow_warp.py` | 偏角 ≤15° 轻量 warp keypoints / 可选帧 | 2 PD |
 | 双套标尺 | `ai_engine/app/pipeline/angle_profiles.py` | `PHASE_WEIGHTS_BY_ANGLE` + `ideal_for_angle()` | 2 PD |
 | 管线集成 | `real_pipeline.py` | 检测 → warp → scoring 选套 | 1.5 PD |
-| ECS 回归 | `ai_engine/app/ecs/angle_regression.py` | AC-1 / AC-2 自动判定 | 2 PD |
+| ECS 回归 | `ai_engine/app/ecs/angle_regression.py` | AC-0 / AC-1b / AC-2 自动判定 | 2 PD |
 | 单测 | `tests/test_camera_angle.py` 等 | 检测 + 评分波动 | 2 PD |
 
 **合计：~12.5 PD**（与 docs/23 §3.4 估时 8 PW 一致，含 ECS 标定迭代 buffer）
@@ -121,21 +121,53 @@ class CameraAngleResult:
     detected_angle: Literal["face_on", "down_the_line", "oblique"]
     offset_deg: float          # 相对最近标准机位的偏角 [0, 90]
     confidence: float          # 检测置信度 0-1
-    declared_angle: str | None # 用户声明（对比用，不参与评分选套）
+    declared_angle: str | None # 用户声明；检测 confidence < 0.7 时 fallback 选套（见 §4.3）
     mismatch: bool             # detected != declared 且 confidence > 0.7
 ```
 
-**选套规则**：评分 / 诊断使用 `detected_angle`（`oblique` 时 fallback 到 `declared_angle`，仍 oblique 则按 face_on 套 + 强制 `offset_deg` 惩罚）
+**选套规则**：默认用 `detected_angle`；`oblique` 或检测 confidence < 0.7 时 fallback 到 `declared_angle`（normalize 后）；仍无法判定则 face_on 套 + `offset_deg` 惩罚
 
-### 3.3 光流补偿（FR-4）
+### 3.2.1 机位枚举映射（W17 编码前冻结）
+
+docs/23 / ECS manifest 与一期 API **命名不一致**，实现须统一 normalize，避免标注、检测、入库三套值：
+
+| 层级 | face_on | down-the-line |
+| --- | --- | --- |
+| ECS manifest（#22 §四） | `face_on` | `dtl`（**别名**，入库前转换） |
+| API / DB / `schemas.py` | `face_on` | `down_the_line` |
+| 算法内部检测输出 | `face_on` | `down_the_line` |
+| docs/23 FR-1 文档写法 | `face_on` | `dtl` / `oblique` |
+
+```python
+def normalize_camera_angle(raw: str) -> Literal["face_on", "down_the_line"]:
+    if raw in ("dtl", "down_the_line", "down-the-line"):
+        return "down_the_line"
+    if raw == "face_on":
+        return "face_on"
+    raise ValueError(...)
+```
+
+> `oblique` 仅作检测中间态，**不**写入 DB `camera_angle` 列；落库时按 §4.3 fallback 规则转为 `face_on` 或 `down_the_line`。
+
+### 3.3 偏角补偿与 confidence hook（FR-4，对齐 docs/23 AC-3）
 
 | 偏角 | 行为 |
 | --- | --- |
-| `offset_deg ≤ 15` | OpenCV `calcOpticalFlowFarneback` 估计全局运动 → 轻量仿射 warp 关键点坐标（**不**重跑 MediaPipe） |
-| `15 < offset_deg ≤ 30` | 不 warp；`analysis_confidence` 乘 0.6（M7-06 全链路就绪后接入统一公式） |
-| `offset_deg > 30` | 不 warp；`analysis_confidence < 0.5` + engine_warning `camera_angle_large_offset` |
+| `offset_deg ≤ 15` | 轻量 warp 关键点（几何仿射为主；§3.3.1 光流为备选 PoC）→ 正常 `analysis_confidence` |
+| `offset_deg > 15` | **不** warp；`analysis_confidence` **强制 < 0.5** + `engine_warning` `camera_angle_large_offset` + 报告「建议重拍」 |
 
-NFR：warp 延迟 ≤ 2s / 视频（§3.4 对齐 docs/23 NFR）
+> **AC-1b 与 AC-3 可并存**：20° 样本综合分仍可相对 0° 波动 ≤5 分（AC-1b），同时因 >15° 触发 confidence < 0.5（AC-3）——分数稳定不等于高可信，用户仍应被引导重拍。
+
+NFR：warp 延迟 ≤ 2s / 视频（对齐 docs/23 NFR）
+
+#### 3.3.1 光流 vs 几何 warp（W18 PoC 必评）
+
+docs/23 FR-4 称「光流补偿」，但机位偏角本质是**静态 mounting angle**。W18 PoC 须对比：
+
+- **A. 几何仿射**：由 `offset_deg` 直接 warp 关键点（优先）
+- **B. 光流**：`calcOpticalFlowFarneback` 估全局运动（仅当 A 不足时备选）
+
+W20 选型写入 §10 变更记录；不预设 B 为唯一路径。
 
 ---
 
@@ -186,17 +218,19 @@ NFR：warp 延迟 ≤ 2s / 视频（§3.4 对齐 docs/23 NFR）
 | --- | --- | --- |
 | face_on 已标注样本 | ≥10 段（W17 第一批） | ECS manifest `camera_angle=face_on` |
 | dtl 已标注样本 | ≥10 段（W17 第一批） | ECS manifest `camera_angle=dtl` |
-| 双机位同一球员同一动作 | ≥3 对（W21 理想） | ECS 扩展；AC-1 核心 |
+| 双机位同一球员同一动作 | ≥3 对（W21 理想） | ECS 扩展；**AC-0 核心** |
 
-**AC-2 判定**：`detect_camera_angle()` 在 ECS 验证集上 argmax 准确率 ≥ 95%
+**AC-2 判定**：`detect_camera_angle()` 在 ECS 验证集上 argmax 准确率 ≥ 95%（manifest 中 `dtl` 须先 normalize 为 `down_the_line`）
 
-### 5.2 合成偏角测试集（AC-1，与 ECS **独立**）
+### 5.2 偏角测试集（AC-1b，与 ECS **独立**）
 
 | 类别 | 数量 | 生成方式 | 用途 |
 | --- | --- | --- | --- |
-| 0° 基准 | ≥3 段 | ECS face_on 原片 | AC-1 基准分 |
-| 10° 偏角 | ≥3 段 | ffmpeg `rotate=10*PI/180` 或物理三脚架偏 10° 自录 | AC-1 波动 ≤5 分 |
-| 20° 偏角 | ≥3 段 | 同上 20° | AC-1 边界；>15° 应触发 confidence 降档 |
+| 0° 基准 | ≥3 段 | ECS face_on 原片 | AC-1b 基准分 |
+| 10° 偏角 | ≥3 段 | **物理三脚架偏 10° 自录**（AC 签字依据） | AC-1b 波动 ≤5 分 |
+| 20° 偏角 | ≥3 段 | **物理三脚架偏 20° 自录** | AC-1b 边界 + AC-3（>15° → confidence <0.5） |
+
+> ffmpeg `rotate=10°` 仅作 W20 smoke（画面旋转 ≠ 机位偏角透视），**不可**作为 AC-1b 签字依据。
 
 存放：`ai_engine/tests/fixtures/angle/`（**不入库**，与 v2 codec fixtures 同策略）
 
@@ -237,10 +271,10 @@ NFR：warp 延迟 ≤ 2s / 视频（§3.4 对齐 docs/23 NFR）
 | --- | --- | --- |
 | **W17** | 本文件评审；读 `constants.py` / `scoring.py` / `diagnose.py`；ECS 子集导出脚本 | ☑ ECS angle 子集 ≥20 段清单；☑ PoC 检测伪代码 review |
 | **W18** | `camera_angle.py` PoC + ECS 子集准确率摸底 | ☑ 摸底准确率 ≥85%（未达 95% 可接受，留 W21 调参） |
-| **W19** | `angle_profiles.py` 双套权重 + scoring 接入；单测 | ☑ face_on/dtl 同特征不同分 ≥10 分差异（合理差异化 smoke） |
-| **W20** | `optical_flow_warp.py`；合成 0/10/20° fixtures | ☑ warp ≤2s；☑ 10° 样本端到端跑通 |
-| **W21** | ECS 回归 AC-2；双套 ideal v0.1 → v0.2（ECS 统计） | ☑ 机位识别 ≥95%；☑ §4.2 至少 3 特征 ideal 更新 |
-| **W22** | AC-1 偏角波动；`real_pipeline` 集成 + migration | ☑ 0/10/20° 综合分波动 ≤5 分；☑ offset 写入 DB |
+| **W19** | `angle_profiles.py` 双套权重 + scoring 接入；单测 | ☑ 双套权重接入 smoke；☑ ECS 成对样本 face_on vs dtl 分差可观测（AC-0 预演） |
+| **W20** | warp PoC（§3.3.1 A/B 选型）；物理偏角 fixtures | ☑ warp ≤2s；☑ 10° 物理样本端到端跑通 |
+| **W21** | ECS 回归 AC-0 + AC-2；双套 ideal v0.1 → v0.2 | ☑ 成对样本 ≥3 对分差 ≤5（AC-0）；☑ 机位识别 ≥95%（AC-2） |
+| **W22** | AC-1b 偏角波动；`real_pipeline` 集成 + migration | ☑ 0/10/20° 物理样本综合分波动 ≤5 分；☑ offset 写入 DB |
 | **W23** | AC-3 偏角 >15° confidence hook；`engine_warnings` _MISMATCH | ☑ 20° 样本 confidence <0.5 + 报告「建议重拍」文案（依赖 M7-06 UI 或 stub） |
 | **W24** | `engine_version` 灰度（P2-M7-14）；docs 回流 | ☑ AC 全达成；☑ docs/05 §2.6 增量 PR |
 
@@ -266,9 +300,10 @@ NFR：warp 延迟 ≤ 2s / 视频（§3.4 对齐 docs/23 NFR）
 | R-03 | 用户声明与检测不一致引发客诉 | `camera_angle_mismatch` warning + 报告脚注「已按画面自动识别机位评分」 |
 | R-04 | 与 P2-M7-05 球杆标尺叠加组合爆炸 | M7-04 仅 angle 二维；M7-05 在其后叠加 club_category（docs/23 已排依赖） |
 
-### 8.3 AC 兜底（复述 docs/23 §3.4）
+### 8.3 AC 兜底（复述 docs/23 §3.4 + 用户场景）
 
-- [ ] **AC-1**：同一段挥杆 0° / 10° / 20° 偏角综合分波动 ≤5 分
+- [ ] **AC-0**（用户场景 · 跨机位公平性）：同一挥杆 face_on vs `down_the_line` 综合分波动 ≤5 分；ECS 成对样本 ≥3 对
+- [ ] **AC-1**（docs/23 AC-1 · 偏角稳定性）：同一段挥杆 0° / 10° / 20° 偏角综合分波动 ≤5 分（物理三脚架样本）
 - [ ] **AC-2**：ECS v2 验证集机位识别准确率 ≥95%
 - [ ] **AC-3**：偏角 >15° 时 `analysis_confidence` < 0.5 并触发「建议重拍」
 
@@ -296,7 +331,7 @@ ECS jsonl 须含（与 P2-M7-01 §四 manifest 对齐）：
 
 ```jsonc
 {
-  "camera_angle": "face_on",           // ground truth
+  "camera_angle": "face_on",           // ground truth；dtl 写入 manifest，normalize 后存 down_the_line
   "camera_angle_offset_deg": 0,        // 标注员估计偏角，0=标准
   "club_type": "7_iron"
 }
@@ -309,4 +344,5 @@ ECS jsonl 须含（与 P2-M7-01 §四 manifest 对齐）：
 | 版本 | 日期 | 变更 |
 | --- | --- | --- |
 | v0.1 | 2026-05-25 | 初版；模块设计 + 双套标尺 v0.1 + W17-W24 周计划 |
+| v0.1.1 | 2026-05-25 | review 修复 3 处：§3.3 AC-3 阈值改为 >15° 即 confidence <0.5（删 30° 中间档）；§8.3 增 AC-0 跨机位公平性；§3.2.1 增 dtl/down_the_line enum 映射。顺带：§3.2 declared_angle 与 §4.3 对齐；§5.2 物理偏角为 AC 签字依据；§3.3.1 光流 vs 几何 warp PoC；W19 DoD 去掉 M7-05 误引 |
 | v0.2 | W24 收尾 | ECS 标定后的 ideal/权重终表回流 docs/05；本文件 `superseded` |
