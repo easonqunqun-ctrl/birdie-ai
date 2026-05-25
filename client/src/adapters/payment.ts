@@ -10,7 +10,7 @@ type VirtualPaymentResult = {
   errCode?: number
 }
 
-declare namespace Taro {
+declare module '@tarojs/taro' {
   interface TaroStatic {
     requestVirtualPayment?: (opts: {
       signData: string
