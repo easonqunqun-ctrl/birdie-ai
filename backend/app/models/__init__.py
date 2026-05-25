@@ -12,6 +12,14 @@ from app.models.event import Event
 from app.models.feedback import Feedback
 from app.models.invitation import Invitation
 from app.models.payment import Order, PaymentTransaction
+from app.models.pro_library import (
+    ProClipAnnotation,
+    ProPlayer,
+    ProSwingClip,
+    ProTopic,
+    UserProFavorite,
+    UserProMatchHistory,
+)
 from app.models.share import ShareAction
 from app.models.training import Drill, PracticeLog, TrainingPlan, TrainingTask
 from app.models.user import User
@@ -31,9 +39,15 @@ __all__ = [
     "Order",
     "PaymentTransaction",
     "PracticeLog",
+    "ProClipAnnotation",
+    "ProPlayer",
+    "ProSwingClip",
+    "ProTopic",
     "ShareAction",
     "SwingAnalysis",
     "TrainingPlan",
     "TrainingTask",
     "User",
+    "UserProFavorite",
+    "UserProMatchHistory",
 ]
