@@ -1,8 +1,11 @@
 {
+  "status": "quarantined",
+  "status_note": "v1.1.1 用 Mixkit 通用高尔夫 stock 素材按 drill_id 占位，内容与 drill 文字步骤完全不对应（如『毛巾夹臂练习』配『爸爸教孩子打球』）。已在 client/src/constants/drillVideoLibrary.ts 将 DRILL_VIDEO_ALIGNED_IDS 置空，前端不再渲染这些视频卡片。本 manifest 仅作历史记录，重建计划见 docs/release-notes/drill-demo-video-revamp.md。",
   "license_name": "Mixkit Stock Video Free License",
   "license_url": "https://mixkit.co/license/#videoFree",
   "license_note": "Free for commercial and personal use; no attribution required by Mixkit, listed here for product transparency.",
   "minio_prefix": "samples/drills",
+  "alignment_with_drill_steps": "all_misaligned",
   "items": [
     {
       "drill_id": "drill_towel_arm",

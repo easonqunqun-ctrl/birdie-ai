@@ -40,7 +40,7 @@ curl -sS "https://api.birdieai.cn/v1/health" | python3 -m json.tool | head -40
 | 5   | 切 **0.5x** 慢放（骨骼模式）                   | 仍连贯，可辨骨骼点                                  |
 | 6   | 点击阶段条 **上杆 / 击球**                     | seek 正常，骨骼仍叠加                              |
 | 7   | （可选）极暗/糊视频走 params 页                  | v1.2.0 硬阻断或软警告；**不应**用无骨骼原片冒充叠加            |
-| 8   | （可选）训练 Tab 展开任务看 **动作参考** 视频          | v1.2.8+ 可播放；与本项独立，失败不阻塞 O-07               |
+| 8   | （可选）训练 Tab 展开任务看 **动作参考** 视频          | v1.2.8+ 可播放；与本项独立，失败不阻塞 O-07。**v1.2.13+ 起预期「整块视频区域不渲染」**（drill 视频专属素材重建中，hotfix 详 [`docs/release-notes/drill-demo-video-revamp.md`](drill-demo-video-revamp.md)）|
 
 
 **失败时记录**（填 §4 签字表）：

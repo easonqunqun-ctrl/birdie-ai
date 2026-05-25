@@ -7,10 +7,18 @@ describe('VideoCard', () => {
     expect(VideoCard).toBeDefined()
   })
 
-  it('已知 drill_id 可解析示范视频', () => {
-    const detail = resolveVideoCardDetail({ drill_id: 'drill_towel_arm' })
-    expect(detail?.video_url).toContain('.mp4')
-    expect(detail?.title).toContain('毛巾')
+  it('未对齐的 drill_id 不再返回 stock 素材（hotfix 防误导）', () => {
+    expect(resolveVideoCardDetail({ drill_id: 'drill_towel_arm' })).toBeNull()
+  })
+
+  it('用户/教练直传 video_url 时仍可正常渲染（M8 教练上传场景）', () => {
+    const detail = resolveVideoCardDetail({
+      drill_id: 'drill_half_swing',
+      title: '教练录制',
+      video_url: 'https://example.com/coach.mp4',
+    })
+    expect(detail?.video_url).toBe('https://example.com/coach.mp4')
+    expect(detail?.title).toBe('教练录制')
   })
 
   it('VideoCardAttachment 类型字段', () => {
