@@ -170,6 +170,11 @@ class Settings(BaseSettings):
     # 留在这里仅为 .env.local 校验完整性 + 便于将来 backend 侧加 fallback 逻辑
     AI_ENGINE_MOCK_MODE: bool = False
 
+    # ==================== Phase 2 灰度开关 ====================
+    # M11 课程体系（courses/lessons/user_course_progress/course_certificates）；
+    # 默认 false，M11-03 学习路径 UI 上线时切 true。
+    PHASE2_COURSES_ENABLED: bool = False
+
     # ==================== 业务规则 ====================
     FREE_USER_MONTHLY_ANALYSES: int = 3
     FREE_USER_DAILY_CHATS: int = 5

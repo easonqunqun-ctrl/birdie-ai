@@ -8,6 +8,7 @@ from app.models.analysis import (
 )
 from app.models.base import Base
 from app.models.chat import ChatMessage, ChatQuota, ChatSession
+from app.models.course import Course, CourseCertificate, Lesson, UserCourseProgress
 from app.models.event import Event
 from app.models.feedback import Feedback
 from app.models.invitation import Invitation
@@ -24,10 +25,13 @@ __all__ = [
     "ChatMessage",
     "ChatQuota",
     "ChatSession",
+    "Course",
+    "CourseCertificate",
     "Drill",
     "Event",
     "Feedback",
     "Invitation",
+    "Lesson",
     "Order",
     "PaymentTransaction",
     "PracticeLog",
@@ -36,4 +40,5 @@ __all__ = [
     "TrainingPlan",
     "TrainingTask",
     "User",
+    "UserCourseProgress",
 ]
