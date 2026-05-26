@@ -24,7 +24,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Iterable, Literal, Mapping
 
 ConfidenceTier = Literal["confirmed", "leaning", "hidden"]
