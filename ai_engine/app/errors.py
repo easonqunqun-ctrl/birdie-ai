@@ -12,15 +12,23 @@
   这样 Celery 侧拿到响应就能判断成功/失败，而不用同时处理两种异常通道
   （后端侧也已经按这个约定实现，见 `backend/app/integrations/ai_engine.py`）。
 
-错误码表（docs/02 §1.4 约定的 50101-50105 段）
-----------------------------------------------
+错误码表（docs/02 §1.4 约定的 50101-50105 段 + docs/23 §3.2 / §11.4 P2 扩展段）
+-----------------------------------------------------------------------------
 | code  | 类                  | 典型触发 |
 |-------|---------------------|---------|
-| 50101 | `PreprocessError`   | 视频解码失败 / ffmpeg 异常 / 文件下载失败 |
+| 50101 | `PreprocessError`   | 文件下载失败 / 容器损坏 / ffprobe 读取失败（一期行为，不变） |
 | 50102 | `PoorQualityError`  | 清晰度不足（拉普拉斯方差 < 阈值）或稳像失败 |
 | 50103 | `NoPersonError`     | MediaPipe 全帧无人体 / 有效帧占比 < 70% |
 | 50104 | `NoSwingError`      | 检测到人但无挥杆动作（W6-T2 阶段分割里用） |
 | 50105 | `PoseModelError`    | MediaPipe 模型初始化失败 / 推理异常 |
+| 50120 | `DecodeError`       | **P2-M7-02**：codec/容器不被本镜像支持（HEVC/HDR/VP9 转码失败） |
+
+P2-M7-02 拆分原则
+-----------------
+- 50101 仍负责"网络/容器层"硬伤：curl 失败、文件损坏、ffprobe 无法读
+- 50120 专管"codec 层"语义：ffmpeg 能找到流但无法解 / tonemap / 转 yuv420p
+- 客户端 50120 文案统一为「视频格式暂不支持」（详见 P2-M7-03）
+- backend `analysis_tasks` 退配额段需含 50120（见 docs/23 §11.4）
 """
 
 from __future__ import annotations
@@ -97,3 +105,21 @@ class PoseModelError(PipelineError):
 
     code = 50105
     user_message = "AI 引擎内部异常，请稍后再试"
+
+
+class DecodeError(PipelineError):
+    """P2-M7-02：codec/容器不被本镜像支持，无法解码或转码到 yuv420p。
+
+    典型触发：
+    - HEVC / H.265 但镜像未编入 libx265（旧基线镜像）
+    - 10-bit HDR + bt2020 但镜像缺 libzimg（zscale tonemap 链失败）
+    - VP9 .webm 但镜像未编入 libvpx
+    - container_format_name 在白名单外（如 .mkv / .3gp）
+
+    与 50101 的区别：50101 是"完全没拿到视频/容器损坏"；50120 是"拿到了但解不了"。
+    backend 退配额段已扩到含 50120（docs/23 §11.4），客户端文案见 docs/23 §11.5 +
+    P2-M7-03 kickoff（统一为「视频格式暂不支持」）。
+    """
+
+    code = 50120
+    user_message = "视频格式暂不支持，请使用 H.264 / mp4 格式重新拍摄"
