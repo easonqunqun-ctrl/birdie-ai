@@ -40,6 +40,14 @@ class IssueItem(BaseModel):
     # W6-T3：每条 issue 的关键帧截图（MinIO URL）。后端 schema 已存在同名字段，
     # 这里补齐避免 ai_engine→backend 映射时丢字段。MVP 期 ai_engine 在 visualize 步骤生成。
     key_frame_url: str | None = None
+    # P2-M7-06：每诊断置信度（0-1）+ 档位（confirmed/leaning/hidden）
+    # V1 路径不填；V2 路径必填。客户端按 tier 决定红/蓝/折叠区。
+    confidence: float | None = Field(
+        default=None, ge=0.0, le=1.0, description="P2-M7-06 每诊断 confidence"
+    )
+    confidence_tier: Literal["confirmed", "leaning", "hidden"] | None = Field(
+        default=None, description="P2-M7-06 档位"
+    )
 
 
 class RecommendationItem(BaseModel):
@@ -91,6 +99,20 @@ class AnalyzeResult(BaseModel):
             "P2-M7-02：引擎侧解码/归一化诊断；每项 {code,level,detail,ts}。"
             "V1 路径始终为空数组；V2 路径填值。≤32 项，超出截断。"
         ),
+    )
+    # P2-M7-06：三层置信度（详 docs/release-notes/p2-m7-06-confidence-pipeline-kickoff.md）
+    analysis_confidence: float = Field(
+        default=1.0,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "P2-M7-06 整体置信度（0-1）。V1 引擎遗留报告兜底 1.0；"
+            "客户端 <0.5 时展示「建议重拍」CTA，0.5-0.75 中可信色块，≥0.75 高可信。"
+        ),
+    )
+    feature_confidences: dict[str, float] = Field(
+        default_factory=dict,
+        description="P2-M7-06 每特征 confidence（feature_name → 0-1）",
     )
 
 
