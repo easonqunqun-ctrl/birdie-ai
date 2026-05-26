@@ -12,8 +12,8 @@
   这样 Celery 侧拿到响应就能判断成功/失败，而不用同时处理两种异常通道
   （后端侧也已经按这个约定实现，见 `backend/app/integrations/ai_engine.py`）。
 
-错误码表（docs/02 §1.4 约定的 50101-50105 段 + P2-M7-03 扩展 50106-50123）
-----------------------------------------------------------------------
+错误码表（docs/02 §1.4 约定的 50101-50105 段 + P2-M7-02/03 扩展 50106-50123）
+-----------------------------------------------------------------------------
 | code  | 类                          | 典型触发 |
 |-------|-----------------------------|---------|
 | 50101 | `PreprocessError`           | 下载/容器损坏（M7-02 起：codec 走 50120） |
@@ -35,10 +35,17 @@
 | 50117 | `OrientationUnsupportedError` | 旋转元数据异常 |
 | 50118 | `AnalysisTimeoutError`      | pipeline SLA 超时 |
 | 50119 | `EngineOverloadError`       | 队列积压 |
-| 50120 | `DecodeError`               | codec/HDR/HEVC/VP9 转码失败（M7-02） |
+| 50120 | `DecodeError`               | **P2-M7-02**：codec/HDR/HEVC/VP9 转码失败（详 DecodeError docstring） |
 | 50121 | `SlowmoMetadataError`       | 慢动作元数据无法解析（M7-02） |
 | 50122 | `MultiSwingOverflowError`   | >5 段挥杆候选（M7-07，占位） |
 | 50123 | `ModeClubMismatchError`     | mode 与 club_type 不匹配（M10，占位） |
+
+P2-M7-02 拆分原则
+-----------------
+- 50101 仍负责"网络/容器层"硬伤：curl 失败、文件损坏、ffprobe 无法读
+- 50120 专管"codec 层"语义：ffmpeg 能找到流但无法解 / tonemap / 转 yuv420p
+- 客户端 50120 文案统一为「视频格式暂不支持」（详见 P2-M7-03）
+- backend `analysis_tasks` 退配额段需含 50120（见 docs/23 §11.4）
 """
 
 from __future__ import annotations
@@ -230,10 +237,17 @@ class EngineOverloadError(PipelineError):
 
 
 class DecodeError(PipelineError):
-    """50120：codec/HDR/HEVC/VP9 转码失败（M7-02 抛；客户端文案归本任务）。
+    """50120：codec/HDR/HEVC/VP9 转码失败（M7-02 抛；客户端文案归 M7-03）。
+
+    典型触发：
+    - HEVC / H.265 但镜像未编入 libx265（旧基线镜像）
+    - 10-bit HDR + bt2020 但镜像缺 libzimg（zscale tonemap 链失败）
+    - VP9 .webm 但镜像未编入 libvpx
+    - container_format_name 在白名单外（如 .mkv / .3gp）
 
     与 50101 的区别：50101 是"完全没拿到视频/容器损坏"；50120 是"拿到了但解不了"。
-    backend 退配额段已扩到含 50120（docs/23 §11.4）。
+    backend 退配额段已扩到含 50120（docs/23 §11.4），客户端文案见 docs/23 §11.5 +
+    P2-M7-03 kickoff（统一为「视频格式暂不支持」）。
     """
 
     code = 50120
