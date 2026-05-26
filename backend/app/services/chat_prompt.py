@@ -26,9 +26,12 @@ from sqlalchemy.orm import selectinload
 
 from app.models.analysis import AnalysisIssue, SwingAnalysis
 from app.models.user import User
+from app.services.profile_v2_prompt_context import build_v2_context
 
 # 模板版本号；改动模板语义时一定要升版
-SYSTEM_PROMPT_VERSION = "v1"
+# v1 → v2 升版：P2-M9-04 引入画像 2.0 prompt 注入（差点 / 目标 / 训练偏好）；
+# 旧 ChatSession 的 system_prompt_version 仍保留 'v1' 作审计字段。
+SYSTEM_PROMPT_VERSION = "v2"
 
 # 最近分析摘要条数：3 条已能呈现短期趋势；太多会挤占 LLM 上下文
 RECENT_ANALYSES_COUNT = 3
@@ -124,28 +127,40 @@ def _format_analysis_brief(a: SwingAnalysis) -> str:
 def build_system_prompt(
     user: User,
     recent_analyses: list[SwingAnalysis],
+    profile_v2=None,
 ) -> str:
     """合成 system prompt 文本。
 
     结构：
     - ROLE_AND_STYLE（固定）
     - 用户画像（一行）
+    - 【画像 2.0】行（**P2-M9-04**，仅当 profile_v2 非空且字段非空时；
+      由 ``build_v2_context`` 渲染，伤病字段经 docs/06 隔离白名单硬过滤）
     - 最近 3 次分析摘要（0-3 行）
-    - 如果最近无分析：一行"目前还没有分析记录，基于通用知识作答"
+
+    profile_v2 参数
+    ---------------
+    - 可传 ``UserProfileV2`` ORM 行 / dict / None
+    - 调用方应在 ``PHASE2_PROFILE_V2_ENABLED=false`` 时传 None，保持 V1 行为
+    - 任何 LLM 透传新字段必须经 ``profile_v2_prompt_context.build_v2_context``
+      统一渲染，避免绕过敏感字段白名单
     """
     profile = _format_user_profile(user)
+    v2_block = build_v2_context(profile_v2)
     if recent_analyses:
         analyses_section = "\n".join(
             f"- {_format_analysis_brief(a)}" for a in recent_analyses
         )
         context_block = (
-            f"【用户画像】{profile}\n\n"
-            f"【最近 {len(recent_analyses)} 次挥杆分析】\n{analyses_section}\n"
+            f"【用户画像】{profile}\n"
+            + (f"{v2_block}\n" if v2_block else "")
+            + f"\n【最近 {len(recent_analyses)} 次挥杆分析】\n{analyses_section}\n"
         )
     else:
         context_block = (
-            f"【用户画像】{profile}\n\n"
-            f"【最近挥杆分析】暂无分析记录，请基于通用高尔夫知识回答。\n"
+            f"【用户画像】{profile}\n"
+            + (f"{v2_block}\n" if v2_block else "")
+            + "\n【最近挥杆分析】暂无分析记录，请基于通用高尔夫知识回答。\n"
         )
 
     return f"{ROLE_AND_STYLE}\n{context_block}"

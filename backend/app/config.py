@@ -171,8 +171,9 @@ class Settings(BaseSettings):
     AI_ENGINE_MOCK_MODE: bool = False
 
     # ==================== Phase 2 灰度开关 ====================
-    # M9 画像 2.0（user_profiles_v2 + user_clubs）；默认 false，M9-02 UI 上线时再切 true。
-    # 关闭时：路由层应直接 404，不暴露字段（不在 service 层短路，避免双写）。
+    # M9 画像 2.0（user_profiles_v2 + user_clubs + onboarding + 目标偏好/LLM 注入）；
+    # 默认 false，M9-02 UI 上线时切 true。关闭时：路由层 404 不暴露字段；
+    # M9-04 LLM prompt 注入也短路（chat_service 拉 V2 profile 前判断此 flag）。
     PHASE2_PROFILE_V2_ENABLED: bool = False
 
     # M11 课程体系（courses/lessons/user_course_progress/course_certificates）；
@@ -193,11 +194,6 @@ class Settings(BaseSettings):
     MAX_VIDEO_DURATION_SECONDS: int = 30
     MIN_VIDEO_DURATION_SECONDS: int = 3
     MAX_VIDEO_SIZE_BYTES: int = 100 * 1024 * 1024  # 100MB
-
-    # ==================== Phase 2 灰度 flag（详 docs/22 / docs/23） ====================
-    # M9-01/02/03/04 共享：装备清单 UI + 画像 2.0 + onboarding + 目标偏好
-    # 默认 False，灰度上线时通过 .env / k8s configmap 切 True
-    PHASE2_PROFILE_V2_ENABLED: bool = False
 
     # ==================== W8-T3：测试期配额放宽 ====================
     # `strict`：按 FREE_USER_* 严格扣减（生产 / 默认）
@@ -222,11 +218,6 @@ class Settings(BaseSettings):
     # 发送 PII（IP / 用户 ID 等）：MVP 期默认 False 走合规保守，
     # 仅在排障某具体用户时临时打开（仍受 PIPL §47 的最小必要原则约束）。
     SENTRY_SEND_DEFAULT_PII: bool = False
-
-    # ========== Phase 2 feature flags ==========
-    # P2-M9 画像 2.0 总开关：未启用时 profile-v2 / clubs 等端点返回 404。
-    # 灰度路径：W21 开 dev/staging → W22 灰度 10% prod → W23 全量。
-    PHASE2_PROFILE_V2_ENABLED: bool = False
 
     @property
     def database_url(self) -> str:

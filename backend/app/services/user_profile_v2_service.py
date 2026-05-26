@@ -64,6 +64,7 @@ _SETTABLE_COLUMNS: frozenset[str] = frozenset(
         "known_injuries",
         "mid_long_goals",
         "training_preference",
+        "training_preference_meta",
         "weekly_target_sessions",
         "favorite_course_ids",
         "coach_visible_fields",
@@ -179,6 +180,11 @@ def project_for_self(profile: UserProfileV2) -> dict:
         "known_injuries": list(profile.known_injuries or []),
         "mid_long_goals": list(profile.mid_long_goals or []),
         "training_preference": profile.training_preference,
+        "training_preference_meta": (
+            dict(profile.training_preference_meta)
+            if profile.training_preference_meta
+            else None
+        ),
         "weekly_target_sessions": profile.weekly_target_sessions,
         "favorite_course_ids": list(profile.favorite_course_ids or []),
         "privacy_payload": dict(profile.privacy_payload or {}),

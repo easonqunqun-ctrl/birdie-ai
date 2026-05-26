@@ -48,6 +48,8 @@ class UserProfileV2Update(BaseModel):
     known_injuries: list[str] | None = Field(None, max_length=20)
     mid_long_goals: list[str] | None = Field(None, max_length=20)
     training_preference: TrainingPreferenceLiteral | None = None
+    # M9-04（alembic 0023_m9_04）：可空 JSONB；显式 None 触发清空
+    training_preference_meta: dict | None = None
     weekly_target_sessions: int | None = Field(None, ge=0, le=14)
     favorite_course_ids: list[str] | None = Field(None, max_length=20)
     privacy_payload: PrivacyPayload | None = None
@@ -69,6 +71,7 @@ class UserProfileV2Read(BaseModel):
     known_injuries: list[str] = []
     mid_long_goals: list[str] = []
     training_preference: TrainingPreferenceLiteral | None = None
+    training_preference_meta: dict | None = None
     weekly_target_sessions: int | None = None
     favorite_course_ids: list[str] = []
     privacy_payload: PrivacyPayload = Field(default_factory=PrivacyPayload)
