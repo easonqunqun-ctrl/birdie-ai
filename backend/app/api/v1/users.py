@@ -24,7 +24,12 @@ from app.schemas.user_club import (
     UserClubResponse,
     UserClubUpdate,
 )
-from app.schemas.user_profile_v2 import UserProfileV2Read, UserProfileV2Update
+from app.schemas.user_profile_v2 import (
+    FavoriteVenueRead,
+    FavoriteVenuesList,
+    UserProfileV2Read,
+    UserProfileV2Update,
+)
 from app.services import (
     account_deletion_service,
     analysis_service,
@@ -291,3 +296,44 @@ async def update_my_profile_v2(
     await db.refresh(profile)
     response_payload = user_profile_v2_service.project_for_self(profile)
     return ok(UserProfileV2Read.model_validate(response_payload))
+
+
+# ==================== P2-M9-05 常去球馆（展开 venue 详情） ====================
+
+
+@router.get(
+    "/me/profile-v2/favorite-venues",
+    summary="获取常去球馆（展开 venue 详情，M9-05）",
+    response_model=APIResponse[FavoriteVenuesList],
+)
+async def list_my_favorite_venues(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """返回当前用户的常去球馆列表，按 ``favorite_course_ids`` 顺序展开 venue 详情.
+
+    consent 短路：
+    - ``location_consent`` 关闭时直接返回空列表（不读 DB，不暴露条数），与
+      ``project_for_self`` 自己的视图保持一致：客户端在 location_consent 关闭时
+      也看不到 favorite_course_ids。
+    - 已下架 / closed 的 venue 在 ``missing_ids`` 单独返回，便于客户端提示
+      「该球场已下架，是否移除」。
+    """
+
+    _ensure_profile_v2_enabled()
+    profile = await user_profile_v2_service.get_profile(db, user.id)
+    if profile is None:
+        return ok(FavoriteVenuesList(items=[], missing_ids=[], total=0))
+
+    privacy = profile.privacy_payload or {}
+    if not privacy.get("location_consent", False):
+        # consent 关闭：不读 venues 表，整列表对调用方不可见
+        return ok(FavoriteVenuesList(items=[], missing_ids=[], total=0))
+
+    venues, missing = await user_profile_v2_service.list_favorite_venues(
+        db, user_id=user.id
+    )
+    items = [FavoriteVenueRead.model_validate(v) for v in venues]
+    return ok(
+        FavoriteVenuesList(items=items, missing_ids=missing, total=len(items))
+    )

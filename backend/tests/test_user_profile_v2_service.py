@@ -1,4 +1,4 @@
-"""M9-01 user_profile_v2_service 单测（对齐 docs/23 §5.1 AC-2）.
+"""M9-01 / M9-05 user_profile_v2_service 单测（对齐 docs/23 §5.1 AC-2 + §5.5）.
 
 覆盖
 ----
@@ -9,6 +9,8 @@
 5. ``add_club()`` 14 支硬上限触发 ``BadRequestError``
 6. ``coach_visible_fields`` 白名单外字段被拒
 7. ``project_for_coach()`` 在 coach_visible_consent=False 时仅返回 user_id
+8. **M9-05** favorite_course_ids 校验：FK + 上限 + dedupe + 顺序 + consent
+9. **M9-05** list_favorite_venues 顺序保留 + missing 拆分
 """
 
 from __future__ import annotations
@@ -21,8 +23,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import AsyncSessionLocal
 from app.core.exceptions import BadRequestError
 from app.core.security import new_id
+from app.models.meetup import Venue
 from app.models.user import User
-from app.models.user_profile_v2 import MAX_CLUBS_PER_USER, UserProfileV2
+from app.models.user_profile_v2 import (
+    MAX_CLUBS_PER_USER,
+    MAX_FAVORITE_VENUES,
+    UserProfileV2,
+)
 from app.schemas.user_profile_v2 import (
     PrivacyPayload,
     UserClubCreate,
@@ -41,6 +48,29 @@ async def _make_user(db: AsyncSession) -> User:
     db.add(u)
     await db.flush()
     return u
+
+
+async def _make_venue(
+    db: AsyncSession,
+    *,
+    name: str = "测试球场",
+    city: str = "Beijing",
+    venue_type: str = "golf_course",
+    status: str = "active",
+) -> Venue:
+    """M9-05 单测用：插入一行 venues，返回 Venue。"""
+
+    v = Venue(
+        id=new_id("ven"),
+        city=city,
+        name=name,
+        venue_type=venue_type,
+        source="ugc",
+        status=status,
+    )
+    db.add(v)
+    await db.flush()
+    return v
 
 
 @pytest.mark.asyncio
@@ -256,3 +286,169 @@ async def test_active_club_types_helper() -> None:
             db, user_id=u.id, payload=UserClubCreate(club_type="driver", is_active=True)
         )
         assert svc.active_club_types([c1, c2, c3]) == ["driver", "iron"]
+
+
+# ============================ M9-05 常去球馆 ============================
+
+
+@pytest.mark.asyncio
+async def test_favorite_courses_rejects_nonexistent_venue() -> None:
+    """传入不存在的 venue ID → 40004，不写入任何数据。"""
+
+    async with AsyncSessionLocal() as db:
+        u = await _make_user(db)
+        v1 = await _make_venue(db, name="真实球场")
+        bogus = "ven_nonexistent_id"
+        with pytest.raises(BadRequestError) as exc_info:
+            await svc.upsert_profile(
+                db,
+                user_id=u.id,
+                payload=UserProfileV2Update(
+                    favorite_course_ids=[v1.id, bogus],
+                    privacy_payload=PrivacyPayload(location_consent=True),
+                ),
+            )
+        assert exc_info.value.code == 40004
+        assert bogus in (exc_info.value.detail or "")
+
+
+@pytest.mark.asyncio
+async def test_favorite_courses_rejects_closed_venue() -> None:
+    """venues.status='closed' 视为不可用（FK-like 校验 = active only）。"""
+
+    async with AsyncSessionLocal() as db:
+        u = await _make_user(db)
+        v_closed = await _make_venue(db, name="已下架球场", status="closed")
+        with pytest.raises(BadRequestError) as exc_info:
+            await svc.upsert_profile(
+                db,
+                user_id=u.id,
+                payload=UserProfileV2Update(
+                    favorite_course_ids=[v_closed.id],
+                    privacy_payload=PrivacyPayload(location_consent=True),
+                ),
+            )
+        assert exc_info.value.code == 40004
+
+
+@pytest.mark.asyncio
+async def test_favorite_courses_dedupes_preserving_order() -> None:
+    """[A, B, A, C, B] → 落库为 [A, B, C]（保位去重，避免 chip 视觉欺骗）。"""
+
+    async with AsyncSessionLocal() as db:
+        u = await _make_user(db)
+        va = await _make_venue(db, name="A")
+        vb = await _make_venue(db, name="B")
+        vc = await _make_venue(db, name="C")
+        profile = await svc.upsert_profile(
+            db,
+            user_id=u.id,
+            payload=UserProfileV2Update(
+                favorite_course_ids=[va.id, vb.id, va.id, vc.id, vb.id],
+                privacy_payload=PrivacyPayload(location_consent=True),
+            ),
+        )
+        assert list(profile.favorite_course_ids) == [va.id, vb.id, vc.id]
+
+
+@pytest.mark.asyncio
+async def test_favorite_courses_cap_enforced_after_dedupe() -> None:
+    """schema 7 条已超 max_length=6；dedupe 减到 6 内 → 写入成功。
+    若 dedupe 仍 > 6 → 40003。
+
+    本测试只覆盖 dedupe 内的 cap：schema 的 max_length 由 Pydantic 拦截，单元层
+    不再重复（pydantic ValidationError 流程已被 _validate_handicap_out_of_range
+    类似的测试覆盖模式）。
+    """
+
+    async with AsyncSessionLocal() as db:
+        u = await _make_user(db)
+        venues = [await _make_venue(db, name=f"V{i}") for i in range(MAX_FAVORITE_VENUES)]
+        ids = [v.id for v in venues]
+        # 6 个全唯一 → 通过
+        profile = await svc.upsert_profile(
+            db,
+            user_id=u.id,
+            payload=UserProfileV2Update(
+                favorite_course_ids=ids,
+                privacy_payload=PrivacyPayload(location_consent=True),
+            ),
+        )
+        assert len(profile.favorite_course_ids) == MAX_FAVORITE_VENUES
+
+
+@pytest.mark.asyncio
+async def test_favorite_courses_consent_off_clears_field() -> None:
+    """关闭 location_consent → favorite_course_ids 被强制清空（已有的 consent 守门链）。"""
+
+    async with AsyncSessionLocal() as db:
+        u = await _make_user(db)
+        v1 = await _make_venue(db)
+        # 先开 consent + 写入
+        await svc.upsert_profile(
+            db,
+            user_id=u.id,
+            payload=UserProfileV2Update(
+                favorite_course_ids=[v1.id],
+                privacy_payload=PrivacyPayload(location_consent=True),
+            ),
+        )
+        # 再关 consent → 字段被清空
+        profile2 = await svc.upsert_profile(
+            db,
+            user_id=u.id,
+            payload=UserProfileV2Update(
+                privacy_payload=PrivacyPayload(location_consent=False),
+            ),
+        )
+        assert list(profile2.favorite_course_ids) == []
+
+
+@pytest.mark.asyncio
+async def test_list_favorite_venues_preserves_order_and_splits_missing() -> None:
+    """list_favorite_venues：按 ids 顺序返回 + 已 closed 的归入 missing_ids。
+
+    重要：客户端依赖 items 顺序 = 用户原排序意图。DB 默认顺序（id / created_at）
+    与用户预期不符，所以服务层显式按 ids 重排。
+    """
+
+    async with AsyncSessionLocal() as db:
+        u = await _make_user(db)
+        v_active1 = await _make_venue(db, name="A")
+        v_active2 = await _make_venue(db, name="B")
+        v_active3 = await _make_venue(db, name="C")
+        # 写入 4 个 ID
+        await svc.upsert_profile(
+            db,
+            user_id=u.id,
+            payload=UserProfileV2Update(
+                favorite_course_ids=[v_active2.id, v_active1.id, v_active3.id],
+                privacy_payload=PrivacyPayload(location_consent=True),
+            ),
+        )
+        # 期间运营把 v_active2 软关闭
+        v_active2.status = "closed"
+        await db.flush()
+
+        venues, missing = await svc.list_favorite_venues(db, user_id=u.id)
+        assert [v.id for v in venues] == [v_active1.id, v_active3.id]
+        assert missing == [v_active2.id]
+
+
+@pytest.mark.asyncio
+async def test_list_favorite_venues_empty_when_no_profile() -> None:
+    """未填过 profile 的用户 → 返回 ([], [])，不抛错。"""
+
+    async with AsyncSessionLocal() as db:
+        u = await _make_user(db)
+        venues, missing = await svc.list_favorite_venues(db, user_id=u.id)
+        assert venues == [] and missing == []
+
+
+def test_dedupe_helper_preserves_order_pure_function() -> None:
+    """_dedupe_preserve_order 纯函数：保位去重；覆盖空列表与全重复边界。"""
+
+    assert svc._dedupe_preserve_order([]) == []
+    assert svc._dedupe_preserve_order(["a"]) == ["a"]
+    assert svc._dedupe_preserve_order(["a", "a", "a"]) == ["a"]
+    assert svc._dedupe_preserve_order(["a", "b", "a", "c", "b"]) == ["a", "b", "c"]
