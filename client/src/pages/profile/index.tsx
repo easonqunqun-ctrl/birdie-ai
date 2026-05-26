@@ -5,7 +5,7 @@ import EnvBadge from '@/components/EnvBadge'
 import { useUserStore } from '@/store/userStore'
 import { switchToCoach, toastTabNavigationFailure } from '@/utils/tabNav'
 import { FREQ_LABEL, GOAL_LABEL, LEVEL_LABEL } from '@/constants/golf'
-import { PAYMENT_ENABLED_FLAG } from '@/constants/flags'
+import { PAYMENT_ENABLED_FLAG, PHASE2_PROFILE_V2_ENABLED_FLAG } from '@/constants/flags'
 import type { GolfLevel, PrimaryGoal, WeeklyFreq } from '@/types/api'
 import './index.scss'
 
@@ -168,6 +168,20 @@ const ProfilePage: FC = () => {
             <Text className='profile__menu-label'>我的分析报告</Text>
             <Text className='profile__menu-arrow'>›</Text>
           </View>
+          {/*
+            P2-M9-02：装备清单入口；与 backend PHASE2_PROFILE_V2_ENABLED 双端联动，
+            未启用时隐藏。W22 灰度时一起翻 flag。
+          */}
+          {PHASE2_PROFILE_V2_ENABLED_FLAG && (
+            <View
+              className='profile__menu-item'
+              onClick={() => Taro.navigateTo({ url: '/pages/profile/clubs' })}
+            >
+              <Text className='profile__menu-icon'>🏌️</Text>
+              <Text className='profile__menu-label'>我的装备</Text>
+              <Text className='profile__menu-arrow'>›</Text>
+            </View>
+          )}
           <View
             className='profile__menu-item'
             onClick={() => void switchToCoach().catch(toastTabNavigationFailure)}

@@ -16,8 +16,7 @@
 | detail | str | 自由文本，便于排错（≤ 200 字符；本模块自动截断） |
 | ts | str | ISO-8601 UTC 时间戳 |
 
-> 本文件在 M7-02 与 M7-04 两个 kickoff 各落一次（内容一致），先合的为准；
-  后合的 git auto-merge 不会冲突（两份字节级相同）。
+> 本文件 M7-02 先落基础结构；M7-04 追加机位类码（camera_angle_*）；M7-07 追加阶段分割 V2 类码。
 """
 
 from __future__ import annotations
