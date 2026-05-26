@@ -634,6 +634,9 @@ async def get_report(*, analysis_id: str, user: User, db: AsyncSession) -> Analy
         status=normalize_analysis_status(analysis.status, analysis_id=analysis.id),
         camera_angle=analysis.camera_angle,  # type: ignore[arg-type]
         club_type=analysis.club_type,  # type: ignore[arg-type]
+        engine_version=(
+            getattr(analysis, "engine_version", None) or "v1"
+        ),  # type: ignore[arg-type]
         video_url=to_proxy_video_url(analysis.video_url) or "",
         video_duration=float(analysis.video_duration) if analysis.video_duration else None,
         skeleton_video_url=to_proxy_video_url(analysis.skeleton_video_url),

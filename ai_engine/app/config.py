@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     AI_ENGINE_MOCK_MODE: bool = False
     AI_ENGINE_PORT: int = 9000
 
+    # M7-14：V2 灰度比例（0-100），见 docs/23 §3.14 + version_router.py
+    # 优先级：Redis (m7:v2:rollout_pct, 60s TTL) > 本字段 > 0
+    M7_V2_ROLLOUT_PCT: int = 0
+
     # 模型路径（真实模式才用到）
     POSE_MODEL_PATH: str = "app/models/pose_landmarker.task"
 
