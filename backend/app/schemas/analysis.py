@@ -144,6 +144,8 @@ class AnalysisReportResponse(BaseModel):
     status: AnalysisStatus
     camera_angle: CameraAngle
     club_type: ClubType
+    # M7-14：报告永久按落库 engine_version 渲染。客户端按值开关 V2 新字段（如 confidence）。
+    engine_version: Literal["v1", "v2"] = "v1"
 
     video_url: str
     video_duration: float | None = None

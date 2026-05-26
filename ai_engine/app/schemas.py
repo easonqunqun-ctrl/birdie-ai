@@ -13,6 +13,16 @@ class AnalyzeRequest(BaseModel):
     camera_angle: Literal["face_on", "down_the_line"]
     club_type: str = Field(..., description="球杆类型")
     callback_url: str | None = Field(default=None, description="完成后回调后端的 URL")
+    # M7-14：后端传 user_id 用于灰度分桶；未传时所有请求走 V1
+    user_id_hint: str | None = Field(
+        default=None,
+        description="用户 ID hint，仅用于 V2 灰度分桶（不落库 ai_engine 侧）",
+    )
+    # M7-14：覆盖灰度判定（仅供运维 / 单测 / shadow 回放使用）
+    force_engine_version: Literal["v1", "v2"] | None = Field(
+        default=None,
+        description="强制指定 engine_version，跳过灰度分桶；仅运维/单测使用",
+    )
 
 
 class PhaseScore(BaseModel):
@@ -64,6 +74,8 @@ class AnalyzeResult(BaseModel):
 
     analysis_id: str
     status: Literal["completed", "failed"]
+    # M7-14：每份报告显式带版本号；V1 默认 "v1"，V2 路径写 "v2"（FR-1）
+    engine_version: Literal["v1", "v2"] = "v1"
     overall_score: int | None = None
     phase_scores: dict[str, PhaseScore] | None = None
     phase_timestamps: PhaseTimestamps | None = None
@@ -80,6 +92,13 @@ class AnalyzeResult(BaseModel):
     quality_warnings: list[str] = Field(
         default_factory=list,
         description="非阻断质量提示 machine codes，如 low_light / camera_shake",
+    )
+    engine_warnings: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "P2-M7-02：引擎侧解码/归一化诊断；每项 {code,level,detail,ts}。"
+            "V1 路径始终为空数组；V2 路径填值。≤32 项，超出截断。"
+        ),
     )
     # P2-M7-06：三层置信度（详 docs/release-notes/p2-m7-06-confidence-pipeline-kickoff.md）
     analysis_confidence: float = Field(

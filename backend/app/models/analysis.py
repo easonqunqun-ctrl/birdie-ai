@@ -62,6 +62,12 @@ class SwingAnalysis(Base, TimestampMixin):
     camera_angle: Mapped[str] = mapped_column(String(20), nullable=False)  # face_on / down_the_line
     club_type: Mapped[str] = mapped_column(String(20), nullable=False)
 
+    # M7-14：评分管线版本标记。V1 报告永久按 'v1' 渲染，V2 报告按 'v2' 渲染；
+    # 不做"二次评分"。
+    engine_version: Mapped[str] = mapped_column(
+        String(20), default="v1", server_default="'v1'", nullable=False
+    )
+
     # 状态
     status: Mapped[str] = mapped_column(String(20), default="pending", server_default="'pending'")
     stage: Mapped[str | None] = mapped_column(String(30), nullable=True)
@@ -116,6 +122,7 @@ class SwingAnalysis(Base, TimestampMixin):
         Index("idx_swing_analyses_user", "user_id", "created_at"),
         Index("idx_swing_analyses_status", "status"),
         Index("idx_swing_analyses_confidence", "analysis_confidence"),
+        Index("idx_swing_analyses_engine_version", "engine_version"),
     )
 
 

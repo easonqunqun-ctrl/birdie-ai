@@ -152,6 +152,8 @@ async def _run_swing_analysis_async(analysis_id: str) -> None:
                     video_url=meta["video_url"],
                     camera_angle=meta["camera_angle"],
                     club_type=meta["club_type"],
+                    # M7-14：传 user_id 让 ai_engine 做灰度分桶
+                    user_id_hint=meta.get("user_id"),
                 )
                 break
             except (httpx.TimeoutException, httpx.ConnectError, httpx.HTTPStatusError) as e:
@@ -319,6 +321,10 @@ async def _mark_completed(analysis_id: str, engine_result: dict) -> None:
         analysis.status = "completed"
         analysis.stage = None
         analysis.stage_progress = 100
+        # M7-14：把 ai_engine 返回的版本号原样落库；缺省保持 'v1'
+        engine_version = engine_result.get("engine_version")
+        if isinstance(engine_version, str) and engine_version in {"v1", "v2"}:
+            analysis.engine_version = engine_version
         analysis.overall_score = engine_result.get("overall_score")
         analysis.phase_scores = _dump_phase_scores(engine_result.get("phase_scores"))
         analysis.phase_timestamps = _dump_phase_timestamps(engine_result.get("phase_timestamps"))
