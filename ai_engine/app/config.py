@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     AI_ENGINE_MOCK_MODE: bool = False
     AI_ENGINE_PORT: int = 9000
 
+    # M7-14：V2 灰度比例（0-100），见 docs/23 §3.14 + version_router.py
+    # 优先级：Redis (m7:v2:rollout_pct, 60s TTL) > 本字段 > 0
+    M7_V2_ROLLOUT_PCT: int = 0
+
     # 模型路径（真实模式才用到）
     POSE_MODEL_PATH: str = "app/models/pose_landmarker.task"
 
@@ -46,6 +50,11 @@ class Settings(BaseSettings):
     DERIVED_SKELETON_PREFIX: str = "skeleton"
     DERIVED_KEYFRAME_PREFIX: str = "keyframes"
     DERIVED_POSE_DATA_PREFIX: str = "skeleton_data"
+
+    # ==================== P2-M7-02：视频读取增强 V2 ====================
+    # V2 路径默认关闭；与 P2-M7-14 灰度框架联动（`engine_version == "v2"` 桶才走 V2）。
+    # 即使 engine_version=v2，本 flag 仍是总闸：DevOps 紧急回滚可以直接关 flag 不动 router。
+    M7_VIDEO_READER_V2_ENABLED: bool = False
 
 
 @lru_cache(maxsize=1)
