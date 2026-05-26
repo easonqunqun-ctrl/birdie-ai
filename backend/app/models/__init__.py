@@ -22,6 +22,7 @@ from app.models.payment import Order, PaymentTransaction
 from app.models.share import ShareAction
 from app.models.training import Drill, PracticeLog, TrainingPlan, TrainingTask
 from app.models.user import User
+from app.models.user_profile_v2 import UserClub, UserProfileV2
 
 __all__ = [
     "AnalysisIssue",
@@ -47,5 +48,7 @@ __all__ = [
     "TrainingPlan",
     "TrainingTask",
     "User",
+    "UserClub",
+    "UserProfileV2",
     "Venue",
 ]
