@@ -175,6 +175,14 @@ class Settings(BaseSettings):
     # 关闭时：路由层应直接 404，不暴露字段（不在 service 层短路，避免双写）。
     PHASE2_PROFILE_V2_ENABLED: bool = False
 
+    # M11 课程体系（courses/lessons/user_course_progress/course_certificates）；
+    # 默认 false，M11-03 学习路径 UI 上线时切 true。
+    PHASE2_COURSES_ENABLED: bool = False
+
+    # M12 球手对比库（pro_players + pro_swing_clips 等 6 张表）；默认 false，
+    # M12-03 资源库 tab UI 上线时切 true。
+    PHASE2_PROS_ENABLED: bool = False
+
     # M13 球友约球（venues/meetup_invitations 等 5 张表）；默认 false，
     # 上线前需 DEP-05 法律意见书到位（M13-09 服务协议 / 未成年保护）。
     PHASE2_MEETUP_ENABLED: bool = False
