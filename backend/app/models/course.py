@@ -66,7 +66,7 @@ class Course(Base, TimestampMixin):
     )
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    lessons: Mapped[list["Lesson"]] = relationship(
+    lessons: Mapped[list[Lesson]] = relationship(
         back_populates="course",
         cascade="all, delete-orphan",
         lazy="noload",
@@ -254,11 +254,11 @@ __all__ = [
     "COURSE_STATUS_IN_PROGRESS",
     "COURSE_STATUS_NOT_STARTED",
     "COURSE_STATUS_PASSED",
+    "MAX_STAGE",
+    "VALID_COURSE_STATUSES",
+    "VALID_STATUS_TRANSITIONS",
     "Course",
     "CourseCertificate",
     "Lesson",
-    "MAX_STAGE",
     "UserCourseProgress",
-    "VALID_COURSE_STATUSES",
-    "VALID_STATUS_TRANSITIONS",
 ]
