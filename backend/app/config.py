@@ -177,6 +177,11 @@ class Settings(BaseSettings):
     MIN_VIDEO_DURATION_SECONDS: int = 3
     MAX_VIDEO_SIZE_BYTES: int = 100 * 1024 * 1024  # 100MB
 
+    # ==================== Phase 2 灰度 flag（详 docs/22 / docs/23） ====================
+    # M9-01/02/03/04 共享：装备清单 UI + 画像 2.0 + onboarding + 目标偏好
+    # 默认 False，灰度上线时通过 .env / k8s configmap 切 True
+    PHASE2_PROFILE_V2_ENABLED: bool = False
+
     # ==================== W8-T3：测试期配额放宽 ====================
     # `strict`：按 FREE_USER_* 严格扣减（生产 / 默认）
     # `unlimited`：所有 consume_* 直接放行，所有 get_* 返回 -1（无限）；
