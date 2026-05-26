@@ -1,0 +1,147 @@
+/**
+ * P2-M9-02 · 我的装备页样式
+ * 颜色严走 app.scss CSS 变量；BEM 命名；flex 布局（RN 友好）。
+ */
+
+.my-clubs {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 32rpx 28rpx 0;
+  background: var(--color-bg);
+
+  &--empty {
+    align-items: center;
+    justify-content: center;
+    padding: 60rpx 32rpx;
+  }
+
+  &__header {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16rpx 8rpx 24rpx;
+  }
+
+  &__title {
+    font-size: 36rpx;
+    font-weight: 700;
+    color: var(--color-text-primary);
+  }
+
+  &__count {
+    font-size: 26rpx;
+    color: var(--color-text-secondary);
+  }
+
+  &__list {
+    flex: 1;
+    margin-bottom: 24rpx;
+  }
+
+  &__empty-hint {
+    padding: 60rpx 32rpx;
+    text-align: center;
+    color: var(--color-text-muted);
+    font-size: 28rpx;
+  }
+
+  &__error {
+    color: var(--color-warning);
+    font-size: 28rpx;
+    text-align: center;
+  }
+
+  &__retry {
+    margin-top: 32rpx;
+    padding: 12rpx 32rpx;
+    background: var(--color-primary);
+    color: var(--color-text-on-primary, #ffffff);
+    border-radius: var(--radius-md);
+    font-size: 28rpx;
+  }
+
+  &__item {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24rpx 28rpx;
+    margin-bottom: 16rpx;
+    border-radius: var(--radius-md);
+    background: var(--color-bg-elevated, #ffffff);
+    box-shadow: var(--shadow-sm);
+  }
+
+  &__item-main {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+  }
+
+  &__item-type {
+    font-size: 30rpx;
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
+
+  &__item-nickname {
+    font-size: 26rpx;
+    color: var(--color-text-secondary);
+    margin-top: 4rpx;
+  }
+
+  &__item-yardage {
+    font-size: 24rpx;
+    color: var(--color-text-muted);
+    margin-top: 4rpx;
+  }
+
+  &__item-delete {
+    padding: 12rpx 24rpx;
+    color: var(--color-warning);
+    font-size: 26rpx;
+  }
+
+  &__add-bar {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 16rpx;
+    padding: 24rpx 0 32rpx;
+    border-top: 1rpx solid var(--color-border-subtle, #f0f0f0);
+  }
+
+  &__picker {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18rpx 28rpx;
+    border-radius: var(--radius-md);
+    background: var(--color-bg-elevated, #ffffff);
+    font-size: 28rpx;
+    color: var(--color-text-primary);
+  }
+
+  &__picker-arrow {
+    color: var(--color-text-muted);
+    margin-left: 8rpx;
+  }
+
+  &__add-btn {
+    padding: 18rpx 36rpx;
+    border-radius: var(--radius-md);
+    background: var(--color-primary);
+    color: var(--color-text-on-primary, #ffffff);
+    font-size: 28rpx;
+    font-weight: 600;
+
+    &--disabled {
+      background: var(--color-text-muted);
+      opacity: 0.6;
+    }
+  }
+}
