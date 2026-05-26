@@ -179,6 +179,10 @@ class Settings(BaseSettings):
     # 默认 false，M11-03 学习路径 UI 上线时切 true。
     PHASE2_COURSES_ENABLED: bool = False
 
+    # M12 球手对比库（pro_players + pro_swing_clips 等 6 张表）；默认 false，
+    # M12-03 资源库 tab UI 上线时切 true。
+    PHASE2_PROS_ENABLED: bool = False
+
     # ==================== 业务规则 ====================
     FREE_USER_MONTHLY_ANALYSES: int = 3
     FREE_USER_DAILY_CHATS: int = 5
