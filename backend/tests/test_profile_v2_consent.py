@@ -6,15 +6,12 @@
 
 from __future__ import annotations
 
-import pytest
-
 from app.schemas.user_profile_v2 import PrivacyPayload, UserProfileV2Update
 from app.services.profile_v2_consent import (
     FIELD_TO_CONSENT,
     infer_consent_for_update,
     merged_update_payload,
 )
-
 
 # ============================================================
 # 1. 字段 → consent 推断
