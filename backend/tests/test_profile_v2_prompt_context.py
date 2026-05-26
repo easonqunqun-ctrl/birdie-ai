@@ -211,6 +211,28 @@ def test_ac2_video_user_does_not_mention_text_style():
     assert "视频派" in block
 
 
+def test_ac2_style_alone_drives_diff_ratio():
+    """剥除混杂变量：只改 training_preference，其余字段完全一致 → diff_pct ≥ 30%。
+
+    防止未来重构 _STYLE_DIRECTIVE 被弱化，仅靠 fixture 变量蒙混过关。
+    """
+    shared = {
+        "handicap_self": 22,
+        "mid_long_goals": ["差点 22→18"],
+        "training_preference_meta": {
+            "cadence": "weekly",
+            "preferred_drill_types": ["tempo"],
+        },
+    }
+    user_video = build_v2_context({**shared, "training_preference": "video"})
+    user_text = build_v2_context({**shared, "training_preference": "text"})
+    ratio = difflib.SequenceMatcher(None, user_video, user_text).ratio()
+    diff_pct = 1 - ratio
+    assert diff_pct >= 0.30, (
+        f"AC-2 style-only diff {diff_pct:.0%} < 30%；style directive 强度不足"
+    )
+
+
 # ============================================================
 # 5. 防御性：known_injuries / 身高体重必须不入 LLM 上下文
 # ============================================================
@@ -236,6 +258,53 @@ def test_render_does_not_leak_injury_keys_even_if_smuggled():
     # 但 LLM 透传链路必须在更上游（extract / build_v2_context）就拒绝
     # 这里只是文档化：render 不做额外清洗
     assert "lower_back" in block  # 不洗（caller 责任）
+
+
+def test_build_v2_context_e2e_with_full_sensitive_profile_does_not_leak():
+    """端到端硬门槛（AC-3 在 #104 加 LLM 注入路径后必须保持）：
+    传入含 known_injuries / height_cm / weight_kg / handicap_official 的完整 profile，
+    最终 prompt block **不得**出现任何敏感字段值。
+
+    白名单设计：build_v2_context 只读 4 个 explicit getter（handicap_self /
+    mid_long_goals / training_preference / training_preference_meta），其余敏感
+    字段被默认忽略——本测试确保这条不变量未来不被打破。
+    """
+    from types import SimpleNamespace
+
+    profile_with_injuries = SimpleNamespace(
+        handicap_self=18,
+        mid_long_goals=["稳定差点", "推杆改善"],
+        training_preference="text",
+        training_preference_meta={"cadence": "weekly", "preferred_drill_types": ["tempo"]},
+        # 以下字段是敏感的，必须不出现在 prompt 里
+        known_injuries=["lower_back", "shoulder", "knee"],
+        height_cm=178,
+        weight_kg=75.5,
+        handicap_official=16.2,
+        # 假设以后还可能加新敏感字段
+        medical_notes="2024 椎间盘突出",
+    )
+
+    block = build_v2_context(profile_with_injuries)
+
+    # 必须包含的非敏感字段
+    assert "差点：18" in block
+    assert "稳定差点" in block
+    assert "文字派" in block
+
+    # 必须不包含的敏感字段值（任何注入都禁止）
+    forbidden_substrings = [
+        "lower_back", "shoulder", "knee",  # injury 枚举
+        "腰部", "肩部", "膝盖",  # injury 中文
+        "178", "75.5",  # 身高体重
+        "16.2",  # 真实差点
+        "椎间盘", "medical",  # 医疗笔记
+        "known_injuries",  # 字段名本身
+    ]
+    for forbidden in forbidden_substrings:
+        assert forbidden not in block, (
+            f"AC-3 e2e: 敏感字段值 {forbidden!r} 泄漏到 LLM prompt：\n{block}"
+        )
 
 
 # ============================================================
