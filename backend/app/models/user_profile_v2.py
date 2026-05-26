@@ -30,19 +30,16 @@ TABLE 是「零 downtime 兼容」，可以提前上线只不开放写入。
 
 from __future__ import annotations
 
-from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
-    DateTime,
     ForeignKey,
     Index,
     Integer,
     Numeric,
     String,
-    func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
