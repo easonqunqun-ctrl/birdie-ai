@@ -16,7 +16,8 @@
 | detail | str | 自由文本，便于排错（≤ 200 字符；本模块自动截断） |
 | ts | str | ISO-8601 UTC 时间戳 |
 
-> 本文件 M7-02 先落基础结构；M7-04 追加机位类码（camera_angle_*）；M7-07 追加阶段分割 V2 类码。
+> 本文件 M7-02 先落基础结构；M7-04 追加机位类码（camera_angle_*）；
+  M7-05 追加球杆差异化码占位；M7-07 追加阶段分割 V2 类码。
 """
 
 from __future__ import annotations
