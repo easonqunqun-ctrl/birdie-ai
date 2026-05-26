@@ -201,6 +201,11 @@ class Settings(BaseSettings):
     # 仅在排障某具体用户时临时打开（仍受 PIPL §47 的最小必要原则约束）。
     SENTRY_SEND_DEFAULT_PII: bool = False
 
+    # ========== Phase 2 feature flags ==========
+    # P2-M9 画像 2.0 总开关：未启用时 profile-v2 / clubs 端点 404；
+    # M9-04 LLM prompt 注入也短路（chat_service 拉 V2 profile 前判断此 flag）。
+    PHASE2_PROFILE_V2_ENABLED: bool = False
+
     @property
     def database_url(self) -> str:
         """优先使用显式 DATABASE_URL，否则按字段组装."""

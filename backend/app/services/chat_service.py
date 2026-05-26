@@ -35,7 +35,8 @@ from app.schemas.chat import (
     MessageAttachment,
     SendMessageResponse,
 )
-from app.services import quota_service
+from app.config import settings
+from app.services import quota_service, user_profile_v2_service
 from app.services.chat_prompt import (
     SYSTEM_PROMPT_VERSION,
     build_system_prompt,
@@ -346,7 +347,14 @@ async def _build_llm_messages(
     返回 `(messages, system_prompt_version_used)`。
     """
     recent_analyses = await load_recent_analyses(db, user)
-    system_prompt = build_system_prompt(user, recent_analyses)
+    # P2-M9-04：仅在 PHASE2_PROFILE_V2_ENABLED 时拉取 V2 画像并注入 prompt
+    profile_v2 = None
+    if settings.PHASE2_PROFILE_V2_ENABLED:
+        try:
+            profile_v2 = await user_profile_v2_service.get_profile(db, user.id)
+        except Exception:  # 防御：V2 表暂未迁移 / service 异常都退回 V1
+            profile_v2 = None
+    system_prompt = build_system_prompt(user, recent_analyses, profile_v2=profile_v2)
 
     llm_messages: list[dict[str, str]] = [
         {"role": "system", "content": system_prompt},
