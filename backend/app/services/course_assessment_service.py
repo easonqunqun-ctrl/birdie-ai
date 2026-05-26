@@ -36,8 +36,9 @@ W30+ 落地范围
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any
 
 # kickoff §3.2 阈值默认值
 DEFAULT_MIN_SCORE = 80
@@ -256,27 +257,27 @@ def maybe_upgrade_stage(
     """
     if not course_lesson_ids:
         return False
-    for lesson_id in course_lesson_ids:
-        if user_progress_statuses.get(lesson_id) != "passed":
-            return False
-    return True
+    return all(
+        user_progress_statuses.get(lesson_id) == "passed"
+        for lesson_id in course_lesson_ids
+    )
 
 
 __all__ = [
-    "DEFAULT_MIN_SCORE",
-    "DEFAULT_MAX_ATTEMPTS_PER_DAY",
     "ALLOWED_ENGINE_MODES",
     "ALLOWED_PHASES",
-    "ERR_INVALID_PASS_CRITERIA",
+    "DEFAULT_MAX_ATTEMPTS_PER_DAY",
+    "DEFAULT_MIN_SCORE",
+    "ERR_ANALYSIS_INCOMPLETE",
     "ERR_ENGINE_MODE_MISMATCH",
+    "ERR_INVALID_PASS_CRITERIA",
     "ERR_LESSON_NOT_ASSESSMENT",
     "ERR_MAX_ATTEMPTS_REACHED",
-    "ERR_ANALYSIS_INCOMPLETE",
-    "AssessmentError",
-    "PassCriteria",
     "AnalysisInput",
+    "AssessmentError",
     "AssessmentOutcome",
-    "parse_pass_criteria",
+    "PassCriteria",
     "evaluate_attempt",
     "maybe_upgrade_stage",
+    "parse_pass_criteria",
 ]
