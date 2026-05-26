@@ -11,6 +11,13 @@ from app.models.chat import ChatMessage, ChatQuota, ChatSession
 from app.models.event import Event
 from app.models.feedback import Feedback
 from app.models.invitation import Invitation
+from app.models.meetup import (
+    EventParticipation,
+    MeetupFeedback,
+    MeetupInvitation,
+    SelfOrganizedEvent,
+    Venue,
+)
 from app.models.payment import Order, PaymentTransaction
 from app.models.share import ShareAction
 from app.models.training import Drill, PracticeLog, TrainingPlan, TrainingTask
@@ -26,14 +33,19 @@ __all__ = [
     "ChatSession",
     "Drill",
     "Event",
+    "EventParticipation",
     "Feedback",
     "Invitation",
+    "MeetupFeedback",
+    "MeetupInvitation",
     "Order",
     "PaymentTransaction",
     "PracticeLog",
+    "SelfOrganizedEvent",
     "ShareAction",
     "SwingAnalysis",
     "TrainingPlan",
     "TrainingTask",
     "User",
+    "Venue",
 ]
