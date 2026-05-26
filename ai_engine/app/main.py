@@ -14,7 +14,6 @@ from app.mock_pipeline import run_mock_analysis
 from app.schemas import AnalyzeRequest, AnalyzeResult, PrecheckRequest, PrecheckResult
 from app.version_router import (
     ENGINE_V1,
-    ENGINE_V2,
     RolloutDowngradeRequiresForce,
     get_engine_version,
     get_rollout_pct,
