@@ -268,7 +268,7 @@ def test_upgrade_false_for_empty_course():
 
 
 def test_assessment_error_exposes_code_and_message():
-    err = AssessmentError(50204, "今日次数已用完")
-    assert err.code == 50204
+    err = AssessmentError(50504, "今日次数已用完")
+    assert err.code == 50504
     assert err.message == "今日次数已用完"
     assert str(err) == "今日次数已用完"

@@ -65,12 +65,20 @@ class AssessmentError(ValueError):
         self.message = message
 
 
-# 错误码（与 docs/02 §error_codes 对齐；占段 50200-50299 留给 M11）
-ERR_INVALID_PASS_CRITERIA = 50201
-ERR_ENGINE_MODE_MISMATCH = 50202
-ERR_LESSON_NOT_ASSESSMENT = 50203
-ERR_MAX_ATTEMPTS_REACHED = 50204
-ERR_ANALYSIS_INCOMPLETE = 50205
+# 错误码（与 docs/02 §error_codes 对齐；占段 **50500-50599** 留给 M11 课程系统）
+#
+# 段位选择记录
+# ------------
+# - 50100-50199 ai_engine 业务（M7-03 已扩到 50123）
+# - 50200-50299 第三方/外部服务（50201 wechat ThirdPartyError / 50202 middleware
+#   unhandled / 50203 analysis_service 已占）
+# - 50300-50399 ExternalServiceError 段（50301 已占）
+# - 50500-59999 业务模块自定义；本任务取 50501-50505
+ERR_INVALID_PASS_CRITERIA = 50501
+ERR_ENGINE_MODE_MISMATCH = 50502
+ERR_LESSON_NOT_ASSESSMENT = 50503
+ERR_MAX_ATTEMPTS_REACHED = 50504
+ERR_ANALYSIS_INCOMPLETE = 50505
 
 
 @dataclass(frozen=True)
