@@ -184,6 +184,20 @@ def test_engine_mode_mismatch_returns_failure_not_exception():
     assert out.failure_reason == "engine_mode_mismatch"
     assert out.score == 99  # 高分也不算通过
     assert "full_swing" in out.feedback
+    # 防 bypass：mode mismatch 必须计入 attempts，否则用户可用错模式无限刷
+    assert out.attempts_used == 1
+
+
+def test_engine_mode_mismatch_still_consumes_attempts_near_limit():
+    """边界：当日已 2 次，第 3 次错模式 → attempts_used=3（耗尽），
+    确保用错模式同样消耗额度，防止"刷错模式不计次"。"""
+    out = evaluate_attempt(
+        criteria=_criteria(engine_mode="full_swing", max_attempts_per_day=3),
+        analysis=_analysis(engine_mode="putting", score=99),
+        today_attempts=2,
+    )
+    assert out.passed is False
+    assert out.attempts_used == 3
 
 
 def test_max_attempts_reached_raises():
