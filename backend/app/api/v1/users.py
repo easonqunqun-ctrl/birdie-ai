@@ -24,19 +24,22 @@ from app.schemas.user_club import (
     UserClubResponse,
     UserClubUpdate,
 )
+from app.schemas.user_profile_v2 import UserProfileV2Read, UserProfileV2Update
 from app.services import (
     account_deletion_service,
     analysis_service,
     quota_service,
     user_clubs_service,
+    user_profile_v2_service,
 )
+from app.services.profile_v2_consent import merged_update_payload
 from app.services.user_presenter import build_user_response
 
 router = APIRouter()
 
 
 def _ensure_profile_v2_enabled() -> None:
-    """守门：未启用 PHASE2_PROFILE_V2_ENABLED 直接 404，不暴露端点（kickoff §4.2）."""
+    """守门：未启用 PHASE2_PROFILE_V2_ENABLED 直接 404，不暴露端点（kickoff §4.2 + 与 M9-02 / M9-03 共用）."""
     if not settings.PHASE2_PROFILE_V2_ENABLED:
         raise NotFoundError(code=40404, message="二期画像功能未开放")
 
@@ -243,3 +246,48 @@ async def delete_my_club(
     await user_clubs_service.delete_club(db, user, club_id)
     await db.commit()
     return ok({"id": club_id, "deleted": True})
+
+
+# ==================== P2-M9-03 onboarding 2.0（profile-v2 PATCH 语义） ====================
+
+
+@router.get(
+    "/me/profile-v2",
+    summary="获取画像 2.0（P2-M9-03）",
+    response_model=APIResponse[UserProfileV2Read],
+)
+async def get_my_profile_v2(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    _ensure_profile_v2_enabled()
+    profile = await user_profile_v2_service.get_profile(db, user.id)
+    if profile is None:
+        # 老用户没填过 → 返回空 schema（前端可直接渲染表单初值）
+        return ok(UserProfileV2Read(user_id=user.id))
+    payload = user_profile_v2_service.project_for_self(profile)
+    return ok(UserProfileV2Read.model_validate(payload))
+
+
+@router.put(
+    "/me/profile-v2",
+    summary="更新画像 2.0（PATCH 语义，consent 自动推断）",
+    response_model=APIResponse[UserProfileV2Read],
+)
+async def update_my_profile_v2(
+    payload: UserProfileV2Update,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    _ensure_profile_v2_enabled()
+    existing = await user_profile_v2_service.get_profile(db, user.id)
+    existing_payload = existing.privacy_payload if existing else None
+    # M9-03 helper：客户端只传字段值，consent 自动推断
+    merged = merged_update_payload(payload, existing_payload)
+    profile = await user_profile_v2_service.upsert_profile(
+        db, user_id=user.id, payload=merged
+    )
+    await db.commit()
+    await db.refresh(profile)
+    response_payload = user_profile_v2_service.project_for_self(profile)
+    return ok(UserProfileV2Read.model_validate(response_payload))
