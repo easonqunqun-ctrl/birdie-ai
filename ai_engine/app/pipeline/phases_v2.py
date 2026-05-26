@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Callable, Literal, Optional
+from typing import Callable, Literal
 
 from app.pipeline.engine_warnings import EngineWarning
 
