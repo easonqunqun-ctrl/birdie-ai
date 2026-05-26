@@ -322,9 +322,98 @@ def active_club_types(clubs: Iterable[UserClub]) -> list[str]:
     return sorted({c.club_type for c in clubs if c.is_active})
 
 
+# ----------------------- M9-06 教练可见性 consent -----------------------
+
+
+async def update_coach_consent(
+    db: AsyncSession, *, user_id: str, visible: bool, fields: list[str]
+) -> UserProfileV2:
+    """原子更新教练可见性（M9-06）.
+
+    与 ``upsert_profile`` 解耦的理由：
+    - 通用 PATCH 接受任何字段子集；这里**强制**开关与字段一起决定，避免「开了但
+      没字段」/「字段非空但开关 False」这两种中间态在 DB 落库。
+    - 服务层保证：``visible=False`` ⇒ ``fields`` 清空（即使客户端传非空也忽略）；
+      ``visible=True`` 且 ``fields`` 为空 ⇒ ``40005``。
+
+    返回更新后的 profile（含投影需要的 privacy_payload）。
+    """
+
+    if visible and not fields:
+        raise BadRequestError(
+            code=40005,
+            message="教练可见性开关打开时必须至少选 1 个可见字段",
+        )
+
+    if fields:
+        _validate_coach_visible_fields(fields)
+
+    profile = await get_profile(db, user_id)
+    if profile is None:
+        profile = UserProfileV2(user_id=user_id, privacy_payload={})
+        db.add(profile)
+
+    next_payload: dict[str, bool] = dict(profile.privacy_payload or {})
+    # 缺省 consent 字段都填 False，避免老 profile 缺键导致服务后续逻辑读不到
+    for key in CONSENT_FIELDS:
+        next_payload.setdefault(key, False)
+    next_payload["coach_visible_consent"] = visible
+
+    if visible:
+        # 服务层去重 + 保位（与 M9-05 favorite_course_ids 一致的护栏）
+        profile.coach_visible_fields = _dedupe_preserve_order(fields)
+    else:
+        # 关闭 → 强制清空，无论客户端传了什么 fields
+        profile.coach_visible_fields = []
+
+    profile.privacy_payload = next_payload
+    await db.flush()
+
+    logger.info(
+        "coach_consent_updated",
+        user_id=user_id,
+        visible=visible,
+        field_count=len(profile.coach_visible_fields),
+    )
+    return profile
+
+
+def coach_consent_view(profile: UserProfileV2 | None) -> dict:
+    """供 GET /me/profile-v2/coach-consent 投影；含 ALLOWED 白名单供 UI 渲染选项。
+
+    ``profile`` 为 None（老用户没填过）→ 返回默认关闭 + 空字段。
+    """
+
+    if profile is None:
+        return {
+            "visible": False,
+            "fields": [],
+            "allowed_fields": sorted(COACH_VISIBLE_ALLOWED),
+        }
+    payload = profile.privacy_payload or {}
+    return {
+        "visible": bool(payload.get("coach_visible_consent", False)),
+        "fields": list(profile.coach_visible_fields or []),
+        "allowed_fields": sorted(COACH_VISIBLE_ALLOWED),
+    }
+
+
+def _dedupe_preserve_order(items: list[str]) -> list[str]:
+    """JSONB 数组顺序代表用户排序意图，去重必须保位（先到先留）。"""
+
+    seen: set[str] = set()
+    out: list[str] = []
+    for x in items:
+        if x not in seen:
+            seen.add(x)
+            out.append(x)
+    return out
+
+
 __all__ = [
     "active_club_types",
     "add_club",
+    "coach_consent_view",
     "count_clubs",
     "delete_club",
     "get_profile",
@@ -333,5 +422,6 @@ __all__ = [
     "project_for_coach",
     "project_for_self",
     "update_club",
+    "update_coach_consent",
     "upsert_profile",
 ]

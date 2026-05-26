@@ -123,8 +123,45 @@ class UserClubList(BaseModel):
     total: int
 
 
+# ----------------- M9-06 教练可见性 consent（原子开关 + 字段列表） -----------------
+
+
+class CoachConsentUpdate(BaseModel):
+    """PUT /v1/users/me/profile-v2/coach-consent 请求体（M9-06）.
+
+    与通用 PATCH /me/profile-v2 解耦：教练可见性是一个**原子**决策（开关 + 字段列表
+    必须一起决定），独立端点能避免「半开半关」的中间态。
+
+    服务层不变量：
+    - ``visible=False`` → 服务器把 ``coach_visible_fields`` 强制清空（PIPL 删除权）
+    - ``visible=True``  → ``fields`` 必须非空，否则 ``40005``（开关打开但啥都不让看，
+      产品上是没意义的中间态，弹回让用户重新选）
+    - ``fields`` 中字段必须在 ``COACH_VISIBLE_ALLOWED`` 白名单内（已有 _validate）
+    """
+
+    visible: bool
+    fields: list[str] = Field(default_factory=list, max_length=20)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class CoachConsentRead(BaseModel):
+    """GET /v1/users/me/profile-v2/coach-consent 响应（M9-06）.
+
+    UI 用 ``allowed_fields`` 渲染勾选列表，避免硬编码白名单。
+    """
+
+    visible: bool
+    fields: list[str] = []
+    allowed_fields: list[str] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 __all__ = [
     "ClubTypeLiteral",
+    "CoachConsentRead",
+    "CoachConsentUpdate",
     "HandednessLiteral",
     "HandicapSourceLiteral",
     "PrivacyPayload",
