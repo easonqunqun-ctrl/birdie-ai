@@ -7,6 +7,7 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -61,6 +62,12 @@ class SwingAnalysis(Base, TimestampMixin):
     camera_angle: Mapped[str] = mapped_column(String(20), nullable=False)  # face_on / down_the_line
     club_type: Mapped[str] = mapped_column(String(20), nullable=False)
 
+    # M7-14：评分管线版本标记。V1 报告永久按 'v1' 渲染，V2 报告按 'v2' 渲染；
+    # 不做"二次评分"。
+    engine_version: Mapped[str] = mapped_column(
+        String(20), default="v1", server_default="'v1'", nullable=False
+    )
+
     # 状态
     status: Mapped[str] = mapped_column(String(20), default="pending", server_default="'pending'")
     stage: Mapped[str | None] = mapped_column(String(30), nullable=True)
@@ -82,6 +89,13 @@ class SwingAnalysis(Base, TimestampMixin):
 
     # 引擎非阻断质量提示（JSON 字符串列表），如 ["low_light","camera_shake"]
     quality_warnings: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+
+    # P2-M7-06：整体置信度 0-1（V1 引擎报告兜底 1.0；客户端 <0.5 展示「建议重拍」CTA）
+    analysis_confidence: Mapped[float] = mapped_column(
+        Float, nullable=False, default=1.0, server_default="1.0"
+    )
+    # P2-M7-06：每特征 confidence dict (feature_name → 0-1)；V1 引擎为 {}
+    feature_confidences: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     # 是否为示例视频体验（不计入配额、不入历史）
     is_sample: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
@@ -107,6 +121,8 @@ class SwingAnalysis(Base, TimestampMixin):
     __table_args__ = (
         Index("idx_swing_analyses_user", "user_id", "created_at"),
         Index("idx_swing_analyses_status", "status"),
+        Index("idx_swing_analyses_confidence", "analysis_confidence"),
+        Index("idx_swing_analyses_engine_version", "engine_version"),
     )
 
 
@@ -128,6 +144,9 @@ class AnalysisIssue(Base, TimestampMixin):
     key_frame_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     key_frame_timestamp: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # P2-M7-06：每诊断 confidence + tier（V1 引擎为 NULL）
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    confidence_tier: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     analysis = relationship("SwingAnalysis", back_populates="issues", lazy="noload")
 

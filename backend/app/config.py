@@ -170,6 +170,24 @@ class Settings(BaseSettings):
     # 留在这里仅为 .env.local 校验完整性 + 便于将来 backend 侧加 fallback 逻辑
     AI_ENGINE_MOCK_MODE: bool = False
 
+    # ==================== Phase 2 灰度开关 ====================
+    # M9 画像 2.0（user_profiles_v2 + user_clubs + onboarding + 目标偏好/LLM 注入）；
+    # 默认 false，M9-02 UI 上线时切 true。关闭时：路由层 404 不暴露字段；
+    # M9-04 LLM prompt 注入也短路（chat_service 拉 V2 profile 前判断此 flag）。
+    PHASE2_PROFILE_V2_ENABLED: bool = False
+
+    # M11 课程体系（courses/lessons/user_course_progress/course_certificates）；
+    # 默认 false，M11-03 学习路径 UI 上线时切 true。
+    PHASE2_COURSES_ENABLED: bool = False
+
+    # M12 球手对比库（pro_players + pro_swing_clips 等 6 张表）；默认 false，
+    # M12-03 资源库 tab UI 上线时切 true。
+    PHASE2_PROS_ENABLED: bool = False
+
+    # M13 球友约球（venues/meetup_invitations 等 5 张表）；默认 false，
+    # 上线前需 DEP-05 法律意见书到位（M13-09 服务协议 / 未成年保护）。
+    PHASE2_MEETUP_ENABLED: bool = False
+
     # ==================== 业务规则 ====================
     FREE_USER_MONTHLY_ANALYSES: int = 3
     FREE_USER_DAILY_CHATS: int = 5
@@ -200,11 +218,6 @@ class Settings(BaseSettings):
     # 发送 PII（IP / 用户 ID 等）：MVP 期默认 False 走合规保守，
     # 仅在排障某具体用户时临时打开（仍受 PIPL §47 的最小必要原则约束）。
     SENTRY_SEND_DEFAULT_PII: bool = False
-
-    # ========== Phase 2 feature flags ==========
-    # P2-M9 画像 2.0 总开关：未启用时 profile-v2 / clubs 端点 404；
-    # M9-04 LLM prompt 注入也短路（chat_service 拉 V2 profile 前判断此 flag）。
-    PHASE2_PROFILE_V2_ENABLED: bool = False
 
     @property
     def database_url(self) -> str:

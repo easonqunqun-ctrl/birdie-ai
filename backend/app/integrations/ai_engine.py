@@ -31,13 +31,20 @@ class AIEngineClient:
         video_url: str,
         camera_angle: str,
         club_type: str,
+        user_id_hint: str | None = None,
+        force_engine_version: str | None = None,
     ) -> dict:
-        payload = {
+        payload: dict = {
             "analysis_id": analysis_id,
             "video_url": video_url,
             "camera_angle": camera_angle,
             "club_type": club_type,
         }
+        # M7-14：传 user_id 让 ai_engine 做灰度分桶；老 ai_engine 容器忽略未知字段
+        if user_id_hint:
+            payload["user_id_hint"] = user_id_hint
+        if force_engine_version:
+            payload["force_engine_version"] = force_engine_version
         log.info("ai_engine_call_start", analysis_id=analysis_id, base_url=self.base_url)
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             resp = await client.post(f"{self.base_url}/analyze", json=payload)
@@ -49,6 +56,7 @@ class AIEngineClient:
                 analysis_id=analysis_id,
                 status=data.get("status"),
                 overall_score=data.get("overall_score"),
+                engine_version=data.get("engine_version"),
             )
             return data
 

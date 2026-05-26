@@ -72,7 +72,7 @@ class UserProfileV2(Base, TimestampMixin):
     # 目标 / 偏好（M9-04）
     mid_long_goals: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
     training_preference: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    # M9-04（alembic 0021）：cadence + preferred_drill_types
+    # M9-04（alembic 0023_m9_04）：cadence + preferred_drill_types
     # {"cadence": "daily"|"2x_per_week"|"weekly", "preferred_drill_types": ["rhythm", ...]}
     training_preference_meta: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     weekly_target_sessions: Mapped[int | None] = mapped_column(Integer, nullable=True)

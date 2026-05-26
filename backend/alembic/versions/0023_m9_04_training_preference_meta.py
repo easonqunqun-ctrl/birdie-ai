@@ -1,7 +1,7 @@
 """M9-04 训练偏好结构化：training_preference_meta JSONB.
 
-Revision ID: 0021_m9_04_training_preference_meta
-Revises: 0020_m13_party_play
+Revision ID: 0023_m9_04_training_preference_meta
+Revises: 0022_m7_06_analysis_confidence
 Create Date: 2026-05-26
 
 设计动机
@@ -19,6 +19,15 @@ training_preference_meta = {
 
 style 字段仍走 M9-01 ``training_preference`` VARCHAR；客户端读时合并视图。
 
+依赖链（按 PR 合入顺序）：
+0016_feedback → 0017_m9_user_profiles_v2 (PR #90)
+              → 0018_m11_courses_schema (PR #91)
+              → 0019_m12_pro_library_schema (PR #92)
+              → 0020_m13_meetup_schema (PR #93)
+              → 0021_swing_analyses_engine_version (PR #94)
+              → 0022_m7_06_analysis_confidence (PR #97)
+              → 0023_m9_04_training_preference_meta (本 PR #104)
+
 回滚
 ----
 ``downgrade`` 仅 DROP COLUMN，对历史读写无影响（M9-04 prompt 注入会读不到
@@ -27,18 +36,16 @@ style 字段仍走 M9-01 ``training_preference`` VARCHAR；客户端读时合并
 
 from __future__ import annotations
 
-from typing import Union
-
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0021_m9_04_training_preference_meta"
-# 暂以 M9-01 (0017) 为父；若 M11/M12/M13 (0018/0019/0020) 先合并，
-# 本 PR rebase 时把 down_revision 调成最后一条 0020_xxx 即可（纯线性追加）。
-down_revision: Union[str, None] = "0017_m9_user_profiles_v2"
-branch_labels: Union[str, tuple[str, ...], None] = None
-depends_on: Union[str, tuple[str, ...], None] = None
+from alembic import op
+
+revision: str = "0023_m9_04_training_preference_meta"
+# Rebase 后：链入 0022_m7_06_analysis_confidence 之后（单线性，无 alembic 多头）。
+down_revision: str | None = "0022_m7_06_analysis_confidence"
+branch_labels: str | tuple[str, ...] | None = None
+depends_on: str | tuple[str, ...] | None = None
 
 
 def upgrade() -> None:
