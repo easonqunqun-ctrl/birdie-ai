@@ -19,6 +19,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.core.exceptions import BadRequestError, ForbiddenError, NotFoundError
 from app.core.security import new_id
 from app.integrations.llm import AbstractLLMClient, get_llm_client
@@ -35,7 +36,6 @@ from app.schemas.chat import (
     MessageAttachment,
     SendMessageResponse,
 )
-from app.config import settings
 from app.services import quota_service, user_profile_v2_service
 from app.services.chat_prompt import (
     SYSTEM_PROMPT_VERSION,

@@ -160,7 +160,7 @@ def build_system_prompt(
         context_block = (
             f"【用户画像】{profile}\n"
             + (f"{v2_block}\n" if v2_block else "")
-            + f"\n【最近挥杆分析】暂无分析记录，请基于通用高尔夫知识回答。\n"
+            + "\n【最近挥杆分析】暂无分析记录，请基于通用高尔夫知识回答。\n"
         )
 
     return f"{ROLE_AND_STYLE}\n{context_block}"

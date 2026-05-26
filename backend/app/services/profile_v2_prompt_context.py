@@ -16,7 +16,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 # 与 M9-04 kickoff §3.2 一致
 ALLOWED_STYLES = ("video", "text", "mixed")
@@ -207,11 +208,11 @@ def build_v2_context(profile) -> str:
 
 
 __all__ = [
-    "ALLOWED_STYLES",
     "ALLOWED_CADENCES",
     "ALLOWED_DRILL_TYPES",
+    "ALLOWED_STYLES",
     "LLM_FORBIDDEN_PROFILE_FIELDS",
+    "build_v2_context",
     "extract_v2_context",
     "render_v2_prompt_block",
-    "build_v2_context",
 ]
