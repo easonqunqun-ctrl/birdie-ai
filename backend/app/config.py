@@ -171,6 +171,10 @@ class Settings(BaseSettings):
     AI_ENGINE_MOCK_MODE: bool = False
 
     # ==================== Phase 2 灰度开关 ====================
+    # M9 画像 2.0（user_profiles_v2 + user_clubs）；默认 false，M9-02 UI 上线时再切 true。
+    # 关闭时：路由层应直接 404，不暴露字段（不在 service 层短路，避免双写）。
+    PHASE2_PROFILE_V2_ENABLED: bool = False
+
     # M11 课程体系（courses/lessons/user_course_progress/course_certificates）；
     # 默认 false，M11-03 学习路径 UI 上线时切 true。
     PHASE2_COURSES_ENABLED: bool = False
