@@ -15,6 +15,8 @@
 | level | str | `info` / `warn` / `error` 三档 |
 | detail | str | 自由文本，便于排错（≤ 200 字符；本模块自动截断） |
 | ts | str | ISO-8601 UTC 时间戳 |
+
+> 本文件 M7-02 先落基础结构；M7-04 追加机位类码（camera_angle_*）。
 """
 
 from __future__ import annotations
@@ -27,24 +29,27 @@ EngineWarningLevel = Literal["info", "warn", "error"]
 
 KNOWN_CODES: frozenset[str] = frozenset(
     {
-        # 容器/codec 类
+        # 容器/codec 类（M7-02）
         "decoded_hevc",
         "decoded_vp9",
         "decoded_h264",
-        # 色彩管线类
+        # 色彩管线类（M7-02）
         "hdr_tonemapped",
         "color_space_normalized",
-        # 帧率类
+        # 帧率类（M7-02）
         "fps_upsampled",
         "fps_downsampled",
         "slowmo_detected",
         "nominal_fps_used",
-        # 音频类
+        # 音频类（M7-02）
         "audio_kept",
         "audio_dropped",
         # 降级提示
         "fallback_to_v1",
         "fixture_normalized",
+        # 机位类（M7-04）
+        "camera_angle_large_offset",
+        "camera_angle_mismatch",
     }
 )
 
