@@ -38,11 +38,19 @@ def infer_consent_for_update(
 
     规则：
     1. 起始值：existing_payload（如有），否则全 False
-    2. 客户端显式传了 `payload.privacy_payload` → 以客户端 explicit 为准（覆盖推断）
+    2. 客户端显式传了 `payload.privacy_payload` → 以客户端 explicit **PATCH 语义**
+       为准（只覆盖客户端显式 set 的 consent 字段；未 set 的保持 existing）
     3. 否则按字段值推断：
        - 字段值非 None / 非空列表 → consent = True
        - 字段值显式 None / 空列表 → consent = False（清空意图）
        - 字段未在 payload 中出现 → 保持 existing 值不变
+
+    关键陷阱（review 修复）
+    ----------------------
+    `PrivacyPayload` 所有字段默认 ``False``。如果客户端 JSON 只传
+    ``{"privacy_payload": {"handicap_consent": true}}``，**不能**用
+    ``model_dump()`` 覆盖 existing，否则其他 4 个 consent 会被无声重置为 False。
+    必须用 ``model_dump(exclude_unset=True)`` 仅取客户端显式 set 的字段。
     """
     if isinstance(existing_payload, PrivacyPayload):
         start = existing_payload.model_dump()
@@ -51,9 +59,11 @@ def infer_consent_for_update(
     else:
         start = {}
 
-    # explicit privacy_payload takes precedence
+    # explicit privacy_payload takes precedence (PATCH 语义)
     if payload.privacy_payload is not None:
-        start.update(payload.privacy_payload.model_dump())
+        # 只取客户端显式 set 的 consent 字段；未 set 的保持 existing
+        explicit_consent = payload.privacy_payload.model_dump(exclude_unset=True)
+        start.update(explicit_consent)
         return PrivacyPayload(**{**PrivacyPayload().model_dump(), **start})
 
     explicit = payload.model_dump(exclude_unset=True)

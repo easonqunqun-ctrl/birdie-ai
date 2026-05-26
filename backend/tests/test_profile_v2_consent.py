@@ -100,6 +100,33 @@ def test_explicit_privacy_payload_overrides_inference():
     assert consent.handicap_consent is False  # explicit 胜出
 
 
+def test_explicit_privacy_payload_uses_patch_semantics_not_overwrite():
+    """回归（review 发现）：客户端只传 {"handicap_consent": true} **不应**
+    把其他 4 个 consent 重置为 False。PrivacyPayload 默认全 False 会导致
+    无声"撤回 consent"——必须用 exclude_unset。"""
+    existing = PrivacyPayload(body_consent=True, injury_consent=True)
+    payload = UserProfileV2Update.model_validate_json(
+        '{"privacy_payload": {"handicap_consent": true}}'
+    )
+    consent = infer_consent_for_update(payload, existing)
+    assert consent.handicap_consent is True  # 客户端 set 的
+    assert consent.body_consent is True  # existing 保留，不被默认 False 重置
+    assert consent.injury_consent is True
+    assert consent.location_consent is False  # existing 是 False，保持
+
+
+def test_explicit_privacy_payload_can_revoke_specific_consent():
+    """与上一条对称：客户端**显式** set false → 应能撤回单个 consent。"""
+    existing = PrivacyPayload(handicap_consent=True, body_consent=True, injury_consent=True)
+    payload = UserProfileV2Update.model_validate_json(
+        '{"privacy_payload": {"body_consent": false}}'
+    )
+    consent = infer_consent_for_update(payload, existing)
+    assert consent.handicap_consent is True  # 未碰，保留
+    assert consent.body_consent is False  # 显式撤回
+    assert consent.injury_consent is True  # 未碰，保留
+
+
 # ============================================================
 # 5. existing_payload 接受多种类型
 # ============================================================
