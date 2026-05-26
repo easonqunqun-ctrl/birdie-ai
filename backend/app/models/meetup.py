@@ -351,15 +351,15 @@ MIN_MEETUP_AGE = 14
 
 
 __all__ = [
+    "MIN_MEETUP_AGE",
+    "VALID_EVENT_STATUSES",
+    "VALID_INVITATION_STATUSES",
+    "VALID_VENUE_TYPES",
     "ContactPayloadComplianceError",
     "EventParticipation",
     "MeetupFeedback",
     "MeetupInvitation",
-    "MIN_MEETUP_AGE",
     "SelfOrganizedEvent",
-    "VALID_EVENT_STATUSES",
-    "VALID_INVITATION_STATUSES",
-    "VALID_VENUE_TYPES",
     "Venue",
     "write_contact_payload",
 ]
