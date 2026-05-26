@@ -30,19 +30,16 @@ TABLE 是「零 downtime 兼容」，可以提前上线只不开放写入。
 
 from __future__ import annotations
 
-from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
-    DateTime,
     ForeignKey,
     Index,
     Integer,
     Numeric,
     String,
-    func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -75,9 +72,6 @@ class UserProfileV2(Base, TimestampMixin):
     # 目标 / 偏好（M9-04）
     mid_long_goals: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
     training_preference: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    # M9-04（alembic 0021）：cadence + preferred_drill_types
-    # {"cadence": "daily"|"2x_per_week"|"weekly", "preferred_drill_types": ["rhythm", ...]}
-    training_preference_meta: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     weekly_target_sessions: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # 常去球馆（M9-05；M13 约球前置）
