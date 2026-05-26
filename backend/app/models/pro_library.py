@@ -69,7 +69,7 @@ class ProPlayer(Base, TimestampMixin):
         Integer, nullable=False, default=0, server_default="0"
     )
 
-    clips: Mapped[list["ProSwingClip"]] = relationship(
+    clips: Mapped[list[ProSwingClip]] = relationship(
         back_populates="player",
         cascade="all, delete-orphan",
         lazy="noload",
@@ -278,13 +278,13 @@ VALID_ANNOTATION_TYPES: frozenset[str] = frozenset({"text", "voice", "sketch"})
 
 
 __all__ = [
+    "VALID_ANNOTATION_TYPES",
+    "VALID_CAMERA_ANGLES",
+    "VALID_LICENSE_STATUSES",
     "ProClipAnnotation",
     "ProPlayer",
     "ProSwingClip",
     "ProTopic",
     "UserProFavorite",
     "UserProMatchHistory",
-    "VALID_ANNOTATION_TYPES",
-    "VALID_CAMERA_ANGLES",
-    "VALID_LICENSE_STATUSES",
 ]
