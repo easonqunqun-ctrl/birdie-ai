@@ -8,6 +8,7 @@ from app.config import settings
 from app.core.database import get_db
 from app.core.exceptions import BadRequestError, NotFoundError
 from app.models.user import User
+from app.models.user_profile_v2 import MAX_CLUBS_PER_USER
 from app.schemas.analysis import AnalysisProgressResponse
 from app.schemas.base import APIResponse, ok
 from app.schemas.user import (
@@ -17,11 +18,18 @@ from app.schemas.user import (
     UserResponse,
     UserUpdateRequest,
 )
+from app.schemas.user_club import (
+    UserClubCreate,
+    UserClubListResponse,
+    UserClubResponse,
+    UserClubUpdate,
+)
 from app.schemas.user_profile_v2 import UserProfileV2Read, UserProfileV2Update
 from app.services import (
     account_deletion_service,
     analysis_service,
     quota_service,
+    user_clubs_service,
     user_profile_v2_service,
 )
 from app.services.profile_v2_consent import merged_update_payload
@@ -31,7 +39,7 @@ router = APIRouter()
 
 
 def _ensure_profile_v2_enabled() -> None:
-    """守门：未启用 PHASE2_PROFILE_V2_ENABLED 直接 404（kickoff §4.2 + 与 M9-02 一致）."""
+    """守门：未启用 PHASE2_PROFILE_V2_ENABLED 直接 404，不暴露端点（kickoff §4.2 + 与 M9-02 / M9-03 共用）."""
     if not settings.PHASE2_PROFILE_V2_ENABLED:
         raise NotFoundError(code=40404, message="二期画像功能未开放")
 
@@ -164,7 +172,83 @@ async def cancel_account_deletion(
     return ok(build_user_response(user))
 
 
-# ==================== P2-M9-03 onboarding 2.0 ====================
+# ==================== P2-M9-02 装备清单（依赖 M9-01 user_clubs 表） ====================
+
+
+@router.get(
+    "/me/clubs",
+    summary="获取我的装备清单（P2-M9-02）",
+    response_model=APIResponse[UserClubListResponse],
+)
+async def list_my_clubs(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    _ensure_profile_v2_enabled()
+    items = await user_clubs_service.list_clubs(db, user)
+    total = len(items)
+    return ok(
+        UserClubListResponse(
+            items=[UserClubResponse.model_validate(c) for c in items],
+            total=total,
+            max_clubs=MAX_CLUBS_PER_USER,
+            remaining=max(0, MAX_CLUBS_PER_USER - total),
+        )
+    )
+
+
+@router.post(
+    "/me/clubs",
+    summary="新增球杆（14 支上限）",
+    response_model=APIResponse[UserClubResponse],
+)
+async def create_my_club(
+    payload: UserClubCreate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    _ensure_profile_v2_enabled()
+    club = await user_clubs_service.add_club(db, user, payload)
+    await db.commit()
+    await db.refresh(club)
+    return ok(UserClubResponse.model_validate(club))
+
+
+@router.put(
+    "/me/clubs/{club_id}",
+    summary="更新球杆信息",
+    response_model=APIResponse[UserClubResponse],
+)
+async def update_my_club(
+    club_id: str,
+    payload: UserClubUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    _ensure_profile_v2_enabled()
+    club = await user_clubs_service.update_club(db, user, club_id, payload)
+    await db.commit()
+    await db.refresh(club)
+    return ok(UserClubResponse.model_validate(club))
+
+
+@router.delete(
+    "/me/clubs/{club_id}",
+    summary="删除球杆（不影响 swing_analyses 历史报告）",
+    response_model=APIResponse[dict],
+)
+async def delete_my_club(
+    club_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    _ensure_profile_v2_enabled()
+    await user_clubs_service.delete_club(db, user, club_id)
+    await db.commit()
+    return ok({"id": club_id, "deleted": True})
+
+
+# ==================== P2-M9-03 onboarding 2.0（profile-v2 PATCH 语义） ====================
 
 
 @router.get(

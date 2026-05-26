@@ -32,3 +32,18 @@ export const PAYMENT_ENABLED_FLAG: boolean = PAYMENT_ENABLED
  * 此处 flag 仅用于会员页底部提示文案等 UI；正式上线构建请设置 `TARO_APP_PAYMENT_MOCK=false`。
  */
 export const PAYMENT_MOCK_FLAG: boolean = PAYMENT_MOCK
+
+/**
+ * P2-M9-02：装备清单 Tab + 画像 2.0 灰度开关。
+ *
+ * - 默认 `false`：profile 页"我的装备"入口隐藏，API 端 404（与 backend
+ *   `PHASE2_PROFILE_V2_ENABLED` 同步开关）
+ * - 启用：W22 把此常量翻 `true` + 后端切 `PHASE2_PROFILE_V2_ENABLED=true` 同步上线
+ *
+ * 与 backend `settings.PHASE2_PROFILE_V2_ENABLED` 双端联动，避免出现"客户端有
+ * 入口但 API 404"的尴尬。
+ *
+ * 后续可通过 `defineConstants` 注入编译期常量替换硬编码（参考
+ * `PAYMENT_ENABLED_FLAG` 模式），W22 灰度时再做。
+ */
+export const PHASE2_PROFILE_V2_ENABLED_FLAG: boolean = false
