@@ -47,6 +47,11 @@ class Settings(BaseSettings):
     DERIVED_KEYFRAME_PREFIX: str = "keyframes"
     DERIVED_POSE_DATA_PREFIX: str = "skeleton_data"
 
+    # ==================== P2-M7-02：视频读取增强 V2 ====================
+    # V2 路径默认关闭；与 P2-M7-14 灰度框架联动（`engine_version == "v2"` 桶才走 V2）。
+    # 即使 engine_version=v2，本 flag 仍是总闸：DevOps 紧急回滚可以直接关 flag 不动 router。
+    M7_VIDEO_READER_V2_ENABLED: bool = False
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

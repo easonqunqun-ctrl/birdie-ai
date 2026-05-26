@@ -73,6 +73,13 @@ class AnalyzeResult(BaseModel):
         default_factory=list,
         description="非阻断质量提示 machine codes，如 low_light / camera_shake",
     )
+    engine_warnings: list[dict] = Field(
+        default_factory=list,
+        description=(
+            "P2-M7-02：引擎侧解码/归一化诊断；每项 {code,level,detail,ts}。"
+            "V1 路径始终为空数组；V2 路径填值。≤32 项，超出截断。"
+        ),
+    )
 
 
 class PrecheckRequest(BaseModel):
