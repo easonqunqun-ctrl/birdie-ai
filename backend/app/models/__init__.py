@@ -12,6 +12,13 @@ from app.models.course import Course, CourseCertificate, Lesson, UserCourseProgr
 from app.models.event import Event
 from app.models.feedback import Feedback
 from app.models.invitation import Invitation
+from app.models.meetup import (
+    EventParticipation,
+    MeetupFeedback,
+    MeetupInvitation,
+    SelfOrganizedEvent,
+    Venue,
+)
 from app.models.payment import Order, PaymentTransaction
 from app.models.pro_library import (
     ProClipAnnotation,
@@ -38,9 +45,12 @@ __all__ = [
     "CourseCertificate",
     "Drill",
     "Event",
+    "EventParticipation",
     "Feedback",
     "Invitation",
     "Lesson",
+    "MeetupFeedback",
+    "MeetupInvitation",
     "Order",
     "PaymentTransaction",
     "PracticeLog",
@@ -48,6 +58,7 @@ __all__ = [
     "ProPlayer",
     "ProSwingClip",
     "ProTopic",
+    "SelfOrganizedEvent",
     "ShareAction",
     "SwingAnalysis",
     "TrainingPlan",
@@ -58,4 +69,5 @@ __all__ = [
     "UserProFavorite",
     "UserProMatchHistory",
     "UserProfileV2",
+    "Venue",
 ]

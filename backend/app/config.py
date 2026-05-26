@@ -183,6 +183,10 @@ class Settings(BaseSettings):
     # M12-03 资源库 tab UI 上线时切 true。
     PHASE2_PROS_ENABLED: bool = False
 
+    # M13 球友约球（venues/meetup_invitations 等 5 张表）；默认 false，
+    # 上线前需 DEP-05 法律意见书到位（M13-09 服务协议 / 未成年保护）。
+    PHASE2_MEETUP_ENABLED: bool = False
+
     # ==================== 业务规则 ====================
     FREE_USER_MONTHLY_ANALYSES: int = 3
     FREE_USER_DAILY_CHATS: int = 5
