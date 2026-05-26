@@ -122,6 +122,9 @@ class IssueItem(BaseModel):
     description: str
     key_frame_url: str | None = None
     key_frame_timestamp: float | None = None
+    # P2-M7-06：每诊断置信度 + 档位（V1 路径为 None）
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    confidence_tier: Literal["confirmed", "leaning", "hidden"] | None = None
 
 
 class RecommendationItem(BaseModel):
@@ -163,6 +166,17 @@ class AnalysisReportResponse(BaseModel):
     quality_warnings: list[str] = Field(
         default_factory=list,
         description="非阻断质量提示（与 ai_engine 相同 machine code）；空列表表示无",
+    )
+    # P2-M7-06：整体置信度（V1 报告兜底 1.0；客户端 <0.5 展示「建议重拍」CTA）
+    analysis_confidence: float = Field(
+        default=1.0,
+        ge=0.0,
+        le=1.0,
+        description="P2-M7-06 整体置信度 0-1；V1 引擎兜底 1.0",
+    )
+    feature_confidences: dict[str, float] = Field(
+        default_factory=dict,
+        description="P2-M7-06 每特征 confidence",
     )
 
     share_card_url: str | None = None
