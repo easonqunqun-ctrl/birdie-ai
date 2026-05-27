@@ -21,6 +21,11 @@ declare const PAYMENT_MOCK: boolean
  *   W9 正式上线前置为 true。
  */
 declare const PAYMENT_ENABLED: boolean
+/** Phase 2 灰度开关（编译期注入；正式包 .env.production 置 true） */
+declare const PHASE2_PROFILE_V2_ENABLED: boolean
+declare const PHASE2_COURSES_ENABLED: boolean
+declare const PHASE2_PROS_ENABLED: boolean
+declare const PHASE2_MEETUP_ENABLED: boolean
 /** 逗号分隔的微信订阅消息模板 ID（编译期注入）；顺序见 `constants/subscribeTemplates.ts` */
 declare const SUBSCRIBE_TEMPLATES: string
 /** Taro 构建目标（weapp / h5 / rn …），与 `process.env.TARO_ENV` 等价但无 `process` */
@@ -51,6 +56,10 @@ declare namespace NodeJS {
     TARO_APP_ENV?: string
     TARO_APP_PAYMENT_MOCK?: string
     TARO_APP_PAYMENT_ENABLED?: string
+    TARO_APP_PHASE2_PROFILE_V2_ENABLED?: string
+    TARO_APP_PHASE2_COURSES_ENABLED?: string
+    TARO_APP_PHASE2_PROS_ENABLED?: string
+    TARO_APP_PHASE2_MEETUP_ENABLED?: string
     /** RN 等直连 MinIO 预签名时使用；小程序默认走同源 `/analyses/uploads/...` */
     TARO_APP_ANALYSIS_DIRECT_MINIO?: string
   }

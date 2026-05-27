@@ -85,6 +85,19 @@ const config: UserConfigExport = {
     // - W9 正式上线：`true` 开启前端入口。
     // 默认 `false`，显式设置 `TARO_APP_PAYMENT_ENABLED=true` 才打开。
     PAYMENT_ENABLED: JSON.stringify(process.env.TARO_APP_PAYMENT_ENABLED === 'true'),
+    // Phase 2 灰度：与 backend settings.PHASE2_*_ENABLED 双端联动；正式包 .env.production 置 true。
+    PHASE2_PROFILE_V2_ENABLED: JSON.stringify(
+      process.env.TARO_APP_PHASE2_PROFILE_V2_ENABLED === 'true',
+    ),
+    PHASE2_COURSES_ENABLED: JSON.stringify(
+      process.env.TARO_APP_PHASE2_COURSES_ENABLED === 'true',
+    ),
+    PHASE2_PROS_ENABLED: JSON.stringify(
+      process.env.TARO_APP_PHASE2_PROS_ENABLED === 'true',
+    ),
+    PHASE2_MEETUP_ENABLED: JSON.stringify(
+      process.env.TARO_APP_PHASE2_MEETUP_ENABLED === 'true',
+    ),
     /** 逗号分隔的订阅消息模板 ID；空则 `requestSubscribeMessage` 不调用 */
     SUBSCRIBE_TEMPLATES: JSON.stringify(process.env.TARO_APP_SUBSCRIBE_TMPL_IDS || ''),
     /** 顺序：1 分析完成 2 会员已到期 3 会员即将到期（到期前 N 天，与后端第三模板一致） */

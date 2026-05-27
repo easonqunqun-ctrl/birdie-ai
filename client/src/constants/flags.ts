@@ -2,7 +2,7 @@
  * 客户端 feature flag 收口（W8-T3）
  *
  * 背景：
- *   `PAYMENT_ENABLED` / `PAYMENT_MOCK` 是 Taro 编译期常量
+ *   `PAYMENT_ENABLED` / `PAYMENT_MOCK` / `PHASE2_*` 是 Taro 编译期常量
  *   （`config/index.ts::defineConstants` 注入），值在构建时已经定型。
  *   多处页面/组件直接 reference 全局常量虽然能工作，但散落各处不利于：
  *     - 统一加注释解释含义
@@ -35,25 +35,15 @@ export const PAYMENT_MOCK_FLAG: boolean = PAYMENT_MOCK
 
 /**
  * P2-M9-02：装备清单 Tab + 画像 2.0 灰度开关。
- *
- * - 默认 `false`：profile 页"我的装备"入口隐藏，API 端 404（与 backend
- *   `PHASE2_PROFILE_V2_ENABLED` 同步开关）
- * - 启用：W22 把此常量翻 `true` + 后端切 `PHASE2_PROFILE_V2_ENABLED=true` 同步上线
- *
- * 与 backend `settings.PHASE2_PROFILE_V2_ENABLED` 双端联动，避免出现"客户端有
- * 入口但 API 404"的尴尬。
- *
- * 后续可通过 `defineConstants` 注入编译期常量替换硬编码（参考
- * `PAYMENT_ENABLED_FLAG` 模式），W22 灰度时再做。
+ * 正式包：`TARO_APP_PHASE2_PROFILE_V2_ENABLED=true`（client/.env.production）。
  */
-export const PHASE2_PROFILE_V2_ENABLED_FLAG: boolean = false
+export const PHASE2_PROFILE_V2_ENABLED_FLAG: boolean = PHASE2_PROFILE_V2_ENABLED
 
 /**
- * P2-M11-03 课程学习路径 / P2-M12-03 球手对比库 / P2-M13 约球灰度开关
- * （与各自后端 settings 字段同步：PHASE2_COURSES_ENABLED / PHASE2_PROS_ENABLED /
- *  PHASE2_MEETUP_ENABLED）。三个能力可独立翻 flag；profile 页菜单入口同时
- *  对应这三个常量门控。
+ * P2-M11-03 / M12-03 / M13：课程 / 球手库 / 约球灰度开关。
+ * 与 backend `PHASE2_COURSES_ENABLED` / `PHASE2_PROS_ENABLED` /
+ * `PHASE2_MEETUP_ENABLED` 双端联动。
  */
-export const PHASE2_COURSES_ENABLED_FLAG: boolean = false
-export const PHASE2_PROS_ENABLED_FLAG: boolean = false
-export const PHASE2_MEETUP_ENABLED_FLAG: boolean = false
+export const PHASE2_COURSES_ENABLED_FLAG: boolean = PHASE2_COURSES_ENABLED
+export const PHASE2_PROS_ENABLED_FLAG: boolean = PHASE2_PROS_ENABLED
+export const PHASE2_MEETUP_ENABLED_FLAG: boolean = PHASE2_MEETUP_ENABLED

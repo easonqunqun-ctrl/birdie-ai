@@ -51,6 +51,18 @@ if (typeof globalThis.PAYMENT_MOCK === 'undefined') {
 if (typeof globalThis.PAYMENT_ENABLED === 'undefined') {
   globalThis.PAYMENT_ENABLED = false
 }
+if (typeof globalThis.PHASE2_PROFILE_V2_ENABLED === 'undefined') {
+  globalThis.PHASE2_PROFILE_V2_ENABLED = false
+}
+if (typeof globalThis.PHASE2_COURSES_ENABLED === 'undefined') {
+  globalThis.PHASE2_COURSES_ENABLED = false
+}
+if (typeof globalThis.PHASE2_PROS_ENABLED === 'undefined') {
+  globalThis.PHASE2_PROS_ENABLED = false
+}
+if (typeof globalThis.PHASE2_MEETUP_ENABLED === 'undefined') {
+  globalThis.PHASE2_MEETUP_ENABLED = false
+}
 if (typeof globalThis.SUBSCRIBE_TEMPLATES === 'undefined') {
   globalThis.SUBSCRIBE_TEMPLATES = ''
 }
