@@ -335,7 +335,7 @@ async def update_my_coach_consent(
 
     服务层保证：
     - ``visible=False`` ⇒ 服务器把字段列表强制清空（PIPL 删除权）
-    - ``visible=True``  ⇒ ``fields`` 必须非空，否则 40005
+    - ``visible=True``  ⇒ ``fields`` 必须非空，否则 40022
     """
 
     _ensure_profile_v2_enabled()

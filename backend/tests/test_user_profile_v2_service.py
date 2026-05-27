@@ -279,7 +279,7 @@ async def test_update_coach_consent_close_clears_fields() -> None:
 
 @pytest.mark.asyncio
 async def test_update_coach_consent_open_without_fields_rejected() -> None:
-    """M9-06：visible=True + 空 fields → 40005（中间态被拦截）。"""
+    """M9-06：visible=True + 空 fields → 40022（中间态被拦截）。"""
 
     async with AsyncSessionLocal() as db:
         u = await _make_user(db)
@@ -287,7 +287,7 @@ async def test_update_coach_consent_open_without_fields_rejected() -> None:
             await svc.update_coach_consent(
                 db, user_id=u.id, visible=True, fields=[]
             )
-        assert exc_info.value.code == 40005
+        assert exc_info.value.code == 40022
 
 
 @pytest.mark.asyncio

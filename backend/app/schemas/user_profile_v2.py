@@ -134,7 +134,7 @@ class CoachConsentUpdate(BaseModel):
 
     服务层不变量：
     - ``visible=False`` → 服务器把 ``coach_visible_fields`` 强制清空（PIPL 删除权）
-    - ``visible=True``  → ``fields`` 必须非空，否则 ``40005``（开关打开但啥都不让看，
+    - ``visible=True``  → ``fields`` 必须非空，否则 ``40022``（开关打开但啥都不让看，
       产品上是没意义的中间态，弹回让用户重新选）
     - ``fields`` 中字段必须在 ``COACH_VISIBLE_ALLOWED`` 白名单内（已有 _validate）
     """

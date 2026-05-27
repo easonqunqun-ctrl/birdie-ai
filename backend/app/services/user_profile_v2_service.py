@@ -334,14 +334,16 @@ async def update_coach_consent(
     - 通用 PATCH 接受任何字段子集；这里**强制**开关与字段一起决定，避免「开了但
       没字段」/「字段非空但开关 False」这两种中间态在 DB 落库。
     - 服务层保证：``visible=False`` ⇒ ``fields`` 清空（即使客户端传非空也忽略）；
-      ``visible=True`` 且 ``fields`` 为空 ⇒ ``40005``。
+      ``visible=True`` 且 ``fields`` 为空 ⇒ ``40022``。
 
     返回更新后的 profile（含投影需要的 privacy_payload）。
     """
 
     if visible and not fields:
+        # 40022 段：M9 画像扩展业务码（40020-40029）。
+        # 不复用 40005（已被 analysis_service 占用为"文件过大"）。
         raise BadRequestError(
-            code=40005,
+            code=40022,
             message="教练可见性开关打开时必须至少选 1 个可见字段",
         )
 
