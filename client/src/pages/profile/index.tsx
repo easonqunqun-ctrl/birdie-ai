@@ -5,7 +5,13 @@ import EnvBadge from '@/components/EnvBadge'
 import { useUserStore } from '@/store/userStore'
 import { switchToCoach, toastTabNavigationFailure } from '@/utils/tabNav'
 import { FREQ_LABEL, GOAL_LABEL, LEVEL_LABEL } from '@/constants/golf'
-import { PAYMENT_ENABLED_FLAG, PHASE2_PROFILE_V2_ENABLED_FLAG } from '@/constants/flags'
+import {
+  PAYMENT_ENABLED_FLAG,
+  PHASE2_COURSES_ENABLED_FLAG,
+  PHASE2_MEETUP_ENABLED_FLAG,
+  PHASE2_PROFILE_V2_ENABLED_FLAG,
+  PHASE2_PROS_ENABLED_FLAG,
+} from '@/constants/flags'
 import type { GolfLevel, PrimaryGoal, WeeklyFreq } from '@/types/api'
 import './index.scss'
 
@@ -179,6 +185,52 @@ const ProfilePage: FC = () => {
             >
               <Text className='profile__menu-icon'>🏌️</Text>
               <Text className='profile__menu-label'>我的装备</Text>
+              <Text className='profile__menu-arrow'>›</Text>
+            </View>
+          )}
+          {/*
+            P2-M11-03：课程学习路径入口；与 backend PHASE2_COURSES_ENABLED 同步。
+          */}
+          {PHASE2_COURSES_ENABLED_FLAG && (
+            <View
+              className='profile__menu-item'
+              onClick={() => Taro.navigateTo({ url: '/pages/courses/index' })}
+            >
+              <Text className='profile__menu-icon'>📚</Text>
+              <Text className='profile__menu-label'>学习路径</Text>
+              <Text className='profile__menu-arrow'>›</Text>
+            </View>
+          )}
+          {/*
+            P2-M12-03：球手对比库入口；与 backend PHASE2_PROS_ENABLED 同步。
+          */}
+          {PHASE2_PROS_ENABLED_FLAG && (
+            <View
+              className='profile__menu-item'
+              onClick={() => Taro.navigateTo({ url: '/pages/pros/index' })}
+            >
+              <Text className='profile__menu-icon'>⛳</Text>
+              <Text className='profile__menu-label'>球手对比库</Text>
+              <Text className='profile__menu-arrow'>›</Text>
+            </View>
+          )}
+          {/*
+            P2-M13：约球邀请列表入口；与 backend PHASE2_MEETUP_ENABLED 同步。
+            预留入口；M13 客户端列表 / 详情页由后续 PR 引入，本 PR 仅挂入口
+            （未启用时隐藏，故不会出现"点击 404"的尴尬）。
+          */}
+          {PHASE2_MEETUP_ENABLED_FLAG && (
+            <View
+              className='profile__menu-item'
+              onClick={() =>
+                Taro.showToast({
+                  title: '约球功能即将上线',
+                  icon: 'none',
+                })
+              }
+            >
+              <Text className='profile__menu-icon'>🤝</Text>
+              <Text className='profile__menu-label'>约球邀请</Text>
               <Text className='profile__menu-arrow'>›</Text>
             </View>
           )}
