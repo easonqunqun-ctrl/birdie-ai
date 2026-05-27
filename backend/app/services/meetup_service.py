@@ -267,6 +267,105 @@ async def decline_invitation(
     return inv
 
 
+async def cancel_invitation(
+    db: AsyncSession, *, invitation_id: str, user_id: str
+) -> MeetupInvitation:
+    """M13-03：邀请人主动撤回（pending 才允许；accepted 之后只能走 declined-by-invitee）."""
+
+    inv = await db.get(MeetupInvitation, invitation_id)
+    if inv is None:
+        raise NotFoundError(code=40406, message="邀请不存在")
+    if inv.inviter_user_id != user_id:
+        raise ForbiddenError(code=40330, message="只能撤回自己发出的邀请")
+    if inv.status != "pending":
+        raise BadRequestError(
+            code=40903,
+            message="只有 pending 邀请可撤回",
+            detail=inv.status,
+        )
+    inv.status = "cancelled"
+    await db.flush()
+    logger.info("meetup_invitation_cancelled", invitation_id=invitation_id)
+    return inv
+
+
+# M13-03 用户视角：作为 inviter / invitee / 双向（默认）查询自己的邀请列表
+InvitationRoleLiteral = str  # "inviter" | "invitee" | "any"
+
+
+async def list_user_invitations(
+    db: AsyncSession,
+    *,
+    user_id: str,
+    role: str = "any",
+    status: str | None = None,
+    limit: int = 50,
+) -> list[MeetupInvitation]:
+    """按角色 / 状态查询用户邀请，按 created_at 倒序.
+
+    参数
+    ----
+    - ``role`` ∈ {``inviter``, ``invitee``, ``any``}；``any`` 等价于"两边都看"
+    - ``status``：可选，``pending``/``accepted``/``declined``/``expired``/``cancelled``
+    - ``limit``：上限 100，默认 50（前端列表分页可拉多次）
+    """
+
+    role = role or "any"
+    if role not in {"inviter", "invitee", "any"}:
+        # 40051 段：M13 约球业务码（40050-40059）；不复用 40016（注销/支付/训练已占）。
+        raise BadRequestError(code=40051, message="role 必须是 inviter/invitee/any")
+    limit = max(1, min(limit, 100))
+
+    stmt = select(MeetupInvitation)
+    if role == "inviter":
+        stmt = stmt.where(MeetupInvitation.inviter_user_id == user_id)
+    elif role == "invitee":
+        stmt = stmt.where(MeetupInvitation.invitee_user_id == user_id)
+    else:  # any
+        stmt = stmt.where(
+            (MeetupInvitation.inviter_user_id == user_id)
+            | (MeetupInvitation.invitee_user_id == user_id)
+        )
+    if status is not None:
+        # 不在合法状态集合 → 直接 40051（避免 SQLAlchemy 抛 OperationalError）
+        if status not in {"pending", "accepted", "declined", "expired", "cancelled"}:
+            raise BadRequestError(code=40051, message=f"status 非法: {status}")
+        stmt = stmt.where(MeetupInvitation.status == status)
+
+    stmt = stmt.order_by(MeetupInvitation.created_at.desc()).limit(limit)
+    rows = await db.execute(stmt)
+    return list(rows.scalars().all())
+
+
+async def expire_overdue_invitations(db: AsyncSession) -> int:
+    """把 ``expires_at < now`` 的 pending 邀请置为 expired，返回处理条数.
+
+    设计要点
+    --------
+    - 仅处理 ``pending``：accepted / declined / cancelled 不动
+    - 不靠 cron；本 PR 由 list_user_invitations / accept_invitation 顺手调用，
+      让 GET / POST 自带"懒清理"。这样真机不依赖 background job 也能体验正确状态
+    - 返回处理条数便于 logging
+    """
+
+    now = datetime.now(UTC)
+    rows = await db.execute(
+        select(MeetupInvitation).where(
+            MeetupInvitation.status == "pending",
+            MeetupInvitation.expires_at.is_not(None),
+            MeetupInvitation.expires_at < now,
+        )
+    )
+    overdue = list(rows.scalars().all())
+    if not overdue:
+        return 0
+    for inv in overdue:
+        inv.status = "expired"
+    await db.flush()
+    logger.info("meetup_invitations_expired", count=len(overdue))
+    return len(overdue)
+
+
 # ---------------- feedback / credit ----------------
 
 
@@ -400,12 +499,15 @@ __all__ = [
     "MAX_NEARBY_RADIUS_KM",
     "accept_invitation",
     "calculate_credit_delta",
+    "cancel_invitation",
     "create_event",
     "create_invitation",
     "create_venue",
     "decline_invitation",
+    "expire_overdue_invitations",
     "flag_venue",
     "haversine_km",
+    "list_user_invitations",
     "search_nearby_venues",
     "sign_up_event",
     "submit_feedback",

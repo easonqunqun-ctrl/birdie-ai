@@ -12,6 +12,7 @@ from app.api.v1 import (
     events,
     feedback,
     invitations,
+    meetups,
     payments,
     pros,
     security,
@@ -39,8 +40,11 @@ api_router.include_router(payments.me_router, prefix="/users/me", tags=["支付"
 api_router.include_router(courses.router, prefix="/courses", tags=["课程"])
 # M12-02 球手对比库（公开读端点）；写入仍在 service 层 / 后续 admin 工具
 api_router.include_router(pros.router, prefix="/pros", tags=["球手对比库"])
-# M13-02 球场 nearby 搜索（M13 写端走后续 PR）
+# M13-02 球场 nearby 搜索
 api_router.include_router(venues.router, prefix="/venues", tags=["约球"])
+# M13-03 约球邀请创建 / 撤回 / 列表（accept / decline 走 M13-04）
+api_router.include_router(meetups.router, prefix="/meetups", tags=["约球"])
+api_router.include_router(meetups.me_router, prefix="/users/me", tags=["约球"])
 api_router.include_router(training.router, prefix="/training-plan", tags=["训练"])
 api_router.include_router(training.me_router, prefix="/users/me", tags=["训练"])
 api_router.include_router(training.drills_router, prefix="/drills", tags=["训练"])

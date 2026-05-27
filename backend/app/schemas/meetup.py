@@ -95,6 +95,35 @@ class InvitationAcceptPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class InvitationRead(BaseModel):
+    """M13-03：邀请列表 / 详情用响应；contact_payload 仅 accepted 后非空."""
+
+    id: str
+    inviter_user_id: str
+    invitee_user_id: str
+    venue_id: str | None = None
+    proposed_time: datetime | None = None
+    expires_at: datetime | None = None
+    status: InvitationStatusLiteral
+    accepted_at: datetime | None = None
+    # contact_payload 只对当事人可见；当前实现简单粗暴：accepted 后返；
+    # M13-04 会引入更细致的"只对 inviter / invitee 显示"逻辑
+    contact_payload: dict | None = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InvitationListResponse(BaseModel):
+    """GET /v1/users/me/meetup-invitations 响应体."""
+
+    items: list[InvitationRead]
+    total: int
+    # 回显请求过滤参数（便于客户端 debug + 翻页时维持上下文）
+    role: str
+    status: str | None = None
+
+
 class FeedbackCreate(BaseModel):
     invitation_id: str = Field(..., max_length=32)
     reviewee_user_id: str = Field(..., max_length=32)
@@ -155,6 +184,8 @@ __all__ = [
     "FeedbackRead",
     "InvitationAcceptPayload",
     "InvitationCreate",
+    "InvitationListResponse",
+    "InvitationRead",
     "InvitationStatusLiteral",
     "ParticipationStatusLiteral",
     "VenueCreate",
