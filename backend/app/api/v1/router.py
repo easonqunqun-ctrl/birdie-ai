@@ -16,6 +16,7 @@ from app.api.v1 import (
     shares,
     training,
     users,
+    venues,
     wechat_push,
 )
 
@@ -32,6 +33,8 @@ api_router.include_router(payments.router, prefix="/payments", tags=["支付"])
 api_router.include_router(wechat_push.router, prefix="/wechat", tags=["微信推送"])
 # /me/orders、/me/membership、/me/training-plan、/me/practice-logs 挂 /users/me 下（集中聚合）
 api_router.include_router(payments.me_router, prefix="/users/me", tags=["支付"])
+# M13-02 球场 nearby 搜索（M13 写端走后续 PR）
+api_router.include_router(venues.router, prefix="/venues", tags=["约球"])
 api_router.include_router(training.router, prefix="/training-plan", tags=["训练"])
 api_router.include_router(training.me_router, prefix="/users/me", tags=["训练"])
 api_router.include_router(training.drills_router, prefix="/drills", tags=["训练"])
