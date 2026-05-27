@@ -56,7 +56,7 @@
   }
 
   &__summary-label {
-    font-size: 26rpx;
+    font-size: var(--font-size-sm);
     color: var(--color-text-secondary);
   }
 
@@ -69,7 +69,7 @@
   }
 
   &__compare-bar-text {
-    font-size: 26rpx;
+    font-size: var(--font-size-sm);
     color: var(--color-text-secondary);
     display: block;
     margin-bottom: 12rpx;
@@ -82,7 +82,43 @@
     gap: 16rpx;
   }
 
-  /* =========== 列表卡片（整卡进入详情；删除见报告详情页顶部更多） =========== */
+  /* =========== 左滑删除 =========== */
+  &__swipe-wrap {
+    position: relative;
+    margin-bottom: 16rpx;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+
+  &__swipe-actions {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 160rpx;
+    display: flex;
+    align-items: stretch;
+    z-index: 0;
+  }
+
+  &__swipe-delete {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-error, #ef4444);
+    color: #fff;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+  }
+
+  &__swipe-content {
+    position: relative;
+    z-index: 1;
+    background: var(--color-bg-card);
+  }
+
+  /* =========== 列表卡片 =========== */
   &__card {
     display: flex;
     align-items: center;
@@ -90,11 +126,11 @@
     padding: 24rpx;
     background: var(--color-bg-card);
     border-radius: var(--radius-md);
-    margin-bottom: 16rpx;
     box-shadow: var(--shadow-sm);
     box-sizing: border-box;
     width: 100%;
     max-width: 100%;
+    margin-bottom: 0;
 
     &:active {
       opacity: 0.92;
@@ -157,7 +193,7 @@
   }
 
   &__status-tag {
-    font-size: 22rpx;
+    font-size: var(--font-size-xs);
     padding: 2rpx 12rpx;
     border-radius: var(--radius-sm);
     background: var(--color-warning, #f59e0b);
@@ -165,12 +201,12 @@
   }
 
   &__date {
-    font-size: 24rpx;
+    font-size: var(--font-size-xs);
     color: var(--color-text-tertiary);
   }
 
   &__change {
-    font-size: 22rpx;
+    font-size: var(--font-size-xs);
     padding: 2rpx 8rpx;
     border-radius: var(--radius-sm);
     align-self: flex-start;
@@ -205,7 +241,7 @@
 
   &__score-level {
     display: block;
-    font-size: 22rpx;
+    font-size: var(--font-size-xs);
     color: var(--color-text-tertiary);
     margin-top: 2rpx;
     overflow: hidden;
@@ -222,7 +258,7 @@
   &__more {
     text-align: center;
     padding: 32rpx 0;
-    font-size: 24rpx;
+    font-size: var(--font-size-xs);
     color: var(--color-text-tertiary);
   }
 
@@ -249,7 +285,7 @@
   }
 
   &__paywall-desc {
-    font-size: 26rpx;
+    font-size: var(--font-size-sm);
     line-height: 1.6;
     color: var(--color-text-secondary);
   }

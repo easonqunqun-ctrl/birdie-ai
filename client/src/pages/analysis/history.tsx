@@ -6,7 +6,7 @@
  *   2. 下拉刷新（小程序原生 `usePullDownRefresh` + `stopPullDownRefresh`）
  *   3. 上拉加载更多（`useReachBottom`，总条数没到就继续拉）
  *   4. 空态 / 错误态 / 完成态三种状态区分
- *   5. 整卡点击 → 进入报告页（删除在报告详情页顶部「⋯ / 更多」操作表）
+ *   5. 整卡点击 → 进入报告页；左滑露出「删除」（对比模式禁用）
  *
  * 设计说明：
  *   - 不存 list 到 zustand；历史列表属于"消费型数据"，进入页拉即可，退出页回收
@@ -22,6 +22,7 @@ import { SCORE_LEVEL_META, scoreLevelFromScore } from '@/constants/scoreLevel'
 import { CLUB_TYPE_LABEL } from '@/types/analysis'
 import type { AnalysisListItem, AnalysisListPaywall } from '@/types/analysis'
 import { PAYMENT_ENABLED_FLAG } from '@/constants/flags'
+import { HistorySwipeRow } from './HistorySwipeRow'
 import './history.scss'
 
 const PAGE_SIZE = 20
@@ -43,6 +44,7 @@ const HistoryPage: FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [picked, setPicked] = useState<string[]>([])
   const [paywall, setPaywall] = useState<AnalysisListPaywall | null>(null)
+  const [openSwipeId, setOpenSwipeId] = useState<string | null>(null)
 
   useEffect(() => {
     if (compareMode && anchorId) {
@@ -138,6 +140,95 @@ const HistoryPage: FC = () => {
     fetchPage(1, 'init')
   }
 
+  const handleDeleteItem = async (it: AnalysisListItem) => {
+    if (it.status === 'pending' || it.status === 'processing') {
+      Taro.showToast({ title: '分析进行中，完成后才可删除', icon: 'none' })
+      return
+    }
+    const res = await Taro.showModal({
+      title: '删除报告',
+      content: '删除后无法在「我的报告」中查看此条记录，确认删除？',
+      confirmText: '删除',
+      confirmColor: '#ef4444',
+    })
+    if (!res.confirm) return
+    try {
+      await analysisService.deleteAnalysis(it.id)
+      setItems((prev) => prev.filter((row) => row.id !== it.id))
+      setTotal((t) => Math.max(0, t - 1))
+      setOpenSwipeId(null)
+      Taro.showToast({ title: '已删除', icon: 'success' })
+    } catch {
+      /* toast 由 http */
+    }
+  }
+
+  const renderCard = (
+    it: AnalysisListItem,
+    meta: (typeof SCORE_LEVEL_META)[keyof typeof SCORE_LEVEL_META] | null,
+    date: string,
+    isPicked: boolean,
+    compareDisabled: boolean,
+  ) => (
+    <View
+      className={[
+        'history__card',
+        isPicked ? 'history__card--picked' : '',
+        compareDisabled ? 'history__card--compare-disabled' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      onClick={() => {
+        if (openSwipeId === it.id) {
+          setOpenSwipeId(null)
+          return
+        }
+        onCardClick(it.id, it.status)
+      }}
+    >
+      <View className='history__thumb'>
+        {it.thumbnail_url ? (
+          <Image mode='aspectFill' src={it.thumbnail_url} className='history__thumb-img' />
+        ) : (
+          <Text className='history__thumb-emoji'>{meta?.emoji || '🏌️'}</Text>
+        )}
+      </View>
+      <View className='history__info'>
+        <View className='history__info-head'>
+          <Text className='history__club'>{CLUB_TYPE_LABEL[it.club_type]}</Text>
+          {it.status !== 'completed' && (
+            <Text className='history__status-tag'>
+              {it.status === 'failed' ? '失败' : '分析中'}
+            </Text>
+          )}
+        </View>
+        <Text className='history__date'>{date}</Text>
+        {typeof it.score_change === 'number' && it.score_change !== 0 && (
+          <Text
+            className={[
+              'history__change',
+              it.score_change > 0 ? 'history__change--up' : 'history__change--down',
+            ].join(' ')}
+          >
+            {it.score_change > 0 ? '▲' : '▼'} {Math.abs(it.score_change)}
+          </Text>
+        )}
+      </View>
+      <View className='history__score'>
+        {typeof it.overall_score === 'number' ? (
+          <>
+            <Text className='history__score-value' style={{ color: meta?.cssVar }}>
+              {it.overall_score}
+            </Text>
+            <Text className='history__score-level'>{meta?.label || ''}</Text>
+          </>
+        ) : (
+          <Text className='history__score-empty'>—</Text>
+        )}
+      </View>
+    </View>
+  )
+
   // -------- 渲染 --------
   if (loading) {
     return (
@@ -223,58 +314,16 @@ const HistoryPage: FC = () => {
         const isPicked = picked.includes(it.id)
         const compareDisabled = compareMode && it.status !== 'completed'
         return (
-          <View
+          <HistorySwipeRow
             key={it.id}
-            className={[
-              'history__card',
-              isPicked ? 'history__card--picked' : '',
-              compareDisabled ? 'history__card--compare-disabled' : '',
-            ]
-              .filter(Boolean)
-              .join(' ')}
-            onClick={() => onCardClick(it.id, it.status)}
+            enabled={!compareMode}
+            open={openSwipeId === it.id}
+            onOpen={() => setOpenSwipeId(it.id)}
+            onClose={() => setOpenSwipeId(null)}
+            onDelete={() => void handleDeleteItem(it)}
           >
-            <View className='history__thumb'>
-              {it.thumbnail_url ? (
-                <Image mode='aspectFill' src={it.thumbnail_url} className='history__thumb-img' />
-              ) : (
-                <Text className='history__thumb-emoji'>{meta?.emoji || '🏌️'}</Text>
-              )}
-            </View>
-            <View className='history__info'>
-              <View className='history__info-head'>
-                <Text className='history__club'>{CLUB_TYPE_LABEL[it.club_type]}</Text>
-                {it.status !== 'completed' && (
-                  <Text className='history__status-tag'>
-                    {it.status === 'failed' ? '失败' : '分析中'}
-                  </Text>
-                )}
-              </View>
-              <Text className='history__date'>{date}</Text>
-              {typeof it.score_change === 'number' && it.score_change !== 0 && (
-                <Text
-                  className={[
-                    'history__change',
-                    it.score_change > 0 ? 'history__change--up' : 'history__change--down',
-                  ].join(' ')}
-                >
-                  {it.score_change > 0 ? '▲' : '▼'} {Math.abs(it.score_change)}
-                </Text>
-              )}
-            </View>
-            <View className='history__score'>
-              {typeof it.overall_score === 'number' ? (
-                <>
-                  <Text className='history__score-value' style={{ color: meta?.cssVar }}>
-                    {it.overall_score}
-                  </Text>
-                  <Text className='history__score-level'>{meta?.label || ''}</Text>
-                </>
-              ) : (
-                <Text className='history__score-empty'>—</Text>
-              )}
-            </View>
-          </View>
+            {renderCard(it, meta, date, isPicked, compareDisabled)}
+          </HistorySwipeRow>
         )
       })}
 
