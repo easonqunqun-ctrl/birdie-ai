@@ -205,7 +205,8 @@ async def list_user_invitations(
 
     role = role or "any"
     if role not in {"inviter", "invitee", "any"}:
-        raise BadRequestError(code=40016, message="role 必须是 inviter/invitee/any")
+        # 40051 段：M13 约球业务码（40050-40059）；不复用 40016（注销/支付/训练已占）。
+        raise BadRequestError(code=40051, message="role 必须是 inviter/invitee/any")
     limit = max(1, min(limit, 100))
 
     stmt = select(MeetupInvitation)
@@ -219,9 +220,9 @@ async def list_user_invitations(
             | (MeetupInvitation.invitee_user_id == user_id)
         )
     if status is not None:
-        # 不在合法状态集合 → 直接 40016（避免 SQLAlchemy 抛 OperationalError）
+        # 不在合法状态集合 → 直接 40051（避免 SQLAlchemy 抛 OperationalError）
         if status not in {"pending", "accepted", "declined", "expired", "cancelled"}:
-            raise BadRequestError(code=40016, message=f"status 非法: {status}")
+            raise BadRequestError(code=40051, message=f"status 非法: {status}")
         stmt = stmt.where(MeetupInvitation.status == status)
 
     stmt = stmt.order_by(MeetupInvitation.created_at.desc()).limit(limit)

@@ -354,17 +354,17 @@ async def test_list_user_invitations_role_and_status() -> None:
 
 @pytest.mark.asyncio
 async def test_list_user_invitations_rejects_bad_params() -> None:
-    """非法 role / status 抛 40016."""
+    """非法 role / status 抛 40051."""
 
     async with AsyncSessionLocal() as db:
         u = await _make_user(db)
         with pytest.raises(BadRequestError) as e1:
             await svc.list_user_invitations(db, user_id=u.id, role="bogus")
-        assert e1.value.code == 40016
+        assert e1.value.code == 40051
 
         with pytest.raises(BadRequestError) as e2:
             await svc.list_user_invitations(db, user_id=u.id, status="bogus")
-        assert e2.value.code == 40016
+        assert e2.value.code == 40051
 
 
 @pytest.mark.asyncio
