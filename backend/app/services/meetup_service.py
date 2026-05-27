@@ -119,16 +119,21 @@ async def search_nearby_venues(
 
     参数校验
     --------
-    - ``radius_km`` ∈ (0, MAX_NEARBY_RADIUS_KM]，否则 ``BadRequestError`` 40015
-    - ``latitude`` ∈ [-90, 90], ``longitude`` ∈ [-180, 180]，否则 ``40015``
+    - ``radius_km`` ∈ (0, MAX_NEARBY_RADIUS_KM]，否则 ``BadRequestError`` 40050
+    - ``latitude`` ∈ [-90, 90], ``longitude`` ∈ [-180, 180]，否则 ``40050``
     - ``limit`` ∈ [1, MAX_NEARBY_LIMIT]
+
+    错误码段位
+    ----------
+    40050-40059 归 M13 约球业务专用；本方法只用 40050。
+    不复用 40015（已被 account_deletion / payment 占用）。
     """
 
     if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
-        raise BadRequestError(code=40015, message="latitude / longitude 超出范围")
+        raise BadRequestError(code=40050, message="latitude / longitude 超出范围")
     if not (0 < radius_km <= MAX_NEARBY_RADIUS_KM):
         raise BadRequestError(
-            code=40015,
+            code=40050,
             message=f"radius_km 必须在 (0, {MAX_NEARBY_RADIUS_KM}] 之间",
         )
     limit = max(1, min(limit, MAX_NEARBY_LIMIT))

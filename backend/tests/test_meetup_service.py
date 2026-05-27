@@ -398,7 +398,10 @@ async def test_search_nearby_venue_type_filter() -> None:
 
 @pytest.mark.asyncio
 async def test_search_nearby_rejects_invalid_params() -> None:
-    """非法 lat/lng/radius 抛 40015."""
+    """非法 lat/lng/radius 抛 40050。
+
+    40050 段位归 M13 约球业务；不复用 40015（已被 account_deletion / payment / training 占）。
+    """
 
     async with AsyncSessionLocal() as db:
         # 超出范围
@@ -406,21 +409,21 @@ async def test_search_nearby_rejects_invalid_params() -> None:
             await svc.search_nearby_venues(
                 db, latitude=200, longitude=0, radius_km=5.0
             )
-        assert e1.value.code == 40015
+        assert e1.value.code == 40050
 
         # radius 超上限
         with pytest.raises(BadRequestError) as e2:
             await svc.search_nearby_venues(
                 db, latitude=0, longitude=0, radius_km=svc.MAX_NEARBY_RADIUS_KM + 1
             )
-        assert e2.value.code == 40015
+        assert e2.value.code == 40050
 
         # radius <= 0
         with pytest.raises(BadRequestError) as e3:
             await svc.search_nearby_venues(
                 db, latitude=0, longitude=0, radius_km=0
             )
-        assert e3.value.code == 40015
+        assert e3.value.code == 40050
 
 
 @pytest.mark.asyncio
