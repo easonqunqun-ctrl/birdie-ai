@@ -31,8 +31,13 @@ export default defineAppConfig({
     'pages/profile/settings',
     'pages/profile/about',
     'pages/profile/clubs',
+<<<<<<< HEAD
     'pages/pros/index',
     'pages/pros/detail'
+=======
+    'pages/courses/index',
+    'pages/courses/detail'
+>>>>>>> origin/main
   ],
   /**
    * 说明：真机上 wx.request **单次等待完整响应**仍有约 60s 量级上限；

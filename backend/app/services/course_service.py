@@ -116,6 +116,39 @@ async def publish_course(db: AsyncSession, course_id: str) -> Course:
 # ---------------- 课时 ----------------
 
 
+async def get_lesson(db: AsyncSession, lesson_id: str) -> Lesson | None:
+    row = await db.execute(select(Lesson).where(Lesson.id == lesson_id))
+    return row.scalar_one_or_none()
+
+
+async def list_lessons_by_course(
+    db: AsyncSession,
+    course_id: str,
+    *,
+    published_only: bool = True,
+) -> list[Lesson]:
+    """按 sort_order 升序返回 course 下所有 lesson.
+
+    设计
+    ----
+    - ``published_only=True``（默认）：上层 GET /v1/courses/{id}/lessons 在课程未发布时
+      应当先 404，所以这里仅在 service 层做"课程存在且发布"的二次校验，避免某些
+      用例（如管理端预览）误用时漏放未发布课程的 lessons。
+    - ``published_only=False``：admin 预览 / seed 流程需要看草稿 lesson。
+    """
+
+    if published_only:
+        course = await get_course(db, course_id)
+        if course is None or not course.is_published:
+            return []
+    rows = await db.execute(
+        select(Lesson)
+        .where(Lesson.course_id == course_id)
+        .order_by(Lesson.sort_order.asc())
+    )
+    return list(rows.scalars().all())
+
+
 async def create_lesson(db: AsyncSession, payload: LessonCreate) -> Lesson:
     course = await get_course(db, payload.course_id)
     if course is None:
@@ -304,6 +337,112 @@ async def maybe_issue_certificate(
     return cert
 
 
+async def seed_initial_courses(db: AsyncSession) -> list[Course]:
+    """开发 / E2E 用：写入 stage 1 的 1 门示范课程 + 3 节 lesson，幂等.
+
+    设计要点
+    --------
+    - **幂等**：用 ``courses.code`` 唯一约束做去重；已存在就直接 return existing。
+    - **不引用 drills**：本 PR 故意把 ``drill_ids=[]`` 而不是塞 demo drill_id，因为
+      drills 表是 seed 数据，写入时机不可控；若引用 drill 而 drill 不存在，
+      ``publish_course`` 会校验失败 → 影响后续 E2E。
+    - **stage 1 文案**：基础挥杆 1 + 站姿 / 握杆 / 上杆三个 lesson；M11-03 UI
+      可以直接拉出来渲染端到端 demo。
+    - 仅 1 门课、3 节 lesson：避免 PR 引入大块固定文本被 review；运营真正上线
+      时通过专门的 admin 工具批量录入。
+    """
+
+    code = "stage1-basic-swing-v1"
+    existing = await db.execute(select(Course).where(Course.code == code))
+    course = existing.scalar_one_or_none()
+    if course is not None:
+        return [course]
+
+    course = Course(
+        id=new_id("crs"),
+        code=code,
+        title="基础挥杆 1：站姿与握杆",
+        subtitle="第 1 阶 · 1/7 课",
+        cover_url=None,
+        stage=1,
+        sort_order=1,
+        is_member_only=False,
+        description="从零开始的高尔夫挥杆。本课覆盖站姿、握杆与上杆基本姿态。",
+        learning_objectives=[
+            "理解中立握杆与重叠 / 互锁 / 棒球握法差异",
+            "掌握肩 / 胯 / 脚的对齐与重心分布",
+            "完成上杆顶点的初步定位",
+        ],
+        estimated_minutes=45,
+        is_published=False,  # 先建草稿，加完 lesson 再 publish
+    )
+    db.add(course)
+    await db.flush()
+
+    lessons_spec: list[dict] = [
+        {
+            "code": "stage1-basic-swing-v1-l1",
+            "title": "站姿与对齐",
+            "sort_order": 1,
+            "duration_minutes": 15,
+            "video_url": None,
+            "transcript": (
+                "本节学习高尔夫的基本站姿：双脚与肩同宽、膝盖微屈、上身前倾，"
+                "球的位置随杆型变化。重心 50/50 平均分布，避免前后偏移。"
+            ),
+            "pass_criteria": {"required_quiz_score": 70},
+        },
+        {
+            "code": "stage1-basic-swing-v1-l2",
+            "title": "握杆三种方式",
+            "sort_order": 2,
+            "duration_minutes": 15,
+            "video_url": None,
+            "transcript": (
+                "中立握杆建议先用重叠或互锁握法，棒球握法仅推荐手部力量薄弱的初学者。"
+                "握杆压力以 3-4 / 10 为佳，过紧会限制手腕铰链。"
+            ),
+            "pass_criteria": {"required_quiz_score": 70},
+        },
+        {
+            "code": "stage1-basic-swing-v1-l3",
+            "title": "上杆顶点定位",
+            "sort_order": 3,
+            "duration_minutes": 15,
+            "video_url": None,
+            "transcript": (
+                "上杆顶点：左肩转到下颌下方，杆头指向目标线，左臂保持伸直但不僵硬。"
+                "训练时可在镜子前练习定型；进入 M11-04 考核前完成至少 3 组定型练习。"
+            ),
+            "pass_criteria": {"required_quiz_score": 70},
+        },
+    ]
+    for spec in lessons_spec:
+        lesson = Lesson(
+            id=new_id("lsn"),
+            course_id=course.id,
+            code=spec["code"],
+            title=spec["title"],
+            sort_order=spec["sort_order"],
+            duration_minutes=spec["duration_minutes"],
+            video_url=spec["video_url"],
+            transcript=spec["transcript"],
+            drill_ids=[],
+            pro_clip_ids=[],
+            quiz_payload=None,
+            pass_criteria=spec["pass_criteria"],
+        )
+        db.add(lesson)
+    await db.flush()
+
+    # 一次性 publish；调用方负责 commit
+    course.is_published = True
+    course.published_at = datetime.now(UTC)
+    await db.flush()
+    logger.info("seed_initial_courses_done", course_id=course.id, lessons=len(lessons_spec))
+    return [course]
+
+
 async def current_user_stage(db: AsyncSession, user_id: str) -> int:
     """用户当前所处阶段：已通关 ``courses.stage`` 的最大值；未开始则返回 1。"""
 
@@ -326,10 +465,13 @@ __all__ = [
     "create_lesson",
     "current_user_stage",
     "get_course",
+    "get_lesson",
     "get_progress",
     "is_course_passed",
+    "list_lessons_by_course",
     "list_published_courses",
     "maybe_issue_certificate",
     "publish_course",
+    "seed_initial_courses",
     "upsert_progress",
 ]
