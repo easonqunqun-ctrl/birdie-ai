@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import math
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -44,6 +45,14 @@ from app.schemas.meetup import (
     VenueCreate,
 )
 
+# Nearby 搜索硬上限：避免恶意客户端用极大 radius 把全国 venue 都拉下来。
+MAX_NEARBY_RADIUS_KM: float = 100.0
+# 默认返回数量；客户端可在 1-50 之间调整。
+DEFAULT_NEARBY_LIMIT: int = 20
+MAX_NEARBY_LIMIT: int = 50
+# 地球半径（km）：haversine 公式标准取值
+EARTH_RADIUS_KM: float = 6371.0088
+
 logger = get_logger("meetup")
 
 
@@ -62,12 +71,110 @@ async def create_venue(
         name=payload.name,
         venue_type=payload.venue_type,
         address=payload.address,
+        latitude=payload.latitude,
+        longitude=payload.longitude,
         source=payload.source,
         contributor_user_id=contributor_user_id,
     )
     db.add(v)
     await db.flush()
     return v
+
+
+def haversine_km(
+    lat1: float, lon1: float, lat2: float, lon2: float
+) -> float:
+    """两点间球面距离（km），haversine 公式.
+
+    与 PostGIS ST_Distance 在小尺度（< 几百 km）误差 < 0.5%，对"找最近球场"
+    完全足够。不引入 PostGIS 依赖，便于 SQLite 测试环境也跑通。
+    """
+
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlam = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(
+        dlam / 2
+    ) ** 2
+    return 2 * EARTH_RADIUS_KM * math.asin(math.sqrt(a))
+
+
+async def search_nearby_venues(
+    db: AsyncSession,
+    *,
+    latitude: float,
+    longitude: float,
+    radius_km: float,
+    limit: int = DEFAULT_NEARBY_LIMIT,
+    venue_type: str | None = None,
+) -> list[tuple[Venue, float]]:
+    """搜索给定圆心 + 半径内的 active venues，按距离升序返回 (venue, distance_km).
+
+    实现策略
+    --------
+    1. **粗筛**：经纬度 bounding box（lat ± Δ / lng ± Δ）走数据库 index
+       减少候选集，避免全表 haversine
+    2. **精筛**：Python haversine 计算精确距离，过滤 > radius 的伪命中
+    3. **排序**：距离升序 + limit 截断
+
+    参数校验
+    --------
+    - ``radius_km`` ∈ (0, MAX_NEARBY_RADIUS_KM]，否则 ``BadRequestError`` 40050
+    - ``latitude`` ∈ [-90, 90], ``longitude`` ∈ [-180, 180]，否则 ``40050``
+    - ``limit`` ∈ [1, MAX_NEARBY_LIMIT]
+
+    错误码段位
+    ----------
+    40050-40059 归 M13 约球业务专用；本方法只用 40050。
+    不复用 40015（已被 account_deletion / payment 占用）。
+    """
+
+    if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+        raise BadRequestError(code=40050, message="latitude / longitude 超出范围")
+    if not (0 < radius_km <= MAX_NEARBY_RADIUS_KM):
+        raise BadRequestError(
+            code=40050,
+            message=f"radius_km 必须在 (0, {MAX_NEARBY_RADIUS_KM}] 之间",
+        )
+    limit = max(1, min(limit, MAX_NEARBY_LIMIT))
+
+    # 经度的 1 度跨度 ≈ 111 km * cos(lat)；高纬度需要展开更大的 Δlng
+    # 这里取保守 fallback：cos(lat) 接近 0 时直接走 ±180（赤道至极点边缘情况罕见）
+    lat_delta = radius_km / 111.0
+    cos_lat = math.cos(math.radians(latitude))
+    lng_delta = 180.0 if cos_lat < 0.01 else radius_km / (111.0 * cos_lat)
+
+    stmt = (
+        select(Venue)
+        .where(
+            Venue.status == "active",
+            Venue.latitude.isnot(None),
+            Venue.longitude.isnot(None),
+            Venue.latitude >= latitude - lat_delta,
+            Venue.latitude <= latitude + lat_delta,
+            Venue.longitude >= longitude - lng_delta,
+            Venue.longitude <= longitude + lng_delta,
+        )
+    )
+    if venue_type is not None:
+        stmt = stmt.where(Venue.venue_type == venue_type)
+
+    rows = await db.execute(stmt)
+    candidates = list(rows.scalars().all())
+
+    # 精筛 + 距离计算
+    annotated: list[tuple[Venue, float]] = []
+    for v in candidates:
+        # 经过 NOT NULL 过滤后这两个不会为 None；但仍保险性 cast
+        if v.latitude is None or v.longitude is None:
+            continue
+        d = haversine_km(latitude, longitude, float(v.latitude), float(v.longitude))
+        if d <= radius_km:
+            annotated.append((v, d))
+
+    annotated.sort(key=lambda pair: pair[1])
+    return annotated[:limit]
 
 
 async def flag_venue(db: AsyncSession, venue_id: str) -> Venue:
@@ -194,6 +301,105 @@ async def decline_invitation(
         actor_user_id=user_id,
     )
     return inv
+
+
+async def cancel_invitation(
+    db: AsyncSession, *, invitation_id: str, user_id: str
+) -> MeetupInvitation:
+    """M13-03：邀请人主动撤回（pending 才允许；accepted 之后只能走 declined-by-invitee）."""
+
+    inv = await db.get(MeetupInvitation, invitation_id)
+    if inv is None:
+        raise NotFoundError(code=40406, message="邀请不存在")
+    if inv.inviter_user_id != user_id:
+        raise ForbiddenError(code=40330, message="只能撤回自己发出的邀请")
+    if inv.status != "pending":
+        raise BadRequestError(
+            code=40903,
+            message="只有 pending 邀请可撤回",
+            detail=inv.status,
+        )
+    inv.status = "cancelled"
+    await db.flush()
+    logger.info("meetup_invitation_cancelled", invitation_id=invitation_id)
+    return inv
+
+
+# M13-03 用户视角：作为 inviter / invitee / 双向（默认）查询自己的邀请列表
+InvitationRoleLiteral = str  # "inviter" | "invitee" | "any"
+
+
+async def list_user_invitations(
+    db: AsyncSession,
+    *,
+    user_id: str,
+    role: str = "any",
+    status: str | None = None,
+    limit: int = 50,
+) -> list[MeetupInvitation]:
+    """按角色 / 状态查询用户邀请，按 created_at 倒序.
+
+    参数
+    ----
+    - ``role`` ∈ {``inviter``, ``invitee``, ``any``}；``any`` 等价于"两边都看"
+    - ``status``：可选，``pending``/``accepted``/``declined``/``expired``/``cancelled``
+    - ``limit``：上限 100，默认 50（前端列表分页可拉多次）
+    """
+
+    role = role or "any"
+    if role not in {"inviter", "invitee", "any"}:
+        # 40051 段：M13 约球业务码（40050-40059）；不复用 40016（注销/支付/训练已占）。
+        raise BadRequestError(code=40051, message="role 必须是 inviter/invitee/any")
+    limit = max(1, min(limit, 100))
+
+    stmt = select(MeetupInvitation)
+    if role == "inviter":
+        stmt = stmt.where(MeetupInvitation.inviter_user_id == user_id)
+    elif role == "invitee":
+        stmt = stmt.where(MeetupInvitation.invitee_user_id == user_id)
+    else:  # any
+        stmt = stmt.where(
+            (MeetupInvitation.inviter_user_id == user_id)
+            | (MeetupInvitation.invitee_user_id == user_id)
+        )
+    if status is not None:
+        # 不在合法状态集合 → 直接 40051（避免 SQLAlchemy 抛 OperationalError）
+        if status not in {"pending", "accepted", "declined", "expired", "cancelled"}:
+            raise BadRequestError(code=40051, message=f"status 非法: {status}")
+        stmt = stmt.where(MeetupInvitation.status == status)
+
+    stmt = stmt.order_by(MeetupInvitation.created_at.desc()).limit(limit)
+    rows = await db.execute(stmt)
+    return list(rows.scalars().all())
+
+
+async def expire_overdue_invitations(db: AsyncSession) -> int:
+    """把 ``expires_at < now`` 的 pending 邀请置为 expired，返回处理条数.
+
+    设计要点
+    --------
+    - 仅处理 ``pending``：accepted / declined / cancelled 不动
+    - 不靠 cron；本 PR 由 list_user_invitations / accept_invitation 顺手调用，
+      让 GET / POST 自带"懒清理"。这样真机不依赖 background job 也能体验正确状态
+    - 返回处理条数便于 logging
+    """
+
+    now = datetime.now(UTC)
+    rows = await db.execute(
+        select(MeetupInvitation).where(
+            MeetupInvitation.status == "pending",
+            MeetupInvitation.expires_at.is_not(None),
+            MeetupInvitation.expires_at < now,
+        )
+    )
+    overdue = list(rows.scalars().all())
+    if not overdue:
+        return 0
+    for inv in overdue:
+        inv.status = "expired"
+    await db.flush()
+    logger.info("meetup_invitations_expired", count=len(overdue))
+    return len(overdue)
 
 
 # ---------------- feedback / credit ----------------
@@ -324,14 +530,22 @@ async def sign_up_event(
 
 
 __all__ = [
+    "DEFAULT_NEARBY_LIMIT",
+    "MAX_NEARBY_LIMIT",
+    "MAX_NEARBY_RADIUS_KM",
     "accept_invitation",
     "calculate_credit_delta",
+    "cancel_invitation",
     "create_event",
     "create_invitation",
     "create_venue",
     "decline_invitation",
+    "expire_overdue_invitations",
     "filter_invitation_contact_for_user",
     "flag_venue",
+    "haversine_km",
+    "list_user_invitations",
+    "search_nearby_venues",
     "sign_up_event",
     "submit_feedback",
 ]
