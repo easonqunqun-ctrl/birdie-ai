@@ -40,6 +40,7 @@ from app.schemas.meetup import (
     FeedbackCreate,
     InvitationAcceptPayload,
     InvitationCreate,
+    InvitationRead,
     VenueCreate,
 )
 
@@ -158,20 +159,18 @@ async def accept_invitation(
 
 def filter_invitation_contact_for_user(
     inv: MeetupInvitation, *, viewer_user_id: str
-) -> MeetupInvitation:
+) -> InvitationRead:
     """合规：``contact_payload`` 只对 inviter / invitee 可见，其他 viewer（含教练 /
-    管理员视图）一律置 None。返回 inv 对象本身（in-place mutation），调用方
-    在序列化前调一次即可。
+    管理员视图）一律置 None。
 
-    设计要点
-    --------
-    - 不动 DB 记录；只修改内存中的 ORM 实例字段
-    - 教练旁观 (M13-10) 进入时同样应该走这一层过滤
+    返回 Pydantic 投影，**不修改 ORM 实例**，避免 M13-10 教练旁观等场景在
+    序列化后误 flush 把 ``contact_payload=None`` 持久化进 DB。
     """
 
+    read = InvitationRead.model_validate(inv)
     if viewer_user_id not in {inv.inviter_user_id, inv.invitee_user_id}:
-        inv.contact_payload = None
-    return inv
+        return read.model_copy(update={"contact_payload": None})
+    return read
 
 
 async def decline_invitation(

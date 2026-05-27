@@ -295,10 +295,10 @@ async def test_filter_contact_payload_visibility() -> None:
         # 第三方 viewer → contact_payload 被置 None
         masked = svc.filter_invitation_contact_for_user(inv, viewer_user_id=c.id)
         assert masked.contact_payload is None
+        # ORM 未被 in-place 污染；当事人仍可读到原始 contact_payload
+        assert inv.contact_payload is not None
+        assert inv.contact_payload.get("note") == original_note
 
-        # 当事人 viewer → 不动
-        # 注：上一步 in-place 修改了 inv；重新拉一次
-        await db.refresh(inv)
         kept = svc.filter_invitation_contact_for_user(inv, viewer_user_id=a.id)
         assert kept.contact_payload is not None
         assert kept.contact_payload.get("note") == original_note

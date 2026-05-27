@@ -78,7 +78,7 @@ async def accept_meetup_invitation(
     inv = meetup_service.filter_invitation_contact_for_user(
         inv, viewer_user_id=user.id
     )
-    return ok(InvitationRead.model_validate(inv))
+    return ok(inv)
 
 
 # ==================== POST /v1/meetups/invitations/{id}/decline ====================
@@ -102,4 +102,4 @@ async def decline_meetup_invitation(
     inv = meetup_service.filter_invitation_contact_for_user(
         inv, viewer_user_id=user.id
     )
-    return ok(InvitationRead.model_validate(inv))
+    return ok(inv)
