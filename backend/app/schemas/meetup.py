@@ -27,6 +27,9 @@ class VenueCreate(BaseModel):
     venue_type: VenueTypeLiteral
     address: str | None = None
     source: VenueSourceLiteral = "ugc"
+    # M13-02：地理坐标可选；同时为 None 时不会出现在 nearby
+    latitude: Decimal | None = Field(None, ge=-90, le=90)
+    longitude: Decimal | None = Field(None, ge=-180, le=180)
 
     model_config = ConfigDict(extra="forbid")
 
@@ -39,8 +42,38 @@ class VenueRead(BaseModel):
     address: str | None = None
     source: VenueSourceLiteral
     status: VenueStatusLiteral
+    latitude: Decimal | None = None
+    longitude: Decimal | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class VenueNearbyItem(BaseModel):
+    """GET /v1/venues/nearby 列表元素：venue 详情 + 距离（km）."""
+
+    id: str
+    city: str
+    name: str
+    venue_type: VenueTypeLiteral
+    address: str | None = None
+    source: VenueSourceLiteral
+    status: VenueStatusLiteral
+    latitude: Decimal
+    longitude: Decimal
+    distance_km: float
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class VenueNearbyResponse(BaseModel):
+    """GET /v1/venues/nearby 响应体."""
+
+    items: list[VenueNearbyItem]
+    total: int
+    # 回显请求参数，便于客户端调试 / 日志
+    center_latitude: float
+    center_longitude: float
+    radius_km: float
 
 
 class InvitationCreate(BaseModel):
@@ -60,6 +93,33 @@ class InvitationAcceptPayload(BaseModel):
     meet_at: str | None = Field(None, max_length=80)  # 自由文本（"8 点门口"）
 
     model_config = ConfigDict(extra="forbid")
+
+
+class InvitationRead(BaseModel):
+    """M13-03 / M13-04：邀请响应；contact_payload 仅当事人可见."""
+
+    id: str
+    inviter_user_id: str
+    invitee_user_id: str
+    venue_id: str | None = None
+    proposed_time: datetime | None = None
+    expires_at: datetime | None = None
+    status: InvitationStatusLiteral
+    accepted_at: datetime | None = None
+    contact_payload: dict | None = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InvitationListResponse(BaseModel):
+    """GET /v1/users/me/meetup-invitations 响应体."""
+
+    items: list[InvitationRead]
+    total: int
+    # 回显请求过滤参数（便于客户端 debug + 翻页时维持上下文）
+    role: str
+    status: str | None = None
 
 
 class FeedbackCreate(BaseModel):
@@ -122,9 +182,13 @@ __all__ = [
     "FeedbackRead",
     "InvitationAcceptPayload",
     "InvitationCreate",
+    "InvitationListResponse",
+    "InvitationRead",
     "InvitationStatusLiteral",
     "ParticipationStatusLiteral",
     "VenueCreate",
+    "VenueNearbyItem",
+    "VenueNearbyResponse",
     "VenueRead",
     "VenueSourceLiteral",
     "VenueStatusLiteral",

@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from urllib.parse import urlparse
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,6 +42,27 @@ from app.schemas.pro_library import (
 )
 
 logger = get_logger("pro_library")
+
+
+# 球手镜头 video_url 允许的域名白名单（合规 + 安全）。
+# 设计考量
+# --------
+# - 球手镜头一律是版权敏感内容，**禁止** 直链第三方未授权的视频站；只允许：
+#   * 自有对象存储 cdn 域名
+#   * mock / dev 占位域名
+# - 上线前运营把真实 CDN 域名加入 ``PRO_CLIP_ALLOWED_VIDEO_DOMAINS`` 即可，
+#   不需要改代码。生产 deployment 时由 ``settings`` 注入扩充。
+# - 测试 / fixture 用 example.com / minio.local，已包含。
+DEFAULT_PRO_CLIP_DOMAINS: frozenset[str] = frozenset(
+    {
+        # 测试 / mock
+        "example.com",
+        "minio.local",
+        # 自有对象存储常见前缀
+        "cos.ap-shanghai.myqcloud.com",
+        "cdn.lingniao-golf.com",
+    }
+)
 
 
 # ---------------- 球手 ----------------
@@ -75,13 +97,66 @@ async def get_player(db: AsyncSession, player_id: str) -> ProPlayer | None:
     return row.scalar_one_or_none()
 
 
+async def list_active_players(db: AsyncSession) -> list[ProPlayer]:
+    """供 M12-03 资源库 tab UI 拉取球手列表（按 sort_order 升序）.
+
+    不展露 ``is_active=False`` 的球手：版权下架或合作终止后用 ``is_active=False``
+    软隔离，列表不再可见，但已有的收藏 / 匹配历史不破坏。
+    """
+
+    rows = await db.execute(
+        select(ProPlayer)
+        .where(ProPlayer.is_active.is_(True))
+        .order_by(ProPlayer.sort_order.asc(), ProPlayer.name.asc())
+    )
+    return list(rows.scalars().all())
+
+
 # ---------------- 镜头 ----------------
 
 
+def _is_video_url_allowed(
+    url: str, allowed_domains: frozenset[str] | None = None
+) -> bool:
+    """检查 video_url 域名是否在 allowed_domains 内.
+
+    设计
+    ----
+    - 用 ``urlparse`` 解析 ``netloc`` 取主机名；不接受 IP 字面量（生产场景几乎都是
+      CDN 域名）
+    - 允许端口号（``example.com:9000`` 仍 match ``example.com``）
+    - 子域名不传染：``cdn.example.com`` 不会因为 ``example.com`` 在白名单就通过；
+      因为后者只允许那个具体域，避免子域名"泛白名单"被滥用
+    """
+
+    allowed = allowed_domains or DEFAULT_PRO_CLIP_DOMAINS
+    if not url:
+        return False
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return False
+    if parsed.scheme not in {"http", "https"}:
+        return False
+    host = parsed.hostname or ""
+    return host in allowed
+
+
 async def add_clip(
-    db: AsyncSession, payload: ProSwingClipCreate
+    db: AsyncSession,
+    payload: ProSwingClipCreate,
+    *,
+    allowed_video_domains: frozenset[str] | None = None,
 ) -> ProSwingClip:
-    """入库一条球手镜头，强制 source_credit + license_status 合规。"""
+    """入库一条球手镜头，强制 source_credit + license_status + 域名白名单合规.
+
+    M12-02 加固
+    -----------
+    - ``video_url`` 必须在 ``allowed_video_domains``（默认 ``DEFAULT_PRO_CLIP_DOMAINS``）
+      → 错 ``40040``。避免误入未授权的第三方视频站，被版权方一锅端。
+      （不复用 40013：已被 payment_service.PaymentNotAllowedError 占用。）
+    - ``thumbnail_url`` 同域名校验（None 时跳过）。
+    """
 
     player = await get_player(db, payload.pro_player_id)
     if player is None:
@@ -98,6 +173,22 @@ async def add_clip(
         )
     if payload.license_status not in VALID_LICENSE_STATUSES:
         raise BadRequestError(code=40001, message="license_status 非法")
+
+    # 域名白名单校验（M12-02 加固）
+    if not _is_video_url_allowed(payload.video_url, allowed_video_domains):
+        raise BadRequestError(
+            code=40040,
+            message="video_url 域名不在白名单",
+            detail=f"host={urlparse(payload.video_url).hostname}",
+        )
+    if payload.thumbnail_url and not _is_video_url_allowed(
+        payload.thumbnail_url, allowed_video_domains
+    ):
+        raise BadRequestError(
+            code=40040,
+            message="thumbnail_url 域名不在白名单",
+            detail=f"host={urlparse(payload.thumbnail_url).hostname}",
+        )
 
     clip = ProSwingClip(
         id=new_id("psc"),
@@ -295,7 +386,69 @@ async def record_match(
     return rec
 
 
+async def seed_initial_pros(db: AsyncSession) -> list[ProPlayer]:
+    """开发 / E2E 用：写入 1 个 demo 球手 + 1 条 published clip，幂等.
+
+    设计要点
+    --------
+    - **幂等**：用 ``pro_players.name`` 简单判重（mock 数据，name 唯一即可）
+    - ``license_status=public_clip``：所有内置 demo 数据声明为公开镜头，配 ``source_credit``
+      标注 "internal demo"，避免误认为外部版权来源
+    - ``video_url`` 用 ``minio.local`` 测试占位，落在 ``DEFAULT_PRO_CLIP_DOMAINS`` 白名单内
+    """
+
+    name = "Demo Pro · 内置示例"
+    existing = await db.execute(select(ProPlayer).where(ProPlayer.name == name))
+    player = existing.scalar_one_or_none()
+    if player is not None:
+        return [player]
+
+    player = ProPlayer(
+        id=new_id("pp"),
+        name=name,
+        name_en="Demo Pro",
+        nationality="CHN",
+        handedness="right",
+        height_cm=180,
+        avatar_url=None,
+        short_bio="内置示例球手，用于 M12 资源库联调；上线时由真实球手替换。",
+        license_status="public_clip",
+        is_active=True,
+        sort_order=0,
+    )
+    db.add(player)
+    await db.flush()
+
+    clip = ProSwingClip(
+        id=new_id("psc"),
+        pro_player_id=player.id,
+        club_type="iron_7",
+        camera_angle="face_on",
+        video_url="https://minio.local/demo/pro_iron7_face_on.mp4",
+        thumbnail_url="https://minio.local/demo/pro_iron7_thumb.jpg",
+        duration_ms=4500,
+        fps=60,
+        overall_score=92,
+        engine_version="v1",
+        features_snapshot={"shoulder_turn_deg": 92, "tempo_ratio": 3.1},
+        phase_timestamps={"address": 0, "top": 1200, "impact": 2200},
+        license_status="public_clip",
+        source_credit="Birdie Golf · internal demo (M12-02 seed)",
+        source_url="https://minio.local/demo/source_metadata.txt",
+        captured_year=2026,
+        description="示例：标准 7 号铁 face-on 镜头；用于资源库 / 对比联调",
+        is_published=True,
+    )
+    db.add(clip)
+    await db.flush()
+    logger.info(
+        "seed_initial_pros_done", player_id=player.id, clip_id=clip.id
+    )
+    return [player]
+
+
 __all__ = [
+    "DEFAULT_PRO_CLIP_DOMAINS",
     "add_annotation",
     "add_clip",
     "create_player",
@@ -303,8 +456,10 @@ __all__ = [
     "favorite_clip",
     "get_clip",
     "get_player",
+    "list_active_players",
     "list_published_clips",
     "record_match",
+    "seed_initial_pros",
     "takedown_clip",
     "unfavorite_clip",
 ]

@@ -49,7 +49,16 @@ from app.models.base import Base, TimestampMixin
 
 
 class Venue(Base, TimestampMixin):
-    """球场 / 打位（UGC 与运营两路并行）."""
+    """球场 / 打位（UGC 与运营两路并行）.
+
+    地理信息（M13-02 alembic 0024 加列）
+    -----------------------------------
+    ``latitude`` / ``longitude`` 是可选 ``Numeric(9,6)`` 列：
+    - 精度 6 位小数 = 约 11cm，对"找最近 5 个球场"绝对够用
+    - 范围 lat ∈ [-90, 90], lng ∈ [-180, 180] 由 CHECK 兜底
+    - 都为 NULL 时 venue 不出现在 nearby 搜索结果里（接受软覆盖率代价，
+      避免 GPS 缺失场地被算成 0,0 → 几内亚湾鬼影）
+    """
 
     __tablename__ = "venues"
 
@@ -58,6 +67,13 @@ class Venue(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     venue_type: Mapped[str] = mapped_column(String(20), nullable=False)
     address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # M13-02：可选地理坐标（NULL → 不进入 nearby 结果）
+    latitude: Mapped[Decimal | None] = mapped_column(
+        Numeric(9, 6), nullable=True
+    )
+    longitude: Mapped[Decimal | None] = mapped_column(
+        Numeric(9, 6), nullable=True
+    )
     source: Mapped[str] = mapped_column(
         String(16), nullable=False, default="ugc", server_default="'ugc'"
     )
@@ -83,7 +99,20 @@ class Venue(Base, TimestampMixin):
             "status IN ('active', 'flagged', 'closed')",
             name="chk_venue_status",
         ),
+        CheckConstraint(
+            "(latitude IS NULL AND longitude IS NULL) OR "
+            "(latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180)",
+            name="chk_venue_geo_range",
+        ),
         Index("idx_venues_city_status", "city", "status"),
+        # 经纬度联合索引：nearby 查询先按 status 过滤再按 lat/lng 范围；
+        # B-tree 联合在 lat 区间 + lng 区间扫描下比单列优，对中小数据集足够。
+        Index(
+            "idx_venues_geo",
+            "latitude",
+            "longitude",
+            postgresql_where="status = 'active' AND latitude IS NOT NULL",
+        ),
     )
 
 
