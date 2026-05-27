@@ -36,6 +36,13 @@ from app.models.meetup import (
     Venue,
     write_contact_payload,
 )
+from app.schemas.meetup import (
+    EventCreate,
+    FeedbackCreate,
+    InvitationAcceptPayload,
+    InvitationCreate,
+    VenueCreate,
+)
 
 # Nearby 搜索硬上限：避免恶意客户端用极大 radius 把全国 venue 都拉下来。
 MAX_NEARBY_RADIUS_KM: float = 100.0
@@ -44,13 +51,6 @@ DEFAULT_NEARBY_LIMIT: int = 20
 MAX_NEARBY_LIMIT: int = 50
 # 地球半径（km）：haversine 公式标准取值
 EARTH_RADIUS_KM: float = 6371.0088
-from app.schemas.meetup import (
-    EventCreate,
-    FeedbackCreate,
-    InvitationAcceptPayload,
-    InvitationCreate,
-    VenueCreate,
-)
 
 logger = get_logger("meetup")
 
@@ -137,10 +137,7 @@ async def search_nearby_venues(
     # 这里取保守 fallback：cos(lat) 接近 0 时直接走 ±180（赤道至极点边缘情况罕见）
     lat_delta = radius_km / 111.0
     cos_lat = math.cos(math.radians(latitude))
-    if cos_lat < 0.01:
-        lng_delta = 180.0
-    else:
-        lng_delta = radius_km / (111.0 * cos_lat)
+    lng_delta = 180.0 if cos_lat < 0.01 else radius_km / (111.0 * cos_lat)
 
     stmt = (
         select(Venue)
