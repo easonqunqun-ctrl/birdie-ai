@@ -624,4 +624,3 @@ async def test_search_nearby_excludes_inactive_status() -> None:
         ids = {v.id for v, _ in results}
         assert active.id in ids
         assert flagged.id not in ids
->>>>>>> origin/main
