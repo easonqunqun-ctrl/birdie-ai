@@ -25,6 +25,8 @@ from app.schemas.user_club import (
     UserClubUpdate,
 )
 from app.schemas.user_profile_v2 import (
+    CoachConsentRead,
+    CoachConsentUpdate,
     FavoriteVenueRead,
     FavoriteVenuesList,
     UserProfileV2Read,
@@ -337,3 +339,53 @@ async def list_my_favorite_venues(
     return ok(
         FavoriteVenuesList(items=items, missing_ids=missing, total=len(items))
     )
+
+
+# ==================== P2-M9-06 教练可见性 consent（独立原子端点） ====================
+
+
+@router.get(
+    "/me/profile-v2/coach-consent",
+    summary="读取教练可见性 consent + 当前白名单（M9-06）",
+    response_model=APIResponse[CoachConsentRead],
+)
+async def get_my_coach_consent(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """读取当前用户的「教练可见性总开关 + 字段列表 + 可选白名单」.
+
+    返回 ``allowed_fields`` 让 UI 渲染勾选项，避免硬编码白名单。
+    """
+
+    _ensure_profile_v2_enabled()
+    profile = await user_profile_v2_service.get_profile(db, user.id)
+    view = user_profile_v2_service.coach_consent_view(profile)
+    return ok(CoachConsentRead.model_validate(view))
+
+
+@router.put(
+    "/me/profile-v2/coach-consent",
+    summary="原子更新教练可见性 consent + 可见字段（M9-06）",
+    response_model=APIResponse[CoachConsentRead],
+)
+async def update_my_coach_consent(
+    payload: CoachConsentUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """原子更新教练可见性，避免「开关与字段不一致」的中间态.
+
+    服务层保证：
+    - ``visible=False`` ⇒ 服务器把字段列表强制清空（PIPL 删除权）
+    - ``visible=True``  ⇒ ``fields`` 必须非空，否则 40022
+    """
+
+    _ensure_profile_v2_enabled()
+    profile = await user_profile_v2_service.update_coach_consent(
+        db, user_id=user.id, visible=payload.visible, fields=payload.fields
+    )
+    await db.commit()
+    await db.refresh(profile)
+    view = user_profile_v2_service.coach_consent_view(profile)
+    return ok(CoachConsentRead.model_validate(view))

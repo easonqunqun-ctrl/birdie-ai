@@ -273,6 +273,112 @@ async def test_list_clubs_sorted_by_sort_order() -> None:
 
 
 @pytest.mark.asyncio
+async def test_update_coach_consent_open_with_fields() -> None:
+    """M9-06：visible=True + fields → consent 打开 + 字段落库 + 白名单校验通过。"""
+
+    async with AsyncSessionLocal() as db:
+        u = await _make_user(db)
+        profile = await svc.update_coach_consent(
+            db,
+            user_id=u.id,
+            visible=True,
+            fields=["handicap_self", "handedness", "handicap_self"],  # 故意含重复
+        )
+        assert profile.privacy_payload["coach_visible_consent"] is True
+        # 保位去重生效
+        assert list(profile.coach_visible_fields) == ["handicap_self", "handedness"]
+
+
+@pytest.mark.asyncio
+async def test_update_coach_consent_close_clears_fields() -> None:
+    """M9-06：visible=False → 服务器无视客户端 fields，强制清空。"""
+
+    async with AsyncSessionLocal() as db:
+        u = await _make_user(db)
+        # 先开
+        await svc.update_coach_consent(
+            db, user_id=u.id, visible=True, fields=["handicap_self"]
+        )
+        # 再关，故意传非空 fields → 服务器清空
+        profile = await svc.update_coach_consent(
+            db, user_id=u.id, visible=False, fields=["handicap_self", "handedness"]
+        )
+        assert profile.privacy_payload["coach_visible_consent"] is False
+        assert list(profile.coach_visible_fields) == []
+
+
+@pytest.mark.asyncio
+async def test_update_coach_consent_open_without_fields_rejected() -> None:
+    """M9-06：visible=True + 空 fields → 40022（中间态被拦截）。"""
+
+    async with AsyncSessionLocal() as db:
+        u = await _make_user(db)
+        with pytest.raises(BadRequestError) as exc_info:
+            await svc.update_coach_consent(
+                db, user_id=u.id, visible=True, fields=[]
+            )
+        assert exc_info.value.code == 40022
+
+
+@pytest.mark.asyncio
+async def test_update_coach_consent_rejects_non_whitelisted_field() -> None:
+    """M9-06：fields 中含白名单外字段 → 复用 _validate_coach_visible_fields → 40001。"""
+
+    async with AsyncSessionLocal() as db:
+        u = await _make_user(db)
+        with pytest.raises(BadRequestError) as exc_info:
+            await svc.update_coach_consent(
+                db, user_id=u.id, visible=True, fields=["nickname", "phone_number"]
+            )
+        assert exc_info.value.code == 40001
+
+
+@pytest.mark.asyncio
+async def test_coach_consent_view_default_for_new_user() -> None:
+    """M9-06：老用户没填过 profile → view 返回默认关闭 + 完整白名单。"""
+
+    view = svc.coach_consent_view(None)
+    assert view["visible"] is False
+    assert view["fields"] == []
+    # 白名单内容稳定（一旦变更必须同步 UI + 文档）
+    assert "handicap_self" in view["allowed_fields"]
+    assert "favorite_course_ids" in view["allowed_fields"]
+    # 必须排序，避免每次请求顺序不稳定
+    assert view["allowed_fields"] == sorted(view["allowed_fields"])
+
+
+@pytest.mark.asyncio
+async def test_update_coach_consent_preserves_other_consent_keys() -> None:
+    """M9-06 回归：只动 coach_visible_consent，不应影响其他 4 个 consent 位。
+
+    场景：先打开 handicap_consent + body_consent，再独立操作 coach 开关，
+    其他 consent 必须保持原值（之前 #103 出过 PATCH 覆盖型 bug）。
+    """
+
+    async with AsyncSessionLocal() as db:
+        u = await _make_user(db)
+        # 1) 通用 PATCH 打开 handicap + body
+        await svc.upsert_profile(
+            db,
+            user_id=u.id,
+            payload=UserProfileV2Update(
+                handicap_self=Decimal("12"),
+                height_cm=180,
+                privacy_payload=PrivacyPayload(
+                    handicap_consent=True, body_consent=True
+                ),
+            ),
+        )
+        # 2) 独立打开 coach consent
+        profile = await svc.update_coach_consent(
+            db, user_id=u.id, visible=True, fields=["handedness"]
+        )
+        assert profile.privacy_payload["handicap_consent"] is True
+        assert profile.privacy_payload["body_consent"] is True
+        assert profile.privacy_payload["coach_visible_consent"] is True
+
+
+@pytest.mark.asyncio
 async def test_active_club_types_helper() -> None:
     async with AsyncSessionLocal() as db:
         u = await _make_user(db)
