@@ -47,3 +47,12 @@ export const PAYMENT_MOCK_FLAG: boolean = PAYMENT_MOCK
  * `PAYMENT_ENABLED_FLAG` 模式），W22 灰度时再做。
  */
 export const PHASE2_PROFILE_V2_ENABLED_FLAG: boolean = false
+
+/**
+ * P2-M12-03：球手对比库灰度开关。
+ *
+ * 与 backend `settings.PHASE2_PROS_ENABLED` 同步：
+ * - 默认 `false`：球手列表 / 详情页 onShow 即退回
+ * - 启用：W22+ 与后端同时切 true
+ */
+export const PHASE2_PROS_ENABLED_FLAG: boolean = false
