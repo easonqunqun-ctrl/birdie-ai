@@ -65,7 +65,7 @@ async def add_club(
         )
 
     club = UserClub(
-        id=f"ucb_{new_id()[:20]}",  # ucb_<nanoid 20>
+        id=new_id("ucb"),
         user_id=user.id,
         club_type=payload.club_type,
         nickname=payload.nickname,
