@@ -11,6 +11,7 @@ from app.api.v1 import (
     events,
     feedback,
     invitations,
+    meetups,
     payments,
     security,
     shares,
@@ -32,6 +33,9 @@ api_router.include_router(payments.router, prefix="/payments", tags=["支付"])
 api_router.include_router(wechat_push.router, prefix="/wechat", tags=["微信推送"])
 # /me/orders、/me/membership、/me/training-plan、/me/practice-logs 挂 /users/me 下（集中聚合）
 api_router.include_router(payments.me_router, prefix="/users/me", tags=["支付"])
+# M13-03 约球邀请创建 / 撤回 / 列表（accept / decline 走 M13-04）
+api_router.include_router(meetups.router, prefix="/meetups", tags=["约球"])
+api_router.include_router(meetups.me_router, prefix="/users/me", tags=["约球"])
 api_router.include_router(training.router, prefix="/training-plan", tags=["训练"])
 api_router.include_router(training.me_router, prefix="/users/me", tags=["训练"])
 api_router.include_router(training.drills_router, prefix="/drills", tags=["训练"])

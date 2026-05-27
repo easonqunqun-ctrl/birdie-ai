@@ -10,6 +10,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -262,3 +264,162 @@ async def test_create_event_no_cash_reward_field() -> None:
 
     with pytest.raises(ValidationError):
         EventCreate(title="不允许的现金挑战", reward_cash=100)  # type: ignore[call-arg]
+
+
+# ============================================================================
+# M13-03 邀请列表 / 撤回 / 懒过期
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_cancel_invitation_only_by_inviter_and_only_pending() -> None:
+    """撤回守门：非 inviter 拒 / 非 pending 拒."""
+
+    async with AsyncSessionLocal() as db:
+        a = await _make_user(db)
+        b = await _make_user(db)
+        c = await _make_user(db)
+        inv = await svc.create_invitation(
+            db,
+            inviter_user_id=a.id,
+            payload=InvitationCreate(invitee_user_id=b.id),
+        )
+        # 非 inviter 撤回 → 403
+        with pytest.raises(ForbiddenError):
+            await svc.cancel_invitation(db, invitation_id=inv.id, user_id=c.id)
+
+        # accept 后再撤回 → 40903
+        await svc.accept_invitation(db, invitation_id=inv.id, user_id=b.id)
+        with pytest.raises(BadRequestError) as e:
+            await svc.cancel_invitation(db, invitation_id=inv.id, user_id=a.id)
+        assert e.value.code == 40903
+
+        # 重新发一条 pending，inviter 撤回 → 成功
+        inv2 = await svc.create_invitation(
+            db,
+            inviter_user_id=a.id,
+            payload=InvitationCreate(invitee_user_id=b.id),
+        )
+        cancelled = await svc.cancel_invitation(
+            db, invitation_id=inv2.id, user_id=a.id
+        )
+        assert cancelled.status == "cancelled"
+
+
+@pytest.mark.asyncio
+async def test_list_user_invitations_role_and_status() -> None:
+    """role / status 过滤组合."""
+
+    async with AsyncSessionLocal() as db:
+        a = await _make_user(db)
+        b = await _make_user(db)
+        c = await _make_user(db)
+        # a 发给 b 和 c；c 发给 a
+        inv_a_to_b = await svc.create_invitation(
+            db,
+            inviter_user_id=a.id,
+            payload=InvitationCreate(invitee_user_id=b.id),
+        )
+        inv_a_to_c = await svc.create_invitation(
+            db,
+            inviter_user_id=a.id,
+            payload=InvitationCreate(invitee_user_id=c.id),
+        )
+        inv_c_to_a = await svc.create_invitation(
+            db,
+            inviter_user_id=c.id,
+            payload=InvitationCreate(invitee_user_id=a.id),
+        )
+        # a 接受 c 发来的
+        await svc.accept_invitation(db, invitation_id=inv_c_to_a.id, user_id=a.id)
+
+        # role=any：a 看到 3 条
+        any_view = await svc.list_user_invitations(db, user_id=a.id, role="any")
+        ids_any = {i.id for i in any_view}
+        assert ids_any == {inv_a_to_b.id, inv_a_to_c.id, inv_c_to_a.id}
+
+        # role=inviter：a 看到 2 条（a 发出的）
+        inviter_view = await svc.list_user_invitations(
+            db, user_id=a.id, role="inviter"
+        )
+        assert {i.id for i in inviter_view} == {inv_a_to_b.id, inv_a_to_c.id}
+
+        # role=invitee + status=accepted：a 收到的已接受 = 1 条
+        accepted = await svc.list_user_invitations(
+            db, user_id=a.id, role="invitee", status="accepted"
+        )
+        assert len(accepted) == 1
+        assert accepted[0].id == inv_c_to_a.id
+
+
+@pytest.mark.asyncio
+async def test_list_user_invitations_rejects_bad_params() -> None:
+    """非法 role / status 抛 40016."""
+
+    async with AsyncSessionLocal() as db:
+        u = await _make_user(db)
+        with pytest.raises(BadRequestError) as e1:
+            await svc.list_user_invitations(db, user_id=u.id, role="bogus")
+        assert e1.value.code == 40016
+
+        with pytest.raises(BadRequestError) as e2:
+            await svc.list_user_invitations(db, user_id=u.id, status="bogus")
+        assert e2.value.code == 40016
+
+
+@pytest.mark.asyncio
+async def test_expire_overdue_invitations_only_pending_overdue() -> None:
+    """expires_at < now 的 pending → expired；其他状态 / 未到期不动."""
+
+    from datetime import timedelta
+
+    async with AsyncSessionLocal() as db:
+        a = await _make_user(db)
+        b = await _make_user(db)
+        # 过期的 pending
+        overdue = await svc.create_invitation(
+            db,
+            inviter_user_id=a.id,
+            payload=InvitationCreate(
+                invitee_user_id=b.id,
+                expires_at=datetime.now(UTC) - timedelta(hours=1),
+            ),
+        )
+        # 未到期的 pending
+        future = await svc.create_invitation(
+            db,
+            inviter_user_id=a.id,
+            payload=InvitationCreate(
+                invitee_user_id=b.id,
+                expires_at=datetime.now(UTC) + timedelta(hours=1),
+            ),
+        )
+        # 已 accepted 的过期不应被动
+        accepted_overdue = await svc.create_invitation(
+            db,
+            inviter_user_id=a.id,
+            payload=InvitationCreate(
+                invitee_user_id=b.id,
+                expires_at=datetime.now(UTC) - timedelta(hours=2),
+            ),
+        )
+        await svc.accept_invitation(
+            db, invitation_id=accepted_overdue.id, user_id=b.id
+        )
+
+        count = await svc.expire_overdue_invitations(db)
+        assert count == 1
+
+        await db.refresh(overdue)
+        await db.refresh(future)
+        await db.refresh(accepted_overdue)
+        assert overdue.status == "expired"
+        assert future.status == "pending"
+        assert accepted_overdue.status == "accepted"
+
+
+@pytest.mark.asyncio
+async def test_expire_overdue_invitations_no_op_returns_zero() -> None:
+    async with AsyncSessionLocal() as db:
+        count = await svc.expire_overdue_invitations(db)
+        assert count == 0
