@@ -293,7 +293,7 @@ async def test_active_club_types_helper() -> None:
 
 @pytest.mark.asyncio
 async def test_favorite_courses_rejects_nonexistent_venue() -> None:
-    """传入不存在的 venue ID → 40004，不写入任何数据。"""
+    """传入不存在的 venue ID → 40021，不写入任何数据。"""
 
     async with AsyncSessionLocal() as db:
         u = await _make_user(db)
@@ -308,7 +308,7 @@ async def test_favorite_courses_rejects_nonexistent_venue() -> None:
                     privacy_payload=PrivacyPayload(location_consent=True),
                 ),
             )
-        assert exc_info.value.code == 40004
+        assert exc_info.value.code == 40021
         assert bogus in (exc_info.value.detail or "")
 
 
@@ -328,7 +328,7 @@ async def test_favorite_courses_rejects_closed_venue() -> None:
                     privacy_payload=PrivacyPayload(location_consent=True),
                 ),
             )
-        assert exc_info.value.code == 40004
+        assert exc_info.value.code == 40021
 
 
 @pytest.mark.asyncio
@@ -354,7 +354,7 @@ async def test_favorite_courses_dedupes_preserving_order() -> None:
 @pytest.mark.asyncio
 async def test_favorite_courses_cap_enforced_after_dedupe() -> None:
     """schema 7 条已超 max_length=6；dedupe 减到 6 内 → 写入成功。
-    若 dedupe 仍 > 6 → 40003。
+    若 dedupe 仍 > 6 → 40020。
 
     本测试只覆盖 dedupe 内的 cap：schema 的 max_length 由 Pydantic 拦截，单元层
     不再重复（pydantic ValidationError 流程已被 _validate_handicap_out_of_range

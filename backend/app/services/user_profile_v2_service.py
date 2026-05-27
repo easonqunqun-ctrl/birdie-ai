@@ -123,8 +123,10 @@ async def upsert_profile(
         deduped = _dedupe_preserve_order(payload.favorite_course_ids)
         if len(deduped) > MAX_FAVORITE_VENUES:
             # 理论上 schema 已拦截；保险起见在 dedupe 后再 check 一次。
+            # 40020 段：M9 画像扩展业务码（40020-40029）。
+            # 不复用 40003（已被 analysis_service 占用为"视频格式不支持"）。
             raise BadRequestError(
-                code=40003,
+                code=40020,
                 message="favorite_course_ids 超出上限",
                 detail=f"最多 {MAX_FAVORITE_VENUES} 个，去重后实际 {len(deduped)}",
             )
@@ -376,8 +378,10 @@ async def _validate_favorite_venue_ids(db: AsyncSession, ids: list[str]) -> None
         # 截断显示，避免 422 detail 过长（客户端只看前几条足以排错）
         shown = ", ".join(missing[:5])
         more = f"…等 {len(missing)} 条" if len(missing) > 5 else ""
+        # 40021 段：与 40020 同段，归 M9 画像扩展业务码。
+        # 不复用 40004（已被 analysis_service 占用为"视频时长不符"）。
         raise BadRequestError(
-            code=40004,
+            code=40021,
             message="favorite_course_ids 含未知 / 已关闭的球场",
             detail=f"不可用 ID：{shown}{more}",
         )
