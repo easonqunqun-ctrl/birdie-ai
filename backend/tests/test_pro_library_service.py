@@ -160,3 +160,128 @@ async def test_annotation_text_requires_content() -> None:
                     content="   ",
                 ),
             )
+
+
+# ============================ M12-02 域名白名单 + 列表 + seed ============================
+
+
+def test_is_video_url_allowed_pure() -> None:
+    """_is_video_url_allowed 纯函数：默认白名单 + 子域名不传染 + 协议过滤."""
+
+    # 默认白名单内
+    assert svc._is_video_url_allowed("https://example.com/x.mp4") is True
+    assert svc._is_video_url_allowed("https://minio.local/y.mp4") is True
+    # 端口号不影响匹配
+    assert svc._is_video_url_allowed("https://example.com:9000/x.mp4") is True
+    # 子域名不传染（cdn.example.com 不在白名单 → False）
+    assert svc._is_video_url_allowed("https://cdn.example.com/x.mp4") is False
+    # 协议必须是 http/https
+    assert svc._is_video_url_allowed("file:///etc/passwd") is False
+    assert svc._is_video_url_allowed("ftp://example.com/x.mp4") is False
+    # 空 / 非法
+    assert svc._is_video_url_allowed("") is False
+    assert svc._is_video_url_allowed("not a url") is False
+
+
+@pytest.mark.asyncio
+async def test_add_clip_rejects_video_url_outside_whitelist() -> None:
+    """video_url 域名不在白名单 → 40013，不写入任何数据."""
+
+    async with AsyncSessionLocal() as db:
+        player = await svc.create_player(
+            db, ProPlayerCreate(name="WhitelistTest", handedness="right")
+        )
+        bad = _make_clip_payload(
+            player.id,
+            video_url="https://evil.malicious-pirate-site.com/leaked.mp4",
+        )
+        with pytest.raises(BadRequestError) as exc_info:
+            await svc.add_clip(db, bad)
+        assert exc_info.value.code == 40013
+
+
+@pytest.mark.asyncio
+async def test_add_clip_rejects_thumbnail_outside_whitelist() -> None:
+    """thumbnail_url 同样守门，但 None 时跳过."""
+
+    async with AsyncSessionLocal() as db:
+        player = await svc.create_player(
+            db, ProPlayerCreate(name="ThumbTest", handedness="right")
+        )
+        # video_url 合法 + thumbnail_url 非法
+        bad = _make_clip_payload(
+            player.id,
+            video_url="https://example.com/ok.mp4",
+            thumbnail_url="https://random-image-host.com/leaked.jpg",
+        )
+        with pytest.raises(BadRequestError) as exc_info:
+            await svc.add_clip(db, bad)
+        assert exc_info.value.code == 40013
+
+        # thumbnail=None 合法（仅 video_url 检查通过）
+        ok_payload = _make_clip_payload(
+            player.id,
+            video_url="https://example.com/ok.mp4",
+            thumbnail_url=None,
+        )
+        clip = await svc.add_clip(db, ok_payload)
+        assert clip.thumbnail_url is None
+
+
+@pytest.mark.asyncio
+async def test_add_clip_accepts_custom_domain_whitelist() -> None:
+    """allowed_video_domains 参数可注入新域名（运营加 CDN 域时的钩子）."""
+
+    async with AsyncSessionLocal() as db:
+        player = await svc.create_player(
+            db, ProPlayerCreate(name="CustomDomain", handedness="right")
+        )
+        custom_domains = frozenset({"custom-cdn.example.org"})
+        payload = _make_clip_payload(
+            player.id,
+            video_url="https://custom-cdn.example.org/x.mp4",
+        )
+        clip = await svc.add_clip(
+            db, payload, allowed_video_domains=custom_domains
+        )
+        assert clip.video_url == "https://custom-cdn.example.org/x.mp4"
+
+
+@pytest.mark.asyncio
+async def test_list_active_players_excludes_soft_deleted() -> None:
+    """list_active_players 不返回 is_active=False 球手."""
+
+    async with AsyncSessionLocal() as db:
+        active = await svc.create_player(
+            db, ProPlayerCreate(name="ActivePro", handedness="right", sort_order=10)
+        )
+        inactive = await svc.create_player(
+            db,
+            ProPlayerCreate(
+                name="InactivePro",
+                handedness="right",
+                is_active=False,
+                sort_order=20,
+            ),
+        )
+        players = await svc.list_active_players(db)
+        ids = {p.id for p in players}
+        assert active.id in ids
+        assert inactive.id not in ids
+
+
+@pytest.mark.asyncio
+async def test_seed_initial_pros_is_idempotent() -> None:
+    """seed_initial_pros 连续两次 → 同一 player + 同一 clip，不重复."""
+
+    async with AsyncSessionLocal() as db:
+        first = await svc.seed_initial_pros(db)
+        second = await svc.seed_initial_pros(db)
+
+        assert len(first) == 1
+        assert len(second) == 1
+        assert first[0].id == second[0].id
+        assert first[0].name == "Demo Pro · 内置示例"
+        clips = await svc.list_published_clips(db, player_id=first[0].id)
+        assert len(clips) == 1
+        assert clips[0].is_published is True
