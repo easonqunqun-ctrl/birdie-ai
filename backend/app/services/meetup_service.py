@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import math
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -43,6 +44,14 @@ from app.schemas.meetup import (
     VenueCreate,
 )
 
+# Nearby 搜索硬上限：避免恶意客户端用极大 radius 把全国 venue 都拉下来。
+MAX_NEARBY_RADIUS_KM: float = 100.0
+# 默认返回数量；客户端可在 1-50 之间调整。
+DEFAULT_NEARBY_LIMIT: int = 20
+MAX_NEARBY_LIMIT: int = 50
+# 地球半径（km）：haversine 公式标准取值
+EARTH_RADIUS_KM: float = 6371.0088
+
 logger = get_logger("meetup")
 
 
@@ -61,12 +70,110 @@ async def create_venue(
         name=payload.name,
         venue_type=payload.venue_type,
         address=payload.address,
+        latitude=payload.latitude,
+        longitude=payload.longitude,
         source=payload.source,
         contributor_user_id=contributor_user_id,
     )
     db.add(v)
     await db.flush()
     return v
+
+
+def haversine_km(
+    lat1: float, lon1: float, lat2: float, lon2: float
+) -> float:
+    """两点间球面距离（km），haversine 公式.
+
+    与 PostGIS ST_Distance 在小尺度（< 几百 km）误差 < 0.5%，对"找最近球场"
+    完全足够。不引入 PostGIS 依赖，便于 SQLite 测试环境也跑通。
+    """
+
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlam = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(
+        dlam / 2
+    ) ** 2
+    return 2 * EARTH_RADIUS_KM * math.asin(math.sqrt(a))
+
+
+async def search_nearby_venues(
+    db: AsyncSession,
+    *,
+    latitude: float,
+    longitude: float,
+    radius_km: float,
+    limit: int = DEFAULT_NEARBY_LIMIT,
+    venue_type: str | None = None,
+) -> list[tuple[Venue, float]]:
+    """搜索给定圆心 + 半径内的 active venues，按距离升序返回 (venue, distance_km).
+
+    实现策略
+    --------
+    1. **粗筛**：经纬度 bounding box（lat ± Δ / lng ± Δ）走数据库 index
+       减少候选集，避免全表 haversine
+    2. **精筛**：Python haversine 计算精确距离，过滤 > radius 的伪命中
+    3. **排序**：距离升序 + limit 截断
+
+    参数校验
+    --------
+    - ``radius_km`` ∈ (0, MAX_NEARBY_RADIUS_KM]，否则 ``BadRequestError`` 40050
+    - ``latitude`` ∈ [-90, 90], ``longitude`` ∈ [-180, 180]，否则 ``40050``
+    - ``limit`` ∈ [1, MAX_NEARBY_LIMIT]
+
+    错误码段位
+    ----------
+    40050-40059 归 M13 约球业务专用；本方法只用 40050。
+    不复用 40015（已被 account_deletion / payment 占用）。
+    """
+
+    if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+        raise BadRequestError(code=40050, message="latitude / longitude 超出范围")
+    if not (0 < radius_km <= MAX_NEARBY_RADIUS_KM):
+        raise BadRequestError(
+            code=40050,
+            message=f"radius_km 必须在 (0, {MAX_NEARBY_RADIUS_KM}] 之间",
+        )
+    limit = max(1, min(limit, MAX_NEARBY_LIMIT))
+
+    # 经度的 1 度跨度 ≈ 111 km * cos(lat)；高纬度需要展开更大的 Δlng
+    # 这里取保守 fallback：cos(lat) 接近 0 时直接走 ±180（赤道至极点边缘情况罕见）
+    lat_delta = radius_km / 111.0
+    cos_lat = math.cos(math.radians(latitude))
+    lng_delta = 180.0 if cos_lat < 0.01 else radius_km / (111.0 * cos_lat)
+
+    stmt = (
+        select(Venue)
+        .where(
+            Venue.status == "active",
+            Venue.latitude.isnot(None),
+            Venue.longitude.isnot(None),
+            Venue.latitude >= latitude - lat_delta,
+            Venue.latitude <= latitude + lat_delta,
+            Venue.longitude >= longitude - lng_delta,
+            Venue.longitude <= longitude + lng_delta,
+        )
+    )
+    if venue_type is not None:
+        stmt = stmt.where(Venue.venue_type == venue_type)
+
+    rows = await db.execute(stmt)
+    candidates = list(rows.scalars().all())
+
+    # 精筛 + 距离计算
+    annotated: list[tuple[Venue, float]] = []
+    for v in candidates:
+        # 经过 NOT NULL 过滤后这两个不会为 None；但仍保险性 cast
+        if v.latitude is None or v.longitude is None:
+            continue
+        d = haversine_km(latitude, longitude, float(v.latitude), float(v.longitude))
+        if d <= radius_km:
+            annotated.append((v, d))
+
+    annotated.sort(key=lambda pair: pair[1])
+    return annotated[:limit]
 
 
 async def flag_venue(db: AsyncSession, venue_id: str) -> Venue:
@@ -387,6 +494,9 @@ async def sign_up_event(
 
 
 __all__ = [
+    "DEFAULT_NEARBY_LIMIT",
+    "MAX_NEARBY_LIMIT",
+    "MAX_NEARBY_RADIUS_KM",
     "accept_invitation",
     "calculate_credit_delta",
     "cancel_invitation",
@@ -396,7 +506,9 @@ __all__ = [
     "decline_invitation",
     "expire_overdue_invitations",
     "flag_venue",
+    "haversine_km",
     "list_user_invitations",
+    "search_nearby_venues",
     "sign_up_event",
     "submit_feedback",
 ]

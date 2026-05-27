@@ -165,6 +165,11 @@ class UserClub(Base, TimestampMixin):
 # 服务层校验用常量：单用户装备清单最大条数
 MAX_CLUBS_PER_USER = 14
 
+# 服务层校验：常去球馆（venues）最多条数（M9-05；M13 约球前置）。
+# 设 6 而非 20：避免「列表式社交骚扰」，引导用户精选高频场地；
+# UI 端表现为 chip 选择上限，溢出时禁用未选项 + Toast。
+MAX_FAVORITE_VENUES = 6
+
 # privacy_payload 合法 consent 字段集合（详 docs/23 §5.1 FR-3）
 CONSENT_FIELDS: frozenset[str] = frozenset(
     {
@@ -198,6 +203,7 @@ __all__ = [
     "COACH_VISIBLE_ALLOWED",
     "CONSENT_FIELDS",
     "MAX_CLUBS_PER_USER",
+    "MAX_FAVORITE_VENUES",
     "UserClub",
     "UserProfileV2",
 ]

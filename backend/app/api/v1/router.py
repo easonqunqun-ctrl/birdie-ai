@@ -8,15 +8,18 @@ from app.api.v1 import (
     auth,
     chat,
     common,
+    courses,
     events,
     feedback,
     invitations,
     meetups,
     payments,
+    pros,
     security,
     shares,
     training,
     users,
+    venues,
     wechat_push,
 )
 
@@ -33,6 +36,12 @@ api_router.include_router(payments.router, prefix="/payments", tags=["支付"])
 api_router.include_router(wechat_push.router, prefix="/wechat", tags=["微信推送"])
 # /me/orders、/me/membership、/me/training-plan、/me/practice-logs 挂 /users/me 下（集中聚合）
 api_router.include_router(payments.me_router, prefix="/users/me", tags=["支付"])
+# M11-02 课程体系（学习路径读端点）；写入仍在 service 层 / 后续 admin 工具
+api_router.include_router(courses.router, prefix="/courses", tags=["课程"])
+# M12-02 球手对比库（公开读端点）；写入仍在 service 层 / 后续 admin 工具
+api_router.include_router(pros.router, prefix="/pros", tags=["球手对比库"])
+# M13-02 球场 nearby 搜索
+api_router.include_router(venues.router, prefix="/venues", tags=["约球"])
 # M13-03 约球邀请创建 / 撤回 / 列表（accept / decline 走 M13-04）
 api_router.include_router(meetups.router, prefix="/meetups", tags=["约球"])
 api_router.include_router(meetups.me_router, prefix="/users/me", tags=["约球"])
