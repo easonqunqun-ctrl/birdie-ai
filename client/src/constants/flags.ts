@@ -47,3 +47,13 @@ export const PAYMENT_MOCK_FLAG: boolean = PAYMENT_MOCK
  * `PAYMENT_ENABLED_FLAG` 模式），W22 灰度时再做。
  */
 export const PHASE2_PROFILE_V2_ENABLED_FLAG: boolean = false
+
+/**
+ * P2-M11-03 课程学习路径 / P2-M12-03 球手对比库 / P2-M13 约球灰度开关
+ * （与各自后端 settings 字段同步：PHASE2_COURSES_ENABLED / PHASE2_PROS_ENABLED /
+ *  PHASE2_MEETUP_ENABLED）。三个能力可独立翻 flag；profile 页菜单入口同时
+ *  对应这三个常量门控。
+ */
+export const PHASE2_COURSES_ENABLED_FLAG: boolean = false
+export const PHASE2_PROS_ENABLED_FLAG: boolean = false
+export const PHASE2_MEETUP_ENABLED_FLAG: boolean = false
