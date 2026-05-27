@@ -86,12 +86,28 @@ class LessonRead(BaseModel):
     sort_order: int
     duration_minutes: int
     video_url: str | None = None
+    # M11-02 / M11-03 UI 需要在 lesson 详情页直接渲染文本讲解；M11-01 service
+    # 已经把字段写入，这里只是把它导出到 GET 响应里。
+    transcript: str | None = None
     drill_ids: list[str] = []
     pro_clip_ids: list[str] = []
     quiz_payload: dict | None = None
     pass_criteria: dict = {}
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CourseLessonsResponse(BaseModel):
+    """GET /v1/courses/{course_id}/lessons 响应体.
+
+    把 ``course_id`` 显式放在响应顶层（不只是每个 lesson item 里），方便客户端
+    在拿到 lessons 后立刻校验"我请求的 course 和服务器返回的一致"，
+    避免因路由参数错配导致渲染错乱。
+    """
+
+    course_id: str
+    items: list[LessonRead]
+    total: int
 
 
 class UserCourseProgressUpdate(BaseModel):
@@ -132,6 +148,7 @@ class CertificateRead(BaseModel):
 __all__ = [
     "CertificateRead",
     "CourseCreate",
+    "CourseLessonsResponse",
     "CourseRead",
     "CourseStatusLiteral",
     "CourseUpdate",
