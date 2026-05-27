@@ -27,6 +27,9 @@ class VenueCreate(BaseModel):
     venue_type: VenueTypeLiteral
     address: str | None = None
     source: VenueSourceLiteral = "ugc"
+    # M13-02：地理坐标可选；同时为 None 时不会出现在 nearby
+    latitude: Decimal | None = Field(None, ge=-90, le=90)
+    longitude: Decimal | None = Field(None, ge=-180, le=180)
 
     model_config = ConfigDict(extra="forbid")
 
@@ -39,8 +42,38 @@ class VenueRead(BaseModel):
     address: str | None = None
     source: VenueSourceLiteral
     status: VenueStatusLiteral
+    latitude: Decimal | None = None
+    longitude: Decimal | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class VenueNearbyItem(BaseModel):
+    """GET /v1/venues/nearby 列表元素：venue 详情 + 距离（km）."""
+
+    id: str
+    city: str
+    name: str
+    venue_type: VenueTypeLiteral
+    address: str | None = None
+    source: VenueSourceLiteral
+    status: VenueStatusLiteral
+    latitude: Decimal
+    longitude: Decimal
+    distance_km: float
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class VenueNearbyResponse(BaseModel):
+    """GET /v1/venues/nearby 响应体."""
+
+    items: list[VenueNearbyItem]
+    total: int
+    # 回显请求参数，便于客户端调试 / 日志
+    center_latitude: float
+    center_longitude: float
+    radius_km: float
 
 
 class InvitationCreate(BaseModel):
@@ -125,6 +158,8 @@ __all__ = [
     "InvitationStatusLiteral",
     "ParticipationStatusLiteral",
     "VenueCreate",
+    "VenueNearbyItem",
+    "VenueNearbyResponse",
     "VenueRead",
     "VenueSourceLiteral",
     "VenueStatusLiteral",
