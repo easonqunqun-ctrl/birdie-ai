@@ -1,0 +1,67 @@
+/**
+ * P2-M11-03：课程学习路径客户端 service。
+ *
+ * 对齐 backend/app/api/v1/courses.py (M11-02)：
+ * - GET /v1/courses?stage=N
+ * - GET /v1/courses/{course_id}
+ * - GET /v1/courses/{course_id}/lessons
+ *
+ * 灰度
+ * ----
+ * 客户端 `PHASE2_COURSES_ENABLED_FLAG`（constants/flags.ts）；
+ * 后端 `settings.PHASE2_COURSES_ENABLED`，未启用时返回 404。
+ * UI 层面在调用前应自行检查 flag，避免 404 弹错误 Toast。
+ */
+
+import { http } from './request'
+
+export interface CourseRead {
+  id: string
+  code: string
+  title: string
+  subtitle: string | null
+  cover_url: string | null
+  stage: number
+  sort_order: number
+  is_member_only: boolean
+  description: string | null
+  learning_objectives: string[]
+  estimated_minutes: number
+  created_by_user_id: string | null
+  is_published: boolean
+  published_at: string | null
+}
+
+export interface LessonRead {
+  id: string
+  course_id: string
+  code: string
+  title: string
+  sort_order: number
+  duration_minutes: number
+  video_url: string | null
+  transcript: string | null
+  drill_ids: string[]
+  pro_clip_ids: string[]
+  quiz_payload: Record<string, unknown> | null
+  pass_criteria: Record<string, unknown>
+}
+
+export interface CourseLessonsResponse {
+  course_id: string
+  items: LessonRead[]
+  total: number
+}
+
+export const coursesService = {
+  list(stage?: number) {
+    const path = stage != null ? `/courses?stage=${stage}` : '/courses'
+    return http.get<CourseRead[]>(path)
+  },
+  detail(courseId: string) {
+    return http.get<CourseRead>(`/courses/${courseId}`)
+  },
+  lessons(courseId: string) {
+    return http.get<CourseLessonsResponse>(`/courses/${courseId}/lessons`)
+  },
+}
