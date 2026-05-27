@@ -62,6 +62,27 @@ class InvitationAcceptPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class InvitationRead(BaseModel):
+    """M13-03 / M13-04：邀请响应；contact_payload 仅当事人可见.
+
+    NOTE：本 schema 同时在 M13-03 (#113) 与 M13-04 (#114) PR 中引入；
+    merge 时择一保留即可（两份内容完全一致）。
+    """
+
+    id: str
+    inviter_user_id: str
+    invitee_user_id: str
+    venue_id: str | None = None
+    proposed_time: datetime | None = None
+    expires_at: datetime | None = None
+    status: InvitationStatusLiteral
+    accepted_at: datetime | None = None
+    contact_payload: dict | None = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class FeedbackCreate(BaseModel):
     invitation_id: str = Field(..., max_length=32)
     reviewee_user_id: str = Field(..., max_length=32)
@@ -122,6 +143,7 @@ __all__ = [
     "FeedbackRead",
     "InvitationAcceptPayload",
     "InvitationCreate",
+    "InvitationRead",
     "InvitationStatusLiteral",
     "ParticipationStatusLiteral",
     "VenueCreate",

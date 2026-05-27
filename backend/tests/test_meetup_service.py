@@ -262,3 +262,97 @@ async def test_create_event_no_cash_reward_field() -> None:
 
     with pytest.raises(ValidationError):
         EventCreate(title="不允许的现金挑战", reward_cash=100)  # type: ignore[call-arg]
+
+
+# ============================================================================
+# M13-04 contact_payload 可见性 + 通知钩子
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_filter_contact_payload_visibility() -> None:
+    """contact_payload 对当事人可见、对第三方不可见."""
+
+    async with AsyncSessionLocal() as db:
+        a = await _make_user(db)
+        b = await _make_user(db)
+        c = await _make_user(db)
+        inv = await svc.create_invitation(
+            db,
+            inviter_user_id=a.id,
+            payload=InvitationCreate(invitee_user_id=b.id),
+        )
+        await svc.accept_invitation(
+            db,
+            invitation_id=inv.id,
+            user_id=b.id,
+            contact_payload=InvitationAcceptPayload(note="见面在 7 号洞"),
+        )
+        await db.refresh(inv)
+        assert inv.contact_payload is not None
+        original_note = inv.contact_payload.get("note")
+
+        # 第三方 viewer → contact_payload 被置 None
+        masked = svc.filter_invitation_contact_for_user(inv, viewer_user_id=c.id)
+        assert masked.contact_payload is None
+
+        # 当事人 viewer → 不动
+        # 注：上一步 in-place 修改了 inv；重新拉一次
+        await db.refresh(inv)
+        kept = svc.filter_invitation_contact_for_user(inv, viewer_user_id=a.id)
+        assert kept.contact_payload is not None
+        assert kept.contact_payload.get("note") == original_note
+
+
+@pytest.mark.asyncio
+async def test_accept_emits_notification_due_log(caplog) -> None:
+    """accept 后 service 必须发结构化日志事件 meetup.notification_due."""
+
+    import logging
+
+    caplog.set_level(logging.INFO)
+    async with AsyncSessionLocal() as db:
+        a = await _make_user(db)
+        b = await _make_user(db)
+        inv = await svc.create_invitation(
+            db,
+            inviter_user_id=a.id,
+            payload=InvitationCreate(invitee_user_id=b.id),
+        )
+        await svc.accept_invitation(
+            db, invitation_id=inv.id, user_id=b.id
+        )
+
+    found = [
+        r for r in caplog.records
+        if "meetup.notification_due" in r.getMessage()
+        or "notification_due" in (getattr(r, "msg", "") or "")
+    ]
+    assert found, "expected meetup.notification_due structured log on accept"
+
+
+@pytest.mark.asyncio
+async def test_decline_emits_notification_due_log(caplog) -> None:
+    """decline 同样发通知事件."""
+
+    import logging
+
+    caplog.set_level(logging.INFO)
+    async with AsyncSessionLocal() as db:
+        a = await _make_user(db)
+        b = await _make_user(db)
+        inv = await svc.create_invitation(
+            db,
+            inviter_user_id=a.id,
+            payload=InvitationCreate(invitee_user_id=b.id),
+        )
+        await svc.decline_invitation(
+            db, invitation_id=inv.id, user_id=b.id
+        )
+
+    found = [
+        r for r in caplog.records
+        if "meetup.notification_due" in r.getMessage()
+        or "notification_due" in (getattr(r, "msg", "") or "")
+    ]
+    assert found

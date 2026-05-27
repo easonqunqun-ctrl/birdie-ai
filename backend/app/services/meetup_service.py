@@ -142,6 +142,35 @@ async def accept_invitation(
 
     await db.flush()
     logger.info("meetup_invitation_accepted", invitation_id=invitation_id, by=user_id)
+    # M13-04 通知钩子：accept 后通知 inviter（实际推送由 M13-04 push integration
+    # 处理；此处只发结构化日志事件，留给后续 wechat_subscribe_message 模板就绪后
+    # 接管）。不写 outbox 表是因为 outbox infra 还没就绪——先打日志事件，业务上线
+    # 后改成 outbox 是非破坏性的。
+    logger.info(
+        "meetup.notification_due",
+        kind="invitation_accepted",
+        invitation_id=invitation_id,
+        notify_user_id=inv.inviter_user_id,
+        actor_user_id=user_id,
+    )
+    return inv
+
+
+def filter_invitation_contact_for_user(
+    inv: MeetupInvitation, *, viewer_user_id: str
+) -> MeetupInvitation:
+    """合规：``contact_payload`` 只对 inviter / invitee 可见，其他 viewer（含教练 /
+    管理员视图）一律置 None。返回 inv 对象本身（in-place mutation），调用方
+    在序列化前调一次即可。
+
+    设计要点
+    --------
+    - 不动 DB 记录；只修改内存中的 ORM 实例字段
+    - 教练旁观 (M13-10) 进入时同样应该走这一层过滤
+    """
+
+    if viewer_user_id not in {inv.inviter_user_id, inv.invitee_user_id}:
+        inv.contact_payload = None
     return inv
 
 
@@ -157,6 +186,14 @@ async def decline_invitation(
         return inv
     inv.status = "declined"
     await db.flush()
+    # 通知钩子（同 accept 走结构化日志事件）
+    logger.info(
+        "meetup.notification_due",
+        kind="invitation_declined",
+        invitation_id=invitation_id,
+        notify_user_id=inv.inviter_user_id,
+        actor_user_id=user_id,
+    )
     return inv
 
 
@@ -294,6 +331,7 @@ __all__ = [
     "create_invitation",
     "create_venue",
     "decline_invitation",
+    "filter_invitation_contact_for_user",
     "flag_venue",
     "sign_up_event",
     "submit_feedback",
