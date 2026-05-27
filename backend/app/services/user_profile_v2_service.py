@@ -28,10 +28,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import BadRequestError, NotFoundError
 from app.core.logging import get_logger
 from app.core.security import new_id
+from app.models.meetup import Venue
 from app.models.user_profile_v2 import (
     COACH_VISIBLE_ALLOWED,
     CONSENT_FIELDS,
     MAX_CLUBS_PER_USER,
+    MAX_FAVORITE_VENUES,
     UserClub,
     UserProfileV2,
 )
@@ -113,6 +115,25 @@ async def upsert_profile(
     # 1) coach_visible_fields 白名单校验
     if payload.coach_visible_fields is not None:
         _validate_coach_visible_fields(payload.coach_visible_fields)
+
+    # 1.5) favorite_course_ids 存在性 + 上限校验（M9-05）
+    # schema 已校验 max_length；这里只校验「ID 必须真实存在于 venues 且 status='active'」。
+    # 注意：列表去重（保持顺序，去掉后位重复，避免「6 个里 3 个重复」的视觉欺骗）。
+    if payload.favorite_course_ids is not None:
+        deduped = _dedupe_preserve_order(payload.favorite_course_ids)
+        if len(deduped) > MAX_FAVORITE_VENUES:
+            # 理论上 schema 已拦截；保险起见在 dedupe 后再 check 一次。
+            # 40020 段：M9 画像扩展业务码（40020-40029）。
+            # 不复用 40003（已被 analysis_service 占用为"视频格式不支持"）。
+            raise BadRequestError(
+                code=40020,
+                message="favorite_course_ids 超出上限",
+                detail=f"最多 {MAX_FAVORITE_VENUES} 个，去重后实际 {len(deduped)}",
+            )
+        if deduped:
+            await _validate_favorite_venue_ids(db, deduped)
+        # 把 dedupe 后的列表回写到 payload，避免后续 _SETTABLE_COLUMNS 应用时重复
+        payload = payload.model_copy(update={"favorite_course_ids": deduped})
 
     # 2) 计算"最终态"的 privacy payload（旧 payload merge 新 patch）
     next_payload: dict[str, bool] = dict(profile.privacy_payload or {})
@@ -322,6 +343,81 @@ def active_club_types(clubs: Iterable[UserClub]) -> list[str]:
     return sorted({c.club_type for c in clubs if c.is_active})
 
 
+# ------------------------------- M9-05 常去球馆 -------------------------------
+
+
+def _dedupe_preserve_order(items: list[str]) -> list[str]:
+    """JSONB 数组顺序代表用户排序意图，去重必须保位（先到先留）。"""
+
+    seen: set[str] = set()
+    out: list[str] = []
+    for x in items:
+        if x not in seen:
+            seen.add(x)
+            out.append(x)
+    return out
+
+
+async def _validate_favorite_venue_ids(db: AsyncSession, ids: list[str]) -> None:
+    """校验 ids 中的 venue 都存在且 status='active'.
+
+    设计说明
+    --------
+    - **不在 DB 层加 FK**：JSONB 数组上加 FK 维护成本高；venue 状态需要软删除
+      （status='closed'），FK 反而会阻断 venue 软关闭。
+    - 这里在 service 层做"存在 + 可用"两段校验，错误信息列出缺失的 ID 便于客户端
+      回滚选择；不暴露其他用户未公开 venue 的额外信息（venues 当前全表都是公开的）。
+    """
+
+    row = await db.execute(
+        select(Venue.id).where(Venue.id.in_(ids), Venue.status == "active")
+    )
+    existing = {r[0] for r in row.all()}
+    missing = [vid for vid in ids if vid not in existing]
+    if missing:
+        # 截断显示，避免 422 detail 过长（客户端只看前几条足以排错）
+        shown = ", ".join(missing[:5])
+        more = f"…等 {len(missing)} 条" if len(missing) > 5 else ""
+        # 40021 段：与 40020 同段，归 M9 画像扩展业务码。
+        # 不复用 40004（已被 analysis_service 占用为"视频时长不符"）。
+        raise BadRequestError(
+            code=40021,
+            message="favorite_course_ids 含未知 / 已关闭的球场",
+            detail=f"不可用 ID：{shown}{more}",
+        )
+
+
+async def list_favorite_venues(
+    db: AsyncSession, *, user_id: str
+) -> tuple[list[Venue], list[str]]:
+    """返回 (按 favorite_course_ids 顺序排序的 venue 行, missing_ids).
+
+    考虑：
+    - **顺序**：用户在 profile 里手动排序的 chip 顺序必须保留，所以这里取出后按
+      原 ids 顺序重排，而不是用 DB 默认顺序。
+    - **missing_ids**：venue 可能在收藏后被运营 closed / 软删，这种条目从 items
+      移除并返回 missing_ids，让客户端弹「该球场已下架，是否移除」。
+    - **consent**：路由层应已在 ``location_consent=False`` 时短路返回空列表，
+      避免本服务被无 consent 调用；这里不再二次拦截以保持职责单一。
+    """
+
+    profile = await get_profile(db, user_id)
+    if profile is None:
+        return ([], [])
+    ids: list[str] = list(profile.favorite_course_ids or [])
+    if not ids:
+        return ([], [])
+
+    row = await db.execute(
+        select(Venue).where(Venue.id.in_(ids), Venue.status == "active")
+    )
+    venues: list[Venue] = list(row.scalars().all())
+    by_id: dict[str, Venue] = {v.id: v for v in venues}
+    ordered: list[Venue] = [by_id[vid] for vid in ids if vid in by_id]
+    missing: list[str] = [vid for vid in ids if vid not in by_id]
+    return (ordered, missing)
+
+
 __all__ = [
     "active_club_types",
     "add_club",
@@ -329,6 +425,7 @@ __all__ = [
     "delete_club",
     "get_profile",
     "list_clubs",
+    "list_favorite_venues",
     "llm_prompt_safe_context",
     "project_for_coach",
     "project_for_self",
