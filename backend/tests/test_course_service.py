@@ -273,3 +273,89 @@ async def test_certificate_idempotent_on_pass() -> None:
         stage = await svc.current_user_stage(db, u.id)
         # 通关 stage=2 → 当前阶段 3
         assert stage == 3
+
+
+# ============================ M11-02 lessons 列表 + seed ============================
+
+
+@pytest.mark.asyncio
+async def test_list_lessons_returns_sorted_by_sort_order() -> None:
+    """list_lessons_by_course 按 sort_order 升序，不依赖 created_at."""
+
+    async with AsyncSessionLocal() as db:
+        drill = await _make_drill(db, 100)
+        course = await svc.create_course(
+            db,
+            CourseCreate(code=f"c_sort_{new_id('x')[-6:]}", title="Sort test", stage=2),
+        )
+        # 故意按 2 → 0 → 1 顺序插入
+        for sort_order in (2, 0, 1):
+            await svc.create_lesson(
+                db,
+                LessonCreate(
+                    course_id=course.id,
+                    code=f"l{sort_order}_{new_id('x')[-6:]}",
+                    title=f"L{sort_order}",
+                    sort_order=sort_order,
+                    drill_ids=[drill.id],
+                ),
+            )
+        await svc.publish_course(db, course.id)
+
+        lessons = await svc.list_lessons_by_course(db, course.id)
+        assert [l.sort_order for l in lessons] == [0, 1, 2]
+
+
+@pytest.mark.asyncio
+async def test_list_lessons_empty_when_course_unpublished_default() -> None:
+    """published_only=True 默认值：草稿课程 → 返回空，不暴露 lesson 草稿."""
+
+    async with AsyncSessionLocal() as db:
+        drill = await _make_drill(db, 101)
+        course = await svc.create_course(
+            db,
+            CourseCreate(code=f"c_draft_{new_id('x')[-6:]}", title="Draft", stage=1),
+        )
+        await svc.create_lesson(
+            db,
+            LessonCreate(
+                course_id=course.id,
+                code=f"l_draft_{new_id('x')[-6:]}",
+                title="draft lesson",
+                sort_order=0,
+                drill_ids=[drill.id],
+            ),
+        )
+        # 不 publish
+        public_view = await svc.list_lessons_by_course(db, course.id)
+        admin_view = await svc.list_lessons_by_course(
+            db, course.id, published_only=False
+        )
+        assert public_view == []
+        assert len(admin_view) == 1
+
+
+@pytest.mark.asyncio
+async def test_seed_initial_courses_is_idempotent() -> None:
+    """seed_initial_courses 必须幂等：连续两次 → 同一 course + 3 lessons，不重复."""
+
+    async with AsyncSessionLocal() as db:
+        first = await svc.seed_initial_courses(db)
+        second = await svc.seed_initial_courses(db)
+
+        assert len(first) == 1
+        assert len(second) == 1
+        assert first[0].id == second[0].id
+        # 课程已 publish 且有 3 节 lesson
+        assert first[0].is_published is True
+        lessons = await svc.list_lessons_by_course(db, first[0].id)
+        assert len(lessons) == 3
+        assert [l.sort_order for l in lessons] == [1, 2, 3]
+        # 课文（transcript）非空，UI 端有内容可渲染
+        assert all(l.transcript and len(l.transcript) > 10 for l in lessons)
+
+
+@pytest.mark.asyncio
+async def test_get_lesson_returns_none_for_missing() -> None:
+    async with AsyncSessionLocal() as db:
+        assert await svc.get_lesson(db, "lsn_nope_xxx") is None
