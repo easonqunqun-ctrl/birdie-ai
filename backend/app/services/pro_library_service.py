@@ -153,7 +153,8 @@ async def add_clip(
     M12-02 加固
     -----------
     - ``video_url`` 必须在 ``allowed_video_domains``（默认 ``DEFAULT_PRO_CLIP_DOMAINS``）
-      → 错 ``40013``。避免误入未授权的第三方视频站，被版权方一锅端。
+      → 错 ``40040``。避免误入未授权的第三方视频站，被版权方一锅端。
+      （不复用 40013：已被 payment_service.PaymentNotAllowedError 占用。）
     - ``thumbnail_url`` 同域名校验（None 时跳过）。
     """
 
@@ -176,7 +177,7 @@ async def add_clip(
     # 域名白名单校验（M12-02 加固）
     if not _is_video_url_allowed(payload.video_url, allowed_video_domains):
         raise BadRequestError(
-            code=40013,
+            code=40040,
             message="video_url 域名不在白名单",
             detail=f"host={urlparse(payload.video_url).hostname}",
         )
@@ -184,7 +185,7 @@ async def add_clip(
         payload.thumbnail_url, allowed_video_domains
     ):
         raise BadRequestError(
-            code=40013,
+            code=40040,
             message="thumbnail_url 域名不在白名单",
             detail=f"host={urlparse(payload.thumbnail_url).hostname}",
         )

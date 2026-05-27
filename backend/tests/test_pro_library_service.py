@@ -185,7 +185,7 @@ def test_is_video_url_allowed_pure() -> None:
 
 @pytest.mark.asyncio
 async def test_add_clip_rejects_video_url_outside_whitelist() -> None:
-    """video_url 域名不在白名单 → 40013，不写入任何数据."""
+    """video_url 域名不在白名单 → 40040，不写入任何数据."""
 
     async with AsyncSessionLocal() as db:
         player = await svc.create_player(
@@ -197,7 +197,7 @@ async def test_add_clip_rejects_video_url_outside_whitelist() -> None:
         )
         with pytest.raises(BadRequestError) as exc_info:
             await svc.add_clip(db, bad)
-        assert exc_info.value.code == 40013
+        assert exc_info.value.code == 40040
 
 
 @pytest.mark.asyncio
@@ -216,7 +216,7 @@ async def test_add_clip_rejects_thumbnail_outside_whitelist() -> None:
         )
         with pytest.raises(BadRequestError) as exc_info:
             await svc.add_clip(db, bad)
-        assert exc_info.value.code == 40013
+        assert exc_info.value.code == 40040
 
         # thumbnail=None 合法（仅 video_url 检查通过）
         ok_payload = _make_clip_payload(
