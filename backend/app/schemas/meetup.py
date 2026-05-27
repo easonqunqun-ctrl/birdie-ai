@@ -96,7 +96,7 @@ class InvitationAcceptPayload(BaseModel):
 
 
 class InvitationRead(BaseModel):
-    """M13-03：邀请列表 / 详情用响应；contact_payload 仅 accepted 后非空."""
+    """M13-03 / M13-04：邀请响应；contact_payload 仅当事人可见."""
 
     id: str
     inviter_user_id: str
@@ -106,8 +106,6 @@ class InvitationRead(BaseModel):
     expires_at: datetime | None = None
     status: InvitationStatusLiteral
     accepted_at: datetime | None = None
-    # contact_payload 只对当事人可见；当前实现简单粗暴：accepted 后返；
-    # M13-04 会引入更细致的"只对 inviter / invitee 显示"逻辑
     contact_payload: dict | None = None
     created_at: datetime
 
