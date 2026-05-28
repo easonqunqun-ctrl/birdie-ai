@@ -254,7 +254,8 @@ def test_probe_ffprobe_raises_emits_probe_failed_warning(monkeypatch, caplog):
     """
 
     def _raise(_):
-        raise RuntimeError("ffprobe binary not found / network unreachable")
+        # 故意用不在 5xx/4xx/timeout/binary_missing 关键字白名单的错误，让 reason 落 unknown
+        raise RuntimeError("some weird unparseable error from container layer")
 
     monkeypatch.setattr(rp2_mod, "_ffprobe_extended", _raise)
     warnings = _probe_video_warnings("https://example.com/v.mp4")
