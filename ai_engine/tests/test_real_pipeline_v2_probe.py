@@ -630,13 +630,27 @@ def test_probe_failed_in_KNOWN_CODES():
 # ============================================================
 
 
+def _patch_minio_endpoints(monkeypatch, *, internal: str, public: str) -> None:
+    """W13-C 测试 helper · 改写 settings 单例上的 MinIO endpoint.
+
+    rp2._rewrite_to_internal_url 内部是函数级 ``from app.config import settings``，
+    每次拿到的都是同一个 settings 单例。直接对 app.config.settings 实例属性 patch
+    即可（不需要走 rp2_mod.settings——那是个不存在的属性）。
+    """
+    from app import config
+
+    monkeypatch.setattr(config.settings, "MINIO_ENDPOINT", internal)
+    monkeypatch.setattr(config.settings, "MINIO_PUBLIC_ENDPOINT", public)
+
+
 def test_rewrite_to_internal_url_replaces_public_prefix(monkeypatch):
     """W13-C · URL 命中 MINIO_PUBLIC_ENDPOINT 前缀 → 改写到 internal endpoint."""
     from app.pipeline.real_pipeline_v2 import _rewrite_to_internal_url
 
-    monkeypatch.setattr(rp2_mod.settings, "MINIO_ENDPOINT", "http://minio:9000")
-    monkeypatch.setattr(
-        rp2_mod.settings, "MINIO_PUBLIC_ENDPOINT", "https://api.birdieai.cn/minio"
+    _patch_minio_endpoints(
+        monkeypatch,
+        internal="http://minio:9000",
+        public="https://api.birdieai.cn/minio",
     )
 
     rewritten = _rewrite_to_internal_url(
@@ -649,9 +663,10 @@ def test_rewrite_to_internal_url_keeps_query_string(monkeypatch):
     """W13-C · URL 含 query string（X-Amz-Signature 等）→ 改写时保留 query."""
     from app.pipeline.real_pipeline_v2 import _rewrite_to_internal_url
 
-    monkeypatch.setattr(rp2_mod.settings, "MINIO_ENDPOINT", "http://minio:9000")
-    monkeypatch.setattr(
-        rp2_mod.settings, "MINIO_PUBLIC_ENDPOINT", "https://api.birdieai.cn/minio"
+    _patch_minio_endpoints(
+        monkeypatch,
+        internal="http://minio:9000",
+        public="https://api.birdieai.cn/minio",
     )
 
     rewritten = _rewrite_to_internal_url(
@@ -667,9 +682,10 @@ def test_rewrite_to_internal_url_passthrough_when_not_minio(monkeypatch):
     """W13-C · COS / 第三方 URL（不在 PUBLIC 前缀下）→ 原样返回，仍走 W12-3 retry 兜底."""
     from app.pipeline.real_pipeline_v2 import _rewrite_to_internal_url
 
-    monkeypatch.setattr(rp2_mod.settings, "MINIO_ENDPOINT", "http://minio:9000")
-    monkeypatch.setattr(
-        rp2_mod.settings, "MINIO_PUBLIC_ENDPOINT", "https://api.birdieai.cn/minio"
+    _patch_minio_endpoints(
+        monkeypatch,
+        internal="http://minio:9000",
+        public="https://api.birdieai.cn/minio",
     )
 
     cos_url = "https://cos.ap-guangzhou.myqcloud.com/bucket/x.mp4"
@@ -686,20 +702,17 @@ def test_rewrite_to_internal_url_passthrough_when_endpoints_missing_or_equal(mon
     url = "http://localhost:9000/xiaoniao-videos/x.mp4"
 
     # internal 缺失
-    monkeypatch.setattr(rp2_mod.settings, "MINIO_ENDPOINT", "")
-    monkeypatch.setattr(
-        rp2_mod.settings, "MINIO_PUBLIC_ENDPOINT", "https://api.birdieai.cn/minio"
-    )
+    _patch_minio_endpoints(monkeypatch, internal="", public="https://api.birdieai.cn/minio")
     assert _rewrite_to_internal_url(url) == url
 
     # public 缺失
-    monkeypatch.setattr(rp2_mod.settings, "MINIO_ENDPOINT", "http://minio:9000")
-    monkeypatch.setattr(rp2_mod.settings, "MINIO_PUBLIC_ENDPOINT", "")
+    _patch_minio_endpoints(monkeypatch, internal="http://minio:9000", public="")
     assert _rewrite_to_internal_url(url) == url
 
     # 二者相等（开发本机）
-    monkeypatch.setattr(rp2_mod.settings, "MINIO_ENDPOINT", "http://localhost:9000")
-    monkeypatch.setattr(rp2_mod.settings, "MINIO_PUBLIC_ENDPOINT", "http://localhost:9000")
+    _patch_minio_endpoints(
+        monkeypatch, internal="http://localhost:9000", public="http://localhost:9000"
+    )
     assert _rewrite_to_internal_url(url) == url
 
 
@@ -709,9 +722,10 @@ def test_probe_video_warnings_calls_ffprobe_with_internal_url(monkeypatch):
     （这是 W13-C 的核心：用户体感不变，但 ffprobe 实际走 docker 内网，
     彻底绕开 nginx /minio/ 反代这一层 5xx 风险源）.
     """
-    monkeypatch.setattr(rp2_mod.settings, "MINIO_ENDPOINT", "http://minio:9000")
-    monkeypatch.setattr(
-        rp2_mod.settings, "MINIO_PUBLIC_ENDPOINT", "https://api.birdieai.cn/minio"
+    _patch_minio_endpoints(
+        monkeypatch,
+        internal="http://minio:9000",
+        public="https://api.birdieai.cn/minio",
     )
 
     captured: list[str] = []
