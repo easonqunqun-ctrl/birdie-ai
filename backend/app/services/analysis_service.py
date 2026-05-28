@@ -611,6 +611,13 @@ async def get_report(*, analysis_id: str, user: User, db: AsyncSession) -> Analy
             key_frame_timestamp=float(it.key_frame_timestamp)
             if it.key_frame_timestamp is not None
             else None,
+            # P2-W10：透传 V2 引擎诊断置信度，让客户端区分 confirmed/leaning/hidden
+            confidence=float(it.confidence) if it.confidence is not None else None,
+            confidence_tier=(
+                it.confidence_tier  # type: ignore[arg-type]
+                if it.confidence_tier in ("confirmed", "leaning", "hidden")
+                else None
+            ),
         )
         for it in sorted(analysis.issues, key=lambda x: x.sort_order)
     ]
@@ -627,6 +634,10 @@ async def get_report(*, analysis_id: str, user: User, db: AsyncSession) -> Analy
     quality_warnings_out: list[str] = (
         [str(x) for x in _qw] if isinstance(_qw, list) else []
     )
+
+    # P2-W10：W8 引擎诊断从 DB → response（schema EngineWarningItem 自带 Pydantic 校验）
+    _ew = getattr(analysis, "engine_warnings", None)
+    engine_warnings_out: list[dict] = _ew if isinstance(_ew, list) else []
 
     return AnalysisReportResponse(
         id=analysis.id,
@@ -650,6 +661,12 @@ async def get_report(*, analysis_id: str, user: User, db: AsyncSession) -> Analy
         issues=issues,
         recommendations=recs,
         quality_warnings=quality_warnings_out,
+        # P2-W10：confidence + engine_warnings 端到端透传
+        analysis_confidence=float(getattr(analysis, "analysis_confidence", 1.0) or 1.0),
+        feature_confidences=(
+            dict(getattr(analysis, "feature_confidences", None) or {})
+        ),
+        engine_warnings=engine_warnings_out,  # type: ignore[arg-type]
         share_card_url=to_proxy_image_url(analysis.share_card_url),
         analyzed_at=analysis.analyzed_at,
         created_at=analysis.created_at,

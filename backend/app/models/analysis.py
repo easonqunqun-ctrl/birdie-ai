@@ -97,6 +97,10 @@ class SwingAnalysis(Base, TimestampMixin):
     # P2-M7-06：每特征 confidence dict (feature_name → 0-1)；V1 引擎为 {}
     feature_confidences: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
+    # P2-W10：W8 引擎诊断（codec/HDR/慢动作/fps/audio/fallback），客户端调试浮层展示
+    # 结构：list[{code, level, detail?, ts}]；V1 引擎或老报告为 NULL
+    engine_warnings: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+
     # 是否为示例视频体验（不计入配额、不入历史）
     is_sample: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 

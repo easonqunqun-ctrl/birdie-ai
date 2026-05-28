@@ -17,7 +17,8 @@
 | **W6** | **V2 灌溉** | ENG-A1 · ENG-A2 · ENG-A3 | metrics 观测 + redis 热改 pct + 离线 V1/V2 diff 脚本 | **✅ Done**（`816e320` · `915a6d2` uv.lock+test fix） |
 | **W7** | **V2 引擎产品力 v0.1 落地** | P2-M7-02 · P2-M7-06 | engine_warnings + 三层 confidence 接入 V2；V1 行为冻结 | **✅ Done**（`a36eb88` 主体 · 待 hotfix `swing_start/swing_end` 注入） |
 | **W8** | **V2 元数据探测灌入 engine_warnings** | P2-M7-02 · P2-W8 ENG-C | V2 入口 ffprobe 原始 URL → codec / hdr / slowmo / fps / audio 落入 `engine_warnings`；pipeline 主体仍走 V1，fps/timing 不变；探测失败静默兜底 | **✅ Done**（`4723bb0`） |
-| **W9** | **V2 enrichment 精算** | P2-M7-06 · P2-W9 ENG-D | feature_confidence 按 landmark 子矩阵 × phase 窗口实算（不再一锅 mean_vis）；issue_confidence 按 feature value vs threshold 归一化距离实算（不再固定 td=0.5）；多 AND 条件取 min td；handedness 动态选 lead 手腕/肘 | **✅ Done**（`efa5f86`） |
+| **W9** | **V2 enrichment 精算** | P2-M7-06 · P2-W9 ENG-D | feature_confidence 按 landmark 子矩阵 × phase 窗口实算（不再一锅 mean_vis）；issue_confidence 按 feature value vs threshold 归一化距离实算（不再固定 td=0.5）；多 AND 条件取 min td；handedness 动态选 lead 手腕/肘 | **✅ Done**（`efa5f86` · review hotfix `69047a1`） |
+| **W10** | **客户端 V2 兑现 · 服务端管道补全** | P2-M7-06 · P2-W10 | 修复 backend `_mark_completed` 完全丢弃 W7+W8+W9 字段的管道断点（`analysis_confidence` / `feature_confidences` / `engine_warnings` / `issue.confidence` / `confidence_tier`）；client `report.tsx` 接 TrustBadge（低 tier 弹重拍 CTA）+ hidden issues 折叠到「AI 不太确定」区 + V2 engine_warnings 调试浮层；alembic 0025 加 `swing_analyses.engine_warnings` 列 | **进行中** |
 
 **并行泳道（不占 Sprint 主表）**：U-2 COS · Q-B5 papay · O-01/O-04 性能抽测 · par-E3/par-T1
 

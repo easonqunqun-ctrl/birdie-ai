@@ -47,12 +47,15 @@ import {
   resolveReportPlaybackSrc,
   type VideoPlaybackMode,
 } from '@/utils/reportPlayback'
+import { groupIssuesByConfidence, ISSUE_SEVERITY_ORDER } from '@/utils/issueConfidenceGroup'
 import RadarChart, { RadarAxis } from '@/components/RadarChart'
 import '@/components/RadarChart.scss'
+import TrustBadge from '@/components/TrustBadge'
+import '@/components/TrustBadge.scss'
 import './report.scss'
 
 const VIDEO_ID = 'report-video'
-const SEVERITY_SORT: Record<string, number> = { high: 0, medium: 1, low: 2 }
+const SEVERITY_SORT: Record<string, number> = ISSUE_SEVERITY_ORDER
 const SEVERITY_LABEL: Record<string, string> = {
   high: '严重',
   medium: '中等',
@@ -98,6 +101,9 @@ const ReportPage: FC = () => {
   const [bodyScrollTop, setBodyScrollTop] = useState<number | undefined>(undefined)
   const [playbackMode, setPlaybackMode] = useState<VideoPlaybackMode>('skeleton')
   const [playbackSrc, setPlaybackSrc] = useState('')
+  // P2-W10: hidden tier issues 默认折叠；engine_warnings 仅在用户主动展开时显示
+  const [showHiddenIssues, setShowHiddenIssues] = useState(false)
+  const [showEngineWarnings, setShowEngineWarnings] = useState(false)
   const videoCtxRef = useRef<Taro.VideoContext | null>(null)
   const scrollResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -210,6 +216,15 @@ const ReportPage: FC = () => {
       (a, b) => (SEVERITY_SORT[a.severity] ?? 9) - (SEVERITY_SORT[b.severity] ?? 9),
     )
   }, [report])
+
+  /**
+   * P2-W10：按 W9 confidence_tier 分组——详 ``utils/issueConfidenceGroup``。
+   * 直接对 report.issues 分组，分组内部自带 severity 排序；不再用上面的 sortedIssues。
+   */
+  const { confident: confidentIssues, hidden: hiddenIssues } = useMemo(
+    () => groupIssuesByConfidence(report?.issues),
+    [report?.issues],
+  )
 
   const qualityWarningLines = useMemo(
     () => linesForQualityWarnings(report?.quality_warnings),
@@ -718,6 +733,18 @@ const ReportPage: FC = () => {
         <Text className='report__score-guide-link'>分数说明</Text>
       </View>
 
+      {/*
+       * P2-W10：AI 整体可信度色块（W7+W8+W9 服务端能力的最终用户触点）
+       * V1 报告：analysis_confidence 兜底 1.0 → resolveTrustTier='high' → 色块仅显示「AI 高可信」无 CTA
+       * V2 低分：<0.5 → 弹「立即重拍一段」CTA，复用 handleShootAgain
+       */}
+      {report.analysis_confidence != null && (
+        <TrustBadge
+          confidence={report.analysis_confidence}
+          onRetake={isSample ? undefined : handleShootAgain}
+        />
+      )}
+
       {qualityWarningLines.length > 0 && (
         <View className='report__quality-warnings'>
           <Text className='report__quality-warnings-title'>拍摄提示</Text>
@@ -784,13 +811,27 @@ const ReportPage: FC = () => {
           <Text className='report__section-title'>问题诊断</Text>
           <Text className='report__section-hint'>共 {sortedIssues.length} 项</Text>
         </View>
-        {sortedIssues.length === 0 ? (
+        {confidentIssues.length === 0 && hiddenIssues.length === 0 ? (
           <Text className='report__empty'>🎉 这一杆没有明显问题，继续保持！</Text>
+        ) : confidentIssues.length === 0 ? (
+          <Text className='report__empty'>
+            🤔 AI 对本次诊断不太有把握，下方「不太确定」区可展开查看
+          </Text>
         ) : (
-          sortedIssues.map((iss) => (
-            <View key={iss.type} className='report__issue'>
+          confidentIssues.map((iss) => (
+            <View
+              key={iss.type}
+              className={[
+                'report__issue',
+                iss.confidence_tier === 'leaning' ? 'report__issue--leaning' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
               <View className='report__issue-head'>
-                <Text className='report__issue-name'>{iss.name}</Text>
+                <Text className='report__issue-name'>
+                  {iss.confidence_tier === 'leaning' ? '可能存在·' : ''}{iss.name}
+                </Text>
                 <Text className={`report__severity report__severity--${iss.severity}`}>
                   {SEVERITY_LABEL[iss.severity] || iss.severity}
                 </Text>
@@ -814,6 +855,42 @@ const ReportPage: FC = () => {
               )}
             </View>
           ))
+        )}
+
+        {/* P2-W10-B3：hidden tier 折叠区——AI confidence<0.6 的诊断默认不打扰用户，
+            想看的可主动展开（kickoff §3.3 + W7+W9 confidence_tier） */}
+        {hiddenIssues.length > 0 && (
+          <View className='report__hidden-issues'>
+            <View
+              className='report__hidden-issues-toggle'
+              onClick={() => setShowHiddenIssues((v) => !v)}
+            >
+              <Text className='report__hidden-issues-title'>
+                AI 不太确定（{hiddenIssues.length} 项）
+              </Text>
+              <Text className='report__hidden-issues-caret'>
+                {showHiddenIssues ? '收起 ▴' : '展开 ▾'}
+              </Text>
+            </View>
+            {showHiddenIssues && (
+              <View className='report__hidden-issues-body'>
+                <Text className='report__hidden-issues-hint'>
+                  以下诊断置信度较低，可能是画质 / 机位等原因影响识别，仅供参考。
+                </Text>
+                {hiddenIssues.map((iss) => (
+                  <View key={iss.type} className='report__issue report__issue--hidden'>
+                    <View className='report__issue-head'>
+                      <Text className='report__issue-name'>{iss.name}</Text>
+                      <Text className={`report__severity report__severity--${iss.severity}`}>
+                        {SEVERITY_LABEL[iss.severity] || iss.severity}
+                      </Text>
+                    </View>
+                    <Text className='report__issue-desc'>{iss.description}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
         )}
       </View>
 
@@ -911,6 +988,56 @@ const ReportPage: FC = () => {
           返回首页
         </Button>
       </View>
+
+      {/* P2-W10-B4：engine_warnings 调试浮层。
+        * 触发条件：仅当 V2 报告（engine_version=v2）且有 warnings 才显示入口；V1 静默。
+        * 用途：让 PM / 教研在真机看 W8 落的 codec/HDR/慢动作/fps/audio 诊断，
+        *       验证 ai_engine probe 是否在生产环境真的命中各分支。
+        * UI 故意做得"灰、小、底部"——不打扰普通用户，只方便能看懂的人查问题。
+        */}
+      {report.engine_version === 'v2' && (report.engine_warnings?.length ?? 0) > 0 && (
+        <View className='report__engine-warnings'>
+          <View
+            className='report__engine-warnings-toggle'
+            onClick={() => setShowEngineWarnings((v) => !v)}
+          >
+            <Text className='report__engine-warnings-title'>
+              引擎诊断（{report.engine_warnings?.length}）· V2
+            </Text>
+            <Text className='report__engine-warnings-caret'>
+              {showEngineWarnings ? '收起 ▴' : '展开 ▾'}
+            </Text>
+          </View>
+          {showEngineWarnings && (
+            <View className='report__engine-warnings-body'>
+              {report.engine_warnings?.map((w, i) => (
+                <View
+                  key={`${w.code}-${i}`}
+                  className={`report__engine-warning report__engine-warning--${w.level}`}
+                >
+                  <Text className='report__engine-warning-code'>{w.code}</Text>
+                  {w.detail && (
+                    <Text className='report__engine-warning-detail'>{w.detail}</Text>
+                  )}
+                </View>
+              ))}
+              {report.feature_confidences &&
+                Object.keys(report.feature_confidences).length > 0 && (
+                  <View className='report__engine-warning-extra'>
+                    <Text className='report__engine-warning-extra-title'>特征可信度</Text>
+                    {Object.entries(report.feature_confidences)
+                      .sort(([, a], [, b]) => b - a)
+                      .map(([name, conf]) => (
+                        <Text key={name} className='report__engine-warning-extra-line'>
+                          {name}: {(conf * 100).toFixed(0)}%
+                        </Text>
+                      ))}
+                  </View>
+                )}
+            </View>
+          )}
+        </View>
+      )}
       </View>
       </ScrollView>
     </View>

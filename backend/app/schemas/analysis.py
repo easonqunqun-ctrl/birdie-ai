@@ -123,8 +123,30 @@ class IssueItem(BaseModel):
     key_frame_url: str | None = None
     key_frame_timestamp: float | None = None
     # P2-M7-06：每诊断置信度 + 档位（V1 路径为 None）
+    # confidence_tier: confirmed/leaning/hidden
+    #   - confirmed: 客户端正常展示
+    #   - leaning:   "可能存在……"语气
+    #   - hidden:    默认折叠到「AI 不太确定」区，避免低质量诊断打扰用户（W10-B3）
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     confidence_tier: Literal["confirmed", "leaning", "hidden"] | None = None
+
+
+class EngineWarningItem(BaseModel):
+    """P2-W10：W8 落地的引擎诊断条目，从 ai_engine.AnalyzeResult 原样透传.
+
+    code 取值参考 ai_engine/app/pipeline/engine_warnings.py KNOWN_CODES，含：
+    - 解码：decoded_h264 / decoded_hevc / decoded_vp9
+    - HDR：hdr_tonemapped
+    - 帧率：slowmo_detected / nominal_fps_used / fps_upsampled / fps_downsampled
+    - 音频：audio_kept / audio_dropped
+    - 灰度：fallback_to_v1
+    level: info（默认）/ warn / error；W10 客户端仅在调试浮层展示，不在主报告区显眼提示
+    """
+
+    code: str
+    level: Literal["info", "warn", "error"] = "info"
+    detail: str | None = None
+    ts: float | None = Field(default=None, description="Unix epoch 秒，由 ai_engine 生成")
 
 
 class RecommendationItem(BaseModel):
@@ -179,6 +201,11 @@ class AnalysisReportResponse(BaseModel):
     feature_confidences: dict[str, float] = Field(
         default_factory=dict,
         description="P2-M7-06 每特征 confidence",
+    )
+    # P2-W10：W8 引擎诊断（codec/HDR/慢动作/fps/audio/fallback），客户端调试浮层展示
+    engine_warnings: list[EngineWarningItem] = Field(
+        default_factory=list,
+        description="P2-W10 引擎诊断结构化条目；V1 引擎或老报告返回空数组",
     )
 
     share_card_url: str | None = None

@@ -86,6 +86,9 @@ export interface PhaseWindow {
   end: number
 }
 
+/** P2-M7-06：每诊断置信度档位（与 backend Literal 1:1） */
+export type IssueConfidenceTier = 'confirmed' | 'leaning' | 'hidden'
+
 export interface AnalysisIssueDetail {
   type: string
   name: string
@@ -93,6 +96,23 @@ export interface AnalysisIssueDetail {
   description: string
   key_frame_url?: string | null
   key_frame_timestamp?: number | null
+  /**
+   * P2-M7-06 + W10：每诊断置信度 0-1（V1 引擎为 null）+ 档位。
+   * 客户端按 confidence_tier 区分展示：
+   * - confirmed: 正常展示
+   * - leaning:   描述前缀加"可能存在……"语气
+   * - hidden:    默认折叠到「AI 不太确定」可展开区，避免低质量诊断打扰用户
+   */
+  confidence?: number | null
+  confidence_tier?: IssueConfidenceTier | null
+}
+
+/** P2-W10：W8 引擎诊断结构化条目（codec/HDR/慢动作/fps/audio/fallback） */
+export interface EngineWarning {
+  code: string
+  level: 'info' | 'warn' | 'error'
+  detail?: string | null
+  ts?: number | null
 }
 
 export interface AnalysisRecommendationDetail {
@@ -135,6 +155,21 @@ export interface AnalysisReportResponse {
    * 空数组或未返回表示无附加提示。
    */
   quality_warnings?: string[] | null
+  /**
+   * P2-M7-06：整体 AI 可信度 0-1。
+   * V1 引擎报告兜底 1.0；客户端 <0.5 触发 TrustBadge"建议重拍" CTA。
+   * 字段一定有值（backend schema NOT NULL DEFAULT 1.0）。
+   */
+  analysis_confidence?: number | null
+  /** P2-M7-06：每特征 confidence dict (feature_name → 0-1)；V1 引擎为 {} */
+  feature_confidences?: Record<string, number> | null
+  /**
+   * P2-W10：W8 引擎诊断结构化条目，仅在报告页"调试浮层"展示，不在主报告区显眼。
+   * V1 引擎或老报告为 [] / null。
+   */
+  engine_warnings?: EngineWarning[] | null
+  /** 引擎版本：V1 / V2 灰度区分（W5+ 由 ai_engine 返回；老报告兜底 v1） */
+  engine_version?: 'v1' | 'v2' | null
   /** 分享卡片（W7 再生成，MVP 期为 null） */
   share_card_url?: string | null
   error?: AnalysisErrorInfo | null

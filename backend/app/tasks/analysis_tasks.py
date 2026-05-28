@@ -336,6 +336,50 @@ async def _mark_completed(analysis_id: str, engine_result: dict) -> None:
             analysis.quality_warnings = [str(x) for x in qw if x is not None]
         else:
             analysis.quality_warnings = None
+
+        # P2-W10：把 W7+W8+W9 引擎产物落库——
+        # 此前 _mark_completed 完全丢弃 confidence + engine_warnings，导致客户端不管
+        # V2 多牛逼都只能看到 schema 默认 1.0 / [] / None。
+        ac = engine_result.get("analysis_confidence")
+        if isinstance(ac, (int, float)):
+            # 容错：ai_engine 偶发 NaN/Inf 时不写入，保留 model 默认 1.0
+            ac_val = float(ac)
+            if ac_val == ac_val and -1e9 < ac_val < 1e9:  # not NaN/Inf
+                analysis.analysis_confidence = max(0.0, min(1.0, ac_val))
+        fc = engine_result.get("feature_confidences")
+        if isinstance(fc, dict):
+            analysis.feature_confidences = {
+                str(k): max(0.0, min(1.0, float(v)))
+                for k, v in fc.items()
+                if isinstance(v, (int, float))
+            } or None
+        else:
+            analysis.feature_confidences = None
+        ew = engine_result.get("engine_warnings")
+        if isinstance(ew, list):
+            # 仅保留 schema 合法的字段，丢弃未知属性，避免历史 ai_engine 版本污染
+            normalized: list[dict] = []
+            for w in ew:
+                if not isinstance(w, dict) or "code" not in w:
+                    continue
+                normalized.append(
+                    {
+                        "code": str(w["code"]),
+                        "level": str(w.get("level", "info")),
+                        "detail": (
+                            str(w["detail"]) if w.get("detail") is not None else None
+                        ),
+                        "ts": (
+                            float(w["ts"])
+                            if isinstance(w.get("ts"), (int, float))
+                            else None
+                        ),
+                    }
+                )
+            analysis.engine_warnings = normalized or None
+        else:
+            analysis.engine_warnings = None
+
         analysis.analyzed_at = datetime.now(UTC)
 
         # 清掉旧子记录（幂等：重跑任务时不累加）
@@ -348,6 +392,17 @@ async def _mark_completed(analysis_id: str, engine_result: dict) -> None:
         # issues
         for idx, it in enumerate(engine_result.get("issues") or []):
             ts = it.get("key_frame_timestamp")
+            # P2-W10：落 issue 维度的 confidence + confidence_tier
+            issue_conf = it.get("confidence")
+            issue_conf_val: float | None = None
+            if isinstance(issue_conf, (int, float)):
+                cv = float(issue_conf)
+                if cv == cv and -1e9 < cv < 1e9:
+                    issue_conf_val = max(0.0, min(1.0, cv))
+            tier = it.get("confidence_tier")
+            tier_val: str | None = None
+            if isinstance(tier, str) and tier in {"confirmed", "leaning", "hidden"}:
+                tier_val = tier
             db.add(
                 AnalysisIssue(
                     id=new_id("iss"),
@@ -359,6 +414,8 @@ async def _mark_completed(analysis_id: str, engine_result: dict) -> None:
                     key_frame_url=it.get("key_frame_url"),
                     key_frame_timestamp=ts,
                     sort_order=idx,
+                    confidence=issue_conf_val,
+                    confidence_tier=tier_val,
                 )
             )
         # recommendations
