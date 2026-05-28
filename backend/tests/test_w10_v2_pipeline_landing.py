@@ -90,7 +90,7 @@ def _v2_engine_result(analysis_id: str) -> dict[str, Any]:
 
 async def _insert_user_and_analysis() -> tuple[str, str]:
     """直接在 DB 建一个 user + 一个 status=processing 的 analysis，返回 (user_id, analysis_id)."""
-    from app.db.session import AsyncSessionLocal
+    from app.core.database import AsyncSessionLocal
 
     user_id = new_id("usr")
     analysis_id = new_id("ana")
@@ -123,7 +123,7 @@ async def _insert_user_and_analysis() -> tuple[str, str]:
 @pytest.mark.asyncio
 async def test_mark_completed_lands_v2_confidence_and_engine_warnings():
     """_mark_completed 真把 V2 引擎 6 字段落到 DB."""
-    from app.db.session import AsyncSessionLocal
+    from app.core.database import AsyncSessionLocal
     from app.tasks.analysis_tasks import _mark_completed
 
     _, analysis_id = await _insert_user_and_analysis()
@@ -160,7 +160,7 @@ async def test_mark_completed_lands_v2_confidence_and_engine_warnings():
 @pytest.mark.asyncio
 async def test_get_report_returns_v2_confidence_and_engine_warnings():
     """service.get_report 真把 V2 字段透传到 AnalysisReportResponse."""
-    from app.db.session import AsyncSessionLocal
+    from app.core.database import AsyncSessionLocal
     from app.services.analysis_service import get_report
     from app.tasks.analysis_tasks import _mark_completed
 
@@ -188,7 +188,7 @@ async def test_get_report_returns_v2_confidence_and_engine_warnings():
 @pytest.mark.asyncio
 async def test_mark_completed_handles_missing_v2_fields_gracefully():
     """V1 引擎或老 ai_engine 返回不含新字段时 → 用 model 默认值不崩."""
-    from app.db.session import AsyncSessionLocal
+    from app.core.database import AsyncSessionLocal
     from app.tasks.analysis_tasks import _mark_completed
 
     _, analysis_id = await _insert_user_and_analysis()
@@ -225,7 +225,7 @@ async def test_mark_completed_handles_missing_v2_fields_gracefully():
 @pytest.mark.asyncio
 async def test_mark_completed_rejects_malformed_v2_values():
     """V2 字段类型异常 / NaN / 未知 tier → 容错丢弃，不破坏主写入路径."""
-    from app.db.session import AsyncSessionLocal
+    from app.core.database import AsyncSessionLocal
     from app.tasks.analysis_tasks import _mark_completed
 
     _, analysis_id = await _insert_user_and_analysis()
