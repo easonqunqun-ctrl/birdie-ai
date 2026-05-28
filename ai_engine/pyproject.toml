@@ -31,6 +31,10 @@ dependencies = [
     "pyarrow>=16.0.0,<19",
     # P2-M7-10：规则 V2 走 YAML 配置；运维与教研可在不改代码的情况下灰度新规则
     "pyyaml>=6.0.0,<7",
+    # P2-W6 ENG-A2：让 version_router.set_rollout_pct() 真的能写进 Redis，
+    # 不再 ModuleNotFoundError → 灰度 pct 可热改不重启 ai_engine 容器。
+    # ＞=5,<6：与 backend 用的 redis-py 主版本对齐，避免分歧。
+    "redis>=5,<6",
 ]
 
 [project.optional-dependencies]

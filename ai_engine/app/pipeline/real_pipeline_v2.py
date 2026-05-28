@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import logging
 
+from app import metrics
 from app.pipeline.constants import issue_meta
 from app.pipeline.diagnose import (
     DiagnosedIssue,
@@ -192,6 +193,7 @@ async def run_real_analysis_v2(req: AnalyzeRequest) -> AnalyzeResult:
             "v2_resources_unavailable_falling_back_to_v1",
             extra={"analysis_id": req.analysis_id, "err": repr(exc)},
         )
+        metrics.incr("v2_fallback_count")
 
     return await run_real_analysis(req, diagnose_fn=diagnose_impl)
 

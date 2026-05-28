@@ -13,9 +13,12 @@
 | **W2** | **画像 2.0** | P2-M9-03 UI | onboarding 2.0 + 画像编辑页（对接已有 `profile-v2` API） | **✅ Done**（`5f0e9df`） |
 | **W3** | **常去球馆 + 考核** | P2-M9-05 · P2-M11-04 | 球馆选择 UI；阶段考核 mock → 真实现 | **✅ Done**（`2f69ff0`） |
 | **W4** | **引擎续做** | P2-M7-10 · M7-14 · M7-N1 | YAML 规则 starter + V2 路由打通 + drill 文案 D-6 | **✅ Done**（`e618a77`） |
-| **W5** | **引擎深耕** | P2-M7-10 · M7-14 | V1→V2 全量 14 规则迁 YAML；features dict 外提让 V2 真正重诊 | **✅ Done**（待 commit） |
+| **W5** | **引擎深耕** | P2-M7-10 · M7-14 | V1→V2 全量 14 规则迁 YAML；features dict 外提让 V2 真正重诊 | **✅ Done**（`6afffda` · backend hotfix `a37499a`） |
+| **W6** | **V2 灌溉** | ENG-A1 · ENG-A2 · ENG-A3 | metrics 观测 + redis 热改 pct + 离线 V1/V2 diff 脚本 | 🚧 In Progress |
 
 **并行泳道（不占 Sprint 主表）**：U-2 COS · Q-B5 papay · O-01/O-04 性能抽测 · par-E3/par-T1
+
+**线上灰度状态**：W5 部署后 V2 pct=5（`.env.local`，CVM 容器内验证 1000 user_id → 49 命中 V2 ≈ 4.9%）。
 
 ---
 
@@ -75,6 +78,22 @@
 
 ---
 
+## W6 · V2 灌溉验收
+
+> **目标**：让 V2 灰度可观测、可热改、可定量对比，**为推 50% → 100% 铺路**。
+
+| # | 验收项 |
+|---|--------|
+| 1 | `ai_engine` 内进程级计数器：`v1_count` / `v2_count` / `v2_errors` / `v1_errors`；新增 `GET /metrics` 返回 JSON（含 pct + 各计数 + uptime_s） |
+| 2 | `analyze_done` structlog 字段含 `engine_version`（已在 W4 落地）；本批补 `engine_v2_fallback` warning（V2 资源加载失败回落 V1 时） |
+| 3 | `ai_engine/pyproject.toml` 新增 `redis>=5,<6`；`set_rollout_pct` 写 Redis 成功（不再 `ModuleNotFoundError`），多容器场景下 60s TTL 内全 ai_engine 实例对齐 |
+| 4 | `/admin/engine-rollout` 端点支持可选 `X-Admin-Token` 鉴权（环境变量 `AI_ENGINE_ADMIN_TOKEN` 配置；未配则保持向后兼容允许内网调用） |
+| 5 | `scripts/v1_v2_diff.py`：输入 N 个 swing_analysis_id → 各以 `force_engine_version` 强制跑 V1 / V2 → 输出 diff CSV（issues 类型集合 / 各 issue severity / overall_score）+ 一致率汇总 |
+| 6 | 单测：metrics 计数器 race-safe、Redis 路径 mock 注入、`/admin/engine-rollout` 鉴权 401/200 路径 |
+| 7 | 生产 smoke：`curl http://ai_engine:9100/metrics` 看到 v1/v2 计数随真实流量增长；CVM 内 `python -c "set_rollout_pct(5)"` 写入 Redis 成功 |
+
+---
+
 ## 文档债（W1 后补）
 
 - [`docs/02`](../02-API接口设计文档.md) 增补 M13 约球 / venues 端点（后端已落地，文档未同步）
@@ -90,4 +109,5 @@
 | 2026-05-28 | W2 ✅（`5f0e9df`）：6 步 onboarding + 我的画像编辑页 |
 | 2026-05-28 | W3 ✅（`2f69ff0`）：常去球馆页 + 课程详情阶段考核 UI |
 | 2026-05-28 | W4 ✅（`e618a77`）：M7-10 YAML loader + starter 5 规则 + locale；M7-14 `real_pipeline_v2` + main.py 灰度路由；M7-N1 D-6 修复 |
-| 2026-05-28 | W5 ✅（待 commit）：YAML 全量 14 规则 + `phase_anchor` + `diagnose_fn` 注入；V2 通过 features 真正重诊 |
+| 2026-05-28 | W5 ✅（`6afffda`）：YAML 全量 14 规则 + `phase_anchor` + `diagnose_fn` 注入；V2 通过 features 真正重诊。backend hotfix `a37499a` 修 W3 `lessons.py` import 错路径 |
+| 2026-05-28 | W5 部署：`make publish-backend-cvm`；`.env.local` 加 `M7_V2_ROLLOUT_PCT=5`，V2 灰度 5% 生效；W6 V2 灌溉开工 |

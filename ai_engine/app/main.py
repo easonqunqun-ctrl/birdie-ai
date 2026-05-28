@@ -1,13 +1,17 @@
 """AI Engine 服务入口."""
 
 import logging
+import os
 import sys
+import time
 from contextlib import asynccontextmanager
 
 import structlog
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, Header, HTTPException, status
+from pydantic import BaseModel, Field
 
 from app import __version__
+from app import metrics
 from app.config import settings
 from app.errors import PipelineError
 from app.mock_pipeline import run_mock_analysis
@@ -96,6 +100,9 @@ async def analyze(req: AnalyzeRequest) -> AnalyzeResult:
         rollout_pct=get_rollout_pct(),
     )
 
+    started_at = time.perf_counter()
+    metrics.incr(f"{engine_version}_count")
+
     if settings.AI_ENGINE_MOCK_MODE:
         result = await run_mock_analysis(req)
     else:
@@ -130,33 +137,84 @@ async def analyze(req: AnalyzeRequest) -> AnalyzeResult:
     # 2) 强制把灰度判定写回 result，覆盖 pipeline 内部默认值
     result.engine_version = engine_version
 
+    # 3) metrics：以 result.status 为准统一记账，避免 except 和外层重复 +1
+    latency_ms = (time.perf_counter() - started_at) * 1000
+    if result.status == "failed":
+        metrics.incr(f"{engine_version}_errors")
+    else:
+        metrics.record_latency(engine_version, latency_ms)
+
     log.info(
         "analyze_done",
         analysis_id=req.analysis_id,
         status=result.status,
         overall_score=result.overall_score,
         engine_version=engine_version,
+        latency_ms=round(latency_ms, 1),
     )
     return result
+
+
+@app.get("/metrics", summary="W6 ENG-A1 · 进程级 V1/V2 计数器")
+async def get_metrics() -> dict:
+    """返回当前进程的 v1/v2 命中数、错误率、平均耗时、流量比。
+
+    用法：``curl http://ai_engine:9000/metrics``；
+    `v2_traffic_ratio` 与当前 `rollout_pct` 对齐说明灰度真的在按比例分流。
+    """
+    return {
+        "rollout_pct": get_rollout_pct(),
+        "mock_mode": settings.AI_ENGINE_MOCK_MODE,
+        **metrics.snapshot(),
+    }
+
+
+class _RolloutPayload(BaseModel):
+    """``/admin/engine-rollout`` 入参；只接受 0–100。"""
+
+    pct: int = Field(..., ge=0, le=100, description="V2 灰度百分比")
+    force: bool = Field(False, description="``new_pct < previous_pct`` 时需 True")
+
+
+def _require_admin_token(
+    x_admin_token: str | None = Header(default=None, alias="X-Admin-Token"),
+) -> None:
+    """W6 ENG-A2 · 可选 admin token 鉴权.
+
+    - 环境变量 ``AI_ENGINE_ADMIN_TOKEN`` 未配 → 允许所有调用（与 W5 兼容，
+      此时安全靠「容器只在 docker 内网 + 9100 端口未对公网」兜底）；
+    - 配置后 → 必须带 ``X-Admin-Token`` header 且值匹配，否则 401。
+
+    使用建议：CVM 上线后请在 ``.env.local`` 配 ``AI_ENGINE_ADMIN_TOKEN=<random>``，
+    并让 backend 通过 ``httpx.headers`` 转发；这样即使将来不慎暴露 9100
+    端口也能挡住盲扫。
+    """
+    expected = os.environ.get("AI_ENGINE_ADMIN_TOKEN")
+    if not expected:
+        return
+    if not x_admin_token or x_admin_token != expected:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="invalid_admin_token",
+        )
 
 
 @app.post(
     "/admin/engine-rollout",
     summary="M7-14 设置 V2 灰度比例",
+    dependencies=[Depends(_require_admin_token)],
 )
-async def admin_engine_rollout(payload: dict) -> dict:
+async def admin_engine_rollout(payload: _RolloutPayload) -> dict:
     """设置 ``M7_V2_ROLLOUT_PCT``（FR-3 配置中心）.
 
     Body: ``{"pct": 25, "force": false}``；``new_pct < previous_pct`` 需 force=True。
 
-    生产环境应在 nginx / API gateway 层加 admin token 拦截（本任务仅暴露
-    ai_engine 内部端点，不直接接到公网）。
+    W6 ENG-A2：支持可选 ``X-Admin-Token`` header 鉴权（见 ``_require_admin_token``）；
+    且依赖 ``redis`` 客户端（同 W6 加入 pyproject）真正把 pct 写进 Redis，
+    多实例 60s TTL 内对齐。
     """
-
-    pct = int(payload.get("pct", 0))
-    force = bool(payload.get("force", False))
     try:
-        out = set_rollout_pct(pct, force=force)
+        out = set_rollout_pct(payload.pct, force=payload.force)
     except RolloutDowngradeRequiresForce as exc:
         return {
             "code": 40010,
