@@ -200,6 +200,33 @@
     color: #fff;
   }
 
+  /* =========== P2-W11：V2 报告可信度小标签 =========== */
+  /* 与 TrustBadge 色板一致（高=mint / 中=gold / 低=warning），但卡片场景做的小一号 */
+  &__trust {
+    flex-shrink: 0;
+    font-size: var(--font-size-xs);
+    padding: 2rpx 12rpx;
+    border-radius: var(--radius-sm);
+    line-height: 1.5;
+    font-weight: 600;
+    white-space: nowrap;
+
+    &--high {
+      background: var(--color-accent-mint-soft, var(--color-accent-mint));
+      color: var(--color-accent-mint-dark, var(--color-accent-mint));
+    }
+
+    &--medium {
+      background: var(--color-gold-soft, var(--color-gold));
+      color: var(--color-gold-dark, var(--color-gold));
+    }
+
+    &--low {
+      background: var(--color-warning-soft, var(--color-bg-elevated));
+      color: var(--color-warning);
+    }
+  }
+
   &__date {
     font-size: var(--font-size-xs);
     color: var(--color-text-tertiary);

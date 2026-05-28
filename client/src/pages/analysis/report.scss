@@ -66,21 +66,6 @@
     line-height: 1.5;
   }
 
-  /* ================= 顶部工具条（删除入口） ================= */
-  &__toolbar {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    margin-bottom: 12rpx;
-    padding: 0 4rpx;
-  }
-
-  &__toolbar-more {
-    font-size: 28rpx;
-    color: var(--color-primary);
-    padding: 8rpx 12rpx;
-  }
-
   /* ================= 1. 视频 ================= */
   &__video-wrap {
     background: #000;
@@ -129,7 +114,7 @@
   }
 
   &__phasebar-label {
-    font-size: 22rpx;
+    font-size: 24rpx;
     color: rgba(255, 255, 255, 0.92);
     font-weight: 500;
   }
@@ -148,7 +133,7 @@
   }
 
   &__rates-label {
-    font-size: 26rpx;
+    font-size: 28rpx;
     opacity: 0.75;
   }
 
@@ -160,7 +145,7 @@
   &__rate {
     padding: 6rpx 20rpx;
     border-radius: var(--radius-sm);
-    font-size: 26rpx;
+    font-size: 28rpx;
     color: rgba(255, 255, 255, 0.65);
     background: rgba(255, 255, 255, 0.08);
 
@@ -218,7 +203,7 @@
 
   &__score-caption {
     display: block;
-    font-size: 26rpx;
+    font-size: 28rpx;
     margin-top: 8rpx;
     opacity: 0.88;
     word-break: break-word;
@@ -329,7 +314,7 @@
   }
 
   &__meta-item {
-    font-size: 26rpx;
+    font-size: 28rpx;
     color: var(--color-text-secondary);
     background: var(--color-bg-card);
     padding: 8rpx 16rpx;

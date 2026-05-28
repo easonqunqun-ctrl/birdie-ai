@@ -190,6 +190,10 @@ export interface AnalysisListItem {
   score_change?: number | null
   analyzed_at?: string | null
   created_at: string
+  // P2-W11：让历史卡片能贴 V2 可信度小标签（高/中/低）+ V2 角标
+  // V1 / 老报告 engine_version 缺省 "v1"，analysis_confidence null 时前端不渲染小标签
+  engine_version?: 'v1' | 'v2' | null
+  analysis_confidence?: number | null
 }
 
 /** 免费用户历史报告被截断时的元信息（与 backend AnalysisListPaywall 对齐）。 */

@@ -27,6 +27,7 @@ import {
   radarPoint,
   truncateLabel,
 } from './posterLayout'
+import { formatTrustCompactLabel, resolveTrustTier } from './trustLabel'
 
 /** 评级 → 中文标题（与 SCORE_LEVEL_META.label 对齐） */
 export const POSTER_LEVEL_LABEL: Record<AnalysisScoreLevel, string> = {
@@ -110,7 +111,16 @@ export function drawPoster(
 
   drawBackground(ctx, accent)
   drawHeader(ctx)
-  drawScoreCard(ctx, input.overallScore, level, accent, input.clubLabel, input.cameraAngleLabel)
+  drawScoreCard(
+    ctx,
+    input.overallScore,
+    level,
+    accent,
+    input.clubLabel,
+    input.cameraAngleLabel,
+    input.engineVersion,
+    input.analysisConfidence,
+  )
   drawRadar(ctx, input.phaseScores, input.phaseLabels, accent)
   const issuesDrawn = drawIssues(ctx, input.topIssues, accent)
   drawWxaCode(ctx, assets.wxaCodeImage, accent)
@@ -169,6 +179,8 @@ function drawScoreCard(
   accent: string,
   clubLabel: string,
   cameraLabel: string,
+  engineVersion: PosterInput['engineVersion'],
+  analysisConfidence: PosterInput['analysisConfidence'],
 ): void {
   const cardX = 60
   const cardY = 280
@@ -206,6 +218,21 @@ function drawScoreCard(
   ctx.textAlign = 'right'
   const meta = `${truncateLabel(clubLabel, 10)} · ${truncateLabel(cameraLabel, 10)}`
   ctx.fillText(meta, cardX + cardW - 40, cardY + cardH - 36)
+
+  if (engineVersion === 'v2' && analysisConfidence != null) {
+    const tier = resolveTrustTier(analysisConfidence)
+    const trustText = formatTrustCompactLabel(analysisConfidence)
+    const trustColor =
+      tier === 'high'
+        ? POSTER_COLORS.accentMint
+        : tier === 'medium'
+          ? POSTER_COLORS.gold
+          : POSTER_COLORS.warning
+    ctx.textAlign = 'left'
+    ctx.fillStyle = trustColor
+    ctx.font = '600 22px sans-serif'
+    ctx.fillText(trustText, cardX + 40, cardY + cardH - 36)
+  }
 }
 
 function scoreWidthEstimate(score: number | null | undefined): number {

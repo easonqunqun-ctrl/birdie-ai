@@ -224,6 +224,10 @@ class AnalysisListItem(BaseModel):
     status: AnalysisStatus
     analyzed_at: datetime | None = None
     created_at: datetime
+    # P2-W11：列表卡片可信度小标签 + V2 角标用
+    # V1 / 老报告 engine_version 缺省按 "v1" 兜底；analysis_confidence 缺省 null（前端不渲染小标签）
+    engine_version: Literal["v1", "v2"] = "v1"
+    analysis_confidence: float | None = None
 
 
 class AnalysisListQuery(BaseModel):

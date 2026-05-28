@@ -457,6 +457,7 @@
   }
 
   &__quick-arrow {
+    flex-shrink: 0;
     font-size: 38rpx;
     color: var(--color-text-tertiary);
     font-weight: 300;

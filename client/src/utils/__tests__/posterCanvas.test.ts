@@ -86,6 +86,28 @@ describe('drawPoster · 正常场景', () => {
     expect(texts.some((t) => t.includes('7 号铁'))).toBe(true)
   })
 
+  it('V2 报告在分数卡左下角绘制可信度标签', () => {
+    const ctx = createMockCtx()
+    drawPoster(ctx, {
+      ...baseInput,
+      engineVersion: 'v2',
+      analysisConfidence: 0.806,
+    })
+    const texts = fillTexts(ctx.calls)
+    expect(texts).toContain('AI 高可信 81%')
+  })
+
+  it('V1 报告不在海报上绘制可信度标签', () => {
+    const ctx = createMockCtx()
+    drawPoster(ctx, {
+      ...baseInput,
+      engineVersion: 'v1',
+      analysisConfidence: 1.0,
+    })
+    const texts = fillTexts(ctx.calls)
+    expect(texts.some((t) => t.startsWith('AI 高可信'))).toBe(false)
+  })
+
   it('雷达图绘制至少 5 圈背景（每圈一次 beginPath/closePath/stroke）', () => {
     const ctx = createMockCtx()
     drawPoster(ctx, baseInput)

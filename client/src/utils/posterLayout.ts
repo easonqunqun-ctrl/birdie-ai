@@ -166,6 +166,10 @@ export interface PosterInput {
   topIssues: string[]
   /** 拍摄角度（"正面" / "侧面" 等） */
   cameraAngleLabel: string
+  /** P2-W11：V2 整体可信度 0-1；null 时不绘制 */
+  analysisConfidence?: number | null
+  /** P2-W11：仅 v2 时在海报上展示可信度条 */
+  engineVersion?: 'v1' | 'v2' | null
 }
 
 /** 截断中文/英文 label，避免标签溢出 Canvas */

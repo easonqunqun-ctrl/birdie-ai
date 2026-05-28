@@ -9,6 +9,9 @@
   padding: 24rpx 28rpx 160rpx;
   background: var(--color-bg);
   box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 
   &--blocked {
     align-items: center;

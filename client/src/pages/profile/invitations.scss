@@ -7,6 +7,9 @@
   background: var(--color-bg);
   min-height: 100%;
   box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 
   &--loading,
   &--error {

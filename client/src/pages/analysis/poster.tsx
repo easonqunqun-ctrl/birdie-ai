@@ -216,6 +216,8 @@ const PosterPage: FC = () => {
           thumbnailUrl: report.thumbnail_url || null,
           wxaCodeUrl: wxaCodeUrl || null,
           topIssues,
+          engineVersion: report.engine_version ?? null,
+          analysisConfidence: report.analysis_confidence ?? null,
         },
         { wxaCodeImage: wxaImage, thumbnailImage: null },
       )

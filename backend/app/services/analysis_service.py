@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
@@ -135,6 +136,27 @@ def coerce_optional_db_int(val: Any, *, field: str, analysis_id: str | None = No
             extra={"analysis_id": analysis_id, "field": field, "raw": repr(val)},
         )
         return None
+
+
+def _coerce_list_confidence(val: Any) -> float | None:
+    """P2-W11：列表卡片 V2 可信度 sanitize。
+
+    历史 V1 报告 / 异常落库的 NaN / Inf / 越界值都 → None，前端就不渲染小标签
+    （不会让 Pydantic 在边界 validation 抛 500）。
+    """
+    if val is None:
+        return None
+    try:
+        f = float(val)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(f):
+        return None
+    if f < 0.0:
+        return 0.0
+    if f > 1.0:
+        return 1.0
+    return f
 
 
 if TYPE_CHECKING:
@@ -750,6 +772,13 @@ async def list_analyses(
             status=normalize_analysis_status(r.status, analysis_id=r.id),
             analyzed_at=r.analyzed_at,
             created_at=r.created_at,
+            # P2-W11：V2 字段透传；V1 老报告 engine_version 缺省 "v1"，analysis_confidence None 让前端不渲染小标签
+            engine_version=(
+                getattr(r, "engine_version", None) or "v1"
+            ),  # type: ignore[arg-type]
+            analysis_confidence=_coerce_list_confidence(
+                getattr(r, "analysis_confidence", None)
+            ),
         )
         for r in rows
     ]

@@ -308,12 +308,14 @@
 
   &__menu-label {
     flex: 1;
+    min-width: 0;
     font-size: 32rpx;
     color: var(--color-text-primary);
     font-weight: 500;
   }
 
   &__menu-arrow {
+    flex-shrink: 0;
     font-size: 32rpx;
     color: var(--color-text-tertiary);
     font-weight: 300;

@@ -3,11 +3,15 @@
  */
 
 .favorite-venues {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
   padding: 32rpx 28rpx 0;
   background: var(--color-bg);
+  overflow: hidden;
 
   &--empty,
   &--blocked {
@@ -15,9 +19,13 @@
     justify-content: center;
     padding: 80rpx 32rpx;
     color: var(--color-text-muted);
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
   }
 
   &__header {
+    flex-shrink: 0;
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -48,6 +56,9 @@
 
   &__list {
     flex: 1;
+    height: 0;
+    width: 100%;
+    box-sizing: border-box;
     margin-bottom: 24rpx;
   }
 
@@ -59,6 +70,8 @@
   }
 
   &__card {
+    box-sizing: border-box;
+    width: 100%;
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -74,6 +87,7 @@
     display: flex;
     flex-direction: column;
     flex: 1;
+    min-width: 0;
     margin-right: 16rpx;
   }
 
@@ -82,14 +96,17 @@
     font-weight: 600;
     color: var(--color-text);
     margin-bottom: 8rpx;
+    word-break: break-word;
   }
 
   &__card-meta {
     font-size: var(--font-size-xs);
     color: var(--color-text-muted);
+    word-break: break-word;
   }
 
   &__remove {
+    flex-shrink: 0;
     padding: 8rpx 20rpx;
     border: 1rpx solid var(--color-error);
     border-radius: 24rpx;
@@ -138,7 +155,9 @@
   }
 
   &__footer {
-    padding: 16rpx 0 48rpx;
+    flex-shrink: 0;
+    padding: 16rpx 0 calc(48rpx + env(safe-area-inset-bottom));
+    background: var(--color-bg);
   }
 
   &__add-btn {

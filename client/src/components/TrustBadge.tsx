@@ -14,24 +14,20 @@
 
 import { FC } from 'react'
 import { View, Text } from '@tarojs/components'
+import {
+  resolveTrustTier,
+  shouldRecommendRetake,
+  type TrustTier,
+} from '@/utils/trustLabel'
 import './TrustBadge.scss'
 
-export type TrustTier = 'high' | 'medium' | 'low'
-
-export const HIGH_CONFIDENCE_THRESHOLD = 0.75
-export const LOW_CONFIDENCE_THRESHOLD = 0.5
-
-export function resolveTrustTier(confidence: number | null | undefined): TrustTier {
-  const value = confidence ?? 1.0
-  if (value >= HIGH_CONFIDENCE_THRESHOLD) return 'high'
-  if (value >= LOW_CONFIDENCE_THRESHOLD) return 'medium'
-  return 'low'
-}
-
-export function shouldRecommendRetake(confidence: number | null | undefined): boolean {
-  const value = confidence ?? 1.0
-  return value < LOW_CONFIDENCE_THRESHOLD
-}
+export type { TrustTier } from '@/utils/trustLabel'
+export {
+  HIGH_CONFIDENCE_THRESHOLD,
+  LOW_CONFIDENCE_THRESHOLD,
+  resolveTrustTier,
+  shouldRecommendRetake,
+} from '@/utils/trustLabel'
 
 const TIER_COPY: Record<TrustTier, { title: string; hint: string }> = {
   high: {

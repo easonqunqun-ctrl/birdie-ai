@@ -8,7 +8,7 @@
  *   4. 问题诊断（按 severity 排序 + 关键帧图 + 点击跳帧）
  *   5. 训练建议（drill 详情卡 + 「一键加入本周训练计划」→ POST /training-plan/from-analysis）
  *   6. 底部动作栏（分享：`open-type=share`；对比历史→报告列表；问 AI：`switchToCoach`）
- *   7. 删除：仅顶部「更多」操作表（不做左滑，避免与纵向滚动、视频手势冲突）
+ *   7. 删除：在「我的报告」列表左滑删除；报告页不再单独放「更多」入口
  *
  * 关键工程决策：
  *   - `phase_scores / phase_timestamps` 是 dict[str, {...}]，需要遍历 PHASE_ORDER
@@ -48,6 +48,7 @@ import {
   type VideoPlaybackMode,
 } from '@/utils/reportPlayback'
 import { groupIssuesByConfidence, ISSUE_SEVERITY_ORDER } from '@/utils/issueConfidenceGroup'
+import { resolveTrustTier } from '@/utils/trustLabel'
 import RadarChart, { RadarAxis } from '@/components/RadarChart'
 import '@/components/RadarChart.scss'
 import TrustBadge from '@/components/TrustBadge'
@@ -328,10 +329,22 @@ const ReportPage: FC = () => {
     Taro.navigateTo({ url: '/pages/help/score-guide?from=report' }).catch(toastTabNavigationFailure)
   }
 
-  // ---------------- 分享（W7-T5）----------------
+  // ---------------- 分享（W7-T5 / P2-W11）----------------
   // 小程序分享只能通过「右上角胶囊 · 转发给朋友」或 `<Button open-type='share'>` 触发
   // （`Taro.shareAppMessage` 自 2024 起已在各小程序平台禁用）。
   // 底部的「分享报告」按钮改造成 `openType='share'`，点击会直接唤起原生转发面板。
+  //
+  // P2-W11：V2 高可信报告在 title 上加「· AI 高可信」后缀，让被分享方一眼看出
+  // 这是经过 V2 引擎置信加权的报告（提升分享接收方的信任 & 二次点击率）；中/低
+  // 可信 V2 报告不挂尾巴（避免误导），V1 老报告完全不动。
+  const buildShareTrustSuffix = (): string => {
+    // publicReport（被分享人视角）不包含 engine_version/analysis_confidence，所以
+    // 只在自己看自己的报告时才能贴；这正好是分享发起方的视角。
+    if (!report || report.engine_version !== 'v2') return ''
+    if (typeof report.analysis_confidence !== 'number') return ''
+    if (resolveTrustTier(report.analysis_confidence) !== 'high') return ''
+    return ' · AI 高可信'
+  }
   useShareAppMessage(() => {
     const score = report?.overall_score ?? publicReport?.overall_score
     const clubLabel = report
@@ -339,9 +352,10 @@ const ReportPage: FC = () => {
       : publicReport
       ? CLUB_TYPE_LABEL[publicReport.club_type as keyof typeof CLUB_TYPE_LABEL] ?? '挥杆'
       : '挥杆'
+    const suffix = buildShareTrustSuffix()
     const title = score
-      ? `我的${clubLabel}挥杆打了 ${score} 分，你来挑战一下？`
-      : `我用小鸟 AI 分析了挥杆，你来看看`
+      ? `我的${clubLabel}挥杆打了 ${score} 分，你来挑战一下？${suffix}`
+      : `我用小鸟 AI 分析了挥杆，你来看看${suffix}`
     return {
       title,
       path: `/pages/analysis/report?id=${analysisId}&from_share=1`,
@@ -360,9 +374,10 @@ const ReportPage: FC = () => {
       : publicReport
         ? CLUB_TYPE_LABEL[publicReport.club_type as keyof typeof CLUB_TYPE_LABEL] ?? '挥杆'
         : '挥杆'
+    const suffix = buildShareTrustSuffix()
     const title = score
-      ? `我的${clubLabel}挥杆 ${score} 分 · 领翼golf`
-      : '领翼golf 挥杆 AI 分析报告'
+      ? `我的${clubLabel}挥杆 ${score} 分 · 领翼golf${suffix}`
+      : `领翼golf 挥杆 AI 分析报告${suffix}`
     return {
       title,
       query: analysisId ? `id=${analysisId}&from_share=1` : '',
@@ -424,43 +439,6 @@ const ReportPage: FC = () => {
         ? { analysisId, prefill }
         : { prefill }
     switchToCoach(ctx).catch(toastTabNavigationFailure)
-  }
-
-  /**
-   * 删除入口（软删除，列表页同步消失）。
-   * 仅从顶部「⋯ / 更多」操作表唤起，避免正文区再放红色删除按钮打断阅读。
-   */
-  const handleDeleteReport = () => {
-    if (!analysisId || analysisId === 'sample') return
-    Taro.showModal({
-      title: '删除报告',
-      content: '删除后无法在「我的报告」中查看此条记录，确认删除？',
-      confirmText: '删除',
-      confirmColor: '#ef4444',
-      success: async (res) => {
-        if (!res.confirm) return
-        try {
-          await analysisService.deleteAnalysis(analysisId)
-          Taro.showToast({ title: '已删除', icon: 'success' })
-          setTimeout(() => {
-            Taro.navigateBack().catch(() => {
-              Taro.redirectTo({ url: '/pages/analysis/history' }).catch(() => undefined)
-            })
-          }, 400)
-        } catch {
-          /* toast 由 http */
-        }
-      },
-    })
-  }
-
-  const openReportMoreMenu = () => {
-    Taro.showActionSheet({
-      itemList: ['删除此报告'],
-      success: (res) => {
-        if (res.tapIndex === 0) handleDeleteReport()
-      },
-    }).catch(() => undefined)
   }
 
   // ---------------- 渲染 ----------------
@@ -590,13 +568,6 @@ const ReportPage: FC = () => {
           <Text className='report__sample-banner-icon'>🎬</Text>
           <Text className='report__sample-banner-text'>
             这是演示报告，用真实数据展示 AI 能发现的问题；不消耗你的分析次数。
-          </Text>
-        </View>
-      )}
-      {!isSample && (
-        <View className='report__toolbar'>
-          <Text className='report__toolbar-more' onClick={openReportMoreMenu}>
-            更多
           </Text>
         </View>
       )}

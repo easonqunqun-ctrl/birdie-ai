@@ -19,6 +19,7 @@
 | **W8** | **V2 元数据探测灌入 engine_warnings** | P2-M7-02 · P2-W8 ENG-C | V2 入口 ffprobe 原始 URL → codec / hdr / slowmo / fps / audio 落入 `engine_warnings`；pipeline 主体仍走 V1，fps/timing 不变；探测失败静默兜底 | **✅ Done**（`4723bb0`） |
 | **W9** | **V2 enrichment 精算** | P2-M7-06 · P2-W9 ENG-D | feature_confidence 按 landmark 子矩阵 × phase 窗口实算（不再一锅 mean_vis）；issue_confidence 按 feature value vs threshold 归一化距离实算（不再固定 td=0.5）；多 AND 条件取 min td；handedness 动态选 lead 手腕/肘 | **✅ Done**（`efa5f86` · review hotfix `69047a1`） |
 | **W10** | **客户端 V2 兑现 · 服务端管道补全** | P2-M7-06 · P2-W10 | 修复 backend `_mark_completed` 完全丢弃 W7+W8+W9 字段的管道断点（`analysis_confidence` / `feature_confidences` / `engine_warnings` / `issue.confidence` / `confidence_tier`）；client `report.tsx` 接 TrustBadge（低 tier 弹重拍 CTA）+ hidden issues 折叠到「AI 不太确定」区 + V2 engine_warnings 调试浮层；alembic 0025 加 `swing_analyses.engine_warnings` 列 | **✅ Done**（`f7aa790` · 测试 fix `68f01ba` · CVM 4/4 backend + 18/18 client + alembic 0025 已生效） |
+| **W11** | **V2 入口与分享面** | P2-M7-06 · P2-W11 | `GET /v1/analyses` 列表 schema 加 `engine_version` + `analysis_confidence`（V1 老报告兜底）；客户端历史卡片对 V2 报告贴「AI 高/中/低可信」mini 标签（V1 不渲染避免噪声）；`useShareAppMessage` / `useShareTimeline` 对 V2 **高可信**报告在 title 尾加「· AI 高可信」后缀；海报 `drawScoreCard` 在 V2 报告右上角画 trust compact 标签 | **🟡 Doing** |
 
 **并行泳道（不占 Sprint 主表）**：U-2 COS · Q-B5 papay · O-01/O-04 性能抽测 · par-E3/par-T1
 
@@ -169,6 +170,30 @@
 | 7 | 单测覆盖：lead/trail 手别判定；phase frame 窗口（含 num_frames=0 边界）；visibility 子矩阵抠取；td 各 operator + scale 归一化 + clamp；issue td 短板；端到端 enrich——脚踝可见但肩腕遮挡时 finish_balance 高 / spine 低、issue 远离阈值 conf 高 / 临界值 conf 低、左右撇子 lead 手别正确切换 |
 | 8 | W7 老测例 `test_real_pipeline_v2_enrich.py` 在 visibility 一致场景下仍 pass（公式向下兼容） |
 | 9 | 生产 smoke：CVM 容器内 W9 新单测全过；V2 路径 `analyze_done` log 输出 `feature_conf_min/max` 区分度（非全部相等） |
+
+---
+
+## W11 · V2 入口与分享面验收
+
+> **目标**：把 W7+W8+W9+W10 的服务端 V2 能力**沿用户路径再往前推一步**：
+> 历史列表 → 报告详情 → 海报 → 分享 title，让 V2 报告在每个入口都有一致的
+> 「AI 高/中/低可信」信号面，**不只是点开报告才看得见**。
+
+> **不做项（留 W12+）**：
+> - 「我的-成长曲线」上把 trust tier 拉成时间序列（依赖 progress API 新字段）
+> - 反向：从历史卡片直接长按调出"建议重拍"（侵入性高，需产品先决策）
+> - 列表筛选「只看 V2 报告」入口（V2 100% 后预期一段时间内 V1/V2 并存窗口很短）
+
+| # | 验收项 |
+|---|--------|
+| 1 | `AnalysisListItem` schema 加 `engine_version: Literal["v1","v2"]="v1"` + `analysis_confidence: float \| None = None`；老 V1 报告兜底 `engine_version="v1"` / `analysis_confidence=None` 不抛 ValidationError |
+| 2 | `services/analysis_service.list_analyses` 透传两字段；`_coerce_list_confidence` 处理 NaN/Inf/越界 → None / clamp，不让边界值抛 500 |
+| 3 | 客户端 `types/analysis.AnalysisListItem` 加可选字段；`history.tsx` 在 V2 报告卡片 `info-head` 右侧贴 `formatTrustMiniLabel` 小标签；V1 / 未完成 / analysis_confidence=null 时不渲染 |
+| 4 | `history.scss` `__trust--high/medium/low` 三档配色严格走 CSS 变量（mint-soft / gold-soft / warning-soft），不硬编码 HEX |
+| 5 | `report.tsx` `useShareAppMessage` / `useShareTimeline` 调 `buildShareTrustSuffix`：V2 + 高可信 → title 加「· AI 高可信」后缀；其它情况 / V1 / publicReport 不动 |
+| 6 | `trustLabel.formatTrustMiniLabel` 新增；单测覆盖 high/medium/low 三档 + null 兜底 |
+| 7 | backend 单测 `test_w11_list_v2_fields.py` 4 例全过：V2 透传、V1 兜底、clamp 越界、`_coerce_list_confidence` NaN/Inf/字符串 |
+| 8 | CVM 部署：backend pytest W11 4/4 + W10 4/4 + client `client-test` 537+ 回归全过；客户端 `client-build-weapp-prod` 出包供体验版上传 |
 
 ---
 

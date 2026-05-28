@@ -22,6 +22,7 @@ import { SCORE_LEVEL_META, scoreLevelFromScore } from '@/constants/scoreLevel'
 import { CLUB_TYPE_LABEL } from '@/types/analysis'
 import type { AnalysisListItem, AnalysisListPaywall } from '@/types/analysis'
 import { PAYMENT_ENABLED_FLAG } from '@/constants/flags'
+import { formatTrustMiniLabel, resolveTrustTier } from '@/utils/trustLabel'
 import { HistorySwipeRow } from './HistorySwipeRow'
 import './history.scss'
 
@@ -201,6 +202,19 @@ const HistoryPage: FC = () => {
               {it.status === 'failed' ? '失败' : '分析中'}
             </Text>
           )}
+          {/* P2-W11：V2 报告才贴 trust 小标签，V1 / 老报告不渲染（避免噪声） */}
+          {it.status === 'completed' &&
+            it.engine_version === 'v2' &&
+            typeof it.analysis_confidence === 'number' && (
+              <Text
+                className={[
+                  'history__trust',
+                  `history__trust--${resolveTrustTier(it.analysis_confidence)}`,
+                ].join(' ')}
+              >
+                {formatTrustMiniLabel(it.analysis_confidence)}
+              </Text>
+            )}
         </View>
         <Text className='history__date'>{date}</Text>
         {typeof it.score_change === 'number' && it.score_change !== 0 && (

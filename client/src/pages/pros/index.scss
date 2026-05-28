@@ -1,9 +1,13 @@
 .pros-list {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
   padding: 24rpx 28rpx 60rpx;
   background: var(--color-bg);
+  overflow-x: hidden;
 
   &--empty,
   &--blocked {
@@ -28,6 +32,8 @@
   }
 
   &__card {
+    box-sizing: border-box;
+    width: 100%;
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -39,6 +45,7 @@
   }
 
   &__avatar {
+    flex-shrink: 0;
     width: 96rpx;
     height: 96rpx;
     border-radius: 48rpx;
@@ -59,6 +66,7 @@
     display: flex;
     flex-direction: column;
     flex: 1;
+    min-width: 0;
   }
 
   &__name {
@@ -66,19 +74,22 @@
     font-weight: 600;
     color: var(--color-text);
     margin-bottom: 4rpx;
+    word-break: break-word;
   }
 
   &__name-en {
     font-size: var(--font-size-xs);
     color: var(--color-text-muted);
     margin-bottom: 8rpx;
+    word-break: break-word;
   }
 
   &__meta {
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 12rpx;
+    flex-wrap: wrap;
+    gap: 8rpx 12rpx;
   }
 
   &__meta-item {
@@ -87,6 +98,7 @@
   }
 
   &__arrow {
+    flex-shrink: 0;
     font-size: 40rpx;
     color: var(--color-text-muted);
     margin-left: 12rpx;
