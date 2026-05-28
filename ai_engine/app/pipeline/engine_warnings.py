@@ -56,6 +56,8 @@ KNOWN_CODES: frozenset[str] = frozenset(
         "phase_seg_v2_nn_failure",
         "phase_seg_v2_low_confidence",
         "phase_seg_v2_hard_constraint_fail",
+        # probe 治理（P2-W12-3）：ffprobe 失败时透传给客户端调试浮层
+        "probe_failed",
     }
 )
 

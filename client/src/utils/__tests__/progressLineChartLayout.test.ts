@@ -31,4 +31,24 @@ describe('buildLineChartLayout', () => {
     const layout = buildLineChartLayout([{ value: 50, label: 'm' }], 120, 90)
     expect(layout.gridY).toHaveLength(5)
   })
+
+  // P2-W12-1：tier 必须从 input 透传到 coords，drawLineChart 才能据此切换点色
+  it('透传 tier 字段（V2 报告 trust tier 着色链路）', () => {
+    const layout = buildLineChartLayout(
+      [
+        { value: 70, label: '5/1', tier: 'high' },
+        { value: 60, label: '5/2', tier: 'medium' },
+        { value: 30, label: '5/3', tier: 'low' },
+        { value: 80, label: '5/4' }, // V1 报告，无 tier
+      ],
+      400,
+      120,
+    )
+    expect(layout.coords.map((c) => c.tier)).toEqual([
+      'high',
+      'medium',
+      'low',
+      undefined,
+    ])
+  })
 })

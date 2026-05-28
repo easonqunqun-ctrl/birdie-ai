@@ -18,6 +18,8 @@ import './ProgressLineChart.scss'
 export interface ProgressLineChartPoint {
   value: number
   label: string
+  // P2-W12-1：V2 报告才传 tier；V1 / 无 tier → 点色走 accentColor（与旧行为一致）
+  tier?: 'high' | 'medium' | 'low'
 }
 
 export interface ProgressLineChartProps {
@@ -53,7 +55,7 @@ const ProgressLineChart: FC<ProgressLineChartProps> = ({
   }, [ready])
 
   const layoutInput = useMemo(
-    () => points.map((p) => ({ value: p.value, label: p.label })),
+    () => points.map((p) => ({ value: p.value, label: p.label, tier: p.tier })),
     [points],
   )
 

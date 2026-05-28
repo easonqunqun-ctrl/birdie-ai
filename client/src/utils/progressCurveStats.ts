@@ -5,6 +5,7 @@
  */
 
 import { PHASE_LABEL, PHASE_ORDER, type SwingPhaseKey } from '@/constants/phaseLabels'
+import { resolveTrustTier, type TrustTier } from '@/utils/trustLabel'
 
 /** 与 backend AnalysisProgressPoint 对齐 */
 export interface ProgressPoint {
@@ -12,6 +13,9 @@ export interface ProgressPoint {
   analyzed_at: string
   overall_score: number
   phase_scores?: Record<string, number> | null
+  // P2-W12-1：让进步曲线按 trust tier 着色（V2 高/中/低 = mint/gold/warning，V1 走默认主色）
+  engine_version?: 'v1' | 'v2' | null
+  analysis_confidence?: number | null
 }
 
 /** 折线图维度：综合分或六维之一 */
@@ -32,6 +36,8 @@ export interface LineSeriesPoint {
   value: number
   /** 短日期标签 M/D */
   label: string
+  // P2-W12-1：V2 报告才有 tier；V1 报告 undefined → 折线图按默认主色画点
+  tier?: TrustTier
 }
 
 const PHASE_KEYS = PHASE_ORDER as readonly SwingPhaseKey[]
@@ -57,10 +63,17 @@ export function seriesForDimension(
       value = p.phase_scores?.[dimension] ?? null
     }
     if (value === null || Number.isNaN(value)) return
+    // P2-W12-1：V2 报告才计算 tier；V1 报告（即使 confidence 默认 1.0）也不给 tier，
+    // 保持折线图视觉与原 V1 行为一致——只有 V2 才会显式上「高/中/低」色点。
+    const tier: TrustTier | undefined =
+      p.engine_version === 'v2' && typeof p.analysis_confidence === 'number'
+        ? resolveTrustTier(p.analysis_confidence)
+        : undefined
     out.push({
       index,
       value: Math.max(0, Math.min(100, Math.round(value))),
       label: shortChartDate(p.analyzed_at),
+      tier,
     })
   })
   return out

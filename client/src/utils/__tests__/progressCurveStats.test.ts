@@ -55,6 +55,54 @@ describe('seriesForDimension', () => {
     expect(seriesForDimension(pts, 'setup')).toHaveLength(1)
     expect(seriesForDimension(pts, 'setup')[0].value).toBe(90)
   })
+
+  // P2-W12-1：V2 报告才上 tier；V1 / 缺字段不上 tier（避免曲线点变色误导用户）
+  it('V2 报告按 analysis_confidence 上 tier；V1 / 缺字段 tier=undefined', () => {
+    const pts: ProgressPoint[] = [
+      {
+        analysis_id: 'v2_high',
+        analyzed_at: '2026-05-01T00:00:00Z',
+        overall_score: 80,
+        engine_version: 'v2',
+        analysis_confidence: 0.9, // → high
+      },
+      {
+        analysis_id: 'v2_medium',
+        analyzed_at: '2026-05-02T00:00:00Z',
+        overall_score: 78,
+        engine_version: 'v2',
+        analysis_confidence: 0.6, // → medium
+      },
+      {
+        analysis_id: 'v2_low',
+        analyzed_at: '2026-05-03T00:00:00Z',
+        overall_score: 75,
+        engine_version: 'v2',
+        analysis_confidence: 0.3, // → low
+      },
+      {
+        analysis_id: 'v1_legacy',
+        analyzed_at: '2026-05-04T00:00:00Z',
+        overall_score: 70,
+        // V1 老报告 → tier=undefined
+      },
+      {
+        analysis_id: 'v2_no_conf',
+        analyzed_at: '2026-05-05T00:00:00Z',
+        overall_score: 72,
+        engine_version: 'v2',
+        analysis_confidence: null, // V2 但 confidence 缺 → tier=undefined
+      },
+    ]
+    const s = seriesForDimension(pts, 'overall')
+    expect(s.map((p) => p.tier)).toEqual([
+      'high',
+      'medium',
+      'low',
+      undefined,
+      undefined,
+    ])
+  })
 })
 
 describe('findBestPhaseImprovement', () => {

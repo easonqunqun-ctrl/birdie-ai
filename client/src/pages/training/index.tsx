@@ -209,6 +209,8 @@ const TrainingPage: FC = () => {
       seriesForDimension(progressPoints, chartDimension).map((p) => ({
         value: p.value,
         label: p.label,
+        // P2-W12-1：V2 报告才有 tier；V1 报告 tier=undefined → 走默认主色
+        tier: p.tier,
       })),
     [progressPoints, chartDimension],
   )

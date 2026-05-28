@@ -362,6 +362,12 @@ class AnalysisProgressPoint(BaseModel):
         default=None,
         description="六维阶段分扁平 map，如 setup→80；无六维数据时为 null",
     )
+    # P2-W12-1：让进步曲线点能按 trust tier（高/中/低）着色——用户在曲线上
+    # 一眼看出"哪几次是 AI 高可信、哪几次曲线点其实是低置信不能完全信"。
+    # 老 V1 报告兜底 engine_version="v1" / analysis_confidence=None
+    # （客户端按 engine_version=="v2" 路由决定是否换色）。
+    engine_version: Literal["v1", "v2"] = "v1"
+    analysis_confidence: float | None = None
 
 
 class AnalysisProgressResponse(BaseModel):

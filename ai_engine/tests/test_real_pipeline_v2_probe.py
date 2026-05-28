@@ -246,15 +246,22 @@ def test_probe_iphone_slowmo_hdr_combo(monkeypatch):
 # ---------- 失败鲁棒性 ----------
 
 
-def test_probe_ffprobe_raises_returns_empty_silently(monkeypatch, caplog):
-    """ffprobe 抛任何异常 → 返回 []，绝不阻塞主流程."""
+def test_probe_ffprobe_raises_emits_probe_failed_warning(monkeypatch, caplog):
+    """W12-3 改变：ffprobe 抛非可重试异常 → 返回单条 ``probe_failed`` warning（之前 W8/W9 是返回 [] 静默）.
+
+    rationale：客户端 W10 已经有「调试浮层」展示 engine_warnings；让 ``probe_failed``
+    透传到那里，比静默吞掉信息更利于线上排查（用户也能截图反馈"调试浮层显示 5xx"）。
+    """
 
     def _raise(_):
         raise RuntimeError("ffprobe binary not found / network unreachable")
 
     monkeypatch.setattr(rp2_mod, "_ffprobe_extended", _raise)
     warnings = _probe_video_warnings("https://example.com/v.mp4")
-    assert warnings == []
+    assert len(warnings) == 1
+    assert warnings[0].code == "probe_failed"
+    # reason 落 unknown（既不是 5xx / 4xx / timeout / binary_missing 关键字）
+    assert "reason=unknown" in warnings[0].detail
 
 
 def test_probe_empty_video_url_returns_empty():
@@ -453,3 +460,165 @@ def test_run_real_analysis_v2_appends_fallback_when_v2_resources_missing(
     # P1-1 fix：analysis_confidence 不应再是 schema 默认 1.0
     assert result.analysis_confidence < 1.0
     assert result.analysis_confidence == pytest.approx(0.5, abs=1e-3)
+
+
+# ============================================================
+# P2-W12-3 · MinIO ffprobe 5XX 治理（retry + 错误分类 + URL 脱敏）
+# ============================================================
+
+
+def test_classify_probe_error_buckets():
+    """W12-3 · `_classify_probe_error` 把 ffprobe 失败粗分桶进窄集合."""
+    import subprocess as sp
+
+    from app.pipeline.real_pipeline_v2 import _classify_probe_error
+
+    # 5xx 关键字
+    assert (
+        _classify_probe_error(
+            RuntimeError("Server returned 503 Service Unavailable for ...")
+        )
+        == "5xx"
+    )
+    # 4xx 关键字
+    assert (
+        _classify_probe_error(RuntimeError("URL expired: signature mismatch"))
+        == "4xx"
+    )
+    assert (
+        _classify_probe_error(RuntimeError("Server returned 404 Not Found"))
+        == "4xx"
+    )
+    # subprocess.TimeoutExpired 实例
+    assert (
+        _classify_probe_error(sp.TimeoutExpired(cmd=["ffprobe"], timeout=15))
+        == "timeout"
+    )
+    # 二进制缺失
+    assert (
+        _classify_probe_error(
+            RuntimeError("FileNotFoundError: ffprobe not found in PATH")
+        )
+        == "binary_missing"
+    )
+    # 兜底
+    assert _classify_probe_error(RuntimeError("something weird")) == "unknown"
+
+
+def test_sanitize_probe_url_strips_query_string():
+    """W12-3 · MinIO 预签名 URL query 含 X-Amz-Signature，必须脱敏避免泄漏."""
+    from app.pipeline.real_pipeline_v2 import _sanitize_probe_url
+
+    raw = "https://minio.example.com/birdie/swing/abc.mp4?X-Amz-Signature=DEADBEEF&X-Amz-Expires=300"
+    assert _sanitize_probe_url(raw) == "https://minio.example.com/birdie/swing/abc.mp4"
+    assert _sanitize_probe_url("") == ""
+    assert _sanitize_probe_url("https://x/y.mp4") == "https://x/y.mp4"
+
+
+def test_probe_retries_5xx_then_succeeds(monkeypatch):
+    """W12-3 · 5xx 触发 retry；第 2 次成功 → 不产 probe_failed warning + 仍出 codec warnings."""
+    from app import metrics
+
+    metrics.reset()
+    calls = {"n": 0}
+
+    def _flaky(_):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("Server returned 503 Service Unavailable")
+        return _probe(codec="h264")
+
+    monkeypatch.setattr(rp2_mod, "_ffprobe_extended", _flaky)
+    # 避免真睡 0.5s
+    monkeypatch.setattr(rp2_mod.time, "sleep", lambda *_: None)
+
+    warnings = _probe_video_warnings("https://x/v.mp4?sig=xx")
+    codes = {w.code for w in warnings}
+    assert "decoded_h264" in codes
+    assert "probe_failed" not in codes
+    # 一次 retry → v2_probe_retries 计数 1
+    snap = metrics.snapshot()
+    assert snap["v2_probe_retries"] == 1
+    assert calls["n"] == 2
+
+
+def test_probe_5xx_all_attempts_fail_emits_probe_failed_warning(monkeypatch):
+    """W12-3 · 5xx 全部 3 次都失败 → probe_failed warning reason=5xx + metrics 分桶."""
+    from app import metrics
+
+    metrics.reset()
+
+    def _raise_5xx(_):
+        raise RuntimeError("Server returned 502 Bad Gateway")
+
+    monkeypatch.setattr(rp2_mod, "_ffprobe_extended", _raise_5xx)
+    monkeypatch.setattr(rp2_mod.time, "sleep", lambda *_: None)
+
+    warnings = _probe_video_warnings("https://x/v.mp4?sig=yy")
+    assert len(warnings) == 1
+    assert warnings[0].code == "probe_failed"
+    assert "reason=5xx" in warnings[0].detail
+    assert "attempts=3" in warnings[0].detail
+    snap = metrics.snapshot()
+    assert snap["v2_probe_errors"] == 1
+    assert snap["v2_probe_retries"] == 2  # 第 1 / 第 2 次失败各 1 次 retry
+    assert snap["v2_probe_errors_5xx_after_retries"] == 1
+
+
+def test_probe_4xx_does_not_retry(monkeypatch):
+    """W12-3 · 4xx (URL 过期) retry 没用，应**立即放弃**避免拖慢 pipeline."""
+    from app import metrics
+
+    metrics.reset()
+    calls = {"n": 0}
+
+    def _raise_4xx(_):
+        calls["n"] += 1
+        raise RuntimeError("URL expired: X-Amz signature invalid")
+
+    monkeypatch.setattr(rp2_mod, "_ffprobe_extended", _raise_4xx)
+    monkeypatch.setattr(rp2_mod.time, "sleep", lambda *_: None)
+
+    warnings = _probe_video_warnings("https://x/v.mp4?sig=zz")
+    assert len(warnings) == 1
+    assert warnings[0].code == "probe_failed"
+    assert "reason=4xx" in warnings[0].detail
+    # 4xx 不 retry，只调一次 ffprobe
+    assert calls["n"] == 1
+    snap = metrics.snapshot()
+    assert snap["v2_probe_retries"] == 0
+    assert snap["v2_probe_errors_4xx"] == 1
+
+
+def test_probe_timeout_retries_like_5xx(monkeypatch):
+    """W12-3 · subprocess.TimeoutExpired 同样触发 retry（短暂超时也属临时性故障）."""
+    import subprocess as sp
+
+    from app import metrics
+
+    metrics.reset()
+    calls = {"n": 0}
+
+    def _flaky_timeout(_):
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise sp.TimeoutExpired(cmd=["ffprobe"], timeout=15)
+        return _probe(codec="h264")
+
+    monkeypatch.setattr(rp2_mod, "_ffprobe_extended", _flaky_timeout)
+    monkeypatch.setattr(rp2_mod.time, "sleep", lambda *_: None)
+
+    warnings = _probe_video_warnings("https://x/v.mp4")
+    codes = {w.code for w in warnings}
+    assert "decoded_h264" in codes  # 第 3 次成功
+    assert "probe_failed" not in codes
+    snap = metrics.snapshot()
+    assert snap["v2_probe_retries"] == 2  # 第 1 / 第 2 次 timeout 各 1 次 retry
+    assert calls["n"] == 3
+
+
+def test_probe_failed_in_KNOWN_CODES():
+    """W12-3 · ``probe_failed`` 必须注册到 engine_warnings.KNOWN_CODES 白名单."""
+    from app.pipeline.engine_warnings import KNOWN_CODES
+
+    assert "probe_failed" in KNOWN_CODES

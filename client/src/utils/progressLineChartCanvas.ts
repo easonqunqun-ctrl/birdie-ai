@@ -18,6 +18,19 @@ export const LINE_CHART_COLORS = {
   fill: 'rgba(26, 35, 126, 0.08)',
 } as const
 
+/**
+ * P2-W12-1：trust tier 点色（与 history mini 标签 / TrustBadge 色板对齐；Canvas 不支持
+ * CSS 变量，所以这里硬编码；HEX 必须与白皮书 §7.2.1 表一致）。
+ *
+ * 折线段与面积填充仍保持 accentColor（不让线条被切碎），只**圆点**根据 tier 上色，
+ * 用户在曲线上能直接看出"哪几个点 AI 高可信、哪几个点其实是低置信"。
+ */
+export const TRUST_TIER_DOT_COLOR: Record<'high' | 'medium' | 'low', string> = {
+  high: '#00d084', // accent-mint
+  medium: '#c9a227', // gold
+  low: '#ef4444', // warning
+}
+
 export interface LineChartCanvasContext {
   strokeStyle: string | CanvasGradient | CanvasPattern
   fillStyle: string | CanvasGradient | CanvasPattern
@@ -97,8 +110,9 @@ export function drawLineChart(
   })
   ctx.stroke()
 
-  ctx.fillStyle = accentColor
+  // P2-W12-1：圆点按 tier 着色；V1 报告 / 无 tier 走 accentColor
   coords.forEach((c) => {
+    ctx.fillStyle = c.tier ? TRUST_TIER_DOT_COLOR[c.tier] : accentColor
     ctx.beginPath()
     ctx.arc(c.x, c.y, 4, 0, Math.PI * 2)
     ctx.fill()

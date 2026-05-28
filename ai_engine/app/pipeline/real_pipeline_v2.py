@@ -29,8 +29,17 @@ P2-W7 收口（V2 灌溉续）
 from __future__ import annotations
 
 import logging
+import subprocess
+import time
+from dataclasses import dataclass
 
 from app import metrics
+from app.pipeline.camera_angle import (
+    CameraAngleResult,
+    angle_engine_warnings,
+    detect_camera_angle,
+    summarize_pose_for_angle,
+)
 from app.pipeline.confidence import (
     analysis_tier,
     compute_analysis_confidence,
@@ -505,15 +514,32 @@ def _enrich_v2(result: AnalyzeResult, ctx) -> None:
         issue.confidence = round(conf, 3)
         issue.confidence_tier = issue_tier(conf)
 
-    # Layer 3 — analysis_confidence（用精算后的 feature_confs）
+    # P2-W12-2 · 机位独立标尺：M7-04 已落地（camera_angle.py），把 offset_deg 真正
+    # 喂给 compute_analysis_confidence；>15° 偏角 angle_penalty=0.6（confidence.py
+    # ANGLE_PENALTY_BAD），让"偏角太大的低质量视频"在 analysis_confidence 上真被惩罚。
+    # 同时把 angle_engine_warnings 追加到 result.engine_warnings，让客户端能看到
+    # 「camera_angle_large_offset / camera_angle_mismatch」具体原因。
+    angle_result = _maybe_detect_angle(pose)
+    camera_offset = angle_result.offset_deg if angle_result is not None else None
+    angle_warns = angle_engine_warnings(angle_result) if angle_result is not None else []
+
+    # Layer 3 — analysis_confidence（用精算后的 feature_confs + 机位 offset 惩罚）
     ac = compute_analysis_confidence(
         mean_visibility=mean_vis,
         quality_warnings=ctx.quality_warnings,
-        camera_angle_offset_deg=None,  # M7-04 接入后补
+        camera_angle_offset_deg=camera_offset,
         feature_confidences=feature_confs,
     )
     result.analysis_confidence = round(ac, 3)
     result.feature_confidences = feature_confs
+
+    # angle warnings 与 run_real_analysis_v2 末尾合并的 probe + fallback warnings
+    # 是不同来源；在这里先写到 result，由 run_real_analysis_v2 末尾**合并**而非
+    # 覆盖（W12-2 同步调整了合并逻辑）
+    if angle_warns:
+        existing = list(result.engine_warnings or [])
+        existing.extend(serialize_engine_warnings(angle_warns))
+        result.engine_warnings = existing
 
     log.info(
         "v2_enrichment_done",
@@ -537,7 +563,149 @@ def _enrich_v2(result: AnalyzeResult, ctx) -> None:
             "num_issues_hidden": sum(
                 1 for i in result.issues if i.confidence_tier == "hidden"
             ),
+            "camera_offset_deg": (
+                round(camera_offset, 1) if camera_offset is not None else None
+            ),
+            "camera_detected_angle": (
+                angle_result.detected_angle if angle_result is not None else None
+            ),
         },
+    )
+
+
+def _summarize_pose_for_angle(pose) -> object | None:  # _PoseSummary 是私有类型，故 object
+    """P2-W12-2 · 从 PoseResult 聚合机位检测所需的 6 个关键点几何摘要.
+
+    策略：
+    - 只用 valid 帧（``pose.valid_mask=True``）的均值，避开漏检帧引入噪声
+    - 6 个 landmark：左右肩 / 左右髋 / 鼻（头部代理）的 x,y
+    - ``valid_frame_ratio`` 直接走 ``pose.valid_frame_ratio``（已是 0-1）
+
+    返回 ``None`` 表示输入不可用（无有效帧），调用方跳过 angle 注入。
+    """
+    if pose is None or pose.num_frames == 0 or pose.valid_mask.sum() == 0:
+        return None
+    kp = pose.keypoints  # (F, 33, 3)
+    mask = pose.valid_mask
+    try:
+        valid = kp[mask]  # (V, 33, 3)
+        left_shoulder = valid[:, LANDMARK_LEFT_SHOULDER]
+        right_shoulder = valid[:, LANDMARK_RIGHT_SHOULDER]
+        left_hip = valid[:, LANDMARK_LEFT_HIP]
+        right_hip = valid[:, LANDMARK_RIGHT_HIP]
+        nose = valid[:, LANDMARK_NOSE]
+    except Exception:  # noqa: BLE001 - 关键点维度异常时直接放弃 angle 注入
+        return None
+    return summarize_pose_for_angle(
+        left_shoulder_x=float(left_shoulder[:, 0].mean()),
+        right_shoulder_x=float(right_shoulder[:, 0].mean()),
+        left_hip_x=float(left_hip[:, 0].mean()),
+        right_hip_x=float(right_hip[:, 0].mean()),
+        head_x=float(nose[:, 0].mean()),
+        head_y=float(nose[:, 1].mean()),
+        valid_frame_ratio=float(pose.valid_frame_ratio),
+    )
+
+
+def _maybe_detect_angle(pose) -> CameraAngleResult | None:
+    """W12-2 · 在 _enrich_v2 / _enrich_v2_fallback 共用的 angle 探测入口.
+
+    任何一步失败（关键点异常 / detect 抛错）→ 返回 None，调用方按"未知机位"
+    继续走（``compute_analysis_confidence(camera_angle_offset_deg=None)``）。
+    """
+    summary = _summarize_pose_for_angle(pose)
+    if summary is None:
+        return None
+    try:
+        return detect_camera_angle(summary)  # type: ignore[arg-type]
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "v2_camera_angle_detect_failed",
+            extra={"err_type": type(exc).__name__, "err": repr(exc)[:200]},
+        )
+        return None
+
+
+def _sanitize_probe_url(url: str) -> str:
+    """W12-3 · MinIO 预签名 URL 的 query string 含 X-Amz-Signature 等机密；log 时只留 path."""
+    if not url:
+        return ""
+    q_idx = url.find("?")
+    return url if q_idx < 0 else url[:q_idx]
+
+
+def _classify_probe_error(exc: Exception) -> str:
+    """W12-3 · 把 ffprobe 失败粗分桶（线上 dashboard 用），用于 engine_warning.detail.
+
+    返回值（必须是窄集合，便于 metrics 聚合）：
+    - ``5xx``：MinIO/对象存储返回 5XX（最常见，应 retry）
+    - ``4xx``：URL 鉴权过期 / 404（retry 无用）
+    - ``timeout``：subprocess timeout
+    - ``binary_missing``：ffprobe 二进制缺失（CI / 本地）
+    - ``unknown``：兜底
+    """
+    err = repr(exc).lower()
+    if isinstance(exc, subprocess.TimeoutExpired):
+        return "timeout"
+    if "server returned 5" in err or "5xx" in err:
+        return "5xx"
+    if "server returned 4" in err or "403" in err or "404" in err or "expired" in err:
+        return "4xx"
+    if "ffprobe" in err and "not found" in err:
+        return "binary_missing"
+    return "unknown"
+
+
+# 5XX / timeout 默认重试 2 次（共 3 次尝试），指数退避 0.5s / 1.5s.
+# 4xx / binary_missing 等不会重试（retry 无用，浪费 wall time + 拖慢 pipeline）。
+_PROBE_RETRY_REASONS = frozenset({"5xx", "timeout"})
+_PROBE_MAX_ATTEMPTS = 3
+_PROBE_BACKOFF_SECONDS = (0.5, 1.5)
+
+
+@dataclass
+class _ProbeRetryOutcome:
+    """``_probe_with_retry`` 返回值；用 dataclass 避免 3 元 tuple 解构 noisy."""
+
+    probe: object | None  # _ProbeInfoExtended 但避免循环 import
+    attempts: int
+    last_error_reason: str | None
+    last_error: Exception | None = None
+
+
+def _probe_with_retry(video_url: str) -> "_ProbeRetryOutcome":
+    """W12-3 · 包一层带退避 retry 的 ffprobe 调用.
+
+    ffprobe 直接读 MinIO 预签名 URL 时，对象存储 5XX / 短暂网络抖动占据线上
+    `v2_probe_errors` 大头；2 次重试足以把绝大多数恢复掉，且不会让 retry 4xx
+    （URL 已过期）白费时间。
+    """
+    last_exc: Exception | None = None
+    last_reason: str = "unknown"
+    for attempt in range(1, _PROBE_MAX_ATTEMPTS + 1):
+        try:
+            probe = _ffprobe_extended(video_url)
+            return _ProbeRetryOutcome(probe=probe, attempts=attempt, last_error_reason=None)
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            last_reason = _classify_probe_error(exc)
+            if last_reason not in _PROBE_RETRY_REASONS or attempt == _PROBE_MAX_ATTEMPTS:
+                break
+            backoff = _PROBE_BACKOFF_SECONDS[min(attempt - 1, len(_PROBE_BACKOFF_SECONDS) - 1)]
+            metrics.incr("v2_probe_retries")
+            log.info(
+                "v2_probe_retry",
+                extra={
+                    "video_url": _sanitize_probe_url(video_url),
+                    "attempt": attempt,
+                    "reason": last_reason,
+                    "backoff": backoff,
+                },
+            )
+            time.sleep(backoff)
+    assert last_exc is not None  # 上面 break 一定走过 except 分支
+    return _ProbeRetryOutcome(
+        probe=None, attempts=_PROBE_MAX_ATTEMPTS, last_error_reason=last_reason, last_error=last_exc
     )
 
 
@@ -552,30 +720,52 @@ def _probe_video_warnings(video_url: str) -> list[EngineWarning]:
     - ``fps_upsampled`` / ``fps_downsampled``：raw fps ≠ TARGET_FPS_V2
     - ``audio_kept`` / ``audio_dropped``：原视频是否含音轨
 
-    出错（网络不通 / ffprobe 不识别 / 私有 URL 鉴权失败）静默返回空列表，
-    **绝不阻塞主分析流程**——pipeline 主体仍走 V1，engine_warnings 仅为辅助信息。
+    出错（网络不通 / ffprobe 不识别 / 私有 URL 鉴权失败）记一条 ``probe_failed``
+    engine_warning 让客户端/运维能看到失败分类，**绝不阻塞主分析流程**——pipeline
+    主体仍走 V1，engine_warnings 仅为辅助信息。
 
     P2-W9+ review fix（P1-2）：失败不再"静默"——log.warning（不只 info）+ metrics
     incr 让运维能从 ``/metrics`` 看到 ``v2_probe_count`` / ``v2_probe_errors`` /
-    ``v2_probe_error_rate``。线上 100% probe 失败时能立刻看到。
+    ``v2_probe_error_rate``。
+
+    P2-W12-3：5XX / timeout 加 2 次指数退避 retry（MinIO 5XX 是线上 probe 失败
+    大头，多数为对象存储短暂抖动）；4xx / binary_missing 不 retry（白费时间）。
+    失败时把 reason 落到 ``probe_failed`` engine_warning，让客户端"调试浮层"
+    （W10 已落地）能直接看到原因。URL 在日志里脱敏（去 query string）。
     """
     if not video_url:
         return []
 
     metrics.incr("v2_probe_count")
-    try:
-        probe = _ffprobe_extended(video_url)
-    except Exception as exc:  # noqa: BLE001
+    outcome = _probe_with_retry(video_url)
+
+    if outcome.probe is None:
         metrics.incr("v2_probe_errors")
+        # 按错误类型再细分（5xx_after_retries vs 4xx 立即放弃）做 metric tag
+        if outcome.last_error_reason in _PROBE_RETRY_REASONS:
+            metrics.incr(f"v2_probe_errors_{outcome.last_error_reason}_after_retries")
+        else:
+            metrics.incr(f"v2_probe_errors_{outcome.last_error_reason}")
         log.warning(
-            "v2_probe_failed_silently",
+            "v2_probe_failed",
             extra={
-                "video_url": video_url,
-                "err_type": type(exc).__name__,
-                "err": repr(exc)[:200],
+                "video_url": _sanitize_probe_url(video_url),
+                "attempts": outcome.attempts,
+                "reason": outcome.last_error_reason,
+                "err_type": type(outcome.last_error).__name__ if outcome.last_error else None,
+                "err": (repr(outcome.last_error)[:200] if outcome.last_error else None),
             },
         )
-        return []
+        # 仍返回 engine_warning 让客户端/调试浮层看到失败；不阻塞主流程
+        return [
+            EngineWarning(
+                code="probe_failed",
+                level="info",
+                detail=f"ffprobe 探测失败 reason={outcome.last_error_reason} attempts={outcome.attempts}",
+            )
+        ]
+
+    probe = outcome.probe
 
     warnings: list[EngineWarning] = []
 
@@ -658,16 +848,28 @@ def _enrich_v2_fallback(result: AnalyzeResult, ctx) -> None:
     本退化版只做 Layer 3 的 ``analysis_confidence`` 兜底：用 pose mean_visibility
     + quality_warnings 算一个保守的 analysis_confidence，避免谎报 1.0。不动 Layer
     1/2（feature_confidences / IssueItem.confidence 都按 schema 默认空 / None）。
+
+    P2-W12-2：fallback 路径也接入 camera_angle 检测——偏角过大时同样要惩罚
+    confidence，避免"V2 资源缺 + 偏角大"双重低质量的报告还报 1.0。
     """
     pose = ctx.pose_result
     mean_vis = float(pose.mean_confidence) if pose.num_frames > 0 else 0.0
+    angle_result = _maybe_detect_angle(pose)
+    camera_offset = angle_result.offset_deg if angle_result is not None else None
     ac = compute_analysis_confidence(
         mean_visibility=mean_vis,
         quality_warnings=ctx.quality_warnings,
-        camera_angle_offset_deg=None,
+        camera_angle_offset_deg=camera_offset,
         feature_confidences=None,  # 没精算，feat_avg=1.0 不惩罚
     )
     result.analysis_confidence = round(ac, 3)
+    # fallback 路径仍把 angle warnings 灌进去，让客户端能看到具体诊断原因
+    if angle_result is not None:
+        angle_warns = angle_engine_warnings(angle_result)
+        if angle_warns:
+            existing = list(result.engine_warnings or [])
+            existing.extend(serialize_engine_warnings(angle_warns))
+            result.engine_warnings = existing
 
 
 async def run_real_analysis_v2(req: AnalyzeRequest) -> AnalyzeResult:
@@ -721,11 +923,15 @@ async def run_real_analysis_v2(req: AnalyzeRequest) -> AnalyzeResult:
     )
 
     # 合并所有 engine_warnings：probe 探测 + fallback 占位（若有）
+    # P2-W12-2：`_enrich_v2` / `_enrich_v2_fallback` 已经把 camera_angle warnings
+    # 写到 result.engine_warnings；这里改成**合并而非覆盖**，否则 angle warnings
+    # 会被覆盖丢掉。顺序：probe（前置）→ enrich 已有（含 angle）→ fallback。
     all_warnings: list[EngineWarning] = list(probe_warnings)
     if fallback_warning is not None:
         all_warnings.append(fallback_warning)
     if all_warnings:
-        result.engine_warnings = serialize_engine_warnings(all_warnings)
+        existing = list(result.engine_warnings or [])
+        result.engine_warnings = existing + serialize_engine_warnings(all_warnings)
 
     return result
 

@@ -4,9 +4,14 @@
  * Y 轴固定 0–100；X 轴按点数等分。
  */
 
+// P2-W12-1：让进步曲线点能按 trust tier 着色（与 history mini 标签 / TrustBadge 色板一致）
+export type LineChartTier = 'high' | 'medium' | 'low'
+
 export interface LineChartInputPoint {
   value: number
   label: string
+  /** V2 报告才传 tier；V1 / 默认 undefined → 走 accentColor */
+  tier?: LineChartTier
 }
 
 export interface LineChartCoord {
@@ -14,6 +19,7 @@ export interface LineChartCoord {
   y: number
   value: number
   label: string
+  tier?: LineChartTier
 }
 
 export interface LineChartLayout {
@@ -46,7 +52,7 @@ export function buildLineChartLayout(
       pad.left + (n <= 1 ? innerW / 2 : (i / Math.max(1, n - 1)) * innerW)
     const clamped = Math.max(0, Math.min(100, p.value))
     const y = pad.top + innerH - (clamped / 100) * innerH
-    return { x, y, value: clamped, label: p.label }
+    return { x, y, value: clamped, label: p.label, tier: p.tier }
   })
 
   const gridY = [0, 25, 50, 75, 100].map(

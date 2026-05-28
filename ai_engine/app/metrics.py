@@ -40,6 +40,15 @@ _COUNTER_KEYS = (
     # 与 v2_fallback_count 区别：v2_fallback_count = 整 V2 资源加载失败回落 V1；
     # v2_enrich_fallback_count = enrichment hook 内部 issue 找不到 YAML rule 走 mean_vis 兜底
     "v2_enrich_fallback_count",
+    # P2-W12-3: probe 治理可观测性
+    # - v2_probe_retries：retry 次数（5xx / timeout 各 attempt 失败时 +1）
+    # - v2_probe_errors_{reason}：按错误分类细分，便于 dashboard 拆分 MinIO 5xx vs URL 过期
+    "v2_probe_retries",
+    "v2_probe_errors_5xx_after_retries",
+    "v2_probe_errors_timeout_after_retries",
+    "v2_probe_errors_4xx",
+    "v2_probe_errors_binary_missing",
+    "v2_probe_errors_unknown",
 )
 _LATENCY_KEYS = ("v1_latency_ms_total", "v2_latency_ms_total")
 

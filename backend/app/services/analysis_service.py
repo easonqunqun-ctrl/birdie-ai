@@ -843,6 +843,14 @@ async def get_user_analysis_progress(
             analyzed_at=r.analyzed_at or r.created_at,
             overall_score=int(r.overall_score or 0),
             phase_scores=_flatten_phase_scores(r.phase_scores),
+            # P2-W12-1：透传 V2 字段；老 V1 报告兜底 "v1"，
+            # confidence 走 _coerce_list_confidence 防 NaN/Inf/越界
+            engine_version=(
+                getattr(r, "engine_version", None) or "v1"
+            ),  # type: ignore[arg-type]
+            analysis_confidence=_coerce_list_confidence(
+                getattr(r, "analysis_confidence", None)
+            ),
         )
         for r in rows
     ]
