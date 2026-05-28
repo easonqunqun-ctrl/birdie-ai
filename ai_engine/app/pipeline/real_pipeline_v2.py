@@ -45,6 +45,10 @@ from app.pipeline.diagnose import (
 )
 from app.pipeline.engine_warnings import EngineWarning, serialize_engine_warnings
 from app.pipeline.phases import PhaseSegmentResult
+from app.pipeline.preprocess_v2 import (
+    TARGET_FPS_V2,
+    _ffprobe_extended,
+)
 from app.pipeline.rule_engine import (
     LOCALES_DIR,
     RULES_DIR,
@@ -265,6 +269,102 @@ def _enrich_v2(result: AnalyzeResult, ctx) -> None:
     )
 
 
+def _probe_video_warnings(video_url: str) -> list[EngineWarning]:
+    """P2-W8 ENG-C2 · 对原始 ``video_url`` 跑 ffprobe 探测，生成 engine_warnings.
+
+    ffprobe 直接支持 HTTP / HTTPS URL（只读 header / 几 KB metadata，无需完整下载）。
+    探测项：
+    - ``decoded_hevc`` / ``decoded_vp9``：codec_name
+    - ``hdr_tonemapped``：color_transfer ∈ {smpte2084, arib-std-b67}
+    - ``slowmo_detected`` + ``nominal_fps_used``：mov/mp4 tags 检出真实帧率
+    - ``fps_upsampled`` / ``fps_downsampled``：raw fps ≠ TARGET_FPS_V2
+    - ``audio_kept`` / ``audio_dropped``：原视频是否含音轨
+
+    出错（网络不通 / ffprobe 不识别 / 私有 URL 鉴权失败）静默返回空列表，
+    **绝不阻塞主分析流程**——pipeline 主体仍走 V1，engine_warnings 仅为辅助信息。
+    """
+    if not video_url:
+        return []
+    try:
+        probe = _ffprobe_extended(video_url)
+    except Exception as exc:  # noqa: BLE001
+        log.info(
+            "v2_probe_failed_silently",
+            extra={"video_url": video_url, "err": repr(exc)},
+        )
+        return []
+
+    warnings: list[EngineWarning] = []
+
+    if probe.codec_name in {"hevc", "h265"}:
+        warnings.append(
+            EngineWarning(
+                code="decoded_hevc",
+                level="info",
+                detail=f"codec={probe.codec_name}",
+            )
+        )
+    elif probe.codec_name == "vp9":
+        warnings.append(
+            EngineWarning(code="decoded_vp9", level="info", detail="codec=vp9")
+        )
+    elif probe.codec_name == "h264":
+        warnings.append(
+            EngineWarning(code="decoded_h264", level="info", detail="codec=h264")
+        )
+
+    if probe.is_hdr:
+        warnings.append(
+            EngineWarning(
+                code="hdr_tonemapped",
+                level="info",
+                detail=(
+                    f"color_transfer={probe.color_transfer} → bt709 "
+                    f"(pix_fmt={probe.pix_fmt})"
+                ),
+            )
+        )
+
+    if probe.is_slowmo and probe.nominal_fps > 0:
+        warnings.append(
+            EngineWarning(
+                code="slowmo_detected",
+                level="info",
+                detail=(
+                    f"nominal_fps={probe.nominal_fps:.1f} vs "
+                    f"fps_raw={probe.fps_raw:.1f}"
+                ),
+            )
+        )
+        warnings.append(
+            EngineWarning(
+                code="nominal_fps_used",
+                level="info",
+                detail=f"using nominal_fps={probe.nominal_fps:.1f} for timeline",
+            )
+        )
+
+    if probe.fps_raw > 0 and abs(probe.fps_raw - TARGET_FPS_V2) > 0.5:
+        code = "fps_upsampled" if probe.fps_raw < TARGET_FPS_V2 else "fps_downsampled"
+        warnings.append(
+            EngineWarning(
+                code=code,
+                level="info",
+                detail=f"raw {probe.fps_raw:.1f}fps vs V2 target {TARGET_FPS_V2}fps",
+            )
+        )
+
+    warnings.append(
+        EngineWarning(
+            code="audio_kept" if probe.has_audio else "audio_dropped",
+            level="info",
+            detail=("audio stream present" if probe.has_audio else "no audio stream"),
+        )
+    )
+
+    return warnings
+
+
 async def run_real_analysis_v2(req: AnalyzeRequest) -> AnalyzeResult:
     """V2 真实分析入口。
 
@@ -303,12 +403,21 @@ async def run_real_analysis_v2(req: AnalyzeRequest) -> AnalyzeResult:
             detail=f"V2 资源加载失败: {type(exc).__name__}",
         )
 
+    # P2-W8 ENG-C：对原始视频跑一次 ffprobe，拿 codec/hdr/slowmo/fps/audio 信息
+    # 做成 engine_warnings。在 V1 pipeline 跑之前（甚至并行）做，避免阻塞主流程。
+    # 探测失败静默返回 []，绝不影响主分析。
+    probe_warnings = _probe_video_warnings(req.video_url)
+
     result = await run_real_analysis(
         req, diagnose_fn=diagnose_impl, enrichment_fn=enrichment_impl
     )
 
+    # 合并所有 engine_warnings：probe 探测 + fallback 占位（若有）
+    all_warnings: list[EngineWarning] = list(probe_warnings)
     if fallback_warning is not None:
-        result.engine_warnings = serialize_engine_warnings([fallback_warning])
+        all_warnings.append(fallback_warning)
+    if all_warnings:
+        result.engine_warnings = serialize_engine_warnings(all_warnings)
 
     return result
 

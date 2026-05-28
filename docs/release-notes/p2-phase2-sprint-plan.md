@@ -16,6 +16,7 @@
 | **W5** | **引擎深耕** | P2-M7-10 · M7-14 | V1→V2 全量 14 规则迁 YAML；features dict 外提让 V2 真正重诊 | **✅ Done**（`6afffda` · backend hotfix `a37499a`） |
 | **W6** | **V2 灌溉** | ENG-A1 · ENG-A2 · ENG-A3 | metrics 观测 + redis 热改 pct + 离线 V1/V2 diff 脚本 | **✅ Done**（`816e320` · `915a6d2` uv.lock+test fix） |
 | **W7** | **V2 引擎产品力 v0.1 落地** | P2-M7-02 · P2-M7-06 | engine_warnings + 三层 confidence 接入 V2；V1 行为冻结 | **✅ Done**（`a36eb88` 主体 · 待 hotfix `swing_start/swing_end` 注入） |
+| **W8** | **V2 元数据探测灌入 engine_warnings** | P2-M7-02 · P2-W8 ENG-C | V2 入口 ffprobe 原始 URL → codec / hdr / slowmo / fps / audio 落入 `engine_warnings`；pipeline 主体仍走 V1，fps/timing 不变；探测失败静默兜底 | **🟡 In Progress** |
 
 **并行泳道（不占 Sprint 主表）**：U-2 COS · Q-B5 papay · O-01/O-04 性能抽测 · par-E3/par-T1
 
@@ -119,6 +120,29 @@
 
 ---
 
+## W8 · V2 元数据探测灌入 engine_warnings 验收
+
+> **目标**：让灰度用户的 V2 报告 `engine_warnings[]` 从 W7 的「只在 fallback 时
+> 写一条 `fallback_to_v1`」升级为「正常路径就反映原始视频 codec / hdr / 慢动作
+> / 帧率 / 音频」实情。**pipeline 主体仍走 V1，不动 fps / phases timing**。
+
+> **不做项（留 W9+）**：真正把 V2 切到 `preprocess_video_v2`（fps 改 60 → 下游
+> timing 全部要重校）；切到 `phases_v2`（NN 模型 W23-W26 才能就绪，当前 fallback
+> 只多写 `phase_seg_nn_not_ready` 一条 info）；机位类码 `camera_angle_*`（要先
+> 接 P2-M7-04 camera_angle 模块）。
+
+| # | 验收项 |
+|---|--------|
+| 1 | `preprocess_v2._ffprobe_extended` 签名扩成 `video_path: Path \| str`；ffprobe 自身直接接 HTTP(S) URL，无需先下载视频 |
+| 2 | `real_pipeline_v2._probe_video_warnings(video_url) -> list[EngineWarning]` 新增；按 probe 结果生成 `decoded_h264 / decoded_hevc / decoded_vp9 / hdr_tonemapped / slowmo_detected / nominal_fps_used / fps_upsampled / fps_downsampled / audio_kept / audio_dropped` 中的若干条 |
+| 3 | 所有产出 code 都在 `engine_warnings.KNOWN_CODES` 白名单内（含 `decoded_h264`，已在 M7-02 注册） |
+| 4 | `run_real_analysis_v2` 在 V1 pipeline 调用前先跑 probe；成功后把 probe warnings + fallback warning（若有）合并 `serialize_engine_warnings` 写到 `result.engine_warnings` |
+| 5 | probe 失败（network / 私有 URL / 二进制缺失）静默 `return []` + log `v2_probe_failed_silently`；**绝不**抛异常打断主分析；客户端能看到一份没有 codec warning 的正常 V2 报告 |
+| 6 | 单测覆盖：h264 / hevc / h265 alias / vp9 / 未知 codec；HDR vs SDR；慢动作（fps_raw=240, nominal_fps=30）；fps 30/60/120/0；音频有无；多类组合（iPhone HEVC HDR 慢动作）；ffprobe 抛错静默；空 URL；KNOWN_CODES 白名单；集成 `run_real_analysis_v2` 合并 probe + fallback |
+| 7 | 生产 smoke：CVM 内 pytest `tests/test_real_pipeline_v2_probe.py` 全过；线上 force `engine_version=v2` 真视频 `result.engine_warnings` 出现 `decoded_*` + `audio_*` 等元数据条目 |
+
+---
+
 ## 文档债（W1 后补）
 
 - [`docs/02`](../02-API接口设计文档.md) 增补 M13 约球 / venues 端点（后端已落地，文档未同步）
@@ -138,3 +162,4 @@
 | 2026-05-28 | W5 部署：`make publish-backend-cvm`；`.env.local` 加 `M7_V2_ROLLOUT_PCT=5`，V2 灰度 5% 生效；W6 V2 灌溉开工 |
 | 2026-05-28 | W6 ✅（`816e320` 主体 + `915a6d2` uv.lock 补 redis & test 隔离）：CVM 容器内 18/18 单测过；`/metrics` 端点返回完整 JSON；Redis 持久化验证通过（set→另一进程 force_refresh 能读到）；线上 pct 由 Redis 接管，业务真值仍为 5 |
 | 2026-05-28 | W7 ✅（`a36eb88` 主体）：`run_real_analysis` 加 `enrichment_fn` hook + `PipelineCtx`；`_enrich_v2` 接三层 confidence + tier 进 V2 报告；fallback 时 engine_warnings 塞 `fallback_to_v1`；CVM 12/12 enrich 单测过；待 hotfix 把 `swing_start/swing_end` test fixture 补全后随下次 publish 入 image |
+| 2026-05-28 | W8 In Progress：`_ffprobe_extended` 接受 str URL；`real_pipeline_v2._probe_video_warnings` 落地 10 种 codec/hdr/slowmo/fps/audio engine_warnings；`run_real_analysis_v2` 在 V1 之前跑 probe 并合并到 result；`test_real_pipeline_v2_probe.py` 22 例覆盖正常/边界/失败/集成；pipeline 主体 fps 仍 30，下游 timing 不变 |

@@ -267,7 +267,7 @@ def preprocess_video_v2(
 # ============================================================
 
 
-def _ffprobe_extended(video_path: Path) -> _ProbeInfoExtended:
+def _ffprobe_extended(video_path: Path | str) -> _ProbeInfoExtended:
     """V2 扩展 ffprobe，读 codec / pix_fmt / color_space / nominal_fps。
 
     比 V1 `_ffprobe` 多读 4 类字段：
@@ -275,6 +275,10 @@ def _ffprobe_extended(video_path: Path) -> _ProbeInfoExtended:
     2. `pix_fmt`：判断 8-bit / 10-bit
     3. `color_space` / `color_transfer` / `color_primaries`：判断 HDR
     4. `tags:com.apple.quicktime.live-photo.auto`（mov）或 `nb_frames`（mp4）反推 nominal_fps
+
+    P2-W8 ENG-C1：支持传 ``str`` 形式的 HTTP URL（ffprobe 自身能直接探测，
+    不需要先下载完整视频），方便 V2 入口拿原始 codec/fps/hdr 元数据生成
+    engine_warnings。
     """
     _require_binary("ffprobe")
 
