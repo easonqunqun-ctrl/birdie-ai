@@ -57,6 +57,8 @@ def _make_phases() -> PhaseSegmentResult:
         },
         top_frame=15,
         impact_frame=20,
+        swing_start=5,
+        swing_end=20,
         handedness="right",
         lead_wrist_idx=15,
         lead_shoulder_idx=11,
