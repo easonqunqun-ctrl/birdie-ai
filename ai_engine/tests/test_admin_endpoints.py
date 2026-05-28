@@ -19,14 +19,20 @@ from app.main import app
 def _isolate_state(monkeypatch):
     """每个用例前后都清 metrics + version_router 缓存，避免互相污染.
 
-    关键：把 `M7_V2_ROLLOUT_PCT` env 显式清空 + `_redis_pct` 默认返回 0，
-    避免在 CVM / 生产环境跑 pytest 时被实际的灰度配置污染（W5 时容器
-    .env.local 里就有 ``M7_V2_ROLLOUT_PCT=5``，会让"基线 set(0) 不应被
-    降级拦"这种用例假阳性）。
+    关键三件：
+    1. ``M7_V2_ROLLOUT_PCT`` env 清空 + ``_redis_pct`` 默认返回 None，
+       让基线用例（无 monkeypatch）get_rollout_pct == 0，
+       避免被 CVM .env.local 里的 ``M7_V2_ROLLOUT_PCT=5`` 干扰。
+    2. ``REDIS_URL`` / ``M7_V2_REDIS_URL`` env 也清空，**防止单测在 CVM 上
+       跑时 set_rollout_pct 把测试 pct 真的写进生产 Redis**（曾把生产值
+       从 5 污染成 10，需要手动 force=True 改回）。
+    3. metrics.reset() + invalidate_cache() 防止跨用例污染。
     """
     metrics.reset()
     version_router.invalidate_cache()
     monkeypatch.delenv("M7_V2_ROLLOUT_PCT", raising=False)
+    monkeypatch.delenv("REDIS_URL", raising=False)
+    monkeypatch.delenv("M7_V2_REDIS_URL", raising=False)
     monkeypatch.setattr(version_router, "_redis_pct", lambda: None)
     yield
     metrics.reset()
