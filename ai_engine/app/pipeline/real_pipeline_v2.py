@@ -29,9 +29,6 @@ P2-W7 收口（V2 灌溉续）
 from __future__ import annotations
 
 import logging
-import subprocess
-import time
-from dataclasses import dataclass
 
 from app import metrics
 from app.pipeline.camera_angle import (
@@ -654,259 +651,26 @@ def _maybe_detect_angle(
         return None
 
 
-def _sanitize_probe_url(url: str) -> str:
-    """W12-3 · MinIO 预签名 URL 的 query string 含 X-Amz-Signature 等机密；log 时只留 path."""
-    if not url:
-        return ""
-    q_idx = url.find("?")
-    return url if q_idx < 0 else url[:q_idx]
+# ----------------------------------------------------------------------
+# P2-W14-D · probe helpers 已抽到 app/integrations/probe.py
+#
+# 为什么这里仍然 re-export 下划线名：
+# - 现有 W12-3 / W13-C 单测直接 from app.pipeline.real_pipeline_v2 import
+#   _sanitize_probe_url / _rewrite_to_internal_url / _classify_probe_error
+#   _probe_with_retry / _probe_video_warnings
+# - 不能为了一次重构强行改 30+ 处测试 import；保留 thin alias 让历史测试稳过
+# - 新代码（W15+）应**直接** from app.integrations.probe import probe_video_warnings 等
+# - W18+ 单测集中迁移后这层 alias 可删
+# ----------------------------------------------------------------------
 
-
-def _rewrite_to_internal_url(url: str) -> str:
-    """W13-C · 把公网 video_url 改写成容器内网 URL，避免 ffprobe 绕公网回环.
-
-    背景（W13-C 根因调查 docs/release-notes/minio-ffprobe-5xx-rca.md）：
-    backend `get_object_url(key)` 返的是 ``MINIO_PUBLIC_ENDPOINT/<bucket>/<key>``
-    （公网，例如 ``https://api.birdieai.cn/minio/xiaoniao-videos/uploads/x.mp4``）。
-
-    ai_engine 容器收到这个 URL 后**直接 ffprobe**——等于：
-        ai_engine 容器 → 公网 DNS → CVM nginx 443 → location /minio/ → minio:9000
-
-    绕了 4 跳，5xx 风险全在 nginx 这一层：
-    - nginx 默认对 5xx **不 retry**（proxy_next_upstream 默认只在连接错误触发）
-    - 公网 TLS 握手 + 域名解析比内网多一跳延迟
-    - 公网入口压力大时（其它流量挤占）会瞬时 503
-
-    本方法把 ``settings.MINIO_PUBLIC_ENDPOINT`` 前缀替换为
-    ``settings.MINIO_ENDPOINT``（内网，如 ``http://minio:9000``）后跑 ffprobe，
-    路径变成：ai_engine 容器 → docker 内网 → minio:9000，**单跳**。
-
-    不匹配时（URL 不在 MINIO_PUBLIC_ENDPOINT 前缀下，比如 COS / 第三方）原样返回，
-    走原 W12-3 逻辑（retry + 分类）兜底。
-    """
-    from app.config import settings
-
-    pub = (settings.MINIO_PUBLIC_ENDPOINT or "").rstrip("/")
-    internal = (settings.MINIO_ENDPOINT or "").rstrip("/")
-    if not pub or not internal or pub == internal:
-        return url
-    if not url.startswith(pub + "/"):
-        return url
-    return internal + url[len(pub):]
-
-
-def _classify_probe_error(exc: Exception) -> str:
-    """W12-3 · 把 ffprobe 失败粗分桶（线上 dashboard 用），用于 engine_warning.detail.
-
-    返回值（必须是窄集合，便于 metrics 聚合）：
-    - ``5xx``：MinIO/对象存储返回 5XX（最常见，应 retry）
-    - ``4xx``：URL 鉴权过期 / 404（retry 无用）
-    - ``timeout``：subprocess timeout
-    - ``binary_missing``：ffprobe 二进制缺失（CI / 本地）
-    - ``unknown``：兜底
-    """
-    err = repr(exc).lower()
-    if isinstance(exc, subprocess.TimeoutExpired):
-        return "timeout"
-    if "server returned 5" in err or "5xx" in err:
-        return "5xx"
-    if "server returned 4" in err or "403" in err or "404" in err or "expired" in err:
-        return "4xx"
-    if "ffprobe" in err and "not found" in err:
-        return "binary_missing"
-    return "unknown"
-
-
-# 5XX / timeout 默认重试 2 次（共 3 次尝试），指数退避 0.5s / 1.5s.
-# 4xx / binary_missing 等不会重试（retry 无用，浪费 wall time + 拖慢 pipeline）。
-_PROBE_RETRY_REASONS = frozenset({"5xx", "timeout"})
-_PROBE_MAX_ATTEMPTS = 3
-_PROBE_BACKOFF_SECONDS = (0.5, 1.5)
-
-
-@dataclass
-class _ProbeRetryOutcome:
-    """``_probe_with_retry`` 返回值；用 dataclass 避免 3 元 tuple 解构 noisy."""
-
-    probe: object | None  # _ProbeInfoExtended 但避免循环 import
-    attempts: int
-    last_error_reason: str | None
-    last_error: Exception | None = None
-
-
-def _probe_with_retry(video_url: str) -> "_ProbeRetryOutcome":
-    """W12-3 · 包一层带退避 retry 的 ffprobe 调用.
-
-    ffprobe 直接读 MinIO 预签名 URL 时，对象存储 5XX / 短暂网络抖动占据线上
-    `v2_probe_errors` 大头；2 次重试足以把绝大多数恢复掉，且不会让 retry 4xx
-    （URL 已过期）白费时间。
-    """
-    last_exc: Exception | None = None
-    last_reason: str = "unknown"
-    for attempt in range(1, _PROBE_MAX_ATTEMPTS + 1):
-        try:
-            probe = _ffprobe_extended(video_url)
-            return _ProbeRetryOutcome(probe=probe, attempts=attempt, last_error_reason=None)
-        except Exception as exc:  # noqa: BLE001
-            last_exc = exc
-            last_reason = _classify_probe_error(exc)
-            if last_reason not in _PROBE_RETRY_REASONS or attempt == _PROBE_MAX_ATTEMPTS:
-                break
-            backoff = _PROBE_BACKOFF_SECONDS[min(attempt - 1, len(_PROBE_BACKOFF_SECONDS) - 1)]
-            metrics.incr("v2_probe_retries")
-            log.info(
-                "v2_probe_retry",
-                extra={
-                    "video_url": _sanitize_probe_url(video_url),
-                    "attempt": attempt,
-                    "reason": last_reason,
-                    "backoff": backoff,
-                },
-            )
-            time.sleep(backoff)
-    assert last_exc is not None  # 上面 break 一定走过 except 分支
-    return _ProbeRetryOutcome(
-        probe=None, attempts=_PROBE_MAX_ATTEMPTS, last_error_reason=last_reason, last_error=last_exc
-    )
-
-
-def _probe_video_warnings(video_url: str) -> list[EngineWarning]:
-    """P2-W8 ENG-C2 · 对原始 ``video_url`` 跑 ffprobe 探测，生成 engine_warnings.
-
-    ffprobe 直接支持 HTTP / HTTPS URL（只读 header / 几 KB metadata，无需完整下载）。
-    探测项：
-    - ``decoded_hevc`` / ``decoded_vp9``：codec_name
-    - ``hdr_tonemapped``：color_transfer ∈ {smpte2084, arib-std-b67}
-    - ``slowmo_detected`` + ``nominal_fps_used``：mov/mp4 tags 检出真实帧率
-    - ``fps_upsampled`` / ``fps_downsampled``：raw fps ≠ TARGET_FPS_V2
-    - ``audio_kept`` / ``audio_dropped``：原视频是否含音轨
-
-    出错（网络不通 / ffprobe 不识别 / 私有 URL 鉴权失败）记一条 ``probe_failed``
-    engine_warning 让客户端/运维能看到失败分类，**绝不阻塞主分析流程**——pipeline
-    主体仍走 V1，engine_warnings 仅为辅助信息。
-
-    P2-W9+ review fix（P1-2）：失败不再"静默"——log.warning（不只 info）+ metrics
-    incr 让运维能从 ``/metrics`` 看到 ``v2_probe_count`` / ``v2_probe_errors`` /
-    ``v2_probe_error_rate``。
-
-    P2-W12-3：5XX / timeout 加 2 次指数退避 retry（MinIO 5XX 是线上 probe 失败
-    大头，多数为对象存储短暂抖动）；4xx / binary_missing 不 retry（白费时间）。
-    失败时把 reason 落到 ``probe_failed`` engine_warning，让客户端"调试浮层"
-    （W10 已落地）能直接看到原因。URL 在日志里脱敏（去 query string）。
-    """
-    if not video_url:
-        return []
-
-    metrics.incr("v2_probe_count")
-    # W13-C：先把公网 URL 改成内网（去掉 nginx 反代这一跳），治根 5xx
-    probe_url = _rewrite_to_internal_url(video_url)
-    if probe_url != video_url:
-        log.debug(
-            "v2_probe_url_rewritten_to_internal",
-            extra={
-                "public_path": _sanitize_probe_url(video_url),
-                "internal_path": _sanitize_probe_url(probe_url),
-            },
-        )
-    outcome = _probe_with_retry(probe_url)
-
-    if outcome.probe is None:
-        metrics.incr("v2_probe_errors")
-        # 按错误类型再细分（5xx_after_retries vs 4xx 立即放弃）做 metric tag
-        if outcome.last_error_reason in _PROBE_RETRY_REASONS:
-            metrics.incr(f"v2_probe_errors_{outcome.last_error_reason}_after_retries")
-        else:
-            metrics.incr(f"v2_probe_errors_{outcome.last_error_reason}")
-        log.warning(
-            "v2_probe_failed",
-            extra={
-                "video_url": _sanitize_probe_url(video_url),
-                "attempts": outcome.attempts,
-                "reason": outcome.last_error_reason,
-                "err_type": type(outcome.last_error).__name__ if outcome.last_error else None,
-                "err": (repr(outcome.last_error)[:200] if outcome.last_error else None),
-            },
-        )
-        # 仍返回 engine_warning 让客户端/调试浮层看到失败；不阻塞主流程
-        return [
-            EngineWarning(
-                code="probe_failed",
-                level="info",
-                detail=f"ffprobe 探测失败 reason={outcome.last_error_reason} attempts={outcome.attempts}",
-            )
-        ]
-
-    probe = outcome.probe
-
-    warnings: list[EngineWarning] = []
-
-    if probe.codec_name in {"hevc", "h265"}:
-        warnings.append(
-            EngineWarning(
-                code="decoded_hevc",
-                level="info",
-                detail=f"codec={probe.codec_name}",
-            )
-        )
-    elif probe.codec_name == "vp9":
-        warnings.append(
-            EngineWarning(code="decoded_vp9", level="info", detail="codec=vp9")
-        )
-    elif probe.codec_name == "h264":
-        warnings.append(
-            EngineWarning(code="decoded_h264", level="info", detail="codec=h264")
-        )
-
-    if probe.is_hdr:
-        warnings.append(
-            EngineWarning(
-                code="hdr_tonemapped",
-                level="info",
-                detail=(
-                    f"color_transfer={probe.color_transfer} → bt709 "
-                    f"(pix_fmt={probe.pix_fmt})"
-                ),
-            )
-        )
-
-    if probe.is_slowmo and probe.nominal_fps > 0:
-        warnings.append(
-            EngineWarning(
-                code="slowmo_detected",
-                level="info",
-                detail=(
-                    f"nominal_fps={probe.nominal_fps:.1f} vs "
-                    f"fps_raw={probe.fps_raw:.1f}"
-                ),
-            )
-        )
-        warnings.append(
-            EngineWarning(
-                code="nominal_fps_used",
-                level="info",
-                detail=f"using nominal_fps={probe.nominal_fps:.1f} for timeline",
-            )
-        )
-
-    if probe.fps_raw > 0 and abs(probe.fps_raw - TARGET_FPS_V2) > 0.5:
-        code = "fps_upsampled" if probe.fps_raw < TARGET_FPS_V2 else "fps_downsampled"
-        warnings.append(
-            EngineWarning(
-                code=code,
-                level="info",
-                detail=f"raw {probe.fps_raw:.1f}fps vs V2 target {TARGET_FPS_V2}fps",
-            )
-        )
-
-    warnings.append(
-        EngineWarning(
-            code="audio_kept" if probe.has_audio else "audio_dropped",
-            level="info",
-            detail=("audio stream present" if probe.has_audio else "no audio stream"),
-        )
-    )
-
-    return warnings
+from app.integrations.probe import (  # noqa: E402 (re-export 故意放在文件中段)
+    _ProbeRetryOutcome,  # noqa: F401  (W12-3 测试 import)
+    _probe_with_retry,  # noqa: F401  (W12-3 测试 import)
+    classify_probe_error as _classify_probe_error,  # noqa: F401  (W12-3 测试 import)
+    probe_video_warnings as _probe_video_warnings,
+    rewrite_to_internal_url as _rewrite_to_internal_url,  # noqa: F401  (W13-C 测试 import)
+    sanitize_probe_url as _sanitize_probe_url,  # noqa: F401  (W12-3 测试 import)
+)
 
 
 def _enrich_v2_fallback(result: AnalyzeResult, ctx) -> None:

@@ -190,10 +190,77 @@ services:
       - ./ai_engine:/app
     command: uv run uvicorn app.main:app --host 0.0.0.0 --port 9000 --reload
 
+  # ============================================================
+  # P2-W14-A · 监控栈（profile=monitoring · 默认不启动）
+  # ============================================================
+  # 启动：docker compose --profile monitoring up -d prometheus alertmanager webhook-echo
+  # 停止：docker compose --profile monitoring down
+  # 详见 infra/monitoring/README.md
+  #
+  # 资源预算（CVM 4G 内存场景）：
+  #   prometheus    mem ≤ 256M（30s scrape + 7d retention）
+  #   alertmanager  mem ≤ 64M
+  #   webhook-echo  mem ≤ 16M
+  # 总 ≤ 350M，对现有 backend(0.5G)+ai_engine(2G)+pg(0.5G) 压力可接受
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: xiaoniao-prometheus
+    restart: unless-stopped
+    profiles: ["monitoring"]
+    volumes:
+      - ./infra/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/monitoring/prometheus-alerts.yml:/etc/prometheus/rules/ai_engine.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      # 7 天保留够看周报告了；CVM 磁盘紧不要更长
+      - '--storage.tsdb.retention.time=7d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      # 仅 bind 127.0.0.1（不暴露公网）；要看面板走 SSH 端口转发：
+      # ssh -L 9090:127.0.0.1:9090 ubuntu@cvm
+      - "127.0.0.1:9090:9090"
+    mem_limit: 256m
+    depends_on:
+      - alertmanager
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: xiaoniao-alertmanager
+    restart: unless-stopped
+    profiles: ["monitoring"]
+    volumes:
+      - ./infra/monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    ports:
+      - "127.0.0.1:9093:9093"
+    mem_limit: 64m
+
+  # 占位收件人：alertmanager-to-wechat-bot 还没接入前，先 echo 看 alert payload
+  # 真接生产渠道（企业微信群机器人）走 W18+，把 alertmanager.yml receivers 的 url 改即可
+  webhook-echo:
+    image: ealen/echo-server:latest
+    container_name: xiaoniao-webhook-echo
+    restart: unless-stopped
+    profiles: ["monitoring"]
+    environment:
+      PORT: "9094"
+      LOGS__IGNORE__PING: "true"
+    ports:
+      - "127.0.0.1:9094:9094"
+    mem_limit: 16m
+
 volumes:
   postgres_data:
   redis_data:
   minio_data:
+  prometheus_data:
+  alertmanager_data:
 
 networks:
   default:

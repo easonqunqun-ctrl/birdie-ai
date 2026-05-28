@@ -53,6 +53,8 @@ import RadarChart, { RadarAxis } from '@/components/RadarChart'
 import '@/components/RadarChart.scss'
 import TrustBadge from '@/components/TrustBadge'
 import '@/components/TrustBadge.scss'
+import CameraAngleAlert from '@/components/CameraAngleAlert'
+import '@/components/CameraAngleAlert.scss'
 import './report.scss'
 
 const VIDEO_ID = 'report-video'
@@ -715,6 +717,15 @@ const ReportPage: FC = () => {
           onRetake={isSample ? undefined : handleShootAgain}
         />
       )}
+
+      {/* P2-W14-B：把 W13-B camera_angle_mismatch + W12-2 camera_angle_large_offset
+        * 翻译成"下次按你选的机位摆好手机会更准"友好文案；用户看不懂 engine_warnings
+        * raw code，但能 act on 这句中文。
+        * 与 debug 浮层（W10）共存：这里给 C 端，那里给 PM/教研。 */}
+      <CameraAngleAlert
+        engineWarnings={report.engine_warnings}
+        declaredCameraAngle={report.camera_angle}
+      />
 
       {qualityWarningLines.length > 0 && (
         <View className='report__quality-warnings'>

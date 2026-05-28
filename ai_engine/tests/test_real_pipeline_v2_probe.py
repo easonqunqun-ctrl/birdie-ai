@@ -9,9 +9,10 @@ from __future__ import annotations
 
 import pytest
 
-from app.pipeline import real_pipeline_v2 as rp2_mod
+from app.integrations import probe as probe_mod  # P2-W14-D · 抽出去后实际入口在这
+from app.pipeline import real_pipeline_v2 as rp2_mod  # 仍保留：metrics / EngineWarning 路径
 from app.pipeline.preprocess_v2 import _ProbeInfoExtended
-from app.pipeline.real_pipeline_v2 import _probe_video_warnings
+from app.pipeline.real_pipeline_v2 import _probe_video_warnings  # thin re-export
 
 
 def _probe(
@@ -49,7 +50,7 @@ def _probe(
 
 
 def test_probe_h264_emits_decoded_h264(monkeypatch):
-    monkeypatch.setattr(rp2_mod, "_ffprobe_extended", lambda _: _probe(codec="h264"))
+    monkeypatch.setattr(probe_mod, "_ffprobe_extended", lambda _: _probe(codec="h264"))
     warnings = _probe_video_warnings("https://example.com/v.mp4")
     codes = {w.code for w in warnings}
     assert "decoded_h264" in codes
@@ -58,7 +59,7 @@ def test_probe_h264_emits_decoded_h264(monkeypatch):
 
 
 def test_probe_hevc_emits_decoded_hevc(monkeypatch):
-    monkeypatch.setattr(rp2_mod, "_ffprobe_extended", lambda _: _probe(codec="hevc"))
+    monkeypatch.setattr(probe_mod, "_ffprobe_extended", lambda _: _probe(codec="hevc"))
     warnings = _probe_video_warnings("https://example.com/v.mp4")
     codes = {w.code for w in warnings}
     assert "decoded_hevc" in codes
@@ -66,13 +67,13 @@ def test_probe_hevc_emits_decoded_hevc(monkeypatch):
 
 
 def test_probe_h265_aliases_to_decoded_hevc(monkeypatch):
-    monkeypatch.setattr(rp2_mod, "_ffprobe_extended", lambda _: _probe(codec="h265"))
+    monkeypatch.setattr(probe_mod, "_ffprobe_extended", lambda _: _probe(codec="h265"))
     warnings = _probe_video_warnings("https://example.com/v.mp4")
     assert "decoded_hevc" in {w.code for w in warnings}
 
 
 def test_probe_vp9_emits_decoded_vp9(monkeypatch):
-    monkeypatch.setattr(rp2_mod, "_ffprobe_extended", lambda _: _probe(codec="vp9"))
+    monkeypatch.setattr(probe_mod, "_ffprobe_extended", lambda _: _probe(codec="vp9"))
     warnings = _probe_video_warnings("https://example.com/v.webm")
     codes = {w.code for w in warnings}
     assert "decoded_vp9" in codes
@@ -80,7 +81,7 @@ def test_probe_vp9_emits_decoded_vp9(monkeypatch):
 
 def test_probe_unknown_codec_no_decoded_warning(monkeypatch):
     monkeypatch.setattr(
-        rp2_mod, "_ffprobe_extended", lambda _: _probe(codec="av1")
+        probe_mod, "_ffprobe_extended", lambda _: _probe(codec="av1")
     )
     warnings = _probe_video_warnings("https://example.com/v.mp4")
     codes = {w.code for w in warnings}
@@ -111,7 +112,7 @@ def test_probe_hdr_emits_hdr_tonemapped(monkeypatch):
 
 
 def test_probe_sdr_no_hdr_warning(monkeypatch):
-    monkeypatch.setattr(rp2_mod, "_ffprobe_extended", lambda _: _probe(codec="h264"))
+    monkeypatch.setattr(probe_mod, "_ffprobe_extended", lambda _: _probe(codec="h264"))
     warnings = _probe_video_warnings("https://example.com/v.mp4")
     assert "hdr_tonemapped" not in {w.code for w in warnings}
 
@@ -137,7 +138,7 @@ def test_probe_slowmo_emits_slowmo_and_nominal_fps(monkeypatch):
 
 
 def test_probe_no_slowmo_no_warning(monkeypatch):
-    monkeypatch.setattr(rp2_mod, "_ffprobe_extended", lambda _: _probe(codec="h264"))
+    monkeypatch.setattr(probe_mod, "_ffprobe_extended", lambda _: _probe(codec="h264"))
     warnings = _probe_video_warnings("https://example.com/v.mp4")
     codes = {w.code for w in warnings}
     assert "slowmo_detected" not in codes
@@ -150,7 +151,7 @@ def test_probe_no_slowmo_no_warning(monkeypatch):
 def test_probe_fps_30_emits_downsampled_relative_to_v2_target_60(monkeypatch):
     """fps_raw=30 vs TARGET_FPS_V2=60 → fps_upsampled（30 < 60）."""
     monkeypatch.setattr(
-        rp2_mod, "_ffprobe_extended", lambda _: _probe(codec="h264", fps_raw=30.0)
+        probe_mod, "_ffprobe_extended", lambda _: _probe(codec="h264", fps_raw=30.0)
     )
     warnings = _probe_video_warnings("https://example.com/v.mp4")
     codes = {w.code for w in warnings}
@@ -160,7 +161,7 @@ def test_probe_fps_30_emits_downsampled_relative_to_v2_target_60(monkeypatch):
 
 def test_probe_fps_120_emits_downsampled(monkeypatch):
     monkeypatch.setattr(
-        rp2_mod, "_ffprobe_extended", lambda _: _probe(codec="h264", fps_raw=120.0)
+        probe_mod, "_ffprobe_extended", lambda _: _probe(codec="h264", fps_raw=120.0)
     )
     warnings = _probe_video_warnings("https://example.com/v.mp4")
     codes = {w.code for w in warnings}
@@ -169,7 +170,7 @@ def test_probe_fps_120_emits_downsampled(monkeypatch):
 
 def test_probe_fps_60_no_fps_warning(monkeypatch):
     monkeypatch.setattr(
-        rp2_mod, "_ffprobe_extended", lambda _: _probe(codec="h264", fps_raw=60.0)
+        probe_mod, "_ffprobe_extended", lambda _: _probe(codec="h264", fps_raw=60.0)
     )
     warnings = _probe_video_warnings("https://example.com/v.mp4")
     codes = {w.code for w in warnings}
@@ -180,7 +181,7 @@ def test_probe_fps_60_no_fps_warning(monkeypatch):
 def test_probe_fps_zero_no_fps_warning(monkeypatch):
     """fps_raw=0（探测失败的边界）→ 不生成 fps 类 warning."""
     monkeypatch.setattr(
-        rp2_mod, "_ffprobe_extended", lambda _: _probe(codec="h264", fps_raw=0.0)
+        probe_mod, "_ffprobe_extended", lambda _: _probe(codec="h264", fps_raw=0.0)
     )
     warnings = _probe_video_warnings("https://example.com/v.mp4")
     codes = {w.code for w in warnings}
@@ -193,7 +194,7 @@ def test_probe_fps_zero_no_fps_warning(monkeypatch):
 
 def test_probe_audio_present_emits_audio_kept(monkeypatch):
     monkeypatch.setattr(
-        rp2_mod, "_ffprobe_extended", lambda _: _probe(codec="h264", has_audio=True)
+        probe_mod, "_ffprobe_extended", lambda _: _probe(codec="h264", has_audio=True)
     )
     warnings = _probe_video_warnings("https://example.com/v.mp4")
     codes = {w.code for w in warnings}
@@ -203,7 +204,7 @@ def test_probe_audio_present_emits_audio_kept(monkeypatch):
 
 def test_probe_no_audio_emits_audio_dropped(monkeypatch):
     monkeypatch.setattr(
-        rp2_mod, "_ffprobe_extended", lambda _: _probe(codec="h264", has_audio=False)
+        probe_mod, "_ffprobe_extended", lambda _: _probe(codec="h264", has_audio=False)
     )
     warnings = _probe_video_warnings("https://example.com/v.mp4")
     codes = {w.code for w in warnings}
@@ -257,7 +258,7 @@ def test_probe_ffprobe_raises_emits_probe_failed_warning(monkeypatch, caplog):
         # 故意用不在 5xx/4xx/timeout/binary_missing 关键字白名单的错误，让 reason 落 unknown
         raise RuntimeError("some weird unparseable error from container layer")
 
-    monkeypatch.setattr(rp2_mod, "_ffprobe_extended", _raise)
+    monkeypatch.setattr(probe_mod, "_ffprobe_extended", _raise)
     warnings = _probe_video_warnings("https://example.com/v.mp4")
     assert len(warnings) == 1
     assert warnings[0].code == "probe_failed"
@@ -340,7 +341,7 @@ def test_probe_metrics_increment_count_and_errors(monkeypatch):
     metrics.reset()
 
     # case 1: 成功 probe → count+1, errors+0
-    monkeypatch.setattr(rp2_mod, "_ffprobe_extended", lambda _: _probe(codec="h264"))
+    monkeypatch.setattr(probe_mod, "_ffprobe_extended", lambda _: _probe(codec="h264"))
     _probe_video_warnings("https://example.com/v.mp4")
     snap = metrics.snapshot()
     assert snap["v2_probe_count"] == 1
@@ -351,7 +352,7 @@ def test_probe_metrics_increment_count_and_errors(monkeypatch):
     def _raise(_):
         raise RuntimeError("ffprobe boom")
 
-    monkeypatch.setattr(rp2_mod, "_ffprobe_extended", _raise)
+    monkeypatch.setattr(probe_mod, "_ffprobe_extended", _raise)
     _probe_video_warnings("https://example.com/v2.mp4")
     snap2 = metrics.snapshot()
     assert snap2["v2_probe_count"] == 2
@@ -529,7 +530,7 @@ def test_probe_retries_5xx_then_succeeds(monkeypatch):
             raise RuntimeError("Server returned 503 Service Unavailable")
         return _probe(codec="h264")
 
-    monkeypatch.setattr(rp2_mod, "_ffprobe_extended", _flaky)
+    monkeypatch.setattr(probe_mod, "_ffprobe_extended", _flaky)
     # 避免真睡 0.5s
     monkeypatch.setattr(rp2_mod.time, "sleep", lambda *_: None)
 
@@ -552,7 +553,7 @@ def test_probe_5xx_all_attempts_fail_emits_probe_failed_warning(monkeypatch):
     def _raise_5xx(_):
         raise RuntimeError("Server returned 502 Bad Gateway")
 
-    monkeypatch.setattr(rp2_mod, "_ffprobe_extended", _raise_5xx)
+    monkeypatch.setattr(probe_mod, "_ffprobe_extended", _raise_5xx)
     monkeypatch.setattr(rp2_mod.time, "sleep", lambda *_: None)
 
     warnings = _probe_video_warnings("https://x/v.mp4?sig=yy")
@@ -577,7 +578,7 @@ def test_probe_4xx_does_not_retry(monkeypatch):
         calls["n"] += 1
         raise RuntimeError("URL expired: X-Amz signature invalid")
 
-    monkeypatch.setattr(rp2_mod, "_ffprobe_extended", _raise_4xx)
+    monkeypatch.setattr(probe_mod, "_ffprobe_extended", _raise_4xx)
     monkeypatch.setattr(rp2_mod.time, "sleep", lambda *_: None)
 
     warnings = _probe_video_warnings("https://x/v.mp4?sig=zz")
@@ -606,7 +607,7 @@ def test_probe_timeout_retries_like_5xx(monkeypatch):
             raise sp.TimeoutExpired(cmd=["ffprobe"], timeout=15)
         return _probe(codec="h264")
 
-    monkeypatch.setattr(rp2_mod, "_ffprobe_extended", _flaky_timeout)
+    monkeypatch.setattr(probe_mod, "_ffprobe_extended", _flaky_timeout)
     monkeypatch.setattr(rp2_mod.time, "sleep", lambda *_: None)
 
     warnings = _probe_video_warnings("https://x/v.mp4")
@@ -734,7 +735,7 @@ def test_probe_video_warnings_calls_ffprobe_with_internal_url(monkeypatch):
         captured.append(str(url))
         return _probe(codec="h264")
 
-    monkeypatch.setattr(rp2_mod, "_ffprobe_extended", _spy)
+    monkeypatch.setattr(probe_mod, "_ffprobe_extended", _spy)
 
     _probe_video_warnings(
         "https://api.birdieai.cn/minio/xiaoniao-videos/uploads/x.mp4?X-Amz-Signature=Z"

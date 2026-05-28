@@ -1,0 +1,59 @@
+# Alertmanager 配置 — P2-W14-A
+#
+# 设计：先用 webhook 占位（默认指向一个 echo container 或本地 socket），
+# 真接生产渠道（企业微信群机器人 / 钉钉 / 飞书）留到 W18+。
+# 这样上线就能跑、能 fire、能 group/dedupe；不阻塞 alerting rules 上线。
+#
+# 启动：docker compose --profile monitoring up -d alertmanager
+# 访问：http://<cvm-ip>:9093
+
+global:
+  resolve_timeout: 5m
+
+# ---- 路由树 ----
+# 按 severity 分流（page → 占位 webhook；warn/info → 同一通道但限频更宽）
+route:
+  receiver: 'default-webhook'
+  group_by: ['alertname', 'service']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+  routes:
+    - matchers:
+        - severity = "page"
+      receiver: 'default-webhook'
+      group_wait: 10s
+      repeat_interval: 1h
+
+    - matchers:
+        - severity = "warn"
+      receiver: 'default-webhook'
+      repeat_interval: 6h
+
+    - matchers:
+        - severity = "info"
+      receiver: 'default-webhook'
+      repeat_interval: 24h
+
+# ---- 静默：tests / 维护窗口可在 UI http://<host>:9093/#/silences 操作 ----
+
+# ---- 收件人 ----
+# webhook URL 占位：默认指向一个 alertmanager-webhook-echo 容器（compose 里启动）
+# 真接企业微信：把 url 改成 https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=<bot-key>
+# 但企业微信 webhook payload 格式与 alertmanager 默认不一致，需中间一层
+# alertmanager-to-wechat-bot 转换（如 https://github.com/wonderivan/alertmanager-wechat-bot）。
+# 待 W18+ 接生产渠道时统一改。
+receivers:
+  - name: 'default-webhook'
+    webhook_configs:
+      - url: 'http://webhook-echo:9094/alert'
+        send_resolved: true
+
+# ---- 抑制规则（高优先级触发时，低优先级同 alert 静默） ----
+inhibit_rules:
+  - source_matchers:
+      - severity = "page"
+    target_matchers:
+      - severity =~ "warn|info"
+    equal: ['alertname', 'service']

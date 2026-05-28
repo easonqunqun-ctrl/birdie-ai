@@ -1,0 +1,49 @@
+/* P2-W14-B · 机位友好警示 banner 样式
+ *
+ * 配色 amber/warn 系（不上 error 红，不吓人）；与 report__quality-warnings
+ * 同档但更醒目（机位错是"下次拍能避免"的可修复错误，比 quality warnings 行动力更强）。
+ */
+
+.camera-angle-alert {
+  margin-top: 16rpx;
+  padding: 20rpx 24rpx;
+  background: rgba(245, 158, 11, 0.08); // amber 透明底
+  border-left: 6rpx solid var(--color-warning-amber, #f59e0b);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+
+  &__head {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8rpx;
+  }
+
+  &__icon {
+    font-size: var(--font-size-md);
+    line-height: 1;
+  }
+
+  &__title {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-primary);
+    font-weight: 600;
+  }
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: 8rpx;
+  }
+
+  &__line {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    line-height: 1.6;
+  }
+}

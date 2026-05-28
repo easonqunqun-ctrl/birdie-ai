@@ -1,0 +1,51 @@
+# Prometheus 主配置 — P2-W14-A
+#
+# 启动：docker compose --profile monitoring up -d prometheus alertmanager
+# 访问：http://<cvm-ip>:9090 （不暴露公网；走 SSH 端口转发或私网）
+#
+# 设计要点：
+# - scrape ai_engine /metrics/prom（W13-D 已输出 Prometheus exposition）
+# - alerting rules 走 W13-D 的 infra/monitoring/prometheus-alerts.yml
+# - alertmanager 也放 docker 同网络，名字 alertmanager:9093（compose service name）
+# - scrape_interval=30s 与 promtool/告警 for 周期匹配；CVM 资源紧不要更密
+
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+  external_labels:
+    env: 'staging'
+    region: 'cvm-shenzhen'
+
+# ---- Alertmanager 路由 ----
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+# ---- 告警 rule files (compose mount 进 /etc/prometheus/rules/) ----
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+# ---- scrape jobs ----
+scrape_configs:
+  # 自监控（Prometheus 自身健康）
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # ai_engine（W13-D · /metrics/prom）
+  # 容器间走 docker network，host=ai_engine，port=9000
+  - job_name: 'ai_engine'
+    metrics_path: /metrics/prom
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['ai_engine:9000']
+        labels:
+          service: 'ai_engine'
+          component: 'pipeline'
+
+  # 预留：backend `/v1/health` 已是 JSON 不是 prom；未来加 /metrics 时再开
+  # - job_name: 'backend'
+  #   metrics_path: /metrics
+  #   static_configs:
+  #     - targets: ['backend:8000']
