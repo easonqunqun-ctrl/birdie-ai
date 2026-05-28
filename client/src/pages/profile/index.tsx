@@ -222,12 +222,7 @@ const ProfilePage: FC = () => {
           {PHASE2_MEETUP_ENABLED_FLAG && (
             <View
               className='profile__menu-item'
-              onClick={() =>
-                Taro.showToast({
-                  title: '约球功能即将上线',
-                  icon: 'none',
-                })
-              }
+              onClick={() => Taro.navigateTo({ url: '/pages/meetup/index' })}
             >
               <Text className='profile__menu-icon'>🤝</Text>
               <Text className='profile__menu-label'>约球邀请</Text>

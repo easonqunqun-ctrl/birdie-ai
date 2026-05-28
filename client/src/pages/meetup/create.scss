@@ -1,0 +1,81 @@
+.meetup-create {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 32rpx 28rpx 48rpx;
+  background: var(--color-bg);
+  box-sizing: border-box;
+
+  &__warn {
+    padding: 24rpx 28rpx;
+    margin-bottom: 24rpx;
+    border-radius: var(--radius-md);
+    background: var(--color-primary-tint, rgba(26, 35, 126, 0.08));
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    line-height: 1.6;
+  }
+
+  &__row {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20rpx 0;
+    margin-bottom: 16rpx;
+    border-bottom: 1rpx solid var(--color-border-subtle, #f0f0f0);
+  }
+
+  &__label {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+  }
+
+  &__value {
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+
+    &--mono {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-tertiary);
+      max-width: 420rpx;
+      text-align: right;
+    }
+  }
+
+  &__field-label {
+    display: block;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    margin: 16rpx 0 8rpx;
+  }
+
+  &__textarea {
+    width: 100%;
+    min-height: 160rpx;
+    padding: 20rpx 24rpx;
+    margin-bottom: 8rpx;
+    border-radius: var(--radius-md);
+    background: var(--color-bg-card);
+    font-size: var(--font-size-sm);
+    box-sizing: border-box;
+  }
+
+  &__picker {
+    padding: 22rpx 28rpx;
+    margin-bottom: 8rpx;
+    border-radius: var(--radius-md);
+    background: var(--color-bg-card);
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+  }
+
+  &__submit {
+    margin-top: 48rpx;
+    background: var(--color-primary) !important;
+    color: var(--color-on-primary, #fff) !important;
+    border-radius: var(--radius-xl) !important;
+    font-size: var(--font-size-base) !important;
+    font-weight: 600 !important;
+  }
+}

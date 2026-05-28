@@ -34,7 +34,10 @@ export default defineAppConfig({
     'pages/courses/index',
     'pages/courses/detail',
     'pages/pros/index',
-    'pages/pros/detail'
+    'pages/pros/detail',
+    'pages/meetup/index',
+    'pages/meetup/detail',
+    'pages/meetup/create'
   ],
   /**
    * 说明：真机上 wx.request **单次等待完整响应**仍有约 60s 量级上限；
