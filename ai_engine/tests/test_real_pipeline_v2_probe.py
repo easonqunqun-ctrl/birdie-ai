@@ -93,7 +93,7 @@ def test_probe_unknown_codec_no_decoded_warning(monkeypatch):
 
 def test_probe_hdr_emits_hdr_tonemapped(monkeypatch):
     monkeypatch.setattr(
-        rp2_mod,
+        probe_mod,
         "_ffprobe_extended",
         lambda _: _probe(
             codec="hevc",
@@ -122,7 +122,7 @@ def test_probe_sdr_no_hdr_warning(monkeypatch):
 
 def test_probe_slowmo_emits_slowmo_and_nominal_fps(monkeypatch):
     monkeypatch.setattr(
-        rp2_mod,
+        probe_mod,
         "_ffprobe_extended",
         lambda _: _probe(
             codec="hevc",
@@ -218,7 +218,7 @@ def test_probe_no_audio_emits_audio_dropped(monkeypatch):
 def test_probe_iphone_slowmo_hdr_combo(monkeypatch):
     """典型 iPhone 14 慢动作 HDR HEVC：5 类 warning 同时触发."""
     monkeypatch.setattr(
-        rp2_mod,
+        probe_mod,
         "_ffprobe_extended",
         lambda _: _probe(
             codec="hevc",
@@ -532,7 +532,7 @@ def test_probe_retries_5xx_then_succeeds(monkeypatch):
 
     monkeypatch.setattr(probe_mod, "_ffprobe_extended", _flaky)
     # 避免真睡 0.5s
-    monkeypatch.setattr(rp2_mod.time, "sleep", lambda *_: None)
+    monkeypatch.setattr(probe_mod.time, "sleep", lambda *_: None)
 
     warnings = _probe_video_warnings("https://x/v.mp4?sig=xx")
     codes = {w.code for w in warnings}
@@ -554,7 +554,7 @@ def test_probe_5xx_all_attempts_fail_emits_probe_failed_warning(monkeypatch):
         raise RuntimeError("Server returned 502 Bad Gateway")
 
     monkeypatch.setattr(probe_mod, "_ffprobe_extended", _raise_5xx)
-    monkeypatch.setattr(rp2_mod.time, "sleep", lambda *_: None)
+    monkeypatch.setattr(probe_mod.time, "sleep", lambda *_: None)
 
     warnings = _probe_video_warnings("https://x/v.mp4?sig=yy")
     assert len(warnings) == 1
@@ -579,7 +579,7 @@ def test_probe_4xx_does_not_retry(monkeypatch):
         raise RuntimeError("URL expired: X-Amz signature invalid")
 
     monkeypatch.setattr(probe_mod, "_ffprobe_extended", _raise_4xx)
-    monkeypatch.setattr(rp2_mod.time, "sleep", lambda *_: None)
+    monkeypatch.setattr(probe_mod.time, "sleep", lambda *_: None)
 
     warnings = _probe_video_warnings("https://x/v.mp4?sig=zz")
     assert len(warnings) == 1
@@ -608,7 +608,7 @@ def test_probe_timeout_retries_like_5xx(monkeypatch):
         return _probe(codec="h264")
 
     monkeypatch.setattr(probe_mod, "_ffprobe_extended", _flaky_timeout)
-    monkeypatch.setattr(rp2_mod.time, "sleep", lambda *_: None)
+    monkeypatch.setattr(probe_mod.time, "sleep", lambda *_: None)
 
     warnings = _probe_video_warnings("https://x/v.mp4")
     codes = {w.code for w in warnings}
