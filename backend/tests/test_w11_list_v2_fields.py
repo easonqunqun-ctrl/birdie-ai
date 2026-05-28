@@ -112,8 +112,14 @@ async def test_list_analyses_returns_v2_engine_version_and_confidence():
 
 
 @pytest.mark.asyncio
-async def test_list_analyses_v1_legacy_defaults_engine_version_and_null_confidence():
-    """老 V1 报告：engine_version 兜底 'v1'，analysis_confidence None → 前端不渲染小标签."""
+async def test_list_analyses_v1_legacy_defaults_engine_version_and_keeps_db_default_confidence():
+    """老 V1 报告：engine_version 兜底 'v1'。
+
+    DB 上 ``analysis_confidence`` 列默认 1.0 + ``nullable=False`` (W10 加的)，所以
+    哪怕传 None 进去也会被 server_default 兜成 1.0；这是预期行为。前端在
+    `history.tsx` 用 ``engine_version === 'v2'`` 做路由，**不依赖** confidence
+    是 None 来区分 V1/V2，因此 1.0 是无害的——V1 卡片永远不渲染 trust mini 标签。
+    """
     from app.core.database import AsyncSessionLocal
     from app.schemas.analysis import AnalysisListQuery
     from app.services.analysis_service import list_analyses
@@ -133,7 +139,8 @@ async def test_list_analyses_v1_legacy_defaults_engine_version_and_null_confiden
 
     assert len(items) == 1
     assert items[0].engine_version == "v1"
-    assert items[0].analysis_confidence is None
+    # DB server_default 兜成 1.0，schema 允许 float | None 透传不抛 ValidationError
+    assert items[0].analysis_confidence == pytest.approx(1.0)
 
 
 @pytest.mark.asyncio
