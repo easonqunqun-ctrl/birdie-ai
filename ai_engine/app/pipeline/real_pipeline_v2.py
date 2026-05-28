@@ -16,10 +16,14 @@ P2-W5 收口
 - ✅ ``diagnose_v2`` 接受 ``PhaseSegmentResult`` 并填 ``key_frame_timestamp``
 - ✅ YAML 全集 14 条规则覆盖 V1 全部 issue（``grip_weak`` 占位除外）
 
-后续 W34 接力
--------------
-- 接 P2-M7-02 → 填 ``AnalyzeResult.engine_warnings``
-- 接 P2-M7-06 → 填 ``IssueItem.confidence`` / ``analysis_confidence``
+P2-W7 收口（V2 灌溉续）
+----------------------
+- ✅ ``_enrich_v2`` 注入 ``run_real_analysis(enrichment_fn=...)``，在 result 组装完
+  后填三层 confidence + tier（M7-06）+ engine_warnings 占位（M7-02）
+- ✅ V1 路径默认不调 enrichment_fn → ``analysis_confidence=1.0`` /
+  ``IssueItem.confidence=None``（schema 默认值，向后兼容）
+- ⏸ V2 pipeline 切到 ``phases_v2`` / ``preprocess_v2``：留 W8+（让 engine_warnings
+  真有内容；当前 MVP 只在 fallback 时塞一条 ``fallback_to_v1`` 占位）
 """
 
 from __future__ import annotations
@@ -27,12 +31,19 @@ from __future__ import annotations
 import logging
 
 from app import metrics
+from app.pipeline.confidence import (
+    analysis_tier,
+    compute_analysis_confidence,
+    issue_confidence,
+    issue_tier,
+)
 from app.pipeline.constants import issue_meta
 from app.pipeline.diagnose import (
     DiagnosedIssue,
     MAX_ISSUES,
     MIN_DISPLAY_CONFIDENCE,
 )
+from app.pipeline.engine_warnings import EngineWarning, serialize_engine_warnings
 from app.pipeline.phases import PhaseSegmentResult
 from app.pipeline.rule_engine import (
     LOCALES_DIR,
@@ -170,6 +181,90 @@ def diagnose_v2(
     return issues[:max_issues]
 
 
+def _enrich_v2(result: AnalyzeResult, ctx) -> None:
+    """P2-W7 ENG-B · V2 enrichment hook：填三层 confidence + engine_warnings 占位.
+
+    在 ``real_pipeline.run_real_analysis`` 组装完 ``AnalyzeResult`` 后被调用一次。
+    所有写操作都对 result 原地修改（IssueItem / AnalyzeResult 都是 Pydantic
+    BaseModel，frozen=False 可改字段）。
+
+    三层填法
+    --------
+    Layer 1 — feature_confidences（dict[feature_name, 0-1]）:
+        MVP 简化：所有特征复用 ``pose_result.mean_confidence``。
+        理由：精确实现需要建 FEATURE_LANDMARKS_MAP 把每个特征关联到 N 个
+        landmarks，工作量大。W8+ 可换成 ``feature_confidence(visibility[:, landmarks])``
+        逐特征精算。当前简化保证「不浮报」（mean 是上界）+ 提供端到端通路。
+
+    Layer 2 — IssueItem.confidence / confidence_tier:
+        对每个 issue 找对应的 YAML rule，取 rule.conditions[].feature 的
+        feature_confidences 求平均 → 调 ``issue_confidence(...)`` →
+        ``issue_tier(...)`` 折算 confirmed / leaning / hidden。
+        阈值距离暂固定 0.5（W8+ 可基于 feature value 与 condition.threshold
+        归一化距离精算）。
+
+    Layer 3 — analysis_confidence:
+        直接喂 ``compute_analysis_confidence(...)``；
+        ``camera_angle_offset_deg=None`` 待 M7-04 接入后补。
+
+    engine_warnings:
+        MVP 阶段 V2 仍走 V1 pipeline，**正常路径不产生 warning**；
+        ``run_real_analysis_v2`` fallback 时由 caller 注入一条 ``fallback_to_v1``。
+    """
+    pose = ctx.pose_result
+    mean_vis = float(pose.mean_confidence) if pose.num_frames > 0 else 0.0
+
+    # Layer 1 — feature_confidences（MVP：全部用 mean_vis）
+    feature_names = list(ctx.features.keys())
+    feature_confs = {name: round(mean_vis, 3) for name in feature_names}
+
+    # Layer 2 — 每 issue confidence + tier
+    rules = _get_rules()
+    rules_by_name = {r.name: r for r in rules}
+    for issue in result.issues:
+        rule = rules_by_name.get(issue.type)
+        if rule is None or not rule.conditions:
+            # 不在 YAML 表里的 issue（V1 兼容路径），用全局 mean 作为兜底
+            conf = mean_vis
+        else:
+            feats_for_issue = [
+                feature_confs.get(c.feature, mean_vis) for c in rule.conditions
+            ]
+            # threshold_distance 暂固定 0.5（中等距离）；W8+ 可按 feature value 实算
+            conf = issue_confidence(feats_for_issue, threshold_distance=0.5)
+        issue.confidence = round(conf, 3)
+        issue.confidence_tier = issue_tier(conf)
+
+    # Layer 3 — analysis_confidence
+    ac = compute_analysis_confidence(
+        mean_visibility=mean_vis,
+        quality_warnings=ctx.quality_warnings,
+        camera_angle_offset_deg=None,  # M7-04 接入后补
+        feature_confidences=feature_confs,
+    )
+    result.analysis_confidence = round(ac, 3)
+    result.feature_confidences = feature_confs
+
+    log.info(
+        "v2_enrichment_done",
+        extra={
+            "analysis_id": result.analysis_id,
+            "mean_visibility": round(mean_vis, 3),
+            "analysis_confidence": result.analysis_confidence,
+            "analysis_tier": analysis_tier(ac),
+            "num_issues_confirmed": sum(
+                1 for i in result.issues if i.confidence_tier == "confirmed"
+            ),
+            "num_issues_leaning": sum(
+                1 for i in result.issues if i.confidence_tier == "leaning"
+            ),
+            "num_issues_hidden": sum(
+                1 for i in result.issues if i.confidence_tier == "hidden"
+            ),
+        },
+    )
+
+
 async def run_real_analysis_v2(req: AnalyzeRequest) -> AnalyzeResult:
     """V2 真实分析入口。
 
@@ -177,13 +272,18 @@ async def run_real_analysis_v2(req: AnalyzeRequest) -> AnalyzeResult:
     YAML RuleEngine 重诊 issues；features 与 phases 由 V1 pipeline 计算后透传给
     ``diagnose_v2``。
 
+    P2-W7：``enrichment_fn=_enrich_v2`` 在 result 组装完后注入三层 confidence + tier。
+
     出错降级：V2 资源（YAML / locale）加载失败 → 记日志后退回 V1 ``diagnose``，
-    确保灰度期不影响报告交付；V1 入口抛 PipelineError 时直接透传，由 main.py
+    确保灰度期不影响报告交付；engine_warnings 注入一条 ``fallback_to_v1`` 占位
+    让客户端看到本次走的是 V1。V1 入口抛 PipelineError 时直接透传，由 main.py
     统一捕获转 ``status=failed``。
     """
     from app.pipeline.real_pipeline import run_real_analysis
 
     diagnose_impl = None
+    enrichment_impl = _enrich_v2
+    fallback_warning: EngineWarning | None = None
     try:
         _get_rules()
         _get_locale()
@@ -194,11 +294,27 @@ async def run_real_analysis_v2(req: AnalyzeRequest) -> AnalyzeResult:
             extra={"analysis_id": req.analysis_id, "err": repr(exc)},
         )
         metrics.incr("v2_fallback_count")
+        # YAML/locale 加载不上时不能跑 _enrich_v2（rules_by_name 为空），跳过；
+        # 客户端能从 engine_warnings 看到走了 V1。
+        enrichment_impl = None
+        fallback_warning = EngineWarning(
+            code="fallback_to_v1",
+            level="warn",
+            detail=f"V2 资源加载失败: {type(exc).__name__}",
+        )
 
-    return await run_real_analysis(req, diagnose_fn=diagnose_impl)
+    result = await run_real_analysis(
+        req, diagnose_fn=diagnose_impl, enrichment_fn=enrichment_impl
+    )
+
+    if fallback_warning is not None:
+        result.engine_warnings = serialize_engine_warnings([fallback_warning])
+
+    return result
 
 
 __all__ = [
+    "_enrich_v2",
     "diagnose_v2",
     "reset_caches",
     "run_real_analysis_v2",

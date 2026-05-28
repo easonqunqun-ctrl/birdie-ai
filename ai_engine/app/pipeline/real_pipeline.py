@@ -28,6 +28,7 @@ from __future__ import annotations
 import logging
 import shutil
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
@@ -36,7 +37,7 @@ from app.pipeline.constants import PHASE_LABELS
 from app.pipeline.diagnose import DiagnosedIssue, diagnose
 from app.pipeline.features import extract_features
 from app.pipeline.phases import PhaseSegmentResult, segment_phases
-from app.pipeline.pose import estimate_poses, quality_warnings_from_pose
+from app.pipeline.pose import PoseResult, estimate_poses, quality_warnings_from_pose
 from app.pipeline.preprocess import preprocess_video, quality_warnings_from_preprocess
 from app.pipeline.recommend import recommend
 from app.pipeline.scoring import score_all_phases, score_overall, weakest_phase
@@ -58,6 +59,26 @@ from app.storage import get_storage
 # P2-W5：诊断函数协议。V1 默认 ``diagnose``；V2 灰度桶传 ``diagnose_v2``。
 DiagnoseFn = Callable[[dict[str, float], PhaseSegmentResult], list[DiagnosedIssue]]
 
+
+@dataclass(frozen=True)
+class PipelineCtx:
+    """P2-W7 ENG-B · 流水线中间态快照，供 V2 ``enrichment_fn`` 算 confidence / warnings.
+
+    设计：用 frozen dataclass 而非裸 dict，免得 hook 误改导致 V1 行为漂移。
+    扩展时直接加字段（向后兼容，旧 hook 只读自己关心的）。
+    """
+
+    pose_result: PoseResult
+    phases: PhaseSegmentResult
+    features: dict[str, float]
+    quality_warnings: list[str]
+    fps: float
+
+
+# P2-W7 ENG-B：enrichment hook。V1 默认 None 不调用，保持行为冻结；
+# V2 注入 ``_enrich_v2`` 在 result 组装完后填三层 confidence + engine_warnings。
+EnrichmentFn = Callable[[AnalyzeResult, PipelineCtx], None]
+
 log = logging.getLogger("ai_engine.real_pipeline")
 
 
@@ -65,6 +86,7 @@ async def run_real_analysis(
     req: AnalyzeRequest,
     *,
     diagnose_fn: DiagnoseFn | None = None,
+    enrichment_fn: EnrichmentFn | None = None,
 ) -> AnalyzeResult:
     """真实分析主入口（替换 mock_pipeline.run_mock_analysis）。
 
@@ -74,6 +96,10 @@ async def run_real_analysis(
 
     P2-W5：``diagnose_fn`` 可注入。V1 默认走 ``diagnose``；
     ``real_pipeline_v2.run_real_analysis_v2`` 注入 ``diagnose_v2`` 走 YAML RuleEngine。
+
+    P2-W7：``enrichment_fn`` 可注入。在 ``AnalyzeResult`` 组装完后被调用一次，
+    收到 ``(result, ctx)``，可原地修改 result（如填 ``analysis_confidence``、
+    ``feature_confidences``、``IssueItem.confidence`` 等）。V1 默认 None → 行为冻结。
     """
     diagnose_impl: DiagnoseFn = diagnose_fn or diagnose
     t0 = time.perf_counter()
@@ -203,7 +229,7 @@ async def run_real_analysis(
     except Exception:  # pragma: no cover - 清理失败不影响主流程
         pass
 
-    return AnalyzeResult(
+    result = AnalyzeResult(
         analysis_id=req.analysis_id,
         status="completed",
         overall_score=overall,
@@ -217,6 +243,27 @@ async def run_real_analysis(
         duration_ms=duration_ms,
         quality_warnings=quality_warnings,
     )
+
+    # P2-W7 ENG-B：V2 通过 enrichment_fn 把三层 confidence + engine_warnings 注入 result；
+    # V1 默认 enrichment_fn=None → 不调用 → analysis_confidence=1.0 / issues 无 confidence 字段（向后兼容）
+    if enrichment_fn is not None:
+        ctx = PipelineCtx(
+            pose_result=pose_result,
+            phases=phases,
+            features=features,
+            quality_warnings=quality_warnings,
+            fps=fps,
+        )
+        try:
+            enrichment_fn(result, ctx)
+        except Exception as exc:  # noqa: BLE001
+            # enrichment 出错不影响主报告交付；记日志由调用方解决
+            log.warning(
+                "enrichment_fn_failed",
+                extra={"analysis_id": req.analysis_id, "err": repr(exc)},
+            )
+
+    return result
 
 
 def _merge_quality_warnings(*groups: list[str]) -> list[str]:

@@ -15,6 +15,7 @@
 | **W4** | **引擎续做** | P2-M7-10 · M7-14 · M7-N1 | YAML 规则 starter + V2 路由打通 + drill 文案 D-6 | **✅ Done**（`e618a77`） |
 | **W5** | **引擎深耕** | P2-M7-10 · M7-14 | V1→V2 全量 14 规则迁 YAML；features dict 外提让 V2 真正重诊 | **✅ Done**（`6afffda` · backend hotfix `a37499a`） |
 | **W6** | **V2 灌溉** | ENG-A1 · ENG-A2 · ENG-A3 | metrics 观测 + redis 热改 pct + 离线 V1/V2 diff 脚本 | **✅ Done**（`816e320` · `915a6d2` uv.lock+test fix） |
+| **W7** | **V2 引擎产品力 v0.1 落地** | P2-M7-02 · P2-M7-06 | engine_warnings + 三层 confidence 接入 V2；V1 行为冻结 | 🚧 In Progress |
 
 **并行泳道（不占 Sprint 主表）**：U-2 COS · Q-B5 papay · O-01/O-04 性能抽测 · par-E3/par-T1
 
@@ -91,6 +92,30 @@
 | 5 | `scripts/v1_v2_diff.py`：输入 N 个 swing_analysis_id → 各以 `force_engine_version` 强制跑 V1 / V2 → 输出 diff CSV（issues 类型集合 / 各 issue severity / overall_score）+ 一致率汇总 |
 | 6 | 单测：metrics 计数器 race-safe、Redis 路径 mock 注入、`/admin/engine-rollout` 鉴权 401/200 路径 |
 | 7 | 生产 smoke：`curl http://ai_engine:9100/metrics` 看到 v1/v2 计数随真实流量增长；CVM 内 `python -c "set_rollout_pct(5)"` 写入 Redis 成功 |
+
+---
+
+## W7 · V2 引擎产品力 v0.1 验收
+
+> **目标**：把 `engine_warnings.py` + `confidence.py` 这两个早就建好但没接入生产
+> 的 v0.1 模块，**真正落进 V2 pipeline**——让灰度用户的报告带上三层可信度，
+> 客户端能据此折叠 `hidden` 诊断、低 `analysis_tier` 时弹「建议重拍」CTA。
+
+> **不做项（留 W8+）**：V2 切到 `phases_v2 / preprocess_v2`（让 engine_warnings 真有
+> codec / fps / 机位等内容）；逐特征精算 `feature_confidence`（按 FEATURE_LANDMARKS_MAP
+> 取 visibility 子矩阵而非全局 mean）；`issue_confidence` 按 feature value 与 condition
+> threshold 实算 `threshold_distance`。
+
+| # | 验收项 |
+|---|--------|
+| 1 | `real_pipeline.run_real_analysis` 新增 `enrichment_fn: Callable[[AnalyzeResult, PipelineCtx], None] \| None = None`；V1 默认 None → 行为冻结（IssueItem.confidence=None / analysis_confidence=1.0 / engine_warnings=[]） |
+| 2 | `PipelineCtx` frozen dataclass 暴露 pose_result / phases / features / quality_warnings / fps；hook 内仅读不改 ctx |
+| 3 | `real_pipeline_v2._enrich_v2` 实现三层：Layer 1 feature_confidences 用 `pose.mean_confidence` 全填（MVP）；Layer 2 按 rule.conditions 找 feature 求平均喂 `issue_confidence`；Layer 3 `compute_analysis_confidence`，camera_angle_offset_deg 暂 None |
+| 4 | IssueItem.confidence_tier ∈ {confirmed / leaning / hidden}（confidence.py 已有 `issue_tier`） |
+| 5 | `run_real_analysis_v2` 注入 `enrichment_fn=_enrich_v2`；V2 fallback 时（YAML 加载失败）engine_warnings 多塞一条 `fallback_to_v1`，让客户端可见 |
+| 6 | `enrichment_fn` 抛错被 `run_real_analysis` try/except 吞掉 + log `enrichment_fn_failed` warning；主报告不受影响 |
+| 7 | 单测：三层端到端 / hidden 过滤 / low tier retake / V1 默认值兼容 / 零帧 pose 不挂 |
+| 8 | 生产 smoke：CVM 容器内 pytest 通过；线上 V2 路径返回 result 含 `analysis_confidence > 0`、`feature_confidences != {}`、issues.confidence ≠ null |
 
 ---
 
