@@ -90,6 +90,80 @@ def test_metrics_reflects_recorded_counters(client):
     assert body["v2_error_rate"] == pytest.approx(1 / 7, rel=1e-3)
 
 
+# ---------- /metrics/prom (W13-D Prometheus exposition) ----------
+
+
+def test_metrics_prom_text_format_basic(client):
+    """W13-D · /metrics/prom 输出标准 Prometheus exposition 文本格式."""
+    resp = client.get("/metrics/prom")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("text/plain")
+    text = resp.text
+    # 每个 metric 必须有 HELP + TYPE + 值 三行
+    assert "# HELP ai_engine_v1_count" in text
+    assert "# TYPE ai_engine_v1_count counter" in text
+    assert "\nai_engine_v1_count 0\n" in text
+    # gauge 类型自动识别（_rate / _ratio 结尾 + uptime_s + mock_mode + avg_latency）
+    assert "# TYPE ai_engine_v2_error_rate gauge" in text
+    assert "# TYPE ai_engine_v2_traffic_ratio gauge" in text
+    assert "# TYPE ai_engine_rollout_pct gauge" in text
+    assert "# TYPE ai_engine_mock_mode gauge" in text
+    assert "# TYPE ai_engine_uptime_s gauge" in text
+
+
+def test_metrics_prom_reflects_counter_increments(client):
+    """W13-D · counter 真自增后 /metrics/prom 文本里能立刻看到."""
+    metrics.incr("v2_count")
+    metrics.incr("v2_count")
+    metrics.incr("v2_probe_count")
+    metrics.incr("v2_probe_retries")
+    metrics.incr("v2_probe_errors_5xx_after_retries")
+
+    text = client.get("/metrics/prom").text
+    assert "\nai_engine_v2_count 2\n" in text
+    assert "\nai_engine_v2_probe_count 1\n" in text
+    assert "\nai_engine_v2_probe_retries 1\n" in text
+    # W12-3 新分桶 metrics 必须被 export（不是个别 export）
+    assert "\nai_engine_v2_probe_errors_5xx_after_retries 1\n" in text
+
+
+def test_metrics_prom_covers_all_w12_w13_buckets(client):
+    """W13-D · 防止后续加 metric key 忘了 export；
+    所有 W12-3 / W13-C 新增的 counter 都必须出现在 /metrics/prom."""
+    text = client.get("/metrics/prom").text
+    required_keys = [
+        "ai_engine_v2_probe_count",
+        "ai_engine_v2_probe_errors",
+        "ai_engine_v2_probe_retries",
+        "ai_engine_v2_probe_errors_5xx_after_retries",
+        "ai_engine_v2_probe_errors_timeout_after_retries",
+        "ai_engine_v2_probe_errors_4xx",
+        "ai_engine_v2_probe_errors_binary_missing",
+        "ai_engine_v2_probe_errors_unknown",
+    ]
+    for key in required_keys:
+        assert f"# HELP {key}" in text, f"/metrics/prom missing key: {key}"
+
+
+def test_metrics_prom_skips_non_numeric_fields(client):
+    """W13-D · uptime_s 是 float 应该 export；任何字符串字段（如未来加 'env' / 'version'）不应 export.
+
+    现在 snap 里全部都是数字，但兼容未来加字符串字段时不要崩。
+    """
+    text = client.get("/metrics/prom").text
+    # uptime_s 应出现且为 gauge
+    assert "ai_engine_uptime_s" in text
+    # 文本不应包含纯 string value（防止字符串字段被误 export 成 metric）
+    lines = [l for l in text.splitlines() if l and not l.startswith("#")]
+    for line in lines:
+        parts = line.rsplit(" ", 1)
+        assert len(parts) == 2
+        try:
+            float(parts[1])
+        except ValueError:
+            pytest.fail(f"non-numeric prom metric value: {line!r}")
+
+
 # ---------- /admin/engine-rollout 鉴权 ----------
 
 

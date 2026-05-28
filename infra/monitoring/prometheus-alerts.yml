@@ -1,0 +1,156 @@
+# Prometheus alerting rules — ai_engine（P2-W13-D）
+#
+# 用法：
+#   1. 在 Prometheus 配置里加 scrape job：
+#      - job_name: 'ai_engine'
+#        metrics_path: /metrics/prom
+#        static_configs:
+#          - targets: ['ai_engine:9000']
+#   2. 把本文件加进 `rule_files:`：
+#      rule_files:
+#        - /etc/prometheus/rules/ai_engine.yml
+#   3. 用 promtool 校验：
+#      promtool check rules infra/monitoring/prometheus-alerts.yml
+#
+# 设计原则
+# --------
+# - 阈值与 W7-W13 实际数据对齐，避免线上首日就触发噪音告警
+# - 区分 P0（影响主分析）/ P1（影响可观测性）/ P2（趋势观察）三级 severity
+# - 所有告警 `for:` 至少 5m，避免单点波动误触
+# - W13-C 已落地内网直连后，5xx 告警阈值会显著下调（< 0.5%）
+
+groups:
+- name: ai_engine_pipeline
+  interval: 1m
+  rules:
+
+  # ------------------------------------------------------------
+  # P0 · 影响主分析流程
+  # ------------------------------------------------------------
+
+  - alert: AiEngineV2ErrorRateHigh
+    expr: ai_engine_v2_error_rate > 0.1
+    for: 10m
+    labels:
+      severity: page
+      service: ai_engine
+      tier: P0
+    annotations:
+      summary: 'V2 分析错误率 > 10%（持续 10m）'
+      description: |
+        当前 v2_error_rate = {{ $value | humanizePercentage }}，
+        累计 v2_count = {{ with query "ai_engine_v2_count" }}{{ . | first | value }}{{ end }}，
+        v2_errors = {{ with query "ai_engine_v2_errors" }}{{ . | first | value }}{{ end }}。
+        排查方向：YAML rule 错误 / mediapipe OOM / DB 写回失败。
+        参考 docs/release-notes/p2-phase2-sprint-plan.md 历史故障表。
+
+  - alert: AiEngineV2FallbackBurst
+    expr: increase(ai_engine_v2_fallback_count[5m]) > 5
+    for: 5m
+    labels:
+      severity: page
+      service: ai_engine
+      tier: P0
+    annotations:
+      summary: 'V2 资源加载失败回落 V1 > 5 次/5m'
+      description: |
+        v2_fallback_count 5m 增量 = {{ $value }}。
+        最可能原因：YAML/locale 缺失（rebuild 后未热加载）/ Docker 镜像未含资源目录。
+        立即检查：`docker exec xiaoniao-ai-engine ls /app/app/rules`
+
+  # ------------------------------------------------------------
+  # P1 · 可观测性 / 数据采集
+  # ------------------------------------------------------------
+
+  - alert: AiEngineProbeFailureHigh
+    # W13-C 落地后预期 < 0.5%；保留 5% 阈值给"PUBLIC ≠ INTERNAL 的非 MinIO 路径"
+    expr: ai_engine_v2_probe_error_rate > 0.05
+    for: 15m
+    labels:
+      severity: warn
+      service: ai_engine
+      tier: P1
+    annotations:
+      summary: 'ffprobe 失败率 > 5%（持续 15m）'
+      description: |
+        当前 v2_probe_error_rate = {{ $value | humanizePercentage }}。
+        分桶诊断：
+          5xx_after_retries = {{ with query "ai_engine_v2_probe_errors_5xx_after_retries" }}{{ . | first | value }}{{ end }}
+          timeout_after_retries = {{ with query "ai_engine_v2_probe_errors_timeout_after_retries" }}{{ . | first | value }}{{ end }}
+          4xx = {{ with query "ai_engine_v2_probe_errors_4xx" }}{{ . | first | value }}{{ end }}
+          binary_missing = {{ with query "ai_engine_v2_probe_errors_binary_missing" }}{{ . | first | value }}{{ end }}
+          unknown = {{ with query "ai_engine_v2_probe_errors_unknown" }}{{ . | first | value }}{{ end }}
+        - 5xx > 0：MinIO/nginx 抖动；W13-C 内网直连应已消除
+        - 4xx > 0：URL 过期 / bucket 权限问题
+        - binary_missing > 0：ai_engine 镜像缺 ffprobe（应不可能）
+        参考 docs/release-notes/minio-ffprobe-5xx-rca.md
+
+  - alert: AiEngineProbeMinioFiveXxResurfaced
+    # W13-C 修复后这条应该永久为 0；非 0 说明根因调查需重启
+    expr: increase(ai_engine_v2_probe_errors_5xx_after_retries[1h]) > 0
+    for: 5m
+    labels:
+      severity: warn
+      service: ai_engine
+      tier: P1
+    annotations:
+      summary: 'MinIO 5xx 在 W13-C 修复后再次出现（1h 增量）'
+      description: |
+        近 1h v2_probe_errors_5xx_after_retries 增量 = {{ $value }}。
+        W13-C 已让 ffprobe 走 docker 内网（_rewrite_to_internal_url），
+        本告警触发说明：
+        - settings.MINIO_PUBLIC_ENDPOINT / MINIO_ENDPOINT 配错（未生效 rewrite）
+        - 用户视频 video_url 走了 COS / 第三方（rewrite 不命中 → 退回公网路径）
+        - MinIO 容器本身故障
+        立即查 ai_engine 日志最近 `v2_probe_failed reason=5xx attempts=3`。
+
+  # ------------------------------------------------------------
+  # P2 · 趋势 / 灰度对齐
+  # ------------------------------------------------------------
+
+  - alert: AiEngineV2TrafficRatioDeviates
+    expr: abs(ai_engine_v2_traffic_ratio - (ai_engine_rollout_pct / 100)) > 0.15
+    for: 30m
+    labels:
+      severity: info
+      service: ai_engine
+      tier: P2
+    annotations:
+      summary: 'V2 实际流量比与 rollout_pct 偏离 > 15%（持续 30m）'
+      description: |
+        rollout_pct = {{ with query "ai_engine_rollout_pct" }}{{ . | first | value }}{{ end }}%，
+        实际 v2_traffic_ratio = {{ $value | humanizePercentage }}。
+        可能：用户基数小（sticky bucketing 偏差，参考 W5 0-hit 历史）；
+        或 force_v1 hint 大量触发；或 cold start 后流量未稳定。
+
+  - alert: AiEngineV2LatencyP50High
+    # avg_latency 是 process-level 累计平均；上线一周后再调阈
+    expr: ai_engine_v2_avg_latency_ms > 60000
+    for: 10m
+    labels:
+      severity: info
+      service: ai_engine
+      tier: P2
+    annotations:
+      summary: 'V2 平均耗时 > 60s（持续 10m）'
+      description: |
+        当前 v2_avg_latency_ms = {{ $value }}ms。
+        正常区间 15-45s（MacBook M1 单 worker 实测）。> 60s 说明：
+        - mediapipe 推理慢（CPU 节流？OOM？）
+        - DB 写回阻塞
+        - W12-3 ffprobe retry 累计了无效 wall time
+
+  - alert: AiEngineEnrichFallbackTrend
+    expr: rate(ai_engine_v2_enrich_fallback_count[1h]) > 0.5
+    for: 30m
+    labels:
+      severity: info
+      service: ai_engine
+      tier: P2
+    annotations:
+      summary: 'V2 enrichment 兜底率 > 50%（持续 30m）'
+      description: |
+        v2_enrich_fallback_count 1h rate = {{ $value }}/s。
+        说明 YAML rule 表与实际 V1 diagnose 输出有大量 mismatch（issue.type 不在表）。
+        建议跑 ai_engine/scripts/v1_v2_diff.py 对最近一批 video 做 diff 看哪些 type
+        被 V2 漏覆盖。

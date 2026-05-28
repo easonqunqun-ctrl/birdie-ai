@@ -38,6 +38,23 @@ from app.pipeline.real_pipeline_v2 import (
 from app.schemas import AnalyzeResult, IssueItem
 
 
+def _make_ctx_with_declared(
+    pose: PoseResult,
+    *,
+    declared: str | None = None,
+    features: dict[str, float] | None = None,
+) -> PipelineCtx:
+    """W13-B 单测 helper：构造带 declared_camera_angle 的 PipelineCtx."""
+    return PipelineCtx(
+        pose_result=pose,
+        phases=_make_phases(),
+        features=features or {"wrist_release_timing": 0.30},
+        quality_warnings=[],
+        fps=30.0,
+        declared_camera_angle=declared,
+    )
+
+
 @pytest.fixture(autouse=True)
 def _reset():
     reset_caches()
@@ -229,6 +246,79 @@ def test_enrich_v2_empty_pose_skips_angle_injection_no_crash():
 
 
 # ---------- engine_warnings 合并而非覆盖 ----------
+
+
+# ============================================================
+# P2-W13-B · attach_declared 接入 (camera_angle_mismatch warning)
+# ============================================================
+
+
+def test_pipeline_ctx_default_declared_is_none():
+    """PipelineCtx 新增字段必须**向后兼容**：旧调用方不传也能构造（默认 None）."""
+    pose = _make_pose_with_shoulder_width(shoulder_width=0.25)
+    ctx = PipelineCtx(
+        pose_result=pose,
+        phases=_make_phases(),
+        features={},
+        quality_warnings=[],
+        fps=30.0,
+    )
+    assert ctx.declared_camera_angle is None
+
+
+def test_maybe_detect_angle_with_declared_face_on_matches_face_on_no_mismatch():
+    """W13-B：declared=face_on + detected=face_on → mismatch=False（无 warning）."""
+    pose = _make_pose_with_shoulder_width(shoulder_width=0.25)
+    result = _maybe_detect_angle(pose, declared_camera_angle="face_on")
+    assert result is not None
+    assert result.declared_angle == "face_on"
+    assert result.detected_angle == "face_on"
+    assert result.mismatch is False
+
+
+def test_maybe_detect_angle_with_mismatched_declared_triggers_mismatch():
+    """W13-B：declared=down_the_line 但 detected=face_on (高置信) → mismatch=True."""
+    # shoulder_width=0.25 + hip_width=0.25 → detected=face_on, conf ≈ 0.7+ (一致性奖励)
+    pose = _make_pose_with_shoulder_width(shoulder_width=0.25)
+    result = _maybe_detect_angle(pose, declared_camera_angle="down_the_line")
+    assert result is not None
+    assert result.declared_angle == "down_the_line"
+    assert result.detected_angle == "face_on"
+    assert result.mismatch is True
+
+
+def test_maybe_detect_angle_with_invalid_declared_alias_does_not_crash():
+    """W13-B：declared 是未知别名（前端传脏数据）→ attach_declared 抛 ValueError，
+    但 _maybe_detect_angle 应吞掉并返回不带 mismatch 的 result（不阻塞主流程）."""
+    pose = _make_pose_with_shoulder_width(shoulder_width=0.25)
+    result = _maybe_detect_angle(pose, declared_camera_angle="nonsense_angle_value")
+    assert result is not None
+    assert result.declared_angle is None  # attach_declared 失败 → 走原 result（无 declared）
+    assert result.mismatch is False
+
+
+def test_enrich_v2_with_declared_mismatch_emits_camera_angle_mismatch_warning():
+    """W13-B 端到端：ctx 带 declared=down_the_line + detected=face_on
+    → result.engine_warnings 含 camera_angle_mismatch."""
+    pose = _make_pose_with_shoulder_width(shoulder_width=0.25, mean_vis=0.9)
+    ctx = _make_ctx_with_declared(pose, declared="down_the_line")
+    result = _make_result()
+    _enrich_v2(result, ctx)
+    codes = {w["code"] for w in (result.engine_warnings or [])}
+    assert "camera_angle_mismatch" in codes
+    # 正机位（offset=0）所以**不应**同时触发 large_offset
+    assert "camera_angle_large_offset" not in codes
+
+
+def test_enrich_v2_without_declared_does_not_emit_mismatch_warning():
+    """W13-B：ctx.declared_camera_angle=None → 不调 attach_declared，
+    mismatch warning 永远不出现（向后兼容 W12-2 行为）."""
+    pose = _make_pose_with_shoulder_width(shoulder_width=0.25, mean_vis=0.9)
+    ctx = _make_ctx_with_declared(pose, declared=None)
+    result = _make_result()
+    _enrich_v2(result, ctx)
+    codes = {w["code"] for w in (result.engine_warnings or [])}
+    assert "camera_angle_mismatch" not in codes
 
 
 def test_run_real_analysis_v2_merges_probe_and_angle_warnings(monkeypatch):

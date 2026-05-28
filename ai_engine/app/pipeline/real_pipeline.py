@@ -66,6 +66,10 @@ class PipelineCtx:
 
     设计：用 frozen dataclass 而非裸 dict，免得 hook 误改导致 V1 行为漂移。
     扩展时直接加字段（向后兼容，旧 hook 只读自己关心的）。
+
+    P2-W13-B：加 ``declared_camera_angle`` 让 V2 enrichment 能调
+    ``camera_angle.attach_declared(...)`` 真生成 ``camera_angle_mismatch`` warning。
+    向后兼容：默认 None；旧 hook（如 W7 _enrich_v2 在 W12 之前）不读不受影响。
     """
 
     pose_result: PoseResult
@@ -73,6 +77,7 @@ class PipelineCtx:
     features: dict[str, float]
     quality_warnings: list[str]
     fps: float
+    declared_camera_angle: str | None = None
 
 
 # P2-W7 ENG-B：enrichment hook。V1 默认 None 不调用，保持行为冻结；
@@ -253,6 +258,9 @@ async def run_real_analysis(
             features=features,
             quality_warnings=quality_warnings,
             fps=fps,
+            # P2-W13-B：把用户声明的机位透传给 V2 enrichment，让 attach_declared
+            # 能算出 mismatch（用户声明 face_on 但 detected dtl 时 warning）
+            declared_camera_angle=getattr(req, "camera_angle", None),
         )
         try:
             enrichment_fn(result, ctx)

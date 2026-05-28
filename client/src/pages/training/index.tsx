@@ -18,6 +18,8 @@ import PracticeCalendar from '@/components/PracticeCalendar'
 import '@/components/PracticeCalendar.scss'
 import ProgressLineChart from '@/components/ProgressLineChart'
 import '@/components/ProgressLineChart.scss'
+import TrustTierLegend from '@/components/TrustTierLegend'
+import '@/components/TrustTierLegend.scss'
 import VideoCard from '@/components/VideoCard'
 import '@/components/VideoCard.scss'
 import { trainingService } from '@/services/trainingService'
@@ -306,6 +308,9 @@ const TrainingPage: FC = () => {
           accentColor={chartAccent}
           canvasId='training-progress-line'
         />
+        {/* P2-W13-A：仅当当前曲线包含 V2 报告点（tier 存在）才显示图例；
+            全 V1 报告时不显示，避免给老用户看到无用色块 */}
+        <TrustTierLegend hasV2Points={chartSeries.some((p) => p.tier)} />
         {progressNarrative ? (
           <Text className='training__progress-narrative'>{progressNarrative}</Text>
         ) : null}

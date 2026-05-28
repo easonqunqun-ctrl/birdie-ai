@@ -623,3 +623,111 @@ def test_probe_failed_in_KNOWN_CODES():
     from app.pipeline.engine_warnings import KNOWN_CODES
 
     assert "probe_failed" in KNOWN_CODES
+
+
+# ============================================================
+# P2-W13-C · MinIO ffprobe 5XX 根治（_rewrite_to_internal_url）
+# ============================================================
+
+
+def test_rewrite_to_internal_url_replaces_public_prefix(monkeypatch):
+    """W13-C · URL 命中 MINIO_PUBLIC_ENDPOINT 前缀 → 改写到 internal endpoint."""
+    from app.pipeline.real_pipeline_v2 import _rewrite_to_internal_url
+
+    monkeypatch.setattr(rp2_mod.settings, "MINIO_ENDPOINT", "http://minio:9000")
+    monkeypatch.setattr(
+        rp2_mod.settings, "MINIO_PUBLIC_ENDPOINT", "https://api.birdieai.cn/minio"
+    )
+
+    rewritten = _rewrite_to_internal_url(
+        "https://api.birdieai.cn/minio/xiaoniao-videos/uploads/abc.mp4"
+    )
+    assert rewritten == "http://minio:9000/xiaoniao-videos/uploads/abc.mp4"
+
+
+def test_rewrite_to_internal_url_keeps_query_string(monkeypatch):
+    """W13-C · URL 含 query string（X-Amz-Signature 等）→ 改写时保留 query."""
+    from app.pipeline.real_pipeline_v2 import _rewrite_to_internal_url
+
+    monkeypatch.setattr(rp2_mod.settings, "MINIO_ENDPOINT", "http://minio:9000")
+    monkeypatch.setattr(
+        rp2_mod.settings, "MINIO_PUBLIC_ENDPOINT", "https://api.birdieai.cn/minio"
+    )
+
+    rewritten = _rewrite_to_internal_url(
+        "https://api.birdieai.cn/minio/xiaoniao-videos/uploads/abc.mp4?X-Amz-Signature=DEAD&X-Amz-Expires=300"
+    )
+    assert rewritten == (
+        "http://minio:9000/xiaoniao-videos/uploads/abc.mp4"
+        "?X-Amz-Signature=DEAD&X-Amz-Expires=300"
+    )
+
+
+def test_rewrite_to_internal_url_passthrough_when_not_minio(monkeypatch):
+    """W13-C · COS / 第三方 URL（不在 PUBLIC 前缀下）→ 原样返回，仍走 W12-3 retry 兜底."""
+    from app.pipeline.real_pipeline_v2 import _rewrite_to_internal_url
+
+    monkeypatch.setattr(rp2_mod.settings, "MINIO_ENDPOINT", "http://minio:9000")
+    monkeypatch.setattr(
+        rp2_mod.settings, "MINIO_PUBLIC_ENDPOINT", "https://api.birdieai.cn/minio"
+    )
+
+    cos_url = "https://cos.ap-guangzhou.myqcloud.com/bucket/x.mp4"
+    assert _rewrite_to_internal_url(cos_url) == cos_url
+
+    sample_url = "https://sample.cdn/x.mp4"
+    assert _rewrite_to_internal_url(sample_url) == sample_url
+
+
+def test_rewrite_to_internal_url_passthrough_when_endpoints_missing_or_equal(monkeypatch):
+    """W13-C · 任一 endpoint 缺失 / 二者相等 → 原样返回（开发本机场景）."""
+    from app.pipeline.real_pipeline_v2 import _rewrite_to_internal_url
+
+    url = "http://localhost:9000/xiaoniao-videos/x.mp4"
+
+    # internal 缺失
+    monkeypatch.setattr(rp2_mod.settings, "MINIO_ENDPOINT", "")
+    monkeypatch.setattr(
+        rp2_mod.settings, "MINIO_PUBLIC_ENDPOINT", "https://api.birdieai.cn/minio"
+    )
+    assert _rewrite_to_internal_url(url) == url
+
+    # public 缺失
+    monkeypatch.setattr(rp2_mod.settings, "MINIO_ENDPOINT", "http://minio:9000")
+    monkeypatch.setattr(rp2_mod.settings, "MINIO_PUBLIC_ENDPOINT", "")
+    assert _rewrite_to_internal_url(url) == url
+
+    # 二者相等（开发本机）
+    monkeypatch.setattr(rp2_mod.settings, "MINIO_ENDPOINT", "http://localhost:9000")
+    monkeypatch.setattr(rp2_mod.settings, "MINIO_PUBLIC_ENDPOINT", "http://localhost:9000")
+    assert _rewrite_to_internal_url(url) == url
+
+
+def test_probe_video_warnings_calls_ffprobe_with_internal_url(monkeypatch):
+    """W13-C 端到端 · _probe_video_warnings 把 public URL 改写成 internal 才喂 ffprobe.
+
+    （这是 W13-C 的核心：用户体感不变，但 ffprobe 实际走 docker 内网，
+    彻底绕开 nginx /minio/ 反代这一层 5xx 风险源）.
+    """
+    monkeypatch.setattr(rp2_mod.settings, "MINIO_ENDPOINT", "http://minio:9000")
+    monkeypatch.setattr(
+        rp2_mod.settings, "MINIO_PUBLIC_ENDPOINT", "https://api.birdieai.cn/minio"
+    )
+
+    captured: list[str] = []
+
+    def _spy(url):
+        captured.append(str(url))
+        return _probe(codec="h264")
+
+    monkeypatch.setattr(rp2_mod, "_ffprobe_extended", _spy)
+
+    _probe_video_warnings(
+        "https://api.birdieai.cn/minio/xiaoniao-videos/uploads/x.mp4?X-Amz-Signature=Z"
+    )
+
+    assert len(captured) == 1
+    assert captured[0].startswith("http://minio:9000/xiaoniao-videos/uploads/x.mp4")
+    # 公网域名 + nginx 前缀都不应再出现在 ffprobe 实际收到的 URL 里
+    assert "api.birdieai.cn" not in captured[0]
+    assert "/minio/" not in captured[0]

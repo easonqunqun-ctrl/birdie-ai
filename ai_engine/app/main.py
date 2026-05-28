@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 
 import structlog
 from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
 from app import __version__
@@ -189,6 +190,54 @@ async def get_metrics() -> dict:
         "mock_mode": settings.AI_ENGINE_MOCK_MODE,
         **metrics.snapshot(),
     }
+
+
+@app.get(
+    "/metrics/prom",
+    summary="W13-D · Prometheus exposition 格式（infra/monitoring 告警用）",
+    response_class=PlainTextResponse,
+)
+async def get_metrics_prom() -> str:
+    """把 ``/metrics`` 的 JSON snapshot 渲染成 Prometheus 文本格式.
+
+    用法：Prometheus scrape 配置
+    ```yaml
+    - job_name: 'ai_engine'
+      metrics_path: /metrics/prom
+      static_configs:
+        - targets: ['ai_engine:9000']
+    ```
+
+    设计要点：
+    - **不引依赖**：手动渲染（Prometheus text format v0.0.4 极简，5 行代码够用）；
+      不引 ``prometheus_client`` 库（避免镜像膨胀 + 兼容 W6 的 process-level 计数器）
+    - 所有 counter 自动 export 为 ``ai_engine_<key>`` 带 HELP / TYPE 注释
+    - rate 字段（``v2_error_rate`` 等）也 export，避免 Prometheus 端再做 rate 计算
+    - 字符串字段（``rollout_pct`` 是 int 不在这里；``mock_mode`` 是 bool）跳过
+    """
+    snap = {
+        "rollout_pct": get_rollout_pct(),
+        "mock_mode": int(bool(settings.AI_ENGINE_MOCK_MODE)),  # bool → 0/1
+        **metrics.snapshot(),
+    }
+    lines: list[str] = []
+    for key, val in snap.items():
+        if not isinstance(val, (int, float)):
+            continue
+        metric_name = f"ai_engine_{key}"
+        # 自动区分 counter / gauge：rate / pct / ratio / mock_mode 是 gauge，其余按 counter
+        is_gauge = (
+            key.endswith("_rate")
+            or key.endswith("_ratio")
+            or key.endswith("_pct")
+            or key in {"mock_mode", "uptime_s"}
+            or "avg_latency" in key
+        )
+        metric_type = "gauge" if is_gauge else "counter"
+        lines.append(f"# HELP {metric_name} ai_engine process-level metric `{key}`")
+        lines.append(f"# TYPE {metric_name} {metric_type}")
+        lines.append(f"{metric_name} {val}")
+    return "\n".join(lines) + "\n"
 
 
 class _RolloutPayload(BaseModel):
