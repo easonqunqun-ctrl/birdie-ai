@@ -1,0 +1,106 @@
+/**
+ * P2-M9-03 · 画像 2.0 编辑页
+ */
+
+.profile-v2 {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 32rpx 28rpx 48rpx;
+  background: var(--color-bg);
+  box-sizing: border-box;
+
+  &--blocked,
+  &--empty {
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+  }
+
+  &__error {
+    color: var(--color-error);
+    margin-bottom: 24rpx;
+  }
+
+  &__retry {
+    padding: 12rpx 32rpx;
+    background: var(--color-primary);
+    color: #fff;
+    border-radius: 32rpx;
+    font-size: var(--font-size-sm);
+  }
+
+  &__section {
+    margin-bottom: 36rpx;
+  }
+
+  &__section-title {
+    display: block;
+    font-size: var(--font-size-md);
+    font-weight: 600;
+    color: var(--color-primary);
+    margin-bottom: 16rpx;
+  }
+
+  &__hint {
+    display: block;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-tertiary);
+    margin-bottom: 16rpx;
+    line-height: 1.5;
+  }
+
+  &__options {
+    display: flex;
+    flex-direction: column;
+    gap: 12rpx;
+  }
+
+  &__chip {
+    padding: 20rpx 24rpx;
+    border-radius: var(--radius-md);
+    background: var(--color-bg-card);
+    border: 2rpx solid var(--color-border);
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+
+    &--active {
+      border-color: var(--color-primary);
+      background: var(--color-primary-tint);
+      color: var(--color-primary);
+      font-weight: 600;
+    }
+  }
+
+  &__field {
+    margin-bottom: 16rpx;
+  }
+
+  &__field-label {
+    display: block;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    margin-bottom: 8rpx;
+  }
+
+  &__input {
+    padding: 20rpx 24rpx;
+    border-radius: var(--radius-md);
+    background: var(--color-bg-card);
+    border: 2rpx solid var(--color-border);
+    font-size: var(--font-size-base);
+  }
+
+  &__footer {
+    margin-top: 16rpx;
+  }
+
+  &__save {
+    background: var(--color-primary) !important;
+    color: var(--color-on-primary, #fff) !important;
+    border-radius: var(--radius-xl) !important;
+    font-size: var(--font-size-base) !important;
+    font-weight: 600 !important;
+  }
+}

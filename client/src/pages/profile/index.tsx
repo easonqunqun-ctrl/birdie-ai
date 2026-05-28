@@ -188,6 +188,16 @@ const ProfilePage: FC = () => {
               <Text className='profile__menu-arrow'>›</Text>
             </View>
           )}
+          {PHASE2_PROFILE_V2_ENABLED_FLAG && (
+            <View
+              className='profile__menu-item'
+              onClick={() => Taro.navigateTo({ url: '/pages/profile/profile-v2' })}
+            >
+              <Text className='profile__menu-icon'>🧭</Text>
+              <Text className='profile__menu-label'>我的画像</Text>
+              <Text className='profile__menu-arrow'>›</Text>
+            </View>
+          )}
           {/*
             P2-M11-03：课程学习路径入口；与 backend PHASE2_COURSES_ENABLED 同步。
           */}

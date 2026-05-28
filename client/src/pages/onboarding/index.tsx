@@ -1,11 +1,13 @@
 import { FC, useState } from 'react'
 import { View, Text, Button } from '@tarojs/components'
 import Taro from '@tarojs/taro'
+import { PHASE2_PROFILE_V2_ENABLED_FLAG } from '@/constants/flags'
 import { describeIntermittentRequestFailure, isRequestError } from '@/services/request'
 import { useUserStore } from '@/store/userStore'
 import { userService } from '@/services/userService'
 import { FREQS, GOALS, LEVELS, MAX_GOALS } from '@/constants/golf'
 import type { GolfLevel, PrimaryGoal, WeeklyFreq } from '@/types/api'
+import { OnboardingV2Flow } from './OnboardingV2Flow'
 import './index.scss'
 
 type Step = 1 | 2 | 3
@@ -77,7 +79,7 @@ const OnboardingPage: FC = () => {
   const handleSkip = () => {
     Taro.showModal({
       title: '跳过档案？',
-      content: '你可以在"我的 · 编辑档案"里随时补填，AI 教练会更懂你。',
+      content: '你可以在"我的 · 我的画像"里随时补填，AI 教练会更懂你。',
       confirmText: '确认跳过',
       cancelText: '继续填写',
       success: async ({ confirm }) => {
@@ -99,8 +101,12 @@ const OnboardingPage: FC = () => {
           })
           setSkipping(false)
         }
-      }
+      },
     })
+  }
+
+  if (PHASE2_PROFILE_V2_ENABLED_FLAG) {
+    return <OnboardingV2Flow onSkip={handleSkip} skipping={skipping} />
   }
 
   return (

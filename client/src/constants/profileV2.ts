@@ -72,6 +72,19 @@ export const HANDEDNESS_OPTIONS: HandednessChoice[] = [
   { id: 'switch', label: '换手' },
 ]
 
+export const TRAINING_PREFERENCE_OPTIONS: { id: 'video' | 'text' | 'mixed'; label: string }[] = [
+  { id: 'video', label: '看视频学动作' },
+  { id: 'text', label: '看文字要点' },
+  { id: 'mixed', label: '图文都可以' },
+]
+
+export const WEEKLY_TARGET_OPTIONS: { value: number; label: string }[] = [
+  { value: 1, label: '每周约 1 次' },
+  { value: 2, label: '每周 2–3 次' },
+  { value: 4, label: '每周 4 次及以上' },
+  { value: 0, label: '偶尔练' },
+]
+
 /** Onboarding 2.0 步数（一期 3 题 → 二期 6 题）。 */
 export const ONBOARDING_V2_TOTAL_STEPS = 6 as const
 

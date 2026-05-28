@@ -148,6 +148,45 @@
     line-height: 1.5;
   }
 
+  &__sub-title {
+    display: block;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    margin: 32rpx 0 16rpx;
+  }
+
+  &__hint {
+    display: block;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-tertiary);
+    margin: -24rpx 0 24rpx;
+    line-height: 1.5;
+  }
+
+  &__field {
+    margin-bottom: 24rpx;
+  }
+
+  &__field-label {
+    display: block;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    margin-bottom: 12rpx;
+  }
+
+  &__input {
+    padding: 22rpx 28rpx;
+    border-radius: var(--radius-md);
+    background: var(--color-bg-card);
+    border: 2rpx solid var(--color-border);
+    font-size: var(--font-size-base);
+  }
+
+  &__options--compact {
+    gap: 10rpx;
+  }
+
   /* ================= 底部按钮 ================= */
   &__footer {
     margin-top: 48rpx;
