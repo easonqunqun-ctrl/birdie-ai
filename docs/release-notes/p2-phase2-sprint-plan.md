@@ -17,6 +17,7 @@
 | **W6** | **V2 灌溉** | ENG-A1 · ENG-A2 · ENG-A3 | metrics 观测 + redis 热改 pct + 离线 V1/V2 diff 脚本 | **✅ Done**（`816e320` · `915a6d2` uv.lock+test fix） |
 | **W7** | **V2 引擎产品力 v0.1 落地** | P2-M7-02 · P2-M7-06 | engine_warnings + 三层 confidence 接入 V2；V1 行为冻结 | **✅ Done**（`a36eb88` 主体 · 待 hotfix `swing_start/swing_end` 注入） |
 | **W8** | **V2 元数据探测灌入 engine_warnings** | P2-M7-02 · P2-W8 ENG-C | V2 入口 ffprobe 原始 URL → codec / hdr / slowmo / fps / audio 落入 `engine_warnings`；pipeline 主体仍走 V1，fps/timing 不变；探测失败静默兜底 | **✅ Done**（`4723bb0`） |
+| **W9** | **V2 enrichment 精算** | P2-M7-06 · P2-W9 ENG-D | feature_confidence 按 landmark 子矩阵 × phase 窗口实算（不再一锅 mean_vis）；issue_confidence 按 feature value vs threshold 归一化距离实算（不再固定 td=0.5）；多 AND 条件取 min td；handedness 动态选 lead 手腕/肘 | **🟡 In Progress** |
 
 **并行泳道（不占 Sprint 主表）**：U-2 COS · Q-B5 papay · O-01/O-04 性能抽测 · par-E3/par-T1
 
@@ -143,6 +144,33 @@
 
 ---
 
+## W9 · V2 enrichment 精算验收
+
+> **目标**：把 W7 的 confidence MVP 从「全部用 mean_visibility + 固定 td=0.5」升级到
+> **逐特征看 landmark 子矩阵 + 逐 issue 按阈值距离实算**。同一段视频里不同特征
+> 的 confidence 会真有差异（脚踝可见但肩腕被遮 → finish_balance 高、spine 低）；
+> issue 触发值越远离阈值 → confidence 越接近 confirmed。
+
+> **不做项（留 W10+）**：
+> - `compute_analysis_confidence` 接 `camera_angle_offset_deg`（等 P2-M7-04 落地）
+> - 把 W9 的 `_STATIC_FEATURE_LANDMARKS` 表回填到 `confidence.py` 通用层
+>   （当前因为有 lead/trail 动态分支，保留在 `real_pipeline_v2.py` 私有）
+> - features.py 提取过程内部直接用 landmark visibility 加权（仍依赖 features dict 外提）
+
+| # | 验收项 |
+|---|--------|
+| 1 | `real_pipeline_v2._STATIC_FEATURE_LANDMARKS` 覆盖 `constants.FEATURES` 全部 15 项中 10 项静态特征；`_lead_landmark_indices` 覆盖余下 5 项手别相关特征（`top_wrist_position / wrist_release_angle / wrist_release_timing / tempo_ratio / finish_height`） |
+| 2 | `_feature_phase_frames(feature, phases, num_frames)` 按 phase 取窗口：setup 类用 `setup.key_frame ± 2`；top 类用 `top_frame ± 2`；rotation 类拼 setup + top window；downswing 用区间；wrist_release 用 [top..impact]；全程类用 [swing_start..swing_end]；finish_balance 用尾 10 帧 |
+| 3 | `_visibility_sub_for_feature(pose, phases, name)` 返回 `(F_window, K_landmarks)` list[list[float]]；num_frames=0 / phases=None / 未知特征 → `[]`；下游 `feature_confidence([])` 返回 0.0 不浮报 |
+| 4 | `_compute_threshold_distance(value, condition)` 按 ideal_max-ideal_min 归一化 scale；`>` / `>=` 在 value>threshold 命中方向才有正 td，反方向 td=0；`<` / `<=` 对称；clamp 上限 5.0；未知特征 scale=1.0 兜底 |
+| 5 | `_issue_threshold_distance(rule, features)` 多 AND 条件取 **min td**（短板原则）；缺失特征当 td=0；空 rule 返回 0 |
+| 6 | `_enrich_v2` 重写：Layer 1 调 `_visibility_sub_for_feature` + `feature_confidence` 实算 → 写 `result.feature_confidences`；Layer 2 调 `_issue_threshold_distance` 算 td → 喂 `issue_confidence(..., threshold_distance=td)`；Layer 3 用精算后的 dict 喂 `compute_analysis_confidence`；V1-only issue 类型仍兜底 mean_vis |
+| 7 | 单测覆盖：lead/trail 手别判定；phase frame 窗口（含 num_frames=0 边界）；visibility 子矩阵抠取；td 各 operator + scale 归一化 + clamp；issue td 短板；端到端 enrich——脚踝可见但肩腕遮挡时 finish_balance 高 / spine 低、issue 远离阈值 conf 高 / 临界值 conf 低、左右撇子 lead 手别正确切换 |
+| 8 | W7 老测例 `test_real_pipeline_v2_enrich.py` 在 visibility 一致场景下仍 pass（公式向下兼容） |
+| 9 | 生产 smoke：CVM 容器内 W9 新单测全过；V2 路径 `analyze_done` log 输出 `feature_conf_min/max` 区分度（非全部相等） |
+
+---
+
 ## 文档债（W1 后补）
 
 - [`docs/02`](../02-API接口设计文档.md) 增补 M13 约球 / venues 端点（后端已落地，文档未同步）
@@ -164,3 +192,4 @@
 | 2026-05-28 | W7 ✅（`a36eb88` 主体）：`run_real_analysis` 加 `enrichment_fn` hook + `PipelineCtx`；`_enrich_v2` 接三层 confidence + tier 进 V2 报告；fallback 时 engine_warnings 塞 `fallback_to_v1`；CVM 12/12 enrich 单测过；待 hotfix 把 `swing_start/swing_end` test fixture 补全后随下次 publish 入 image |
 | 2026-05-28 | W8 In Progress：`_ffprobe_extended` 接受 str URL；`real_pipeline_v2._probe_video_warnings` 落地 10 种 codec/hdr/slowmo/fps/audio engine_warnings；`run_real_analysis_v2` 在 V1 之前跑 probe 并合并到 result；`test_real_pipeline_v2_probe.py` 22 例覆盖正常/边界/失败/集成；pipeline 主体 fps 仍 30，下游 timing 不变 |
 | 2026-05-28 | W8 ✅（`4723bb0`）：CVM 21/21 probe 单测过；真 fixture 视频探测端到端产 `decoded_h264 / fps_upsampled / audio_dropped` 三类 warnings；`/metrics` 端点正常、`rollout_pct=5` 灰度未受影响 |
+| 2026-05-28 | W9 In Progress：`real_pipeline_v2` 加 15 项 feature→landmark 静态表 + 5 项手别动态表；`_feature_phase_frames` 覆盖 7 类 phase 选窗口；`_compute_threshold_distance` 按 ideal scale 归一化；`_enrich_v2` 重写精算 Layer 1/2；新增 `tests/test_real_pipeline_v2_enrich_precise.py` 38 例（lead/trail / phase frames / sub matrix / td / 端到端） |

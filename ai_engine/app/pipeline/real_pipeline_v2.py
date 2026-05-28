@@ -34,10 +34,11 @@ from app import metrics
 from app.pipeline.confidence import (
     analysis_tier,
     compute_analysis_confidence,
+    feature_confidence,
     issue_confidence,
     issue_tier,
 )
-from app.pipeline.constants import issue_meta
+from app.pipeline.constants import feature_meta, issue_meta
 from app.pipeline.diagnose import (
     DiagnosedIssue,
     MAX_ISSUES,
@@ -45,6 +46,21 @@ from app.pipeline.diagnose import (
 )
 from app.pipeline.engine_warnings import EngineWarning, serialize_engine_warnings
 from app.pipeline.phases import PhaseSegmentResult
+from app.pipeline.pose import (
+    LANDMARK_LEFT_ANKLE,
+    LANDMARK_LEFT_ELBOW,
+    LANDMARK_LEFT_HIP,
+    LANDMARK_LEFT_KNEE,
+    LANDMARK_LEFT_SHOULDER,
+    LANDMARK_LEFT_WRIST,
+    LANDMARK_NOSE,
+    LANDMARK_RIGHT_ANKLE,
+    LANDMARK_RIGHT_ELBOW,
+    LANDMARK_RIGHT_HIP,
+    LANDMARK_RIGHT_KNEE,
+    LANDMARK_RIGHT_SHOULDER,
+    LANDMARK_RIGHT_WRIST,
+)
 from app.pipeline.preprocess_v2 import (
     TARGET_FPS_V2,
     _ffprobe_extended,
@@ -53,6 +69,7 @@ from app.pipeline.rule_engine import (
     LOCALES_DIR,
     RULES_DIR,
     Rule,
+    RuleCondition,
     RuleEngine,
     RuleResult,
     load_locale,
@@ -185,61 +202,310 @@ def diagnose_v2(
     return issues[:max_issues]
 
 
+# ============================================================
+# P2-W9 ENG-D · enrichment 精算用：feature → landmark 依赖表 + phase 抽取
+# ============================================================
+#
+# 设计：W7 MVP 全部 feature_confidence 用 pose.mean_confidence 一锅端，
+# 不能反映「不同特征对不同身体部位的依赖差异」（比如 finish_balance 只看脚踝，
+# 与肩腕 visibility 无关）。W9 把 docs/05 §2.5 15 个特征逐一映射到所用 landmark
+# 子集，并按特征所在 phase 取相应帧 window，从 pose.visibility 子矩阵实算
+# feature_confidence。
+#
+# 不依赖 lead/trail 手别的特征用静态 indices；依赖 lead 手别的（如 top_wrist_position
+# / wrist_release_* / tempo_ratio / finish_height）在运行时按 ``phases.lead_wrist_idx``
+# / ``phases.lead_shoulder_idx`` 动态取 idx。
+#
+# 与 `confidence.FEATURE_LANDMARK_DEPENDENCY` 的关系
+# ------------------------------------------------
+# confidence.py 里那张 dict 是 docs/05 kickoff §3.2.1 提供的「教学版样例」（只列了 3
+# 个特征 + W18 注释），不构成生产单一真源。我们在 V2 enrichment 内部保留一份
+# 完整 15 项依赖表，避免把 lead/trail 动态判定推进通用 confidence.py。
+
+# 静态依赖（不依赖手别）：feature_name → 涉及的 MediaPipe landmark idx 列表
+_STATIC_FEATURE_LANDMARKS: dict[str, list[int]] = {
+    "spine_angle_setup": [
+        LANDMARK_LEFT_SHOULDER, LANDMARK_RIGHT_SHOULDER,
+        LANDMARK_LEFT_HIP, LANDMARK_RIGHT_HIP,
+    ],
+    "knee_flexion_setup": [
+        LANDMARK_LEFT_HIP, LANDMARK_RIGHT_HIP,
+        LANDMARK_LEFT_KNEE, LANDMARK_RIGHT_KNEE,
+        LANDMARK_LEFT_ANKLE, LANDMARK_RIGHT_ANKLE,
+    ],
+    "shoulder_rotation_top": [LANDMARK_LEFT_SHOULDER, LANDMARK_RIGHT_SHOULDER],
+    "hip_rotation_top": [LANDMARK_LEFT_HIP, LANDMARK_RIGHT_HIP],
+    "x_factor": [
+        LANDMARK_LEFT_SHOULDER, LANDMARK_RIGHT_SHOULDER,
+        LANDMARK_LEFT_HIP, LANDMARK_RIGHT_HIP,
+    ],
+    "left_arm_straightness": [
+        LANDMARK_LEFT_SHOULDER, LANDMARK_LEFT_ELBOW, LANDMARK_LEFT_WRIST,
+    ],
+    "downswing_sequence": [
+        LANDMARK_LEFT_SHOULDER, LANDMARK_RIGHT_SHOULDER,
+        LANDMARK_LEFT_HIP, LANDMARK_RIGHT_HIP,
+    ],
+    "spine_angle_impact_delta": [
+        LANDMARK_LEFT_SHOULDER, LANDMARK_RIGHT_SHOULDER,
+        LANDMARK_LEFT_HIP, LANDMARK_RIGHT_HIP,
+    ],
+    "head_lateral_shift": [LANDMARK_NOSE],
+    "finish_balance": [LANDMARK_LEFT_ANKLE, LANDMARK_RIGHT_ANKLE],
+}
+
+
+def _lead_landmark_indices(
+    feature_name: str, phases: PhaseSegmentResult
+) -> list[int] | None:
+    """依赖手别的特征：按 ``phases.lead_wrist_idx`` / ``lead_shoulder_idx`` 动态算。
+
+    返回 None 表示该特征不依赖手别（应去 ``_STATIC_FEATURE_LANDMARKS`` 查）。
+    """
+    lead_wrist = phases.lead_wrist_idx
+    lead_shoulder = phases.lead_shoulder_idx
+    # 对侧肘 idx：lead_wrist=15→LEFT_ELBOW=13；lead_wrist=16→RIGHT_ELBOW=14
+    lead_elbow = (
+        LANDMARK_LEFT_ELBOW if lead_wrist == LANDMARK_LEFT_WRIST else LANDMARK_RIGHT_ELBOW
+    )
+    if feature_name == "top_wrist_position":
+        return [LANDMARK_NOSE, lead_wrist, lead_shoulder]
+    if feature_name in ("wrist_release_angle", "wrist_release_timing"):
+        return [lead_wrist, lead_elbow]
+    if feature_name == "tempo_ratio":
+        return [lead_wrist]
+    if feature_name == "finish_height":
+        return [lead_wrist, lead_shoulder]
+    return None
+
+
+def _landmark_indices_for(
+    feature_name: str, phases: PhaseSegmentResult
+) -> list[int]:
+    """统一入口：feature_name → landmark idx 列表（含手别判定）。"""
+    dyn = _lead_landmark_indices(feature_name, phases)
+    if dyn is not None:
+        return dyn
+    return _STATIC_FEATURE_LANDMARKS.get(feature_name, [])
+
+
+def _feature_phase_frames(
+    feature_name: str, phases: PhaseSegmentResult, num_frames: int
+) -> list[int]:
+    """每特征对应的 phase 帧索引列表。
+
+    选取策略（详 docs/05 §2.5 + features.py 实现）：
+    - 单帧特征 → 该 key_frame ± 2 帧 window
+    - 阶段区间特征 → start_frame..end_frame 闭区间
+    - 跨阶段对比特征 → 两侧 key_frame 各取 window 后拼接
+    - 全程特征 → swing_start..swing_end
+    - finish_balance → follow_through 最后 10 帧
+    """
+    if num_frames <= 0:
+        return []
+
+    def _window(center: int, half: int = 2) -> list[int]:
+        lo = max(0, center - half)
+        hi = min(num_frames - 1, center + half)
+        return list(range(lo, hi + 1)) if hi >= lo else []
+
+    def _range(start: int, end: int) -> list[int]:
+        s = max(0, start)
+        e = min(num_frames - 1, end)
+        return list(range(s, e + 1)) if e >= s else []
+
+    phs = phases.phases
+    if feature_name in ("spine_angle_setup", "knee_flexion_setup"):
+        return _window(phs["setup"].key_frame)
+    if feature_name in ("left_arm_straightness", "top_wrist_position"):
+        return _window(phases.top_frame)
+    if feature_name in ("shoulder_rotation_top", "hip_rotation_top", "x_factor"):
+        # 跨 setup ↔ top：两侧各取 window
+        return _window(phs["setup"].key_frame) + _window(phases.top_frame)
+    if feature_name == "downswing_sequence":
+        ds = phs.get("downswing")
+        return _range(ds.start_frame, ds.end_frame) if ds else _range(phases.top_frame, phases.impact_frame)
+    if feature_name in ("wrist_release_angle", "wrist_release_timing"):
+        return _range(phases.top_frame, phases.impact_frame)
+    if feature_name == "spine_angle_impact_delta":
+        return _window(phs["setup"].key_frame) + _window(phases.impact_frame)
+    if feature_name in ("head_lateral_shift", "tempo_ratio"):
+        return _range(phases.swing_start, phases.swing_end)
+    if feature_name == "finish_height":
+        ft = phs.get("follow_through")
+        return _window(ft.key_frame) if ft else []
+    if feature_name == "finish_balance":
+        ft = phs.get("follow_through")
+        if ft is None:
+            return []
+        tail_start = max(ft.start_frame, ft.end_frame - 9)
+        return _range(tail_start, ft.end_frame)
+    # 未识别特征：保守取整个 swing 区间
+    return _range(phases.swing_start, phases.swing_end)
+
+
+def _visibility_sub_for_feature(
+    pose,  # PoseResult
+    phases: PhaseSegmentResult | None,
+    feature_name: str,
+) -> list[list[float]]:
+    """从 ``pose.visibility[F, 33]`` 抠 (selected_frames, selected_landmarks) 子矩阵.
+
+    返回 ``list[list[float]]``（pure-Python），匹配 ``confidence.feature_confidence``
+    签名。``phases=None`` 或抠不到帧/landmark → 返回 ``[]``，让 ``feature_confidence``
+    返回 0.0（不浮报）。
+    """
+    if phases is None or pose.num_frames <= 0:
+        return []
+    landmarks = _landmark_indices_for(feature_name, phases)
+    if not landmarks:
+        return []
+    frames = _feature_phase_frames(feature_name, phases, pose.num_frames)
+    if not frames:
+        return []
+    vis = pose.visibility  # numpy (F, 33)
+    sub: list[list[float]] = []
+    for f in frames:
+        if f < 0 or f >= pose.num_frames:
+            continue
+        sub.append([float(vis[f, lm]) for lm in landmarks])
+    return sub
+
+
+# ============================================================
+# P2-W9 ENG-D · issue_confidence 精算用：threshold_distance 实算
+# ============================================================
+
+# 触发方向（命中即 raw_dist > 0 还是 < 0）
+_TRIGGER_SIGN_GREATER = {">", ">="}
+_TRIGGER_SIGN_LESS = {"<", "<="}
+
+
+def _compute_threshold_distance(
+    feature_value: float, condition: RuleCondition
+) -> float:
+    """按 feature value 与 condition.threshold 的归一化距离算 td.
+
+    归一化 scale = ``ideal_max - ideal_min``（从 ``constants.FEATURES`` 取，
+    与 ``score_feature`` 的 tolerance 概念一致）；缺省 scale=1.0 兜底。
+
+    方向判定：
+    - operator ∈ {>, >=}：命中方向 = value > threshold；td = (value - threshold) / scale
+    - operator ∈ {<, <=}：命中方向 = value < threshold；td = (threshold - value) / scale
+    - 其它操作符（==/!=）：td = abs(value - threshold) / scale（兜底，不应在 V2 YAML 出现）
+    - 反方向（value 在 threshold 错误侧）：td=0，issue_confidence 退化到 0.75 × feat_avg
+
+    Clamp 到 [0, 5]：σ(5)≈0.993，factor≈0.997 ≈ 已饱和。
+    """
+    try:
+        meta = feature_meta(condition.feature)
+        scale = max(1e-6, float(meta["ideal_max"]) - float(meta["ideal_min"]))
+    except KeyError:
+        scale = 1.0
+
+    op = condition.operator
+    raw = float(feature_value) - float(condition.threshold)
+    if op in _TRIGGER_SIGN_GREATER:
+        signed = raw
+    elif op in _TRIGGER_SIGN_LESS:
+        signed = -raw
+    else:
+        signed = abs(raw)
+
+    td = signed / scale
+    if td < 0.0:
+        return 0.0
+    if td > 5.0:
+        return 5.0
+    return td
+
+
+def _issue_threshold_distance(
+    rule: Rule, features: dict[str, float]
+) -> float:
+    """聚合 rule 内 AND 条件的 threshold_distance。
+
+    多条件 AND：取最小 td（短板原则——一个 condition 临界，整 issue 就不够确信）。
+    无条件 → 0（落回 sigmoid 0.5 中位）。
+    """
+    if not rule.conditions:
+        return 0.0
+    tds: list[float] = []
+    for c in rule.conditions:
+        v = features.get(c.feature)
+        if v is None:
+            tds.append(0.0)
+            continue
+        tds.append(_compute_threshold_distance(v, c))
+    return min(tds) if tds else 0.0
+
+
+# ============================================================
+# P2-W9 ENG-D · _enrich_v2 重写（精算 vs W7 MVP）
+# ============================================================
+
+
 def _enrich_v2(result: AnalyzeResult, ctx) -> None:
-    """P2-W7 ENG-B · V2 enrichment hook：填三层 confidence + engine_warnings 占位.
+    """P2-W9 ENG-D · V2 enrichment hook（**精算版**）：三层 confidence + engine_warnings.
 
-    在 ``real_pipeline.run_real_analysis`` 组装完 ``AnalyzeResult`` 后被调用一次。
-    所有写操作都对 result 原地修改（IssueItem / AnalyzeResult 都是 Pydantic
-    BaseModel，frozen=False 可改字段）。
+    与 W7 MVP 的差异
+    -----------------
+    Layer 1 (feature_confidences)
+        W7: 所有特征同填 ``pose.mean_confidence``。
+        W9: 每特征按 ``FEATURE_LANDMARK_DEPS[feature]`` 取 visibility 子矩阵 ×
+            ``_feature_phase_frames(feature, phases)`` 选定帧 → 调
+            ``feature_confidence(visibility_sub)`` 实算。**不同特征 confidence 真有差异**。
 
-    三层填法
-    --------
-    Layer 1 — feature_confidences（dict[feature_name, 0-1]）:
-        MVP 简化：所有特征复用 ``pose_result.mean_confidence``。
-        理由：精确实现需要建 FEATURE_LANDMARKS_MAP 把每个特征关联到 N 个
-        landmarks，工作量大。W8+ 可换成 ``feature_confidence(visibility[:, landmarks])``
-        逐特征精算。当前简化保证「不浮报」（mean 是上界）+ 提供端到端通路。
+    Layer 2 (IssueItem.confidence / confidence_tier)
+        W7: ``threshold_distance=0.5`` 固定常数。
+        W9: 按 ``feature_value`` 与 ``rule.conditions[].threshold`` 的归一化距离实算
+            （归一 scale = ideal_max - ideal_min）；多 AND 条件取 min td（短板）；
+            sigmoid 折算后乘 feature_confidences 平均得 issue.confidence。
+            **issue 偏离阈值越远，confidence 越高；临界值贴近时分档自动降到 leaning/hidden**。
 
-    Layer 2 — IssueItem.confidence / confidence_tier:
-        对每个 issue 找对应的 YAML rule，取 rule.conditions[].feature 的
-        feature_confidences 求平均 → 调 ``issue_confidence(...)`` →
-        ``issue_tier(...)`` 折算 confirmed / leaning / hidden。
-        阈值距离暂固定 0.5（W8+ 可基于 feature value 与 condition.threshold
-        归一化距离精算）。
+    Layer 3 (analysis_confidence)
+        与 W7 一致：``compute_analysis_confidence``，喂入 Layer 1 精算后的
+        ``feature_confidences``（feat_avg 因此更"诚实"）。camera_angle_offset_deg
+        仍 None（待 M7-04 落地后补）。
 
-    Layer 3 — analysis_confidence:
-        直接喂 ``compute_analysis_confidence(...)``；
-        ``camera_angle_offset_deg=None`` 待 M7-04 接入后补。
-
-    engine_warnings:
-        MVP 阶段 V2 仍走 V1 pipeline，**正常路径不产生 warning**；
-        ``run_real_analysis_v2`` fallback 时由 caller 注入一条 ``fallback_to_v1``。
+    engine_warnings
+        W8 已落地：probe + fallback 由 ``run_real_analysis_v2`` 合并；本 hook 不动。
     """
     pose = ctx.pose_result
+    phases = ctx.phases
     mean_vis = float(pose.mean_confidence) if pose.num_frames > 0 else 0.0
 
-    # Layer 1 — feature_confidences（MVP：全部用 mean_vis）
+    # Layer 1 — feature_confidences（精算）
+    feature_confs: dict[str, float] = {}
     feature_names = list(ctx.features.keys())
-    feature_confs = {name: round(mean_vis, 3) for name in feature_names}
+    for name in feature_names:
+        sub = _visibility_sub_for_feature(pose, phases, name)
+        if sub:
+            conf = feature_confidence(sub)
+        else:
+            # 取不到子矩阵（phases 缺失 / 特征不在依赖表）：退化用 mean_vis 兜底，
+            # 保证 ``analysis_confidence`` 的 feat_avg 不被 0 拖死
+            conf = mean_vis
+        feature_confs[name] = round(float(conf), 3)
 
-    # Layer 2 — 每 issue confidence + tier
+    # Layer 2 — 每 issue confidence + tier（精算 td）
     rules = _get_rules()
     rules_by_name = {r.name: r for r in rules}
     for issue in result.issues:
         rule = rules_by_name.get(issue.type)
         if rule is None or not rule.conditions:
-            # 不在 YAML 表里的 issue（V1 兼容路径），用全局 mean 作为兜底
+            # V1-only issue（不在 YAML 表）：用 mean_vis 兜底，没有 td 可算
             conf = mean_vis
         else:
             feats_for_issue = [
                 feature_confs.get(c.feature, mean_vis) for c in rule.conditions
             ]
-            # threshold_distance 暂固定 0.5（中等距离）；W8+ 可按 feature value 实算
-            conf = issue_confidence(feats_for_issue, threshold_distance=0.5)
+            td = _issue_threshold_distance(rule, ctx.features)
+            conf = issue_confidence(feats_for_issue, threshold_distance=td)
         issue.confidence = round(conf, 3)
         issue.confidence_tier = issue_tier(conf)
 
-    # Layer 3 — analysis_confidence
+    # Layer 3 — analysis_confidence（用精算后的 feature_confs）
     ac = compute_analysis_confidence(
         mean_visibility=mean_vis,
         quality_warnings=ctx.quality_warnings,
@@ -254,6 +520,12 @@ def _enrich_v2(result: AnalyzeResult, ctx) -> None:
         extra={
             "analysis_id": result.analysis_id,
             "mean_visibility": round(mean_vis, 3),
+            "feature_conf_min": (
+                round(min(feature_confs.values()), 3) if feature_confs else 0.0
+            ),
+            "feature_conf_max": (
+                round(max(feature_confs.values()), 3) if feature_confs else 0.0
+            ),
             "analysis_confidence": result.analysis_confidence,
             "analysis_tier": analysis_tier(ac),
             "num_issues_confirmed": sum(
