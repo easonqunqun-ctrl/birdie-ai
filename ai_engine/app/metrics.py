@@ -32,6 +32,14 @@ _COUNTER_KEYS = (
     "v1_errors",
     "v2_errors",
     "v2_fallback_count",  # V2 资源加载失败回落到 V1 的次数
+    # P2-W9+ ENG-C2: V2 probe（ffprobe 原始 URL）调用次数与失败次数
+    # 用于回答「ffprobe 是否在真流量下被普遍跑通 / 失败原因是什么」
+    "v2_probe_count",
+    "v2_probe_errors",
+    # P2-W9+ ENG-D: V2 enrichment fallback——YAML / locale / pose 缺失导致退化路径次数
+    # 与 v2_fallback_count 区别：v2_fallback_count = 整 V2 资源加载失败回落 V1；
+    # v2_enrich_fallback_count = enrichment hook 内部 issue 找不到 YAML rule 走 mean_vis 兜底
+    "v2_enrich_fallback_count",
 )
 _LATENCY_KEYS = ("v1_latency_ms_total", "v2_latency_ms_total")
 
@@ -66,7 +74,10 @@ def snapshot() -> dict[str, float | int | str]:
     - ``v1_count`` / ``v2_count``：成功 + 失败均计入（区别仅看 errors）
     - ``v1_errors`` / ``v2_errors``：``status=failed`` 或捕获 PipelineError
     - ``v2_fallback_count``：YAML / locale 加载失败被迫走 V1 的次数
+    - ``v2_probe_count`` / ``v2_probe_errors``：V2 入口 ffprobe 原始 URL 调用次数 / 失败次数
+    - ``v2_enrich_fallback_count``：``_enrich_v2`` 内 issue 找不到 YAML rule 走 mean_vis 兜底次数
     - ``v1_error_rate`` / ``v2_error_rate``：errors / count（计数为 0 时返回 0.0）
+    - ``v2_probe_error_rate``：probe_errors / probe_count
     - ``v1_avg_latency_ms`` / ``v2_avg_latency_ms``：成功请求平均耗时
     - ``v2_traffic_ratio``：v2_count / (v1_count + v2_count)，与 rollout pct 对照
     """
@@ -87,6 +98,9 @@ def snapshot() -> dict[str, float | int | str]:
         **counters,
         "v1_error_rate": _rate(counters["v1_errors"], v1),
         "v2_error_rate": _rate(counters["v2_errors"], v2),
+        "v2_probe_error_rate": _rate(
+            counters["v2_probe_errors"], counters["v2_probe_count"]
+        ),
         "v1_avg_latency_ms": round(latencies["v1_latency_ms_total"] / v1, 1)
         if v1 > 0
         else 0.0,

@@ -140,13 +140,21 @@ def test_enrich_v2_fills_issue_confidence_and_tier_for_yaml_known_type():
 
 
 def test_enrich_v2_high_visibility_yields_confirmed_tier():
-    """visibility=0.95 + threshold_distance=0.5 → conf ≈ 0.95 × 0.81 ≈ 0.77, leaning."""
+    """visibility=0.95 + casting rule（wrist_release_timing<0.40，ctx feature=0.30）.
+
+    .. note:: 公式演进（W7 → W9 review）
+
+       W7 MVP 公式：``threshold_distance=0.5`` 固定 → conf ≈ 0.95 × 0.81 ≈ 0.77, leaning。
+       W9 精算公式（当前）：td = (0.40 - 0.30) / (0.85 - 0.45) = 0.25 →
+       factor = 0.5 + 0.5 × σ(0.25) ≈ 0.78 → conf ≈ 0.95 × 0.78 ≈ 0.74, 仍 leaning。
+
+       本测断言只要 tier ∈ (confirmed, leaning)，向下兼容两套公式（数学巧合）。
+       具体精算分支由 ``test_real_pipeline_v2_enrich_precise.py`` 验证。
+    """
     result = _make_result_with_issues("casting")
     ctx = _make_ctx(mean_vis=0.95)
     _enrich_v2(result, ctx)
     issue = result.issues[0]
-    # MVP 公式：feature_avg(0.95) × (0.5 + 0.5 × sigmoid(0.5)=0.62) ≈ 0.59
-    # 这个值在 leaning 区（0.6-0.85）边缘，主要验证 tier ≠ hidden
     assert issue.confidence is not None
     assert issue.confidence_tier in ("confirmed", "leaning")
 

@@ -579,3 +579,61 @@ def test_enrich_v2_handedness_left_uses_right_wrist_low_when_left_visible():
     _enrich_v2(result, ctx)
     # 取 right wrist+elbow（实际 vis=0.2）→ low
     assert result.feature_confidences["wrist_release_timing"] <= 0.1
+
+
+# ============================================================
+# P2-W9+ review fix（P1-1）：_enrich_v2_fallback 单测
+# ============================================================
+
+
+def test_enrich_v2_fallback_uses_real_analysis_confidence_not_default_1():
+    """V2 资源缺失走 _enrich_v2_fallback 时，analysis_confidence 应按 mean_vis 实算，
+    而非 schema 默认 1.0——避免「fallback_to_v1 warning + 高可信」自相矛盾报告."""
+    from app.pipeline.real_pipeline_v2 import _enrich_v2_fallback
+
+    pose = _make_pose(num_frames=30, vis=0.6)
+    phases = _phases_right_handed()
+    ctx = _make_ctx_with_features(pose, phases, {"x_factor": 70.0})
+    result = _make_result([])
+    # 默认 result.analysis_confidence = 1.0（schema）
+    assert result.analysis_confidence == 1.0
+    _enrich_v2_fallback(result, ctx)
+    # base=0.6, qw_penalty=1.0, angle_penalty=1.0, feat_avg=1.0（fallback 不算特征）→ 0.6
+    assert result.analysis_confidence == pytest.approx(0.6, abs=1e-3)
+    # feature_confidences 仍是 schema 默认空（fallback 不算 Layer 1）
+    assert result.feature_confidences == {}
+    # IssueItem.confidence 也是 None（不动 Layer 2）
+    # （此 result 没 issues，跳过）
+
+
+def test_enrich_v2_fallback_penalizes_low_visibility():
+    """低 visibility + quality_warnings → fallback analysis_confidence 应落低位."""
+    from app.pipeline.real_pipeline_v2 import _enrich_v2_fallback
+
+    pose = _make_pose(num_frames=30, vis=0.4)
+    phases = _phases_right_handed()
+    ctx = PipelineCtx(
+        pose_result=pose,
+        phases=phases,
+        features={},
+        quality_warnings=["low_light", "camera_shake"],
+        fps=30.0,
+    )
+    result = _make_result([])
+    _enrich_v2_fallback(result, ctx)
+    # base=0.4, qw_penalty=1-2×0.15=0.7, feat_avg=1.0 → 0.28（< 0.5 触发 retake）
+    assert result.analysis_confidence == pytest.approx(0.28, abs=1e-3)
+
+
+def test_enrich_v2_fallback_zero_frame_pose_yields_zero():
+    """num_frames=0 → mean_vis=0 → analysis_confidence=0."""
+    from app.pipeline.real_pipeline_v2 import _enrich_v2_fallback
+
+    pose = _make_pose(num_frames=0, vis=0.9)
+    phases = _phases_right_handed()
+    ctx = PipelineCtx(
+        pose_result=pose, phases=phases, features={}, quality_warnings=[], fps=30.0
+    )
+    result = _make_result([])
+    _enrich_v2_fallback(result, ctx)
+    assert result.analysis_confidence == 0.0

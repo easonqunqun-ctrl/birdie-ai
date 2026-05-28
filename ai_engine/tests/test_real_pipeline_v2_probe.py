@@ -322,10 +322,52 @@ def test_run_real_analysis_v2_merges_probe_warnings_into_result(monkeypatch):
     assert "fallback_to_v1" not in codes  # 资源正常加载，无 fallback
 
 
+# ---------- P2-W9+ review fix（P1-2）：probe metrics 可观测性 ----------
+
+
+def test_probe_metrics_increment_count_and_errors(monkeypatch):
+    """probe 调用应 incr v2_probe_count；失败时 incr v2_probe_errors."""
+    from app import metrics
+
+    metrics.reset()
+
+    # case 1: 成功 probe → count+1, errors+0
+    monkeypatch.setattr(rp2_mod, "_ffprobe_extended", lambda _: _probe(codec="h264"))
+    _probe_video_warnings("https://example.com/v.mp4")
+    snap = metrics.snapshot()
+    assert snap["v2_probe_count"] == 1
+    assert snap["v2_probe_errors"] == 0
+    assert snap["v2_probe_error_rate"] == 0.0
+
+    # case 2: 失败 probe → count+1, errors+1
+    def _raise(_):
+        raise RuntimeError("ffprobe boom")
+
+    monkeypatch.setattr(rp2_mod, "_ffprobe_extended", _raise)
+    _probe_video_warnings("https://example.com/v2.mp4")
+    snap2 = metrics.snapshot()
+    assert snap2["v2_probe_count"] == 2
+    assert snap2["v2_probe_errors"] == 1
+    assert snap2["v2_probe_error_rate"] == 0.5  # 1/2
+
+
+def test_probe_metrics_skip_count_on_empty_url():
+    """空 URL 提前 return，不消耗 probe_count 计数（避免 ratio 被假信号污染）."""
+    from app import metrics
+
+    metrics.reset()
+    _probe_video_warnings("")
+    snap = metrics.snapshot()
+    assert snap["v2_probe_count"] == 0
+    assert snap["v2_probe_errors"] == 0
+
+
 def test_run_real_analysis_v2_appends_fallback_when_v2_resources_missing(
     monkeypatch,
 ):
-    """V2 资源加载失败 → probe + fallback 两类 warning 合并."""
+    """V2 资源加载失败 → probe + fallback 两类 warning 合并；
+    并且 ``_enrich_v2_fallback`` 会让 ``analysis_confidence`` 反映真 mean_visibility
+    （不再 schema 默认 1.0 谎报高可信——P2-W9+ review P1-1）."""
     from app.pipeline import real_pipeline_v2 as mod
     from app.schemas import AnalyzeRequest, AnalyzeResult
 
@@ -338,12 +380,57 @@ def test_run_real_analysis_v2_appends_fallback_when_v2_resources_missing(
 
     monkeypatch.setattr(mod, "_get_rules", _raise)
 
+    # _fake_v1 模拟「V1 跑出来 result」，并真调 enrichment_fn=_enrich_v2_fallback 让
+    # analysis_confidence 反映 mean_vis（base=0.5、qw=1.0、feat_avg=1.0 → 0.5）
+    import numpy as np
+
+    from app.pipeline.phases import PhaseInfo, PhaseSegmentResult
+    from app.pipeline.pose import (
+        LANDMARK_LEFT_SHOULDER,
+        LANDMARK_LEFT_WRIST,
+        PoseResult,
+    )
+    from app.pipeline.real_pipeline import PipelineCtx
+
     async def _fake_v1(req, *, diagnose_fn=None, enrichment_fn=None):
-        return AnalyzeResult(
+        result = AnalyzeResult(
             analysis_id=req.analysis_id,
             status="completed",
             overall_score=70,
         )
+        if enrichment_fn is not None:
+            pose = PoseResult(
+                keypoints=np.zeros((30, 33, 3), dtype=np.float32),
+                visibility=np.full((30, 33), 0.5, dtype=np.float32),
+                valid_mask=np.ones(30, dtype=bool),
+                num_frames=30,
+                fps=30.0,
+            )
+            phases = PhaseSegmentResult(
+                phases={
+                    "setup": PhaseInfo(0, 4, 2),
+                    "backswing": PhaseInfo(5, 14, 10),
+                    "top": PhaseInfo(15, 15, 15),
+                    "downswing": PhaseInfo(16, 19, 18),
+                    "impact": PhaseInfo(20, 20, 20),
+                    "follow_through": PhaseInfo(21, 29, 25),
+                },
+                top_frame=15, impact_frame=20,
+                swing_start=5, swing_end=20,
+                handedness="right",
+                lead_wrist_idx=LANDMARK_LEFT_WRIST,
+                lead_shoulder_idx=LANDMARK_LEFT_SHOULDER,
+                fps=30.0,
+            )
+            ctx = PipelineCtx(
+                pose_result=pose,
+                phases=phases,
+                features={},
+                quality_warnings=[],
+                fps=30.0,
+            )
+            enrichment_fn(result, ctx)
+        return result
 
     import app.pipeline.real_pipeline as v1_mod
 
@@ -363,3 +450,6 @@ def test_run_real_analysis_v2_appends_fallback_when_v2_resources_missing(
     assert "decoded_h264" in codes
     assert "audio_dropped" in codes
     assert "fallback_to_v1" in codes
+    # P1-1 fix：analysis_confidence 不应再是 schema 默认 1.0
+    assert result.analysis_confidence < 1.0
+    assert result.analysis_confidence == pytest.approx(0.5, abs=1e-3)

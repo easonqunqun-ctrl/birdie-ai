@@ -554,15 +554,26 @@ def _probe_video_warnings(video_url: str) -> list[EngineWarning]:
 
     出错（网络不通 / ffprobe 不识别 / 私有 URL 鉴权失败）静默返回空列表，
     **绝不阻塞主分析流程**——pipeline 主体仍走 V1，engine_warnings 仅为辅助信息。
+
+    P2-W9+ review fix（P1-2）：失败不再"静默"——log.warning（不只 info）+ metrics
+    incr 让运维能从 ``/metrics`` 看到 ``v2_probe_count`` / ``v2_probe_errors`` /
+    ``v2_probe_error_rate``。线上 100% probe 失败时能立刻看到。
     """
     if not video_url:
         return []
+
+    metrics.incr("v2_probe_count")
     try:
         probe = _ffprobe_extended(video_url)
     except Exception as exc:  # noqa: BLE001
-        log.info(
+        metrics.incr("v2_probe_errors")
+        log.warning(
             "v2_probe_failed_silently",
-            extra={"video_url": video_url, "err": repr(exc)},
+            extra={
+                "video_url": video_url,
+                "err_type": type(exc).__name__,
+                "err": repr(exc)[:200],
+            },
         )
         return []
 
@@ -637,6 +648,28 @@ def _probe_video_warnings(video_url: str) -> list[EngineWarning]:
     return warnings
 
 
+def _enrich_v2_fallback(result: AnalyzeResult, ctx) -> None:
+    """V2 资源加载失败 → enrichment_fn 退化版.
+
+    P2-W9+ review fix（P1-1）：之前 fallback 路径下 enrichment_fn=None，schema 默认
+    ``analysis_confidence=1.0`` / ``feature_confidences={}``——客户端会看到「高可信
+    + fallback_to_v1 warning」**自相矛盾**的报告。
+
+    本退化版只做 Layer 3 的 ``analysis_confidence`` 兜底：用 pose mean_visibility
+    + quality_warnings 算一个保守的 analysis_confidence，避免谎报 1.0。不动 Layer
+    1/2（feature_confidences / IssueItem.confidence 都按 schema 默认空 / None）。
+    """
+    pose = ctx.pose_result
+    mean_vis = float(pose.mean_confidence) if pose.num_frames > 0 else 0.0
+    ac = compute_analysis_confidence(
+        mean_visibility=mean_vis,
+        quality_warnings=ctx.quality_warnings,
+        camera_angle_offset_deg=None,
+        feature_confidences=None,  # 没精算，feat_avg=1.0 不惩罚
+    )
+    result.analysis_confidence = round(ac, 3)
+
+
 async def run_real_analysis_v2(req: AnalyzeRequest) -> AnalyzeResult:
     """V2 真实分析入口。
 
@@ -645,6 +678,9 @@ async def run_real_analysis_v2(req: AnalyzeRequest) -> AnalyzeResult:
     ``diagnose_v2``。
 
     P2-W7：``enrichment_fn=_enrich_v2`` 在 result 组装完后注入三层 confidence + tier。
+
+    P2-W9+ review fix：V2 资源加载失败 → enrichment 用 ``_enrich_v2_fallback`` 兜底
+    Layer 3 的 ``analysis_confidence``，避免谎报 1.0。
 
     出错降级：V2 资源（YAML / locale）加载失败 → 记日志后退回 V1 ``diagnose``，
     确保灰度期不影响报告交付；engine_warnings 注入一条 ``fallback_to_v1`` 占位
@@ -666,9 +702,9 @@ async def run_real_analysis_v2(req: AnalyzeRequest) -> AnalyzeResult:
             extra={"analysis_id": req.analysis_id, "err": repr(exc)},
         )
         metrics.incr("v2_fallback_count")
-        # YAML/locale 加载不上时不能跑 _enrich_v2（rules_by_name 为空），跳过；
-        # 客户端能从 engine_warnings 看到走了 V1。
-        enrichment_impl = None
+        # YAML/locale 加载不上时不能跑 _enrich_v2（rules_by_name 为空），但仍要给
+        # Layer 3 analysis_confidence 一个真值，否则客户端看「fallback + 高可信」矛盾。
+        enrichment_impl = _enrich_v2_fallback
         fallback_warning = EngineWarning(
             code="fallback_to_v1",
             level="warn",
@@ -677,7 +713,7 @@ async def run_real_analysis_v2(req: AnalyzeRequest) -> AnalyzeResult:
 
     # P2-W8 ENG-C：对原始视频跑一次 ffprobe，拿 codec/hdr/slowmo/fps/audio 信息
     # 做成 engine_warnings。在 V1 pipeline 跑之前（甚至并行）做，避免阻塞主流程。
-    # 探测失败静默返回 []，绝不影响主分析。
+    # 探测失败静默返回 []，绝不影响主分析（metrics 仍记数，便于线上观察）。
     probe_warnings = _probe_video_warnings(req.video_url)
 
     result = await run_real_analysis(
@@ -696,6 +732,7 @@ async def run_real_analysis_v2(req: AnalyzeRequest) -> AnalyzeResult:
 
 __all__ = [
     "_enrich_v2",
+    "_enrich_v2_fallback",
     "diagnose_v2",
     "reset_caches",
     "run_real_analysis_v2",

@@ -63,6 +63,11 @@ def test_metrics_endpoint_returns_baseline_shape(client):
         "v1_avg_latency_ms",
         "v2_avg_latency_ms",
         "uptime_s",
+        # P2-W9+ review fix（P1-2）：probe + enrich fallback 可观测
+        "v2_probe_count",
+        "v2_probe_errors",
+        "v2_probe_error_rate",
+        "v2_enrich_fallback_count",
     ):
         assert k in body, f"missing key in /metrics: {k}"
     assert body["v1_count"] == 0
