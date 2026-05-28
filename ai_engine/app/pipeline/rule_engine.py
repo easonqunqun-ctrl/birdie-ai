@@ -2,14 +2,16 @@
 
 详 docs/release-notes/p2-m7-10-rule-engine-v2-kickoff.md v0.1。
 
-本 PR 范围（W28 起跑前置）
--------------------------
+本 PR 范围（W28 起跑前置 + P2-W4 收口）
+---------------------------------------
 - ✅ RuleEngine 框架 + Rule / Condition 数据结构
-- ✅ YAML rule loader（含 schema 校验 + 互斥矩阵）
+- ✅ YAML rule loader（含 schema 校验 + 互斥矩阵）        ← P2-W4 落地
 - ✅ severity 动态计算 + confidence 注入
 - ✅ i18n 占位渲染（key + payload，**不**包文案）
 - ✅ engine_version_tag 注入
-- ❌ 实际迁移 15 条 V1 规则 / 新增 10-15 规则 / 教研文案（W29-W33 PR）
+- ✅ `rules/v2_starter.yaml`：5 条 V1→V2 入门集（W29 持续追加） ← P2-W4 落地
+- ✅ `locales/zh_CN.json`：起跑期文案，与 starter 规则一一对应 ← P2-W4 落地
+- ❌ 全量 15 V1 规则迁移 / 新增 10-15 规则 / 教研文案（W29-W33 PR）
 - ❌ ECS 触发率验证（W34 AC-1 PR）
 
 为什么"前置"
@@ -21,8 +23,10 @@ RuleEngine + Schema + 互斥矩阵 + i18n 渲染就位，W29-W33 只需追加 ya
 
 from __future__ import annotations
 
+import json
 import operator as op
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Callable, Literal, Mapping
 
 ConditionOperator = Literal["<", "<=", ">", ">=", "==", "!="]
@@ -271,8 +275,8 @@ def render_i18n_key(
 ) -> str:
     """从 locale_dict 取模板 + payload 插值。
 
-    本 PR 实现 stub：locale_dict 默认空 → 返回 `{key}` 本身。
-    W33 PR 注入 `ai_engine/app/pipeline/locales/zh_CN.json`。
+    locale_dict 默认空 → 返回 `{key}` 本身（仅起跑期占位）。
+    P2-W4 起 ``locales/zh_CN.json`` 与 starter rules 同步入库；调用方按需 load。
 
     模板格式：`你的{hip_dist}米偏离太大`
     """
@@ -282,3 +286,104 @@ def render_i18n_key(
         return template.format(**payload)
     except (KeyError, ValueError, IndexError):
         return template
+
+
+# ============================================================
+# YAML loader + locale loader（P2-W4）
+# ============================================================
+
+# yaml 在 import 时不强制：单测可以脱离 yaml 跑 RuleEngine 主体；
+# 仅 ``load_rules_from_yaml`` 实际调用时再 import，避免装包顺序耦合。
+RULES_DIR = Path(__file__).parent / "rules"
+LOCALES_DIR = Path(__file__).parent / "locales"
+
+# YAML 顶层允许字段（多于此集 → ValueError，避免拼写错被静默忽略）
+_RULE_YAML_KEYS = {
+    "name",
+    "display_name_key",
+    "severity_feature",
+    "confidence_floor",
+    "engine_version_tag",
+    "mutually_exclusive_with",
+    "conditions",
+}
+_CONDITION_YAML_KEYS = {"feature", "operator", "threshold"}
+
+
+def _coerce_rule(raw: Mapping[str, Any]) -> Rule:
+    """校验 + 转换单条 YAML rule → Rule dataclass。"""
+    unknown = set(raw.keys()) - _RULE_YAML_KEYS
+    if unknown:
+        raise ValueError(f"rule 含未知字段：{sorted(unknown)}（rule={raw.get('name')!r}）")
+    for required in ("name", "display_name_key", "conditions"):
+        if required not in raw:
+            raise ValueError(f"rule 缺字段 {required!r}（rule={raw.get('name')!r}）")
+    conditions_raw = raw["conditions"]
+    if not isinstance(conditions_raw, list) or not conditions_raw:
+        raise ValueError(f"rule.conditions 必须为非空 list（rule={raw['name']!r}）")
+    conditions: list[RuleCondition] = []
+    for cond in conditions_raw:
+        bad = set(cond.keys()) - _CONDITION_YAML_KEYS
+        if bad:
+            raise ValueError(f"condition 含未知字段 {sorted(bad)}（rule={raw['name']!r}）")
+        if cond.get("operator") not in _OPERATORS:
+            raise ValueError(
+                f"condition.operator 非法：{cond.get('operator')!r}（rule={raw['name']!r}）"
+            )
+        conditions.append(
+            RuleCondition(
+                feature=str(cond["feature"]),
+                operator=cond["operator"],
+                threshold=float(cond["threshold"]),
+            )
+        )
+    return Rule(
+        name=str(raw["name"]),
+        display_name_key=str(raw["display_name_key"]),
+        conditions=tuple(conditions),
+        severity_feature=raw.get("severity_feature"),
+        mutually_exclusive_with=tuple(raw.get("mutually_exclusive_with", ()) or ()),
+        confidence_floor=float(raw.get("confidence_floor", 0.0)),
+        engine_version_tag=raw.get("engine_version_tag", "v2.0"),
+    )
+
+
+def load_rules_from_yaml(path: str | Path) -> list[Rule]:
+    """从 YAML 文件读取规则定义。
+
+    顶层结构::
+
+        version: v2.0
+        rules:
+          - name: early_extension
+            display_name_key: issues.early_extension.title
+            conditions: [{feature: x, operator: ">", threshold: 0.15}]
+            ...
+
+    单测可直接传任意路径；线上 ``rule_engine_v2.py`` 默认走
+    ``RULES_DIR / "v2_starter.yaml"``。
+    """
+    import yaml  # 局部 import：保留 pure-python 单测路径
+
+    text = Path(path).read_text(encoding="utf-8")
+    data = yaml.safe_load(text) or {}
+    if not isinstance(data, dict):
+        raise ValueError(f"YAML 顶层必须是 mapping：{path}")
+    raw_rules = data.get("rules") or []
+    if not isinstance(raw_rules, list):
+        raise ValueError(f"YAML rules 必须是 list：{path}")
+    return [_coerce_rule(r) for r in raw_rules]
+
+
+def load_locale(locale_path: str | Path) -> dict[str, str]:
+    """从 JSON 文件加载 locale 字典；仅顶层 key→string 模板。"""
+    text = Path(locale_path).read_text(encoding="utf-8")
+    data = json.loads(text)
+    if not isinstance(data, dict):
+        raise ValueError(f"locale JSON 顶层必须是 mapping：{locale_path}")
+    out: dict[str, str] = {}
+    for k, v in data.items():
+        if not isinstance(v, str):
+            raise ValueError(f"locale 值必须为 string：key={k!r} path={locale_path}")
+        out[str(k)] = v
+    return out

@@ -20,7 +20,7 @@ def test_detect_reply_attachments_pairs_video_after_each_drill() -> None:
     video_ids = [a["drill_id"] for a in attachments if a["type"] == "video_card"]
     assert drill_ids == ["drill_towel_arm", "drill_hip_rotation"]
     assert video_ids == drill_ids
-    assert attachments[1]["title"] == "毛巾夹臂练习 · 动作参考"
+    assert attachments[1]["title"] == "毛巾夹臂练习 · 教练示范"
 
 
 def test_detect_reply_attachments_empty_when_no_drill_keywords() -> None:
@@ -39,7 +39,8 @@ def test_all_thirteen_drills_have_keyword_coverage() -> None:
     assert len(covered) == 13
 
 
-def test_video_card_title_uses_action_reference_suffix() -> None:
+def test_video_card_title_uses_coach_demo_suffix() -> None:
+    """P2-M7-N1 D-6：后端 title 后缀对齐前端 `DRILL_VIDEO_TITLE_SUFFIX`。"""
     attachments = _detect_reply_attachments("可以先做瞄准杆站位练习。")
     video = next(a for a in attachments if a["type"] == "video_card")
-    assert video["title"] == "瞄准杆站位练习 · 动作参考"
+    assert video["title"] == "瞄准杆站位练习 · 教练示范"

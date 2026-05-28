@@ -73,7 +73,7 @@
 - 落库的消息结构、API schema、SSE 流不动
 - 前端做最末端的「白名单过滤 + graceful null」，后端 / 数据库 / Celery 任务零改动 → 极低破坏性
 
-> ⚠️ **二期重启坑位（必看）**：当前 `_video_cards_for_drills()` 拼的 title 后缀是 `· 动作参考`（[`backend/app/services/chat_service.py`](../../backend/app/services/chat_service.py) L325），而前端 `DRILL_VIDEO_TITLE_SUFFIX = ' · 教练示范'`（[`client/src/constants/drillVideoLibrary.ts`](../../client/src/constants/drillVideoLibrary.ts) L63）。`resolveVideoCardDetail` 取 `title: input.title || base.title` ⇒ 二期 `DRILL_VIDEO_ALIGNED_IDS` 重新填值后，后端 title 会**覆盖**前端 suffix，最终展示「{name} · 动作参考」，与新视觉文案不一致。`P2-M7-N1` 重建素材库前请同步把后端 suffix 改为 `· 教练示范`（或一次性改成「后端只传 drill_id，title 全由前端 base.title 生成」更干净）。已加入 §四 D-6。
+> ✅ **P2-W4 修复（D-6 落地）**：`_video_cards_for_drills()` 后缀已由 `· 动作参考` 改为 `· 教练示范`（[`backend/app/services/chat_service.py`](../../backend/app/services/chat_service.py)），与前端 `DRILL_VIDEO_TITLE_SUFFIX` 对齐；后续 `DRILL_VIDEO_ALIGNED_IDS` 重新填值时两端文案保持一致。回归测试同步更新（`tests/test_chat_reply_attachments.py`）。
 
 ### 2.4 验收清单（hotfix）
 
@@ -176,7 +176,7 @@
 | D-3 | 不删除 `scripts/drill-demo-videos/manifest.json` | 2026-05-25 | 留作历史记录 + 同步脚本未来仍可能复用；用 status 字段隔离即可 |
 | D-4 | 13 段专属素材纳入 **Phase 2.1**（与 M7 引擎地基同期）而非 Phase 2.4（产品包装） | 2026-05-25 | 教练对话 / 训练计划 / 报告页是一期已上线核心闭环，越早恢复视频补全越能挽回 NPS |
 | D-5 | 拍摄成本控制在 ¥11K-18K（不超 ¥20K） | 2026-05-25 | 与 docs/21 §十三 商业模式约束一致（二期不铺重资产） |
-| D-6 | 后端 `_video_cards_for_drills()` title 后缀**暂不改**，但在二期重建素材库前**必须**改为 `· 教练示范`（或彻底改为「后端只传 drill_id，title 全由前端生成」） | 2026-05-25 | 当前 `DRILL_VIDEO_ALIGNED_IDS` 为空 → 前端拿 video_card 必定 null，文案分裂对用户不可见；改后端要带回归测试 + 后端单测（`tests/services/test_chat_reply_attachments.py`），单纯为「不可见的将来场景」改动得不偿失。**P2-M7-N1 启动时同步处理**。 |
+| D-6 | 后端 `_video_cards_for_drills()` title 后缀改为 `· 教练示范` | 2026-05-25 → **2026-05-28 落地** | 当前 `DRILL_VIDEO_ALIGNED_IDS` 为空 → 文案分裂对用户暂不可见；P2-W4 启动「13 drill 专属视频」前置项时一并修复，确保素材库重新填值后两端文案对齐（`backend/tests/test_chat_reply_attachments.py` 已同步）。 |
 
 ---
 
@@ -186,3 +186,4 @@
 |------|------|------|
 | 2026-05-25 | v0.1 | 初版：诊断 / hotfix / 二期专属素材库重建方案 / 排期 / 成本 |
 | 2026-05-25 | v0.1.1 | review 补漏：§2.3 加二期重启坑位提示（后端 / 前端 title 后缀分裂）+ §四 加 D-6 决策；顺手修 `client/src/components/VideoCard.tsx` 一期遗留 TS bug（`<Video showLoading>` 非法 prop，Taro 运行时本就忽略，删除即可消除 type-check 噪音）；给 [`docs/release-notes/o-07-skeleton-fps-smoke-runbook.md`](o-07-skeleton-fps-smoke-runbook.md) §2 步骤 8 加 hotfix 期预期注 |
+| 2026-05-28 | v0.1.2 | **D-6 落地**：`chat_service._video_cards_for_drills()` 后缀对齐为 `· 教练示范`；`tests/test_chat_reply_attachments.py` 同步更新。视频拍摄 / 素材替换仍按 §3 排期（W14-W17）执行，前端 `DRILL_VIDEO_ALIGNED_IDS` 暂保持为空。 |

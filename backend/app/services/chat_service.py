@@ -311,7 +311,12 @@ def _detect_drill_attachments(reply_text: str) -> list[dict]:
 
 
 def _video_cards_for_drills(drill_attachments: list[dict]) -> list[dict]:
-    """与 drill_card 成对插入 video_card（v1.1.1）。"""
+    """与 drill_card 成对插入 video_card（v1.1.1）。
+
+    P2-M7-N1 D-6（详 docs/release-notes/drill-demo-video-revamp.md §四）：
+    title 后缀与前端 ``DRILL_VIDEO_TITLE_SUFFIX`` 对齐为 ``· 教练示范``，
+    避免二期 ``DRILL_VIDEO_ALIGNED_IDS`` 重新填值后两端文案分裂。
+    """
     videos: list[dict] = []
     for att in drill_attachments:
         if att.get("type") != "drill_card":
@@ -323,7 +328,7 @@ def _video_cards_for_drills(drill_attachments: list[dict]) -> list[dict]:
             {
                 "type": "video_card",
                 "drill_id": drill_id,
-                "title": f"{att.get('name', '练习')} · 动作参考",
+                "title": f"{att.get('name', '练习')} · 教练示范",
             }
         )
     return videos

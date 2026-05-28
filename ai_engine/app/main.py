@@ -14,6 +14,7 @@ from app.mock_pipeline import run_mock_analysis
 from app.schemas import AnalyzeRequest, AnalyzeResult, PrecheckRequest, PrecheckResult
 from app.version_router import (
     ENGINE_V1,
+    ENGINE_V2,
     RolloutDowngradeRequiresForce,
     get_engine_version,
     get_rollout_pct,
@@ -99,14 +100,17 @@ async def analyze(req: AnalyzeRequest) -> AnalyzeResult:
         result = await run_mock_analysis(req)
     else:
         try:
-            # V2 管线尚未独立模块，暂时同走 real_pipeline（M7-07/M7-10 接力实现独立 V2 分支）
-            # 一旦 V2 模块就位，这里改成：
-            #   if engine_version == ENGINE_V2:
-            #       from app.pipeline.real_pipeline_v2 import run_real_analysis_v2
-            #       result = await run_real_analysis_v2(req)
-            from app.pipeline.real_pipeline import run_real_analysis
+            # P2-W4：V2 模块（real_pipeline_v2）就位；按灰度桶分流。
+            # V1 路径保持原样；V2 路径目前仍复用 V1 pipeline（W34 PR 接 features
+            # 外提后切到 diagnose_v2 重诊）。任何 V2 入口异常都不会影响 V1 桶用户。
+            if engine_version == ENGINE_V2:
+                from app.pipeline.real_pipeline_v2 import run_real_analysis_v2
 
-            result = await run_real_analysis(req)
+                result = await run_real_analysis_v2(req)
+            else:
+                from app.pipeline.real_pipeline import run_real_analysis
+
+                result = await run_real_analysis(req)
         except PipelineError as exc:
             log.warning(
                 "pipeline_error",

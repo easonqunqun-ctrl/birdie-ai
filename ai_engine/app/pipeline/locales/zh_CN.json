@@ -1,0 +1,13 @@
+{
+  "_meta": "P2-M7-10 起跑期 locale；与 rules/v2_starter.yaml 一一对应。",
+  "issues.early_extension.title": "提前伸展（Early Extension）",
+  "issues.early_extension.summary": "击球时脊柱角比准备位变化了 {spine_angle_impact_delta:.1f}°（理想 ≤5°），髋部过早前伸。",
+  "issues.loss_of_posture.title": "身体姿势散架（Loss of Posture）",
+  "issues.loss_of_posture.summary": "脊柱角变化 {spine_angle_impact_delta:.1f}°、头部水平位移 {head_lateral_shift:.2f}，挥杆中身体稳定性不足。",
+  "issues.casting.title": "抛杆（Casting）",
+  "issues.casting.summary": "手腕在下杆 {wrist_release_timing:.0%} 就释放（理想 50%-70%），杆面容易打开右曲。",
+  "issues.over_rotation.title": "转肩过度（Over Rotation）",
+  "issues.over_rotation.summary": "顶点肩转 {shoulder_rotation_top:.0f}°（理想 80°-100°），过度转肩可能影响节奏。",
+  "issues.under_rotation.title": "转肩不足（Under Rotation）",
+  "issues.under_rotation.summary": "顶点肩转仅 {shoulder_rotation_top:.0f}°（理想 80°-100°），上杆力量传递受限。"
+}

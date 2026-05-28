@@ -29,6 +29,8 @@ dependencies = [
     # - pyarrow：把 (F, 33, 3) + visibility 写成 parquet（比 JSON 省 3-5x，前端 mini-cdn 可读）
     "minio>=7.2.0",
     "pyarrow>=16.0.0,<19",
+    # P2-M7-10：规则 V2 走 YAML 配置；运维与教研可在不改代码的情况下灰度新规则
+    "pyyaml>=6.0.0,<7",
 ]
 
 [project.optional-dependencies]

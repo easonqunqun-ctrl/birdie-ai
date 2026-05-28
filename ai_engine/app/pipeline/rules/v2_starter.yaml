@@ -1,0 +1,69 @@
+# P2-M7-10 · V2 RuleEngine 起跑规则集
+#
+# 范围：从 V1 `diagnose.py` 15 条规则里挑出 **诊断置信度最高、教研结论最稳**
+# 的 5 条做 YAML 迁移。W29-W33 持续把剩余 10 条 + 新增规则迁过来。
+#
+# 字段说明见 `rule_engine.py` 顶部 docstring；阈值与 V1 `diagnose.py` 保持一致
+# 以便 V1↔V2 灰度对照（kickoff §3.6 影子流量）。
+#
+# 互斥矩阵必须双向声明（启动时会校验）；同一个 issue 若需向后扩 confidence
+# 模板，请同步在 `locales/zh_CN.json` 添加对应 key。
+
+version: v2.0
+rules:
+  # ---- 1. 提前伸展（Early Extension）------------------------------------
+  - name: early_extension
+    display_name_key: issues.early_extension.title
+    severity_feature: spine_angle_impact_delta
+    confidence_floor: 0.6
+    mutually_exclusive_with: [loss_of_posture]
+    conditions:
+      - feature: spine_angle_impact_delta
+        operator: ">"
+        threshold: 8.0
+
+  # ---- 2. 失去身体姿势（Loss of Posture）-------------------------------
+  - name: loss_of_posture
+    display_name_key: issues.loss_of_posture.title
+    severity_feature: spine_angle_impact_delta
+    confidence_floor: 0.55
+    mutually_exclusive_with: [early_extension]
+    conditions:
+      - feature: spine_angle_impact_delta
+        operator: ">"
+        threshold: 5.0
+      - feature: head_lateral_shift
+        operator: ">"
+        threshold: 0.08
+
+  # ---- 3. 抛杆（Casting）-----------------------------------------------
+  - name: casting
+    display_name_key: issues.casting.title
+    severity_feature: wrist_release_timing
+    confidence_floor: 0.6
+    conditions:
+      - feature: wrist_release_timing
+        operator: "<"
+        threshold: 0.40
+
+  # ---- 4. 转肩过度（Over Rotation）-------------------------------------
+  - name: over_rotation
+    display_name_key: issues.over_rotation.title
+    severity_feature: shoulder_rotation_top
+    confidence_floor: 0.55
+    mutually_exclusive_with: [under_rotation]
+    conditions:
+      - feature: shoulder_rotation_top
+        operator: ">"
+        threshold: 105.0
+
+  # ---- 5. 转肩不足（Under Rotation）------------------------------------
+  - name: under_rotation
+    display_name_key: issues.under_rotation.title
+    severity_feature: shoulder_rotation_top
+    confidence_floor: 0.6
+    mutually_exclusive_with: [over_rotation]
+    conditions:
+      - feature: shoulder_rotation_top
+        operator: "<"
+        threshold: 75.0
