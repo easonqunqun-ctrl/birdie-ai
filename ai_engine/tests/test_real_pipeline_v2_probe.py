@@ -300,7 +300,7 @@ def test_run_real_analysis_v2_merges_probe_warnings_into_result(monkeypatch):
     from app.schemas import AnalyzeRequest, AnalyzeResult
 
     monkeypatch.setattr(
-        mod, "_ffprobe_extended", lambda _: _probe(codec="hevc", has_audio=True)
+        probe_mod, "_ffprobe_extended", lambda _: _probe(codec="hevc", has_audio=True)
     )
 
     async def _fake_v1(req, *, diagnose_fn=None, enrichment_fn=None):
@@ -381,7 +381,7 @@ def test_run_real_analysis_v2_appends_fallback_when_v2_resources_missing(
     from app.schemas import AnalyzeRequest, AnalyzeResult
 
     monkeypatch.setattr(
-        mod, "_ffprobe_extended", lambda _: _probe(codec="h264", has_audio=False)
+        probe_mod, "_ffprobe_extended", lambda _: _probe(codec="h264", has_audio=False)
     )
 
     def _raise(*_args, **_kwargs):
