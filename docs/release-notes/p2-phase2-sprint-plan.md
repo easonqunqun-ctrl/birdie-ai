@@ -16,7 +16,7 @@
 | **W5** | **引擎深耕** | P2-M7-10 · M7-14 | V1→V2 全量 14 规则迁 YAML；features dict 外提让 V2 真正重诊 | **✅ Done**（`6afffda` · backend hotfix `a37499a`） |
 | **W6** | **V2 灌溉** | ENG-A1 · ENG-A2 · ENG-A3 | metrics 观测 + redis 热改 pct + 离线 V1/V2 diff 脚本 | **✅ Done**（`816e320` · `915a6d2` uv.lock+test fix） |
 | **W7** | **V2 引擎产品力 v0.1 落地** | P2-M7-02 · P2-M7-06 | engine_warnings + 三层 confidence 接入 V2；V1 行为冻结 | **✅ Done**（`a36eb88` 主体 · 待 hotfix `swing_start/swing_end` 注入） |
-| **W8** | **V2 元数据探测灌入 engine_warnings** | P2-M7-02 · P2-W8 ENG-C | V2 入口 ffprobe 原始 URL → codec / hdr / slowmo / fps / audio 落入 `engine_warnings`；pipeline 主体仍走 V1，fps/timing 不变；探测失败静默兜底 | **🟡 In Progress** |
+| **W8** | **V2 元数据探测灌入 engine_warnings** | P2-M7-02 · P2-W8 ENG-C | V2 入口 ffprobe 原始 URL → codec / hdr / slowmo / fps / audio 落入 `engine_warnings`；pipeline 主体仍走 V1，fps/timing 不变；探测失败静默兜底 | **✅ Done**（`4723bb0`） |
 
 **并行泳道（不占 Sprint 主表）**：U-2 COS · Q-B5 papay · O-01/O-04 性能抽测 · par-E3/par-T1
 
@@ -163,3 +163,4 @@
 | 2026-05-28 | W6 ✅（`816e320` 主体 + `915a6d2` uv.lock 补 redis & test 隔离）：CVM 容器内 18/18 单测过；`/metrics` 端点返回完整 JSON；Redis 持久化验证通过（set→另一进程 force_refresh 能读到）；线上 pct 由 Redis 接管，业务真值仍为 5 |
 | 2026-05-28 | W7 ✅（`a36eb88` 主体）：`run_real_analysis` 加 `enrichment_fn` hook + `PipelineCtx`；`_enrich_v2` 接三层 confidence + tier 进 V2 报告；fallback 时 engine_warnings 塞 `fallback_to_v1`；CVM 12/12 enrich 单测过；待 hotfix 把 `swing_start/swing_end` test fixture 补全后随下次 publish 入 image |
 | 2026-05-28 | W8 In Progress：`_ffprobe_extended` 接受 str URL；`real_pipeline_v2._probe_video_warnings` 落地 10 种 codec/hdr/slowmo/fps/audio engine_warnings；`run_real_analysis_v2` 在 V1 之前跑 probe 并合并到 result；`test_real_pipeline_v2_probe.py` 22 例覆盖正常/边界/失败/集成；pipeline 主体 fps 仍 30，下游 timing 不变 |
+| 2026-05-28 | W8 ✅（`4723bb0`）：CVM 21/21 probe 单测过；真 fixture 视频探测端到端产 `decoded_h264 / fps_upsampled / audio_dropped` 三类 warnings；`/metrics` 端点正常、`rollout_pct=5` 灰度未受影响 |
