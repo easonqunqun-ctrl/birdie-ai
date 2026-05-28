@@ -38,6 +38,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 # kickoff §3.2 阈值默认值
@@ -250,6 +251,53 @@ def evaluate_attempt(
     )
 
 
+def club_type_to_engine_mode(club_type: str | None) -> str | None:
+    """从 swing_analyses.club_type 派生考核 engine_mode（无 DB 字段时的 MVP 映射）."""
+
+    if not club_type:
+        return None
+    if club_type == "putter":
+        return "putting"
+    if club_type == "wedge":
+        return "chipping"
+    if club_type == "driver":
+        return "drive"
+    return "full_swing"
+
+
+def score_from_analysis(
+    *,
+    overall_score: int | None,
+    phase_scores: Mapping[str, Any] | None,
+    phase: str,
+) -> int:
+    """按 pass_criteria.phase 从分析记录提取分数；缺省回退 overall."""
+
+    if phase == "overall":
+        return int(overall_score or 0)
+    if phase_scores and isinstance(phase_scores, Mapping):
+        raw = phase_scores.get(phase)
+        if isinstance(raw, Mapping):
+            nested = raw.get("score")
+            if isinstance(nested, (int, float)):
+                return int(nested)
+        elif isinstance(raw, (int, float)):
+            return int(raw)
+    return int(overall_score or 0)
+
+
+def count_today_attempts(*, attempts: int, updated_at: datetime | None) -> int:
+    """当日已尝试次数：跨日归零（progress.attempts 仅在 updated_at 为今天时有效）."""
+
+    from datetime import UTC, datetime as dt
+
+    if updated_at is None:
+        return 0
+    if updated_at.date() != dt.now(UTC).date():
+        return 0
+    return max(attempts, 0)
+
+
 def maybe_upgrade_stage(
     *,
     course_lesson_ids: list[str],
@@ -285,7 +333,10 @@ __all__ = [
     "AssessmentError",
     "AssessmentOutcome",
     "PassCriteria",
+    "club_type_to_engine_mode",
+    "count_today_attempts",
     "evaluate_attempt",
     "maybe_upgrade_stage",
     "parse_pass_criteria",
+    "score_from_analysis",
 ]

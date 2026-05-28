@@ -13,7 +13,12 @@
  * - 已知伤病字段（`known_injuries`）属高敏感，UI 层必须按 §3.3.3 做二次 Modal 确认。
  */
 
-import type { HandednessOption, HandicapSource, InjuryKey } from '@/constants/profileV2'
+import type {
+  HandednessOption,
+  HandicapSource,
+  InjuryKey,
+} from '@/constants/profileV2'
+import type { VenueType } from '@/constants/meetup'
 import { http } from './request'
 
 export interface ProfileV2PrivacyPayload {
@@ -59,11 +64,29 @@ export interface ProfileV2UpdatePayload {
   privacy_payload?: Partial<ProfileV2PrivacyPayload>
 }
 
+/** M9-05 · GET /users/me/profile-v2/favorite-venues 列表元素。 */
+export interface FavoriteVenueRead {
+  id: string
+  city: string
+  name: string
+  venue_type: VenueType
+  source: 'ugc' | 'verified'
+}
+
+export interface FavoriteVenuesList {
+  items: FavoriteVenueRead[]
+  missing_ids: string[]
+  total: number
+}
+
 export const profileV2Service = {
   get() {
     return http.get<ProfileV2Read>('/users/me/profile-v2')
   },
   update(payload: ProfileV2UpdatePayload) {
     return http.put<ProfileV2Read>('/users/me/profile-v2', payload)
+  },
+  listFavoriteVenues() {
+    return http.get<FavoriteVenuesList>('/users/me/profile-v2/favorite-venues')
   },
 }

@@ -14,11 +14,19 @@ import { FC, useCallback, useState } from 'react'
 import { View, Text, ScrollView } from '@tarojs/components'
 import Taro, { useDidShow, useRouter } from '@tarojs/taro'
 import { PHASE2_COURSES_ENABLED_FLAG } from '@/constants/flags'
+import { analysisService } from '@/services/analysisService'
 import {
   coursesService,
   type CourseRead,
   type LessonRead,
+  type LessonAttemptResponse,
 } from '@/services/coursesService'
+import type { AnalysisListItem } from '@/types/analysis'
+import {
+  getAssessmentMaxAttempts,
+  getAssessmentMinScore,
+  isAssessmentLesson,
+} from '@/utils/courseAssessment'
 import './detail.scss'
 
 const CourseDetailPage: FC = () => {
@@ -31,6 +39,7 @@ const CourseDetailPage: FC = () => {
   const [lessons, setLessons] = useState<LessonRead[]>([])
   // 同一时间最多展开一节，避免页面过长
   const [expandedLessonId, setExpandedLessonId] = useState<string | null>(null)
+  const [submittingLessonId, setSubmittingLessonId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!courseId) {
@@ -103,6 +112,54 @@ const CourseDetailPage: FC = () => {
     setExpandedLessonId((cur) => (cur === id ? null : id))
   }
 
+  const formatAnalysisLabel = (item: AnalysisListItem): string => {
+    const score =
+      item.overall_score != null ? `${Math.round(item.overall_score)}分` : '—'
+    const when = item.analyzed_at ?? item.created_at
+    const date = when ? when.slice(0, 10) : '未知日期'
+    return `${date} · ${score}`
+  }
+
+  const showAttemptResult = (result: LessonAttemptResponse) => {
+    const title = result.passed ? '考核通过' : '未通过'
+    let content = `${result.feedback}\n得分 ${result.score} / 及格 ${result.min_score}`
+    content += `\n今日已考 ${result.attempts_used}/${result.max_attempts} 次`
+    if (result.stage_upgraded && result.upgraded_to_stage != null) {
+      content += `\n恭喜升阶至第 ${result.upgraded_to_stage} 阶！`
+    }
+    void Taro.showModal({ title, content, showCancel: false })
+  }
+
+  const handleSubmitAssessment = async (lesson: LessonRead) => {
+    if (submittingLessonId) return
+    setSubmittingLessonId(lesson.id)
+    try {
+      const res = await analysisService.listAnalyses({ page: 1, page_size: 20 })
+      const completed = res.items.filter((i) => i.status === 'completed')
+      if (completed.length === 0) {
+        Taro.showToast({ title: '请先完成一次挥杆分析', icon: 'none' })
+        return
+      }
+      const pickList = completed.slice(0, 6)
+      const sheet = await Taro.showActionSheet({
+        itemList: pickList.map(formatAnalysisLabel),
+      })
+      const picked = pickList[sheet.tapIndex]
+      if (!picked) return
+      const result = await coursesService.submitLessonAttempt(lesson.id, picked.id)
+      showAttemptResult(result)
+    } catch (e) {
+      if (e && typeof e === 'object' && 'errMsg' in e) {
+        const msg = String((e as { errMsg?: string }).errMsg ?? '')
+        if (msg.includes('cancel')) return
+      }
+      const msg = e instanceof Error ? e.message : '提交失败'
+      Taro.showToast({ title: msg, icon: 'none' })
+    } finally {
+      setSubmittingLessonId(null)
+    }
+  }
+
   return (
     <ScrollView scrollY className='course-detail'>
       <View className='course-detail__header'>
@@ -138,6 +195,8 @@ const CourseDetailPage: FC = () => {
         )}
         {lessons.map((lesson) => {
           const expanded = expandedLessonId === lesson.id
+          const isAssessment = isAssessmentLesson(lesson)
+          const submitting = submittingLessonId === lesson.id
           return (
             <View key={lesson.id} className='course-detail__lesson-card'>
               <View
@@ -151,6 +210,9 @@ const CourseDetailPage: FC = () => {
                   <Text className='course-detail__lesson-title'>
                     {lesson.title}
                   </Text>
+                  {isAssessment && (
+                    <Text className='course-detail__lesson-badge'>考核</Text>
+                  )}
                 </View>
                 <View className='course-detail__lesson-header-right'>
                   <Text className='course-detail__lesson-duration'>
@@ -183,6 +245,23 @@ const CourseDetailPage: FC = () => {
                       }
                     >
                       <Text>▶ 观看视频</Text>
+                    </View>
+                  )}
+                  {isAssessment && (
+                    <View className='course-detail__assessment'>
+                      <Text className='course-detail__assessment-hint'>
+                        及格线 {getAssessmentMinScore(lesson)} 分 · 每日最多{' '}
+                        {getAssessmentMaxAttempts(lesson)} 次
+                      </Text>
+                      <View
+                        className={[
+                          'course-detail__assessment-cta',
+                          submitting ? 'course-detail__assessment-cta--busy' : '',
+                        ].join(' ')}
+                        onClick={() => !submitting && void handleSubmitAssessment(lesson)}
+                      >
+                        <Text>{submitting ? '提交中…' : '选择分析报告并提交考核'}</Text>
+                      </View>
                     </View>
                   )}
                 </View>

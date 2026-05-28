@@ -191,6 +191,16 @@ const ProfilePage: FC = () => {
           {PHASE2_PROFILE_V2_ENABLED_FLAG && (
             <View
               className='profile__menu-item'
+              onClick={() => Taro.navigateTo({ url: '/pages/profile/favorite-venues' })}
+            >
+              <Text className='profile__menu-icon'>📍</Text>
+              <Text className='profile__menu-label'>常去球馆</Text>
+              <Text className='profile__menu-arrow'>›</Text>
+            </View>
+          )}
+          {PHASE2_PROFILE_V2_ENABLED_FLAG && (
+            <View
+              className='profile__menu-item'
               onClick={() => Taro.navigateTo({ url: '/pages/profile/profile-v2' })}
             >
               <Text className='profile__menu-icon'>🧭</Text>

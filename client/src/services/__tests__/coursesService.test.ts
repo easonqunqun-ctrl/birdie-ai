@@ -77,4 +77,27 @@ describe('coursesService', () => {
     const sent = T.request.mock.calls[0][0]
     expect(sent.url).toContain('crs_normal_id_123')
   })
+
+  test('submitLessonAttempt → POST /lessons/{id}/attempt', async () => {
+    T.request.mockResolvedValueOnce(
+      ok({
+        passed: true,
+        score: 85,
+        min_score: 80,
+        attempts_used: 1,
+        max_attempts: 3,
+        failure_reason: null,
+        feedback: '表现不错',
+        stage_upgraded: false,
+        upgraded_to_stage: null,
+      }),
+    )
+    const res = await coursesService.submitLessonAttempt('les_abc', 'sa_xyz')
+    const sent = T.request.mock.calls[0][0]
+    expect(sent.method).toBe('POST')
+    expect(sent.url).toMatch(/\/lessons\/les_abc\/attempt$/)
+    expect(sent.data).toEqual({ swing_analysis_id: 'sa_xyz' })
+    expect(res.passed).toBe(true)
+    expect(res.score).toBe(85)
+  })
 })

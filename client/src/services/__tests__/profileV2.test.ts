@@ -87,4 +87,28 @@ describe('profileV2Service', () => {
     })
     await expect(profileV2Service.get()).rejects.toThrow()
   })
+
+  test('listFavoriteVenues → GET /users/me/profile-v2/favorite-venues', async () => {
+    T.request.mockResolvedValueOnce(
+      ok({
+        items: [
+          {
+            id: 'ven_1',
+            city: '上海',
+            name: '测试练习场',
+            venue_type: 'indoor_range',
+            source: 'verified',
+          },
+        ],
+        missing_ids: [],
+        total: 1,
+      }),
+    )
+    const res = await profileV2Service.listFavoriteVenues()
+    const sent = T.request.mock.calls[0][0]
+    expect(sent.method).toBe('GET')
+    expect(sent.url).toContain('/users/me/profile-v2/favorite-venues')
+    expect(res.total).toBe(1)
+    expect(res.items[0].name).toBe('测试练习场')
+  })
 })

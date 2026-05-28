@@ -53,6 +53,19 @@ export interface CourseLessonsResponse {
   total: number
 }
 
+/** P2-M11-04 · POST /lessons/{id}/attempt 响应。 */
+export interface LessonAttemptResponse {
+  passed: boolean
+  score: number
+  min_score: number
+  attempts_used: number
+  max_attempts: number
+  failure_reason: 'score_below_threshold' | 'engine_mode_mismatch' | null
+  feedback: string
+  stage_upgraded: boolean
+  upgraded_to_stage: number | null
+}
+
 export const coursesService = {
   list(stage?: number) {
     const path = stage != null ? `/courses?stage=${stage}` : '/courses'
@@ -63,5 +76,11 @@ export const coursesService = {
   },
   lessons(courseId: string) {
     return http.get<CourseLessonsResponse>(`/courses/${courseId}/lessons`)
+  },
+  submitLessonAttempt(lessonId: string, swingAnalysisId: string) {
+    return http.post<LessonAttemptResponse>(
+      `/lessons/${encodeURIComponent(lessonId)}/attempt`,
+      { swing_analysis_id: swingAnalysisId },
+    )
   },
 }

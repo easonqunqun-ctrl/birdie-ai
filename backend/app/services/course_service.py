@@ -20,9 +20,10 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import BadRequestError, NotFoundError
+from app.core.exceptions import BadRequestError, ForbiddenError, NotFoundError
 from app.core.logging import get_logger
 from app.core.security import new_id
+from app.models.analysis import SwingAnalysis
 from app.models.course import (
     COURSE_STATUS_IN_PROGRESS,
     COURSE_STATUS_PASSED,
@@ -38,6 +39,17 @@ from app.schemas.course import (
     CourseCreate,
     LessonCreate,
     UserCourseProgressUpdate,
+)
+from app.services.course_assessment_service import (
+    AnalysisInput,
+    AssessmentError,
+    AssessmentOutcome,
+    club_type_to_engine_mode,
+    count_today_attempts,
+    evaluate_attempt,
+    maybe_upgrade_stage,
+    parse_pass_criteria,
+    score_from_analysis,
 )
 
 logger = get_logger("course")
@@ -460,6 +472,113 @@ async def current_user_stage(db: AsyncSession, user_id: str) -> int:
     return min(MAX_STAGE, int(val) + 1)
 
 
+async def submit_lesson_attempt(
+    db: AsyncSession,
+    *,
+    user_id: str,
+    lesson_id: str,
+    swing_analysis_id: str,
+) -> tuple[AssessmentOutcome, bool, int | None]:
+    """提交阶段考核：校验 lesson / analysis → evaluate → upsert progress → 升阶判定."""
+
+    lesson = await get_lesson(db, lesson_id)
+    if lesson is None:
+        raise NotFoundError(code=40406, message="课时不存在")
+    course = await get_course(db, lesson.course_id)
+    if course is None or not course.is_published:
+        raise NotFoundError(code=40406, message="课程不存在或未发布")
+
+    try:
+        criteria = parse_pass_criteria(lesson.pass_criteria)
+    except AssessmentError as exc:
+        raise BadRequestError(code=exc.code, message=exc.message) from exc
+
+    progress = await get_progress(db, user_id=user_id, lesson_id=lesson_id)
+    if progress is not None and progress.status == COURSE_STATUS_PASSED:
+        raise BadRequestError(code=40903, message="该课时已通过考核")
+
+    analysis_row = await db.execute(
+        select(SwingAnalysis).where(
+            SwingAnalysis.id == swing_analysis_id,
+            SwingAnalysis.deleted_at.is_(None),
+        )
+    )
+    analysis = analysis_row.scalar_one_or_none()
+    if analysis is None:
+        raise NotFoundError(code=40402, message="分析记录不存在")
+    if analysis.user_id != user_id:
+        raise ForbiddenError(code=40301, message="无权使用该分析记录")
+    if analysis.is_sample:
+        raise BadRequestError(code=40093, message="示例分析报告不可用于考核")
+
+    today_attempts = count_today_attempts(
+        attempts=progress.attempts if progress else 0,
+        updated_at=progress.updated_at if progress else None,
+    )
+    analysis_input = AnalysisInput(
+        analysis_id=analysis.id,
+        score=score_from_analysis(
+            overall_score=analysis.overall_score,
+            phase_scores=analysis.phase_scores,
+            phase=criteria.phase,
+        ),
+        engine_mode=club_type_to_engine_mode(analysis.club_type),
+        status=analysis.status,
+    )
+
+    try:
+        outcome = evaluate_attempt(
+            criteria=criteria,
+            analysis=analysis_input,
+            today_attempts=today_attempts,
+        )
+    except AssessmentError as exc:
+        raise BadRequestError(code=exc.code, message=exc.message) from exc
+
+    next_status = COURSE_STATUS_PASSED if outcome.passed else COURSE_STATUS_IN_PROGRESS
+    failed_reasons = list(progress.failed_reasons or []) if progress else []
+    if not outcome.passed and outcome.failure_reason:
+        failed_reasons.append(outcome.failure_reason)
+
+    await upsert_progress(
+        db,
+        user_id=user_id,
+        lesson_id=lesson_id,
+        payload=UserCourseProgressUpdate(
+            status=next_status,
+            last_score=outcome.score,
+            failed_reasons=failed_reasons or None,
+        ),
+    )
+
+    stage_upgraded = False
+    upgraded_to_stage: int | None = None
+    if outcome.passed:
+        lessons = await list_lessons_by_course(db, lesson.course_id)
+        lesson_ids = [item.id for item in lessons]
+        statuses: dict[str, str] = {}
+        if lesson_ids:
+            rows = await db.execute(
+                select(UserCourseProgress.lesson_id, UserCourseProgress.status).where(
+                    UserCourseProgress.user_id == user_id,
+                    UserCourseProgress.lesson_id.in_(lesson_ids),
+                )
+            )
+            statuses = {row.lesson_id: row.status for row in rows.all()}
+        stage_upgraded = maybe_upgrade_stage(
+            course_lesson_ids=lesson_ids,
+            user_progress_statuses=statuses,
+        )
+        if stage_upgraded:
+            await maybe_issue_certificate(
+                db, user_id=user_id, course_id=lesson.course_id
+            )
+            if course.stage < MAX_STAGE:
+                upgraded_to_stage = course.stage + 1
+
+    return outcome, stage_upgraded, upgraded_to_stage
+
+
 __all__ = [
     "create_course",
     "create_lesson",
@@ -473,5 +592,6 @@ __all__ = [
     "maybe_issue_certificate",
     "publish_course",
     "seed_initial_courses",
+    "submit_lesson_attempt",
     "upsert_progress",
 ]

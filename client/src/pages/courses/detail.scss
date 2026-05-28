@@ -204,4 +204,46 @@
     margin-top: 12rpx;
     font-size: var(--font-size-sm);
   }
+
+  &__lesson-badge {
+    margin-left: 12rpx;
+    padding: 4rpx 12rpx;
+    border-radius: 8rpx;
+    background: rgba(201, 162, 39, 0.15);
+    color: var(--color-gold);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+  }
+
+  &__assessment {
+    display: flex;
+    flex-direction: column;
+    margin-top: 20rpx;
+    padding-top: 20rpx;
+    border-top: 1rpx dashed var(--color-bg);
+  }
+
+  &__assessment-hint {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    margin-bottom: 16rpx;
+    line-height: 40rpx;
+  }
+
+  &__assessment-cta {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-accent-mint);
+    color: #ffffff;
+    padding: 16rpx 24rpx;
+    border-radius: 32rpx;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+
+    &--busy {
+      opacity: 0.6;
+    }
+  }
 }

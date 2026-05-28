@@ -85,6 +85,9 @@ export const WEEKLY_TARGET_OPTIONS: { value: number; label: string }[] = [
   { value: 0, label: '偶尔练' },
 ]
 
+/** M9-05：常去球馆上限（与 backend MAX_FAVORITE_VENUES 一致）。 */
+export const MAX_FAVORITE_VENUES = 6 as const
+
 /** Onboarding 2.0 步数（一期 3 题 → 二期 6 题）。 */
 export const ONBOARDING_V2_TOTAL_STEPS = 6 as const
 

@@ -32,6 +32,7 @@ export default defineAppConfig({
     'pages/profile/about',
     'pages/profile/clubs',
     'pages/profile/profile-v2',
+    'pages/profile/favorite-venues',
     'pages/courses/index',
     'pages/courses/detail',
     'pages/pros/index',
