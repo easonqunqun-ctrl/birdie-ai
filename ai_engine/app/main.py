@@ -27,13 +27,35 @@ from app.version_router import (
 
 
 def _setup_logging() -> None:
-    logging.basicConfig(stream=sys.stdout, level=logging.INFO, format="%(message)s")
+    # P2-W10 hotfix：让 stdlib logging（pipeline 模块用 logging.getLogger）也走 structlog
+    # ProcessorFormatter，否则 `log.warning("evt", extra={...})` 字段会被默认 formatter
+    # 吞掉——线上排查 v2_probe_failed_silently 等失败时全盲。
+    timestamper = structlog.processors.TimeStamper(fmt="iso")
+    pre_chain = [
+        structlog.contextvars.merge_contextvars,
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.ExtraAdder(),  # 把 stdlib extra={} 字段并入 event_dict
+        timestamper,
+    ]
+    formatter = structlog.stdlib.ProcessorFormatter(
+        foreign_pre_chain=pre_chain,
+        processors=[
+            structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+            structlog.dev.ConsoleRenderer(colors=True),
+        ],
+    )
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(formatter)
+    root_logger = logging.getLogger()
+    root_logger.handlers = [handler]
+    root_logger.setLevel(logging.INFO)
+
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,
-            structlog.processors.add_log_level,
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.dev.ConsoleRenderer(colors=True),
+            structlog.stdlib.add_log_level,
+            timestamper,
+            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
         ],
         wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
         logger_factory=structlog.stdlib.LoggerFactory(),
