@@ -10,18 +10,16 @@
 - 报告 ``engine_version`` 字段由 ``main.py`` 在路由层最终覆盖；本模块内部不显式
   写值，避免与路由层重复。
 
-W4 范围（本 PR）
-----------------
-- ✅ ``run_real_analysis_v2`` 入口 + 路由打通（main.py 按灰度桶分流）
-- ✅ ``diagnose_v2`` 公共 API（YAML RuleEngine + locale 渲染）
-- ✅ 资源缓存（进程级；单测 ``reset_caches`` 可清）
+P2-W5 收口
+----------
+- ✅ ``run_real_analysis_v2`` 通过 ``diagnose_fn=diagnose_v2`` 真正重诊 issues
+- ✅ ``diagnose_v2`` 接受 ``PhaseSegmentResult`` 并填 ``key_frame_timestamp``
+- ✅ YAML 全集 14 条规则覆盖 V1 全部 issue（``grip_weak`` 占位除外）
 
-W34 接力
---------
+后续 W34 接力
+-------------
 - 接 P2-M7-02 → 填 ``AnalyzeResult.engine_warnings``
 - 接 P2-M7-06 → 填 ``IssueItem.confidence`` / ``analysis_confidence``
-- 接 features dict 外提 → ``run_real_analysis_v2`` 内部用 ``diagnose_v2``
-  重诊 issues，替换 V1 ``diagnose`` 结果
 """
 
 from __future__ import annotations
@@ -85,11 +83,35 @@ def _severity_label(ratio: float) -> str:
     return "low"
 
 
+def _keyframe_timestamp(
+    res: RuleResult, phases: PhaseSegmentResult | None
+) -> float | None:
+    """根据 ``phase_anchor`` 从 ``PhaseSegmentResult`` 计算关键帧秒数。
+
+    优先级：top/impact → 用 ``top_frame`` / ``impact_frame``（与 V1 一致）；
+    其余阶段 → 用对应 ``PhaseInfo.key_frame``。
+    """
+    if phases is None or phases.fps <= 0:
+        return None
+    anchor = res.phase_anchor
+    if anchor == "top":
+        frame = phases.top_frame
+    elif anchor == "impact":
+        frame = phases.impact_frame
+    else:
+        info = phases.phases.get(anchor)
+        if info is None:
+            return None
+        frame = info.key_frame
+    return round(frame / phases.fps, 2)
+
+
 def _build_issue_from_rule_result(
     res: RuleResult,
     locale: dict[str, str],
     *,
     fallback_name: str | None = None,
+    phases: PhaseSegmentResult | None = None,
 ) -> DiagnosedIssue:
     """RuleResult → DiagnosedIssue（沿用 V1 schema，便于 main.py 直接组装）。"""
     name = fallback_name or render_i18n_key(
@@ -103,6 +125,7 @@ def _build_issue_from_rule_result(
         severity=_severity_label(res.severity),
         description=description,
         confidence=res.confidence,
+        key_frame_timestamp=_keyframe_timestamp(res, phases),
         metrics=dict(res.payload),
     )
 
@@ -121,12 +144,9 @@ def diagnose_v2(
 
     与 V1 ``diagnose`` 签名一致；report assembly 不需要分支。
 
-    ``confidences`` 缺省时所有规则置 1.0；W34 接 P2-M7-06 后由 issue_confidence
-    输出填充。``phases`` 当前未使用（V2 关键帧时间戳延迟到 W34 接 features dict
-    外提一并处理），保留入参以保持签名稳定。
+    - ``confidences`` 缺省时所有规则置 1.0；W34 接 P2-M7-06 后由 issue_confidence 填充
+    - ``phases`` 用于按 ``phase_anchor`` 填 ``key_frame_timestamp``；缺省时该字段为 None
     """
-    _ = phases  # 显式忽略；保留参数签名与 V1 对齐
-
     rules_engine = engine or RuleEngine(rules=_get_rules())
     loc = locale if locale is not None else _get_locale()
 
@@ -139,7 +159,9 @@ def diagnose_v2(
             fallback = issue_meta(res.type)["name"]
         except KeyError:
             fallback = None
-        issue = _build_issue_from_rule_result(res, loc, fallback_name=fallback)
+        issue = _build_issue_from_rule_result(
+            res, loc, fallback_name=fallback, phases=phases
+        )
         if issue.confidence < min_confidence:
             continue
         issues.append(issue)
@@ -150,25 +172,28 @@ def diagnose_v2(
 async def run_real_analysis_v2(req: AnalyzeRequest) -> AnalyzeResult:
     """V2 真实分析入口。
 
-    MVP（W4）：先**完整复用** V1 ``run_real_analysis``，仅在路由层声明用户落
-    V2 桶。后续 W34 PR 把 features dict 外提，再切到 ``diagnose_v2`` 重诊 issues。
+    P2-W5：通过 ``real_pipeline.run_real_analysis(diagnose_fn=diagnose_v2)`` 真正用
+    YAML RuleEngine 重诊 issues；features 与 phases 由 V1 pipeline 计算后透传给
+    ``diagnose_v2``。
 
-    出错降级：V1 入口本身抛 PipelineError 时直接透传，由 main.py 统一捕获转
-    ``status=failed``；V2 资源（YAML / locale）加载失败 → 记日志后仍跑 V1 流程，
-    确保灰度期不影响报告交付。
+    出错降级：V2 资源（YAML / locale）加载失败 → 记日志后退回 V1 ``diagnose``，
+    确保灰度期不影响报告交付；V1 入口抛 PipelineError 时直接透传，由 main.py
+    统一捕获转 ``status=failed``。
     """
     from app.pipeline.real_pipeline import run_real_analysis
 
+    diagnose_impl = None
     try:
         _get_rules()
         _get_locale()
+        diagnose_impl = diagnose_v2
     except Exception as exc:  # noqa: BLE001
         log.warning(
             "v2_resources_unavailable_falling_back_to_v1",
             extra={"analysis_id": req.analysis_id, "err": repr(exc)},
         )
 
-    return await run_real_analysis(req)
+    return await run_real_analysis(req, diagnose_fn=diagnose_impl)
 
 
 __all__ = [

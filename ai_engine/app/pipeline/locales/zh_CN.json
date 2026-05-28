@@ -1,13 +1,45 @@
 {
-  "_meta": "P2-M7-10 起跑期 locale；与 rules/v2_starter.yaml 一一对应。",
+  "_meta": "P2-M7-10 V2 全量 locale；与 rules/v2_starter.yaml 一一对应。",
+
   "issues.early_extension.title": "提前伸展（Early Extension）",
   "issues.early_extension.summary": "击球时脊柱角比准备位变化了 {spine_angle_impact_delta:.1f}°（理想 ≤5°），髋部过早前伸。",
+
   "issues.loss_of_posture.title": "身体姿势散架（Loss of Posture）",
   "issues.loss_of_posture.summary": "脊柱角变化 {spine_angle_impact_delta:.1f}°、头部水平位移 {head_lateral_shift:.2f}，挥杆中身体稳定性不足。",
+
   "issues.casting.title": "抛杆（Casting）",
   "issues.casting.summary": "手腕在下杆 {wrist_release_timing:.0%} 就释放（理想 50%-70%），杆面容易打开右曲。",
+
   "issues.over_rotation.title": "转肩过度（Over Rotation）",
   "issues.over_rotation.summary": "顶点肩转 {shoulder_rotation_top:.0f}°（理想 80°-100°），过度转肩可能影响节奏。",
+
   "issues.under_rotation.title": "转肩不足（Under Rotation）",
-  "issues.under_rotation.summary": "顶点肩转仅 {shoulder_rotation_top:.0f}°（理想 80°-100°），上杆力量传递受限。"
+  "issues.under_rotation.summary": "顶点肩转仅 {shoulder_rotation_top:.0f}°（理想 80°-100°），上杆力量传递受限。",
+
+  "issues.over_the_top.title": "由外到内下杆（Over-the-Top）",
+  "issues.over_the_top.summary": "下杆顺序错乱（肩比髋早 {downswing_sequence:.0f} 帧），杆头容易从身体外侧切入。",
+
+  "issues.sway_slide.title": "侧移（Sway/Slide）",
+  "issues.sway_slide.summary": "头部水平位移 {head_lateral_shift:.2f}（约超过 10cm），上杆重心右移过度，下杆回正困难。",
+
+  "issues.reverse_spine.title": "反向脊柱角（Reverse Spine）",
+  "issues.reverse_spine.summary": "顶点手腕位置过低（低于头顶 {top_wrist_position:.2f}），脊柱可能向目标侧反向倾斜，存在受伤风险。",
+
+  "issues.chicken_wing.title": "鸡翅（Chicken Wing）",
+  "issues.chicken_wing.summary": "跟进时左臂夹角 {left_arm_straightness:.0f}°（理想 165°-180°），伸直度不足影响击球质量与距离。",
+
+  "issues.sway_lead.title": "下杆侧移（Sway Lead）",
+  "issues.sway_lead.summary": "下杆时肩比髋先动约 {downswing_sequence:.0f} 帧（理想髋先于肩 2-7 帧），发力顺序错。",
+
+  "issues.hanging_back.title": "留身（Hanging Back）",
+  "issues.hanging_back.summary": "收杆不稳定（双脚踝抖动 {finish_balance:.3f}，理想 <0.02），击球后重心未完成转移。",
+
+  "issues.flat_shoulder.title": "肩平面过平（Flat Shoulder）",
+  "issues.flat_shoulder.summary": "X-Factor {x_factor:.0f}°（理想 20-50°），肩旋转平面偏水平，上杆路径可能过内。",
+
+  "issues.steep_shoulder.title": "肩平面过陡（Steep Shoulder）",
+  "issues.steep_shoulder.summary": "X-Factor 仅 {x_factor:.0f}°（理想 20-50°），肩旋转平面偏陡，上杆路径可能过外。",
+
+  "issues.open_stance.title": "开放站位（Open Stance）",
+  "issues.open_stance.summary": "准备位膝弯角 {knee_flexion_setup:.0f}°（理想 130°-170°），双腿过直，站位可能偏开。"
 }

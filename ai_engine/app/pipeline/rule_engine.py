@@ -72,6 +72,11 @@ class RuleCondition:
             return False
 
 
+PhaseAnchor = Literal[
+    "setup", "backswing", "top", "downswing", "impact", "follow_through"
+]
+
+
 @dataclass(frozen=True)
 class Rule:
     """单条诊断规则。
@@ -83,6 +88,8 @@ class Rule:
     mutually_exclusive_with: 互斥的 issue_type 列表（kickoff §3.2 mutual_exclusion.yaml）
     confidence_floor: 当 issue confidence 低于此值时不触发（默认 0.0）
     engine_version_tag: rule_engine_version（默认 v2.0）
+    phase_anchor: 关键帧锚点阶段，diagnose_v2 据此计算 key_frame_timestamp；
+                  默认 ``impact``（绝大多数 V1 规则都用 impact_frame）
     """
 
     name: str
@@ -92,6 +99,7 @@ class Rule:
     mutually_exclusive_with: tuple[str, ...] = ()
     confidence_floor: float = 0.0
     engine_version_tag: RuleEngineVersion = "v2.0"
+    phase_anchor: PhaseAnchor = "impact"
 
     def evaluate(self, features: Mapping[str, float]) -> bool:
         """所有 conditions AND；空 conditions → False（防误触）。"""
@@ -118,6 +126,7 @@ class RuleResult:
     rule_engine_version: RuleEngineVersion
     display_name_key: str
     payload: dict[str, float] = field(default_factory=dict)
+    phase_anchor: PhaseAnchor = "impact"
 
 
 # ============================================================
@@ -220,6 +229,7 @@ class RuleEngine:
                     rule_engine_version=rule.engine_version_tag,
                     display_name_key=rule.display_name_key,
                     payload=payload,
+                    phase_anchor=rule.phase_anchor,
                 )
             )
 
@@ -306,8 +316,12 @@ _RULE_YAML_KEYS = {
     "engine_version_tag",
     "mutually_exclusive_with",
     "conditions",
+    "phase_anchor",
 }
 _CONDITION_YAML_KEYS = {"feature", "operator", "threshold"}
+_PHASE_ANCHORS: frozenset[str] = frozenset(
+    {"setup", "backswing", "top", "downswing", "impact", "follow_through"}
+)
 
 
 def _coerce_rule(raw: Mapping[str, Any]) -> Rule:
@@ -337,6 +351,12 @@ def _coerce_rule(raw: Mapping[str, Any]) -> Rule:
                 threshold=float(cond["threshold"]),
             )
         )
+    anchor = raw.get("phase_anchor", "impact")
+    if anchor not in _PHASE_ANCHORS:
+        raise ValueError(
+            f"phase_anchor 非法：{anchor!r}，允许：{sorted(_PHASE_ANCHORS)}"
+            f"（rule={raw['name']!r}）"
+        )
     return Rule(
         name=str(raw["name"]),
         display_name_key=str(raw["display_name_key"]),
@@ -345,6 +365,7 @@ def _coerce_rule(raw: Mapping[str, Any]) -> Rule:
         mutually_exclusive_with=tuple(raw.get("mutually_exclusive_with", ()) or ()),
         confidence_floor=float(raw.get("confidence_floor", 0.0)),
         engine_version_tag=raw.get("engine_version_tag", "v2.0"),
+        phase_anchor=anchor,
     )
 
 

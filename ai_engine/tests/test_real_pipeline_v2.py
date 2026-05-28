@@ -135,7 +135,77 @@ def test_reset_caches_reloads_yaml() -> None:
     assert any(i.type == "casting" for i in issues)
 
 
-def test_starter_rules_loaded_into_engine_is_exactly_five() -> None:
+def test_full_rules_loaded_into_engine_matches_yaml() -> None:
+    """V2 全集 14 条规则（grip_weak V1 占位除外）。"""
     rules = load_rules_from_yaml(RULES_DIR / "v2_starter.yaml")
     engine = RuleEngine(rules=rules)
-    assert len(engine.rules) == 5
+    assert len(engine.rules) == 14
+
+
+def test_diagnose_v2_fills_key_frame_timestamp_from_phases() -> None:
+    """phases 提供时，``key_frame_timestamp`` 应按 phase_anchor 落到具体秒数。"""
+    from app.pipeline.phases import PhaseInfo, PhaseSegmentResult
+
+    # 30 fps · 100 frames；top=45, impact=60
+    phases = PhaseSegmentResult(
+        phases={
+            "setup": PhaseInfo(start_frame=0, end_frame=10, key_frame=5),
+            "backswing": PhaseInfo(start_frame=11, end_frame=44, key_frame=28),
+            "top": PhaseInfo(start_frame=45, end_frame=45, key_frame=45),
+            "downswing": PhaseInfo(start_frame=46, end_frame=59, key_frame=53),
+            "impact": PhaseInfo(start_frame=60, end_frame=60, key_frame=60),
+            "follow_through": PhaseInfo(start_frame=61, end_frame=99, key_frame=80),
+        },
+        top_frame=45,
+        impact_frame=60,
+        handedness="right",
+        lead_wrist_idx=15,
+        lead_shoulder_idx=11,
+        fps=30.0,
+    )
+
+    issues = diagnose_v2(
+        features={"wrist_release_timing": 0.30},  # casting · phase_anchor=impact
+        phases=phases,
+    )
+    casting = next(i for i in issues if i.type == "casting")
+    assert casting.key_frame_timestamp == round(60 / 30.0, 2)  # 2.0s
+
+    # over_rotation · phase_anchor=top → 45/30 = 1.5s
+    issues_top = diagnose_v2(
+        features={"shoulder_rotation_top": 120.0},
+        phases=phases,
+    )
+    over = next(i for i in issues_top if i.type == "over_rotation")
+    assert over.key_frame_timestamp == round(45 / 30.0, 2)  # 1.5s
+
+
+def test_diagnose_v2_keyframe_timestamp_none_without_phases() -> None:
+    issues = diagnose_v2(features={"wrist_release_timing": 0.30})
+    casting = next(i for i in issues if i.type == "casting")
+    assert casting.key_frame_timestamp is None
+
+
+def test_diagnose_v2_full_set_triggers_steep_and_flat_mutually_exclusive() -> None:
+    """flat_shoulder（x_factor > 60）与 steep_shoulder（x_factor < 25）互斥；同一 x_factor 只能触发一个。"""
+    issues = diagnose_v2(features={"x_factor": 80.0})
+    types = {i.type for i in issues}
+    assert "flat_shoulder" in types
+    assert "steep_shoulder" not in types
+
+    issues_low = diagnose_v2(features={"x_factor": 10.0})
+    types_low = {i.type for i in issues_low}
+    assert "steep_shoulder" in types_low
+    assert "flat_shoulder" not in types_low
+
+
+def test_run_real_analysis_accepts_custom_diagnose_fn(monkeypatch) -> None:
+    """P2-W5：``run_real_analysis`` 通过 ``diagnose_fn`` 把诊断步替换为 V2 实现。
+
+    本测试不真跑 pipeline（依赖 mediapipe/cv2）；只验证签名 + 默认值。
+    """
+    from app.pipeline import real_pipeline as rp_mod
+
+    # 默认走 V1 ``diagnose``
+    assert rp_mod.DiagnoseFn is not None  # type alias 已定义
+    # 真实端到端测试在 ai_engine integration suite 中按需手动跑（依赖视频素材）

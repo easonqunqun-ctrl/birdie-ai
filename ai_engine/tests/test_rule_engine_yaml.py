@@ -23,20 +23,48 @@ from app.pipeline.rule_engine import (
 )
 
 
+EXPECTED_V2_RULES = {
+    "early_extension",
+    "loss_of_posture",
+    "casting",
+    "over_rotation",
+    "under_rotation",
+    "over_the_top",
+    "sway_slide",
+    "reverse_spine",
+    "chicken_wing",
+    "sway_lead",
+    "hanging_back",
+    "flat_shoulder",
+    "steep_shoulder",
+    "open_stance",
+}
+
+
 def test_starter_yaml_loads_and_builds_engine() -> None:
     rules = load_rules_from_yaml(RULES_DIR / "v2_starter.yaml")
-    assert len(rules) == 5
-    names = {r.name for r in rules}
-    assert names == {
-        "early_extension",
-        "loss_of_posture",
-        "casting",
-        "over_rotation",
-        "under_rotation",
-    }
+    assert len(rules) == len(EXPECTED_V2_RULES)
+    assert {r.name for r in rules} == EXPECTED_V2_RULES
     # 互斥矩阵对称性由 RuleEngine 构造时校验；不抛即对称
     engine = RuleEngine(rules=rules)
     assert engine.engine_version == "v2.0"
+
+
+def test_full_rule_set_covers_v1_diagnose_types() -> None:
+    """V2 全集应覆盖 V1 ``diagnose._RULES`` 全部 issue 类型；``grip_weak`` 占位除外。"""
+    from app.pipeline.diagnose import _RULES as v1_rules
+
+    v1_types = set()
+    for fn in v1_rules:
+        # 函数名 ``_rule_xxx`` → issue_type ``xxx``
+        name = fn.__name__.removeprefix("_rule_")
+        v1_types.add(name)
+    v1_types.discard("grip_weak")  # V1 占位，不迁入 YAML
+
+    rules = load_rules_from_yaml(RULES_DIR / "v2_starter.yaml")
+    yaml_types = {r.name for r in rules}
+    missing = v1_types - yaml_types
+    assert not missing, f"V2 YAML 缺以下 V1 规则：{sorted(missing)}"
 
 
 def test_starter_yaml_rules_have_locale_entries() -> None:
@@ -130,10 +158,37 @@ rules:
 
 
 def test_starter_mutual_exclusion_is_symmetric() -> None:
-    """starter 集里 early_extension ↔ loss_of_posture / over ↔ under_rotation 双向声明。"""
+    """V2 全集互斥矩阵双向声明。"""
     rules = load_rules_from_yaml(RULES_DIR / "v2_starter.yaml")
     by_name = {r.name: r for r in rules}
     assert "loss_of_posture" in by_name["early_extension"].mutually_exclusive_with
     assert "early_extension" in by_name["loss_of_posture"].mutually_exclusive_with
     assert "under_rotation" in by_name["over_rotation"].mutually_exclusive_with
     assert "over_rotation" in by_name["under_rotation"].mutually_exclusive_with
+    assert "steep_shoulder" in by_name["flat_shoulder"].mutually_exclusive_with
+    assert "flat_shoulder" in by_name["steep_shoulder"].mutually_exclusive_with
+    assert "sway_slide" in by_name["loss_of_posture"].mutually_exclusive_with
+    assert "loss_of_posture" in by_name["sway_slide"].mutually_exclusive_with
+
+
+def test_every_rule_has_phase_anchor_and_locale_summary() -> None:
+    """全集每条规则的 phase_anchor 合法，且 locale 同时存在 title + summary。"""
+    valid_anchors = {"setup", "backswing", "top", "downswing", "impact", "follow_through"}
+    rules = load_rules_from_yaml(RULES_DIR / "v2_starter.yaml")
+    locale = load_locale(LOCALES_DIR / "zh_CN.json")
+    for rule in rules:
+        assert rule.phase_anchor in valid_anchors, rule.name
+        assert rule.display_name_key in locale
+        summary_key = rule.display_name_key.replace(".title", ".summary")
+        assert summary_key in locale, f"locale 缺 summary key={summary_key}"
+
+
+def test_coerce_rule_rejects_invalid_phase_anchor() -> None:
+    raw = {
+        "name": "x",
+        "display_name_key": "x",
+        "phase_anchor": "not_a_phase",
+        "conditions": [{"feature": "x", "operator": ">", "threshold": 0}],
+    }
+    with pytest.raises(ValueError, match="phase_anchor"):
+        _coerce_rule(raw)

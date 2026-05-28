@@ -1,13 +1,28 @@
-# P2-M7-10 · V2 RuleEngine 起跑规则集
+# P2-M7-10 · V2 RuleEngine 全量规则集（V1 → V2 平迁完成）
 #
-# 范围：从 V1 `diagnose.py` 15 条规则里挑出 **诊断置信度最高、教研结论最稳**
-# 的 5 条做 YAML 迁移。W29-W33 持续把剩余 10 条 + 新增规则迁过来。
+# 范围：V1 ``ai_engine/app/pipeline/diagnose.py`` 共 15 条 issue 规则；其中
+# ``grip_weak`` 在 V1 是占位（始终返回 None），本期不迁入 YAML，避免线上误触发。
+# 余下 **14 条**全部 YAML 化；阈值与 V1 一致以便影子流量比对（kickoff §3.6）。
 #
-# 字段说明见 `rule_engine.py` 顶部 docstring；阈值与 V1 `diagnose.py` 保持一致
-# 以便 V1↔V2 灰度对照（kickoff §3.6 影子流量）。
+# 字段说明
+# --------
+# - phase_anchor: 关键帧锚点阶段；``diagnose_v2`` 据此填 ``key_frame_timestamp``。
+#   - top 类问题 → top；setup → setup；finish/收杆 → follow_through；其余 → impact。
+# - severity_feature: 严重度按该 feature 偏离阈值的比例计算（0-1 clamp）。
+#   省略时取 conditions[0].feature。
+# - mutually_exclusive_with: 互斥矩阵；启动期 ``RuleEngine`` 校验对称性。
 #
-# 互斥矩阵必须双向声明（启动时会校验）；同一个 issue 若需向后扩 confidence
-# 模板，请同步在 `locales/zh_CN.json` 添加对应 key。
+# 迁移决策
+# --------
+# - V1 ``_rule_chicken_wing`` 用 ``OR`` 触发（left_arm < 150 或 finish_h > -0.05），
+#   YAML schema 仅支持 AND；选择保留主信号 ``left_arm_straightness < 150``，
+#   把 finish_height 留作次条件后续 PR 用「拆成两条规则 + 互斥」表达。
+# - V1 ``_rule_over_the_top`` 阈值 ``x_factor < 55 OR seq >= 0`` 也是 OR；
+#   保留主信号 ``downswing_sequence < 0``（下杆顺序错乱是 over-the-top 的核心特征）。
+# - flat_shoulder（x_factor > 60）与 over_rotation（shoulder_rotation_top > 105）
+#   不互斥（不同 feature）；steep_shoulder ↔ flat_shoulder 互斥（x_factor 不能既 >60 又 <25）。
+# - sway_slide ↔ loss_of_posture 互斥：sway_slide 是更严格的「头部位移」专项，
+#   loss_of_posture 是「头 + 脊柱组合」泛化诊断。
 
 version: v2.0
 rules:
@@ -17,6 +32,7 @@ rules:
     severity_feature: spine_angle_impact_delta
     confidence_floor: 0.6
     mutually_exclusive_with: [loss_of_posture]
+    phase_anchor: impact
     conditions:
       - feature: spine_angle_impact_delta
         operator: ">"
@@ -27,7 +43,8 @@ rules:
     display_name_key: issues.loss_of_posture.title
     severity_feature: spine_angle_impact_delta
     confidence_floor: 0.55
-    mutually_exclusive_with: [early_extension]
+    mutually_exclusive_with: [early_extension, sway_slide]
+    phase_anchor: impact
     conditions:
       - feature: spine_angle_impact_delta
         operator: ">"
@@ -41,6 +58,7 @@ rules:
     display_name_key: issues.casting.title
     severity_feature: wrist_release_timing
     confidence_floor: 0.6
+    phase_anchor: impact
     conditions:
       - feature: wrist_release_timing
         operator: "<"
@@ -52,6 +70,7 @@ rules:
     severity_feature: shoulder_rotation_top
     confidence_floor: 0.55
     mutually_exclusive_with: [under_rotation]
+    phase_anchor: top
     conditions:
       - feature: shoulder_rotation_top
         operator: ">"
@@ -63,7 +82,112 @@ rules:
     severity_feature: shoulder_rotation_top
     confidence_floor: 0.6
     mutually_exclusive_with: [over_rotation]
+    phase_anchor: top
     conditions:
       - feature: shoulder_rotation_top
         operator: "<"
         threshold: 75.0
+
+  # ---- 6. 由外到内下杆（Over-the-Top）---------------------------------
+  - name: over_the_top
+    display_name_key: issues.over_the_top.title
+    severity_feature: downswing_sequence
+    confidence_floor: 0.55
+    phase_anchor: impact
+    conditions:
+      - feature: downswing_sequence
+        operator: "<"
+        threshold: 0.0
+
+  # ---- 7. 侧移（Sway/Slide）------------------------------------------
+  - name: sway_slide
+    display_name_key: issues.sway_slide.title
+    severity_feature: head_lateral_shift
+    confidence_floor: 0.6
+    mutually_exclusive_with: [loss_of_posture]
+    phase_anchor: top
+    conditions:
+      - feature: head_lateral_shift
+        operator: ">"
+        threshold: 0.12
+
+  # ---- 8. 反向脊柱角（Reverse Spine）---------------------------------
+  - name: reverse_spine
+    display_name_key: issues.reverse_spine.title
+    severity_feature: top_wrist_position
+    confidence_floor: 0.55
+    phase_anchor: top
+    conditions:
+      - feature: top_wrist_position
+        operator: "<"
+        threshold: 0.0
+
+  # ---- 9. 鸡翅（Chicken Wing）----------------------------------------
+  # 说明：V1 OR 逻辑；这里保留主信号「左臂伸直度 < 150°」。finish_height
+  # 留待后续 PR 拆成两条互斥规则。
+  - name: chicken_wing
+    display_name_key: issues.chicken_wing.title
+    severity_feature: left_arm_straightness
+    confidence_floor: 0.55
+    phase_anchor: follow_through
+    conditions:
+      - feature: left_arm_straightness
+        operator: "<"
+        threshold: 150.0
+
+  # ---- 10. 下杆侧移（Sway Lead）-------------------------------------
+  - name: sway_lead
+    display_name_key: issues.sway_lead.title
+    severity_feature: downswing_sequence
+    confidence_floor: 0.6
+    phase_anchor: top
+    conditions:
+      - feature: downswing_sequence
+        operator: "<"
+        threshold: -2.0
+
+  # ---- 11. 留身（Hanging Back）--------------------------------------
+  - name: hanging_back
+    display_name_key: issues.hanging_back.title
+    severity_feature: finish_balance
+    confidence_floor: 0.55
+    phase_anchor: follow_through
+    conditions:
+      - feature: finish_balance
+        operator: ">"
+        threshold: 0.04
+
+  # ---- 12. 肩平面过平（Flat Shoulder）-------------------------------
+  - name: flat_shoulder
+    display_name_key: issues.flat_shoulder.title
+    severity_feature: x_factor
+    confidence_floor: 0.55
+    mutually_exclusive_with: [steep_shoulder]
+    phase_anchor: top
+    conditions:
+      - feature: x_factor
+        operator: ">"
+        threshold: 60.0
+
+  # ---- 13. 肩平面过陡（Steep Shoulder）-----------------------------
+  - name: steep_shoulder
+    display_name_key: issues.steep_shoulder.title
+    severity_feature: x_factor
+    confidence_floor: 0.55
+    mutually_exclusive_with: [flat_shoulder]
+    phase_anchor: top
+    conditions:
+      - feature: x_factor
+        operator: "<"
+        threshold: 25.0
+
+  # ---- 14. 开放站位（Open Stance）---------------------------------
+  - name: open_stance
+    display_name_key: issues.open_stance.title
+    severity_feature: knee_flexion_setup
+    confidence_floor: 0.55
+    phase_anchor: setup
+    conditions:
+      - feature: knee_flexion_setup
+        operator: ">"
+        threshold: 170.0

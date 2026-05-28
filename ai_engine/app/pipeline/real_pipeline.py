@@ -29,12 +29,13 @@ import logging
 import shutil
 import time
 from pathlib import Path
+from typing import Callable
 
 from app.config import settings
 from app.pipeline.constants import PHASE_LABELS
-from app.pipeline.diagnose import diagnose
+from app.pipeline.diagnose import DiagnosedIssue, diagnose
 from app.pipeline.features import extract_features
-from app.pipeline.phases import segment_phases
+from app.pipeline.phases import PhaseSegmentResult, segment_phases
 from app.pipeline.pose import estimate_poses, quality_warnings_from_pose
 from app.pipeline.preprocess import preprocess_video, quality_warnings_from_preprocess
 from app.pipeline.recommend import recommend
@@ -54,16 +55,27 @@ from app.schemas import (
 )
 from app.storage import get_storage
 
+# P2-W5：诊断函数协议。V1 默认 ``diagnose``；V2 灰度桶传 ``diagnose_v2``。
+DiagnoseFn = Callable[[dict[str, float], PhaseSegmentResult], list[DiagnosedIssue]]
+
 log = logging.getLogger("ai_engine.real_pipeline")
 
 
-async def run_real_analysis(req: AnalyzeRequest) -> AnalyzeResult:
+async def run_real_analysis(
+    req: AnalyzeRequest,
+    *,
+    diagnose_fn: DiagnoseFn | None = None,
+) -> AnalyzeResult:
     """真实分析主入口（替换 mock_pipeline.run_mock_analysis）。
 
     该函数是 `async def` 以保持与 main.py 的签名兼容，但内部是同步 CPU/IO 密集工作；
     T5 如果需要可以包 `asyncio.to_thread`。MVP 期单进程单任务，阻塞 event loop 也没事
     （Celery worker 一次只处理一个分析）。
+
+    P2-W5：``diagnose_fn`` 可注入。V1 默认走 ``diagnose``；
+    ``real_pipeline_v2.run_real_analysis_v2`` 注入 ``diagnose_v2`` 走 YAML RuleEngine。
     """
+    diagnose_impl: DiagnoseFn = diagnose_fn or diagnose
     t0 = time.perf_counter()
     log.info(
         "real_analysis_start",
@@ -108,8 +120,8 @@ async def run_real_analysis(req: AnalyzeRequest) -> AnalyzeResult:
     overall = score_overall(phase_scores_int)
     weakest = weakest_phase(phase_scores_int)
 
-    # 6. 诊断
-    issues_raw = diagnose(features, phases)
+    # 6. 诊断（V1 默认 ``diagnose``；V2 灰度桶可注入 ``diagnose_v2``）
+    issues_raw = diagnose_impl(features, phases)
 
     # 7. 推荐
     recommendations = recommend(issues_raw)
