@@ -91,4 +91,19 @@
     color: var(--color-text-tertiary);
     line-height: 1.45;
   }
+
+  &__action-btn {
+    margin: 16rpx 0 0 !important;
+    padding: 0 24rpx !important;
+    height: 64rpx !important;
+    line-height: 64rpx !important;
+    font-size: 26rpx !important;
+    background: var(--color-primary) !important;
+    color: var(--color-on-primary) !important;
+    border-radius: 999rpx !important;
+
+    &::after {
+      border: none !important;
+    }
+  }
 }

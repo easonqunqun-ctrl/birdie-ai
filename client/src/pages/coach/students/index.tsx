@@ -106,6 +106,18 @@ const CoachStudentsPage: FC = () => {
             {item.invite_message ? (
               <Text className='coach-students__message'>{item.invite_message}</Text>
             ) : null}
+            {item.status === 'active' && (
+              <Button
+                className='coach-students__action-btn'
+                onClick={() =>
+                  Taro.navigateTo({
+                    url: `/pages/coach/task-assign/index?studentUserId=${encodeURIComponent(item.student_user_id)}&studentName=${encodeURIComponent(item.student?.nickname || '')}`,
+                  })
+                }
+              >
+                布置作业
+              </Button>
+            )}
           </View>
         ))}
     </View>

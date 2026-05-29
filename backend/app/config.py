@@ -196,6 +196,10 @@ class Settings(BaseSettings):
     # M8-04 / M12-09 教练报告批注（video_ref 等）；默认 false。
     PHASE2_COACH_ANNOTATIONS_ENABLED: bool = False
 
+    # M8-05 教练作业派发；默认 false。
+    PHASE2_COACH_TASKS_ENABLED: bool = False
+    COACH_TASK_MAX_PER_DAY: int = 50
+
     # M13 球友约球
     # 上线前需 DEP-05 法律意见书到位（M13-09 服务协议 / 未成年保护）。
     PHASE2_MEETUP_ENABLED: bool = False

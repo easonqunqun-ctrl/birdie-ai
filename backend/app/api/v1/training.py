@@ -25,6 +25,7 @@ from app.schemas.training import (
     TrainingPlanDetail,
     TrainingTaskItem,
 )
+from app.services import coach_task_service as coach_task_svc
 from app.services import pro_favorites_service as fav_svc
 from app.services import training_service
 
@@ -33,11 +34,26 @@ async def _plan_to_detail(
     db: AsyncSession, user: User, plan
 ) -> TrainingPlanDetail:
     tasks = sorted(plan.tasks, key=lambda t: (t.scheduled_date, t.sort_order))
+    task_ids = [t.id for t in tasks]
     refs = await fav_svc.load_pro_clip_refs_for_tasks(
-        db, user_id=user.id, task_ids=[t.id for t in tasks]
+        db, user_id=user.id, task_ids=task_ids
     )
+    coach_refs = await coach_task_svc.load_coach_refs_for_tasks(db, task_ids=task_ids)
     task_items = []
     for task in tasks:
+        coach_ref = coach_refs.get(task.id)
+        if coach_ref:
+            coach_user_id, coach_name, target_count, coach_note = coach_ref
+            task_items.append(
+                training_service.training_task_to_item(
+                    task,
+                    coach_user_id=coach_user_id,
+                    coach_display_name=coach_name,
+                    coach_target_count=target_count,
+                    coach_note=coach_note,
+                )
+            )
+            continue
         ref = refs.get(task.id)
         if ref:
             clip_id, player_name, unavailable = ref
@@ -66,6 +82,17 @@ async def _plan_to_detail(
 
 
 async def _task_to_item(db: AsyncSession, user: User, task) -> TrainingTaskItem:
+    coach_refs = await coach_task_svc.load_coach_refs_for_tasks(db, task_ids=[task.id])
+    coach_ref = coach_refs.get(task.id)
+    if coach_ref:
+        coach_user_id, coach_name, target_count, coach_note = coach_ref
+        return training_service.training_task_to_item(
+            task,
+            coach_user_id=coach_user_id,
+            coach_display_name=coach_name,
+            coach_target_count=target_count,
+            coach_note=coach_note,
+        )
     refs = await fav_svc.load_pro_clip_refs_for_tasks(
         db, user_id=user.id, task_ids=[task.id]
     )
@@ -147,6 +174,7 @@ async def complete_task(
         duration_minutes=payload.duration_minutes,
         notes=payload.notes,
     )
+    await coach_task_svc.sync_on_training_task_complete(db, task_id=task.id)
     await db.commit()
     await db.refresh(task)
     await db.refresh(plan)
