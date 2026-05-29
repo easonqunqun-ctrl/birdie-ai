@@ -27,8 +27,9 @@ from app.schemas.analysis import (
     UploadTokenResponse,
 )
 from app.schemas.base import APIResponse, ok
+from app.schemas.coach_annotation import CoachAnnotationClipRefRead
 from app.schemas.pro_library import ProMatchItemRead, ProMatchResultRead, ProPlayerRead, ProSwingClipRead
-from app.services import analysis_service, pro_match_service
+from app.services import analysis_service, coach_annotation_service, pro_match_service
 from app.services.analysis_service import FREE_HISTORY_VISIBLE_LIMIT, _load_owned
 from app.services.sample_fixture import build_sample_report
 from app.services.share_card_service import ensure_share_wxa_code_url
@@ -216,6 +217,22 @@ async def get_analysis_pro_matches(
             recorded_match_id=history.id if history else None,
         )
     )
+
+
+@router.get(
+    "/{analysis_id}/coach-annotations",
+    summary="学员查看教练批注（M12-09）",
+    response_model=APIResponse[list[CoachAnnotationClipRefRead]],
+)
+async def list_analysis_coach_annotations(
+    analysis_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    items = await coach_annotation_service.list_student_annotations(
+        db, student=user, analysis_id=analysis_id
+    )
+    return ok(items)
 
 
 @router.delete(

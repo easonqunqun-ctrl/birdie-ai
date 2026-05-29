@@ -1632,6 +1632,21 @@ POST /v1/pros/clips/{clip_id}/pgc-insight
 
 **客户端**：`prosService.annotations()` / `prosService.pgcInsight()`；`pages/pros/detail` 镜头卡片「解说」→ `pages/pros/clip-insight`；职业对比页可带 `analysisId` query。
 
+### 5B.3 教练批注引用职业镜头（M12-09 · 依赖 M8-04 骨架）
+
+```
+POST   /v1/coach/analyses/{analysis_id}/annotations     Body: { annotation_type: "video_ref", pro_clip_id }
+GET    /v1/coach/analyses/{analysis_id}/annotations     教练侧列表（含 clip/player 展开）
+DELETE /v1/coach/annotations/{annotation_id}
+GET    /v1/analyses/{analysis_id}/coach-annotations     学员侧可见批注（is_visible + approved）
+```
+
+**灰度**：`PHASE2_COACH_ANNOTATIONS_ENABLED` + `PHASE2_PROS_ENABLED`；教练写端点额外要求 `COACH_COURSE_USER_IDS` 白名单（M8-01 就位前）。`video_ref` 引用已发布 pro clip，默认 `audit_status=approved` / `is_visible=true`。
+
+**客户端**：`coachAnnotationService`；`ProClipPicker` + `pages/coach/analysis-annotate`；报告页 `ProClipReferenceCard` +「看对比」跳转 `pro-compare`。
+
+**`GET /v1/users/me`** 响应新增 `can_coach_annotate: bool`（白名单 + 灰度）。
+
 ---
 
 ## 六、支付模块（/payments）

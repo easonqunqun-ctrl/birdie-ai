@@ -8,6 +8,7 @@ from app.models.analysis import (
 )
 from app.models.base import Base
 from app.models.chat import ChatMessage, ChatQuota, ChatSession
+from app.models.coach import AnalysisAnnotation
 from app.models.course import Course, CourseCertificate, Lesson, UserCourseProgress
 from app.models.event import Event
 from app.models.feedback import Feedback
@@ -34,6 +35,7 @@ from app.models.user import User
 from app.models.user_profile_v2 import UserClub, UserProfileV2
 
 __all__ = [
+    "AnalysisAnnotation",
     "AnalysisIssue",
     "AnalysisQuota",
     "AnalysisRecommendation",
