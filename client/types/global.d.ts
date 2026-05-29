@@ -29,6 +29,8 @@ declare const PHASE2_MEETUP_ENABLED: boolean
 declare const PHASE2_COACH_ENABLED: boolean
 declare const PHASE2_PUTTING_MODE_ENABLED: boolean
 declare const PHASE2_CHIPPING_MODE_ENABLED: boolean
+declare const PHASE2_YARDAGE_BOOK_ENABLED: boolean
+declare const PHASE2_TRAINING_CATEGORIES_ENABLED: boolean
 /** 逗号分隔的微信订阅消息模板 ID（编译期注入）；顺序见 `constants/subscribeTemplates.ts` */
 declare const SUBSCRIBE_TEMPLATES: string
 /** Taro 构建目标（weapp / h5 / rn …），与 `process.env.TARO_ENV` 等价但无 `process` */
@@ -66,6 +68,8 @@ declare namespace NodeJS {
     TARO_APP_PHASE2_COACH_ENABLED?: string
     TARO_APP_PHASE2_PUTTING_MODE_ENABLED?: string
     TARO_APP_PHASE2_CHIPPING_MODE_ENABLED?: string
+    TARO_APP_PHASE2_YARDAGE_BOOK_ENABLED?: string
+    TARO_APP_PHASE2_TRAINING_CATEGORIES_ENABLED?: string
     /** RN 等直连 MinIO 预签名时使用；小程序默认走同源 `/analyses/uploads/...` */
     TARO_APP_ANALYSIS_DIRECT_MINIO?: string
   }
