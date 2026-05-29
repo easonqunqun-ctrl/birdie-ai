@@ -46,6 +46,10 @@ class Drill(Base, TimestampMixin):
     duration_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
     sets: Mapped[int | None] = mapped_column(Integer, nullable=True)
     difficulty: Mapped[str] = mapped_column(String(10), nullable=False)
+    # M10-04：训练类目 full_swing / putting / chipping / short_game / general
+    category: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="full_swing", server_default="'full_swing'"
+    )
 
     illustration_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     video_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
@@ -57,6 +61,10 @@ class Drill(Base, TimestampMixin):
         CheckConstraint(
             "difficulty IN ('easy', 'medium', 'hard')",
             name="chk_drill_difficulty",
+        ),
+        CheckConstraint(
+            "category IN ('full_swing', 'putting', 'chipping', 'short_game', 'general')",
+            name="chk_drill_category",
         ),
     )
 

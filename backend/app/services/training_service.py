@@ -470,6 +470,13 @@ async def list_practice_logs_for_month(
     return list((await db.execute(stmt)).scalars().all())
 
 
-async def list_drills(db: AsyncSession) -> list[Drill]:
-    stmt = select(Drill).where(Drill.is_active.is_(True)).order_by(Drill.sort_order)
+async def list_drills(
+    db: AsyncSession,
+    *,
+    category: str | None = None,
+) -> list[Drill]:
+    stmt = select(Drill).where(Drill.is_active.is_(True))
+    if category:
+        stmt = stmt.where(Drill.category == category)
+    stmt = stmt.order_by(Drill.sort_order)
     return list((await db.execute(stmt)).scalars().all())
