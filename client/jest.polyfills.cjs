@@ -66,6 +66,18 @@ if (typeof globalThis.PHASE2_MEETUP_ENABLED === 'undefined') {
 if (typeof globalThis.PHASE2_COACH_ENABLED === 'undefined') {
   globalThis.PHASE2_COACH_ENABLED = false
 }
+if (typeof globalThis.PHASE2_PUTTING_MODE_ENABLED === 'undefined') {
+  globalThis.PHASE2_PUTTING_MODE_ENABLED = false
+}
+if (typeof globalThis.PHASE2_CHIPPING_MODE_ENABLED === 'undefined') {
+  globalThis.PHASE2_CHIPPING_MODE_ENABLED = false
+}
+if (typeof globalThis.PHASE2_YARDAGE_BOOK_ENABLED === 'undefined') {
+  globalThis.PHASE2_YARDAGE_BOOK_ENABLED = false
+}
+if (typeof globalThis.PHASE2_TRAINING_CATEGORIES_ENABLED === 'undefined') {
+  globalThis.PHASE2_TRAINING_CATEGORIES_ENABLED = false
+}
 if (typeof globalThis.SUBSCRIBE_TEMPLATES === 'undefined') {
   globalThis.SUBSCRIBE_TEMPLATES = ''
 }

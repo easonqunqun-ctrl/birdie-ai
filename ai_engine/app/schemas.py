@@ -147,6 +147,11 @@ class AnalyzeResult(BaseModel):
         default=None,
         description="本次分析使用的候选段索引（0-based）",
     )
+    # M10-01/02：推杆/切杆 mode 专属特征分（pendulum_stability 等）
+    mode_feature_scores: dict[str, int] | None = Field(
+        default=None,
+        description="mode=putting/chipping 时各专属特征 0-100 分",
+    )
 
 
 class PrecheckRequest(BaseModel):

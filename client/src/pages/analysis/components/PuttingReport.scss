@@ -1,0 +1,101 @@
+.putting-report {
+  &__block {
+    margin-bottom: 32rpx;
+  }
+
+  &__header {
+    display: flex;
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 16rpx;
+  }
+
+  &__title {
+    font-size: 34rpx;
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
+
+  &__hint {
+    font-size: 24rpx;
+    color: var(--color-text-tertiary);
+  }
+
+  &__phase-list {
+    margin-top: 20rpx;
+    display: flex;
+    flex-direction: column;
+    gap: 12rpx;
+  }
+
+  &__phase-item {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 16rpx 20rpx;
+    border-radius: var(--radius-sm);
+    background: var(--color-bg-card);
+    border: 1rpx solid var(--color-border);
+  }
+
+  &__phase-item--weakest {
+    border-color: var(--color-warning);
+    background: rgba(244, 169, 35, 0.08);
+  }
+
+  &__phase-name {
+    flex: 1;
+    font-size: 28rpx;
+    color: var(--color-text-primary);
+  }
+
+  &__phase-score {
+    font-size: 32rpx;
+    font-weight: 700;
+    color: var(--color-primary);
+    margin-right: 12rpx;
+  }
+
+  &__feature-grid {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 16rpx;
+  }
+
+  &__feature-card {
+    width: calc(50% - 8rpx);
+    box-sizing: border-box;
+    padding: 20rpx;
+    border-radius: var(--radius-md);
+    background: var(--color-bg-card);
+    border: 1rpx solid var(--color-border);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  &__feature-card--weakest {
+    border-color: var(--color-warning);
+    background: rgba(244, 169, 35, 0.08);
+  }
+
+  &__feature-label {
+    font-size: 26rpx;
+    color: var(--color-text-secondary);
+    margin-bottom: 8rpx;
+  }
+
+  &__feature-score {
+    font-size: 40rpx;
+    font-weight: 700;
+    color: var(--color-primary);
+  }
+
+  &__badge {
+    margin-top: 8rpx;
+    font-size: 22rpx;
+    color: var(--color-warning);
+  }
+}

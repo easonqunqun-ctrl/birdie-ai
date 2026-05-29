@@ -31,10 +31,14 @@ export interface UploadTokenResponse {
 }
 
 /* ==================== 创建任务 ==================== */
+export type AnalysisMode = 'full_swing' | 'putting' | 'chipping'
+
 export interface CreateAnalysisRequest {
   upload_id: string
   camera_angle: CameraAngle
   club_type: ClubType
+  /** M10-01：分析模式；默认 full_swing */
+  mode?: AnalysisMode
 }
 
 export interface CreateAnalysisResponse {
@@ -137,6 +141,10 @@ export interface AnalysisReportResponse {
   status: AnalysisStatus
   camera_angle: CameraAngle
   club_type: ClubType
+  /** M10-01：分析模式；老报告缺省 full_swing */
+  analysis_mode?: AnalysisMode | null
+  /** M10-01：推杆专属 4 维度；仅 analysis_mode=putting */
+  putting_features?: Record<string, PhaseScore> | null
   video_url: string
   /** 视频时长（秒）；backend 会返回 decimal 转 float */
   video_duration?: number | null

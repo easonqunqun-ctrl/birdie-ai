@@ -636,7 +636,8 @@ POST /v1/analyses
 {
   "upload_id": "upl_abc123（必填，上传凭证 ID）",
   "camera_angle": "face_on | down_the_line（必填）",
-  "club_type": "driver | fairway_wood | iron_3 | iron_4 | iron_5 | iron_6 | iron_7 | iron_8 | iron_9 | wedge | putter | unknown（必填）"
+  "club_type": "driver | fairway_wood | iron_3 | iron_4 | iron_5 | iron_6 | iron_7 | iron_8 | iron_9 | wedge | putter | unknown（必填）",
+  "mode": "full_swing | putting | chipping（可选，默认 full_swing；需 `PHASE2_PUTTING_MODE_ENABLED` / `PHASE2_CHIPPING_MODE_ENABLED` 灰度开启）"
 }
 ```
 
@@ -739,6 +740,8 @@ GET /v1/analyses/{analysis_id}
     "status": "completed",
     "camera_angle": "down_the_line",
     "club_type": "iron_7",
+    "analysis_mode": "full_swing",
+    "putting_features": null,
     "video_url": "https://cos.xiaoniaoai.com/videos/ana_def456/original.mp4",
     "skeleton_video_url": "https://cos.xiaoniaoai.com/videos/ana_def456/skeleton.mp4",
 
@@ -813,6 +816,8 @@ GET /v1/analyses/{analysis_id}
 **字段补充**：
 
 - **`quality_warnings`**：`string[]`，AI 引擎返回的**非阻断**拍摄质量提示（machine codes，如 `low_light`、`camera_shake`），入库列 `swing_analyses.quality_warnings`（JSONB）。与失败态 `error` 互斥存在；空数组表示无附加提示。客户端展示文案见 `client/src/constants/qualityWarnings.ts`，产品与话术真源见 [`docs/20` §4.3～§4.4](./20-AI引擎产品力迭代设计.md)。
+- **`analysis_mode`**：`full_swing` / `putting` / `chipping`；入库 `swing_analyses.analysis_mode`（M10-01）。
+- **`putting_features`**：仅 `analysis_mode=putting` 时返回 4 维度分（`pendulum_stability` / `head_stability` / `face_alignment` / `tempo_ratio`）；来源 `swing_analyses.mode_feature_scores`（M10-01）。`phase_scores` 在同 mode 下为推杆 4 阶段（setup/backstroke/impact/follow），与全挥杆 6 阶段不同构。
 
 ---
 

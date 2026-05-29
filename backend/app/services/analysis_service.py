@@ -19,6 +19,11 @@ from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.constants.putting import (
+    PUTTING_FEATURE_LABELS,
+    PUTTING_FEATURE_ORDER,
+    PUTTING_FEATURE_PRIMARY_PHASE,
+)
 from app.core.exceptions import (
     AnalysisDispatchError,
     BadRequestError,
@@ -462,6 +467,12 @@ async def create_analysis(
     request_role: str | None = None,
 ) -> CreateAnalysisResponse:
     """创建分析任务：落库 + 扣配额；Celery 调度见路由层 `finalize_analysis_dispatch_after_commit`。"""
+    mode = payload.mode or "full_swing"
+    if mode == "putting" and not settings.PHASE2_PUTTING_MODE_ENABLED:
+        raise BadRequestError(message="推杆模式尚未开放")
+    if mode == "chipping" and not settings.PHASE2_CHIPPING_MODE_ENABLED:
+        raise BadRequestError(message="切杆模式尚未开放")
+
     # 1) 取凭证上下文 & 归属校验
     raw = await redis.get(UPLOAD_TOKEN_REDIS_KEY.format(upload_id=payload.upload_id))
     if raw is None:
@@ -536,6 +547,7 @@ async def create_analysis(
         video_file_size=int(meta["file_size"]),
         camera_angle=payload.camera_angle,
         club_type=payload.club_type,
+        analysis_mode=mode,
         status="pending",
         stage=None,
         stage_progress=0,
@@ -607,6 +619,49 @@ async def get_status(*, analysis_id: str, user: User, db: AsyncSession) -> Analy
 # ==================================================================
 # 3.4 GET /v1/analyses/{id}
 # ==================================================================
+def _build_putting_features(analysis: SwingAnalysis) -> dict[str, PhaseScore] | None:
+    """推杆 mode 专属 4 维度；优先 mode_feature_scores，缺失时从 phase_scores 兜底。"""
+    if getattr(analysis, "analysis_mode", "full_swing") != "putting":
+        return None
+
+    raw = getattr(analysis, "mode_feature_scores", None)
+    if isinstance(raw, dict) and raw:
+        out: dict[str, PhaseScore] = {}
+        for name in PUTTING_FEATURE_ORDER:
+            val = raw.get(name)
+            if isinstance(val, int):
+                out[name] = PhaseScore(
+                    score=val,
+                    label=PUTTING_FEATURE_LABELS.get(name, name),
+                )
+        if out:
+            weakest = min(out, key=lambda k: out[k].score)
+            for k in out:
+                out[k] = out[k].model_copy(update={"is_weakest": k == weakest})
+            return out
+
+    phase_scores = analysis.phase_scores if isinstance(analysis.phase_scores, dict) else {}
+    if not phase_scores:
+        return None
+
+    out = {}
+    for name in PUTTING_FEATURE_ORDER:
+        phase_key = PUTTING_FEATURE_PRIMARY_PHASE.get(name, "impact")
+        ps = phase_scores.get(phase_key)
+        score_val = ps.get("score") if isinstance(ps, dict) else None
+        if isinstance(score_val, int):
+            out[name] = PhaseScore(
+                score=score_val,
+                label=PUTTING_FEATURE_LABELS.get(name, name),
+            )
+    if not out:
+        return None
+    weakest = min(out, key=lambda k: out[k].score)
+    for k in out:
+        out[k] = out[k].model_copy(update={"is_weakest": k == weakest})
+    return out
+
+
 async def get_report(*, analysis_id: str, user: User, db: AsyncSession) -> AnalysisReportResponse:
     from app.core.exceptions import ConflictError
 
@@ -674,6 +729,8 @@ async def get_report(*, analysis_id: str, user: User, db: AsyncSession) -> Analy
         status=normalize_analysis_status(analysis.status, analysis_id=analysis.id),
         camera_angle=analysis.camera_angle,  # type: ignore[arg-type]
         club_type=analysis.club_type,  # type: ignore[arg-type]
+        analysis_mode=getattr(analysis, "analysis_mode", None) or "full_swing",  # type: ignore[arg-type]
+        putting_features=_build_putting_features(analysis),
         engine_version=(
             getattr(analysis, "engine_version", None) or "v1"
         ),  # type: ignore[arg-type]

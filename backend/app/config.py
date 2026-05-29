@@ -218,6 +218,11 @@ class Settings(BaseSettings):
     COACH_ANALYSIS_DAILY_LIMIT: int = 1000
     COACH_CHAT_DAILY_LIMIT: int = 2000
 
+    # M10-01 推杆 mode UI + 引擎路由；与 ai_engine mode=putting 双端联动。
+    PHASE2_PUTTING_MODE_ENABLED: bool = False
+    # M10-02 切杆 mode UI；与 ai_engine mode=chipping 双端联动。
+    PHASE2_CHIPPING_MODE_ENABLED: bool = False
+
     # M13 球友约球
     # 上线前需 DEP-05 法律意见书到位（M13-09 服务协议 / 未成年保护）。
     PHASE2_MEETUP_ENABLED: bool = False

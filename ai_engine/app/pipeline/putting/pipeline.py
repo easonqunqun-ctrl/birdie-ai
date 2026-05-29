@@ -118,6 +118,7 @@ async def run_putting_analysis(req: AnalyzeRequest) -> AnalyzeResult:
         analysis_mode="putting",
         overall_score=scores["overall"],
         phase_scores=phase_scores,
+        mode_feature_scores=scores["features"],
         phase_timestamps=None,  # 推杆 4 阶段与 full_swing PhaseTimestamps 6 段不同构，置空
         issues=issues,
         skeleton_video_url=skeleton_url,
