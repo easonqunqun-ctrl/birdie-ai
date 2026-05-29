@@ -49,6 +49,8 @@ import {
 } from '@/utils/reportPlayback'
 import { groupIssuesByConfidence, ISSUE_SEVERITY_ORDER } from '@/utils/issueConfidenceGroup'
 import { resolveTrustTier } from '@/utils/trustLabel'
+import { PHASE2_PROS_ENABLED_FLAG } from '@/constants/flags'
+import { prosService, type ProMatchItemRead } from '@/services/prosService'
 import RadarChart, { RadarAxis } from '@/components/RadarChart'
 import '@/components/RadarChart.scss'
 import TrustBadge from '@/components/TrustBadge'
@@ -107,6 +109,7 @@ const ReportPage: FC = () => {
   // P2-W10: hidden tier issues 默认折叠；engine_warnings 仅在用户主动展开时显示
   const [showHiddenIssues, setShowHiddenIssues] = useState(false)
   const [showEngineWarnings, setShowEngineWarnings] = useState(false)
+  const [proMatchTop, setProMatchTop] = useState<ProMatchItemRead | null>(null)
   const videoCtxRef = useRef<Taro.VideoContext | null>(null)
   const scrollResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -174,6 +177,32 @@ const ReportPage: FC = () => {
       .then((r) => setShareImageUrl(r.wxa_code_url || ''))
       .catch(() => setShareImageUrl(''))
   }, [analysisId, currentUserToken, fromShare])
+
+  useEffect(() => {
+    if (
+      !PHASE2_PROS_ENABLED_FLAG ||
+      !analysisId ||
+      analysisId === 'sample' ||
+      fromShare ||
+      !report ||
+      report.status !== 'completed'
+    ) {
+      setProMatchTop(null)
+      return
+    }
+    let cancelled = false
+    prosService
+      .matchForAnalysis(analysisId, { limit: 1, record: false })
+      .then((result) => {
+        if (!cancelled) setProMatchTop(result.matches[0] ?? null)
+      })
+      .catch(() => {
+        if (!cancelled) setProMatchTop(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [analysisId, fromShare, report])
 
   // 默认给 Taro.setNavigationBarTitle 一个更友好的标题
   useEffect(() => {
@@ -324,6 +353,13 @@ const ReportPage: FC = () => {
     }
     Taro.navigateTo({
       url: `/pages/analysis/history?mode=compare&anchor=${encodeURIComponent(analysisId)}`,
+    }).catch(toastTabNavigationFailure)
+  }
+
+  const handleGoProCompare = () => {
+    if (!analysisId || analysisId === 'sample' || !proMatchTop) return
+    Taro.navigateTo({
+      url: `/pages/analysis/pro-compare?id=${encodeURIComponent(analysisId)}&clipId=${encodeURIComponent(proMatchTop.clip.id)}`,
     }).catch(toastTabNavigationFailure)
   }
 
@@ -787,6 +823,25 @@ const ReportPage: FC = () => {
         </View>
       )}
 
+      {proMatchTop && !isSample && (
+        <View className='report__section report__pro-match'>
+          <View className='report__section-header'>
+            <Text className='report__section-title'>和你最像的职业球手</Text>
+            <Text className='report__section-hint'>匹配度 {proMatchTop.match_score}</Text>
+          </View>
+          <Text className='report__pro-match-name'>{proMatchTop.player.name}</Text>
+          <Text className='report__pro-match-meta'>
+            职业综合分 {proMatchTop.clip.overall_score ?? '—'} · 并排看视频与六维雷达
+          </Text>
+          <Button
+            className='report__pro-match-btn'
+            onClick={handleGoProCompare}
+          >
+            并排对比
+          </Button>
+        </View>
+      )}
+
       {/* ==================== 4. 问题诊断 ==================== */}
       <View className='report__section'>
         <View className='report__section-header'>
@@ -946,6 +1001,11 @@ const ReportPage: FC = () => {
         <Button className='report__footer-btn' onClick={handleCompareHistory}>
           📊 对比历史
         </Button>
+        {proMatchTop && !isSample && (
+          <Button className='report__footer-btn' onClick={handleGoProCompare}>
+            🏌️ 职业对比
+          </Button>
+        )}
         <Button className='report__footer-btn' onClick={handleAskCoach}>
           💬 问 AI 教练
         </Button>
