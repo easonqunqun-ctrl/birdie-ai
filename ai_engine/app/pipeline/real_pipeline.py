@@ -149,14 +149,20 @@ async def run_real_analysis(
     features = extract_features(pose_result.keypoints, phases)
 
     # 5. 评分（W22：``club_aware_scoring`` 仅由 V2 入口打开，搭 version_router 灰度爬坡；
-    #    V1 默认 False → club_category=None → 阶段分用 V1 ideal、综合分用单套 PHASE_WEIGHTS，
-    #    生产路径字节不变。打开时按球杆类别选 per-feature ideal（阶段分）+ 相位权重（综合分）；
-    #    iron/putter/未 override 的特征都回落 V1，故 7 铁分数接入前后不跳变。）
+    #    V1 默认 False → 两 profile 维度都 None → 阶段分用 V1 ideal、综合分用单套 PHASE_WEIGHTS，
+    #    生产路径字节不变。打开时按 (机位, 球杆类别) 二维合成 per-feature ideal（阶段分）+
+    #    相位权重（综合分）：ideal 优先级 category>angle>V1；权重 = V1+两维 delta 叠加。
+    #    iron+无机位==V1；真实分析机位必填，故 V2 桶分数会带机位 delta（仅灰度桶）。)
     club_category = (
         to_club_category(getattr(req, "club_type", None)) if club_aware_scoring else None
     )
-    phase_scores_int = score_all_phases(features, club_category=club_category)
-    overall = score_overall(phase_scores_int, club_category=club_category)
+    camera_angle = getattr(req, "camera_angle", None) if club_aware_scoring else None
+    phase_scores_int = score_all_phases(
+        features, club_category=club_category, camera_angle=camera_angle
+    )
+    overall = score_overall(
+        phase_scores_int, club_category=club_category, camera_angle=camera_angle
+    )
     weakest = weakest_phase(phase_scores_int)
 
     # 6. 诊断（V1 默认 ``diagnose``；V2 灰度桶可注入 ``diagnose_v2``）

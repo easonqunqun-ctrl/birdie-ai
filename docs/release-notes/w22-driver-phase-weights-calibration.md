@@ -30,9 +30,9 @@ P2-M7-05 落了 5 套 `PHASE_WEIGHTS_BY_CATEGORY`，但 driver 那套是 **v0.1 
 - 不改变任何 V1 分析报告的分数 → 无评分漂移、不触发 `test_ecs_regression.py` 基线回归；
 - 只影响 `category_weight_diff_count`（差异度计数）→ 让 W19 DoD 测试转绿。
 
-接进 scoring 时（§6）通过 `club_aware_scoring` 开关把球杆相位权重限定在 V2 桶，
-V1 用户分数不变；driver 报告分数纳入 V1↔V2 灰度对比（参考 kickoff R-02：7 铁 V1↔V2
-不跳变的同类约定）。
+接进 scoring 时（§6）通过 `club_aware_scoring` 开关把全部标尺限定在 V2 桶，
+**V1 生产路径分数恒不变**。注：B-1（球杆维）阶段「7 铁 V1↔V2 不跳变」的严格不变量，
+在 angle 维接入后放宽——见 §6 待办 #3 的灰度安全边界说明。
 
 ## 4. 权重对照
 
@@ -80,7 +80,23 @@ iron 基线（= V1 单套 `PHASE_WEIGHTS`）：`setup .15 / backswing .20 / top 
     `test_score_phase_driver_uses_category_ideal_band`、`test_score_all_phases_threads_club_category`
     （`tests/test_scoring.py`）。
   - 注：tolerance / weight 仍取 `constants.FEATURES`，本期只标定 ideal 区间维度。
-- [ ] angle 维度（`angle_profiles.phase_weights_for` / `ideal_for_angle`）同样尚未接入 scoring；
-  kickoff 的「(angle, category) 二维笛卡尔积」需定**两维 override 的优先级**后再合并。
-- [ ] driver 报告分数纳入 V1↔V2 灰度对比，确认无异常跳变。
+- [x] **angle 维度接进 scoring，与 category 二维合成，同 V2-only 灰度门**：
+  新增 `app/pipeline/score_profiles.py`（`resolve_phase_weights` / `resolve_ideal`）把
+  M7-04 机位维与 M7-05 球杆维合成单一标尺；`score_phase` / `score_overall` /
+  `score_all_phases` 新增 `camera_angle` 参数走它，`run_real_analysis` 在
+  `club_aware_scoring=True`（仅 V2）时把 `req.camera_angle` 一并传入。
+  - **合成规则（决策记录）**：
+    - **相位权重 = 增量叠加**：`V1 + (category套−V1) + (angle套−V1)`，clip≥0 后归一化。
+      两维 delta 各自和为 0 → 无 clip 时天然和为 1。`iron+无机位 == V1`；
+      `driver+dtl` 两维 delta 复合。**取此方案而非「category 优先盖掉 angle」**：否则
+      iron 永远命中 category 套（==V1），angle 权重成死代码；增量叠加让两维都生效。
+    - **per-feature ideal = 优先级 category > angle > V1**：球杆类别决定动作真实理想区间，
+      机位是测量视角的次要修正；同一特征两维同时 override 时取 category。
+  - **灰度安全边界变化（重要）**：真实分析 `camera_angle` 必填，故 **V2 桶内即便 iron，
+    综合分也会带机位 delta，不再严格 == V1**（这是 M7-04 机位标尺的本意，且仅 V2 灰度桶生效，
+    V1 生产路径 `club_aware_scoring=False` 仍字节不变）。B-1 阶段「iron 7 V1↔V2 不跳变」的
+    严格不变量，自 angle 维接入起放宽为「V1 生产不变 + V2 桶按 (机位,球杆) 标尺」。
+  - 守门测试：`tests/test_score_profiles.py`（11 例：增量叠加/归一化/优先级/兜底）+
+    `tests/test_scoring.py` 新增机位维穿线 3 例。
+- [ ] driver 报告分数纳入 V1↔V2 灰度对比，确认无异常跳变（W14-C，等 V2 真实流量 ≥20）。
 - [ ] 真实 ECS 争议样本 ≥20 后，用 `scripts/calibration_regression.py` 同源思路二次校准本表。

@@ -136,6 +136,37 @@ def test_score_all_phases_threads_club_category() -> None:
     assert iron == default
 
 
+def test_score_phase_camera_angle_threads_to_ideal() -> None:
+    """W22 待办 #3：score_phase 收 camera_angle → top 阶段 ideal 走机位维。
+
+    top_wrist_position 仅 dtl override(0.15,0.38)、V1 ideal 更宽；取 value=0.5
+    （V1 区间内、dtl 区间外）→ dtl 与默认 top 阶段分不同。
+    """
+    features = {"top_wrist_position": 0.5}
+    default = score_phase(features, "top")
+    dtl = score_phase(features, "top", camera_angle="down_the_line")
+    assert dtl != default
+
+
+def test_score_overall_camera_angle_only_uses_angle_weights() -> None:
+    """只传 camera_angle（category None）→ 综合分用机位维相位权重（iron delta 0）。"""
+    from app.pipeline.angle_profiles import phase_weights_for
+
+    phase_scores = {p: (100 if p == "downswing" else 0) for p in PHASE_ORDER}
+    expected = int(round(100 * phase_weights_for("down_the_line")["downswing"]))
+    assert (
+        score_overall(phase_scores, camera_angle="down_the_line") == expected
+    )
+
+
+def test_score_all_phases_threads_camera_angle() -> None:
+    """score_all_phases 把 camera_angle 透传给 score_phase。"""
+    features = {"top_wrist_position": 0.5}
+    default = score_all_phases(features)
+    dtl = score_all_phases(features, camera_angle="down_the_line")
+    assert dtl["top"] != default["top"]
+
+
 def test_weakest_phase_returns_lowest() -> None:
     scores = {
         "setup": 90,
