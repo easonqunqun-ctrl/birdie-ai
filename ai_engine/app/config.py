@@ -46,6 +46,22 @@ class Settings(BaseSettings):
     MINIO_REGION: str = "us-east-1"
     AI_ENGINE_DERIVED_ASSETS_ENABLED: bool = True
 
+    # ==================== P2-W15-D：probe URL rewrite 泛化 ====================
+    # `rewrite_to_internal_url` 把 ffprobe 的公网 URL 改写成内网 URL 是个**通用**能力，
+    # 不只为 MinIO 一家。当未来从 MinIO 切到腾讯云 COS / 阿里云 OSS / 七牛 KODO，
+    # 公网域名和内网 endpoint 不一定有 nginx 反代关系，可以通过本字段直接配映射对。
+    #
+    # 格式：分号分隔的 `<public>=<internal>` 对。例：
+    #   EXTRA_INTERNAL_URL_REWRITES=https://cos.example.com=http://internal-cos:443;https://oss.example.cn=http://internal-oss:443
+    #
+    # 行为：
+    # - MinIO 那对（MINIO_PUBLIC_ENDPOINT → MINIO_ENDPOINT）始终是**第一个尝试**
+    # - 然后按本字段顺序逐对尝试 startswith 匹配，命中即返回 internal URL
+    # - 全部不命中 → 原样返回（W12-3 retry 兜底；不阻断分析）
+    #
+    # 目的：W18+ 切 COS 时只改 env 不改代码。
+    EXTRA_INTERNAL_URL_REWRITES: str = ""
+
     # 衍生产物的对象 key 前缀；改这里需要同步 docs/14
     DERIVED_SKELETON_PREFIX: str = "skeleton"
     DERIVED_KEYFRAME_PREFIX: str = "keyframes"

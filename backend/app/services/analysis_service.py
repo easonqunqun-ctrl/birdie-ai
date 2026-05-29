@@ -49,6 +49,7 @@ from app.schemas.analysis import (
     PhaseScore,
     PhaseWindow,
     RecommendationItem,
+    ScorePercentileResponse,
     UploadTokenRequest,
     UploadTokenResponse,
     estimate_swing_remaining_seconds,
@@ -855,6 +856,206 @@ async def get_user_analysis_progress(
         for r in rows
     ]
     return AnalysisProgressResponse(points=pts)
+
+
+# ==================================================================
+# P2-W16-A · ENG-05 · 同水平 + 同器材的得分分位
+# ==================================================================
+#
+# 历史脉络
+# - W12-1：进步曲线接 trust tier 着色（用户能看出"自己曲线"的可信度）
+# - **W16-A**：进步曲线之外，加一条横向对比："你击败了 X% 同水平用户"——
+#   把"个人 vs 群体"的语义补齐，直接呼应 §5.1 产品白皮书 P-03 / ENG-05。
+#
+# 维度选择
+# - **golf_level**（User 表，beginner/amateur/intermediate/advanced/unknown）→ 心智上"同一档"
+# - **club_type**（必传）→ 不同球杆分数分布差很大（小铁杆 70+ vs 一号木 50+）
+#
+# 与 user_profiles_v2.handicap 的关系
+# - 现阶段不接入 handicap：① UPv2 未必所有用户都填；② golf_level 已是用户主动声明的"自我定位"
+# - W17+ 等真实流量积累后可加 handicap 二级分桶（如 0-9 / 10-18 / 19+）
+#
+# 隐私
+# - 响应**只**暴露聚合字段（cohort_size / median / percentile）
+# - 不返其他用户的 user_id / 具体分数 / 分析记录
+#
+# 性能边界
+# - cohort 查询走 DISTINCT ON (user_id) 等价物，单 club_type 单 level 上限
+#   `_PERCENTILE_MAX_COHORT` 行（默认 1000）
+# - 调用频率：客户端按"每次进训练页"调一次，足够稀疏
+
+# 样本量阈值：< 5 → percentile=null；UI 隐藏（避免 1-2 人对比就出"击败 50%"）
+_PERCENTILE_MIN_COHORT = 5
+# 单次查询 cohort 上限：保护 DB（热门 club_type 单 cohort 也不会爆）
+_PERCENTILE_MAX_COHORT = 1000
+
+# 人话化标签（前端可直接展示；不在 i18n 表里因为这是 backend 兜底，前端可以再覆盖）
+_GOLF_LEVEL_LABELS_ZH: dict[str, str] = {
+    "beginner": "初学",
+    "amateur": "业余",
+    "intermediate": "中级",
+    "advanced": "进阶",
+    "professional": "职业",
+    "unknown": "全部水平",
+}
+
+_CLUB_TYPE_LABELS_ZH: dict[str, str] = {
+    "driver": "一号木",
+    "fairway_wood": "球道木",
+    "hybrid": "混合杆",
+    "iron_3": "三号铁",
+    "iron_4": "四号铁",
+    "iron_5": "五号铁",
+    "iron_6": "六号铁",
+    "iron_7": "七号铁",
+    "iron_8": "八号铁",
+    "iron_9": "九号铁",
+    "wedge_pw": "P 杆",
+    "wedge_aw": "A 杆",
+    "wedge_sw": "S 杆",
+    "wedge_lw": "L 杆",
+    "putter": "推杆",
+    "other": "其他",
+}
+
+
+def _format_percentile_cohort_label(golf_level: str | None, club_type: str) -> str:
+    """W16-A · 拼"中级 / 七号铁"等人话标签；翻译表 fallback 到原始 enum 值."""
+    level_zh = _GOLF_LEVEL_LABELS_ZH.get(golf_level or "unknown", "全部水平")
+    club_zh = _CLUB_TYPE_LABELS_ZH.get(club_type, club_type)
+    return f"{level_zh} / {club_zh}"
+
+
+def _calc_percentile(user_score: int, cohort_scores: list[int]) -> int | None:
+    """W16-A · 把 cohort_scores（不含当前用户）算成 0-100 的整数百分位.
+
+    定义："击败"= cohort 中**严格小于** user_score 的人数占比。
+    - cohort 全员 > user_score → 0%
+    - cohort 全员 < user_score → 100%
+    - 平局（user_score 命中 cohort 中的多个值）→ 不计入"击败"，向下取整即可
+
+    样本量 < `_PERCENTILE_MIN_COHORT` → 返回 None。
+    """
+    n = len(cohort_scores)
+    if n < _PERCENTILE_MIN_COHORT:
+        return None
+    below = sum(1 for s in cohort_scores if s < user_score)
+    pct = (below * 100) // n
+    return max(0, min(100, pct))
+
+
+def _calc_median(scores: list[int]) -> int | None:
+    """W16-A · 中位数（P50）；空列表返 None；偶数取下中位数（保 int 不引浮点）."""
+    if not scores:
+        return None
+    sorted_s = sorted(scores)
+    return sorted_s[len(sorted_s) // 2]
+
+
+async def get_user_score_percentile(
+    db: AsyncSession,
+    user: User,
+    *,
+    club_type: str,
+) -> ScorePercentileResponse:
+    """P2-W16-A · ENG-05 · 算用户在同水平+同器材 cohort 中的分位.
+
+    流程：
+    1. 取当前用户最近一条 `club_type` 完成态分析的 ``overall_score`` →
+       没有 → ``user_score=None``、``percentile=None``、``cohort_size=0`` 直接返回
+    2. 取 cohort：所有"同 ``golf_level`` + 同 ``club_type`` 其他用户"的最近一次
+       完成态分析的 ``overall_score``。``user.golf_level`` 为 None 时 cohort 不限定 level。
+    3. cohort_size < 5 → percentile/median = None（UI 隐藏分位行）
+    4. percentile = ``_calc_percentile(user_score, cohort_scores)``
+    5. median = ``_calc_median(cohort_scores)``
+
+    SQL 思路：
+    - 用 ``DISTINCT ON`` 等价：取每个 user 最新的一条同 club_type 完成态分析；PG 用
+      `ROW_NUMBER()` 窗口或 ``DISTINCT ON``
+    - SQLAlchemy 这里用子查询 + ``func.row_number()``，保留 SQLAlchemy 2.x async 风格
+    """
+    now = datetime.now(UTC)
+
+    # === 1. 当前用户的最近一次同 club_type 综合分 ===
+    user_score_stmt = (
+        select(SwingAnalysis.overall_score)
+        .where(
+            SwingAnalysis.user_id == user.id,
+            SwingAnalysis.club_type == club_type,
+            SwingAnalysis.is_sample.is_(False),
+            SwingAnalysis.deleted_at.is_(None),
+            SwingAnalysis.status == "completed",
+            SwingAnalysis.overall_score.isnot(None),
+        )
+        .order_by(
+            SwingAnalysis.analyzed_at.desc().nulls_last(),
+            SwingAnalysis.created_at.desc(),
+        )
+        .limit(1)
+    )
+    user_score_row = (await db.execute(user_score_stmt)).scalar_one_or_none()
+    user_score = int(user_score_row) if user_score_row is not None else None
+
+    # === 2. cohort 用户的最近一次同 club_type 综合分 ===
+    # 用窗口函数取每 user 最新一条
+    rn_col = func.row_number().over(
+        partition_by=SwingAnalysis.user_id,
+        order_by=(
+            SwingAnalysis.analyzed_at.desc().nulls_last(),
+            SwingAnalysis.created_at.desc(),
+        ),
+    ).label("rn")
+    inner = (
+        select(
+            SwingAnalysis.user_id.label("uid"),
+            SwingAnalysis.overall_score.label("score"),
+            rn_col,
+        )
+        .where(
+            SwingAnalysis.user_id != user.id,
+            SwingAnalysis.club_type == club_type,
+            SwingAnalysis.is_sample.is_(False),
+            SwingAnalysis.deleted_at.is_(None),
+            SwingAnalysis.status == "completed",
+            SwingAnalysis.overall_score.isnot(None),
+        )
+    ).subquery()
+
+    cohort_stmt = (
+        select(inner.c.score)
+        .select_from(inner.join(User, User.id == inner.c.uid))
+        .where(inner.c.rn == 1, User.deleted_at.is_(None))
+    )
+    if user.golf_level:
+        cohort_stmt = cohort_stmt.where(User.golf_level == user.golf_level)
+    cohort_stmt = cohort_stmt.limit(_PERCENTILE_MAX_COHORT)
+
+    cohort_scores: list[int] = [
+        int(s) for s in (await db.execute(cohort_stmt)).scalars().all() if s is not None
+    ]
+
+    # === 3-5. 计算 ===
+    if user_score is None:
+        percentile = None
+        median = None
+    else:
+        percentile = _calc_percentile(user_score, cohort_scores)
+        median = (
+            _calc_median(cohort_scores)
+            if len(cohort_scores) >= _PERCENTILE_MIN_COHORT
+            else None
+        )
+
+    return ScorePercentileResponse(
+        user_score=user_score,
+        percentile=percentile,
+        cohort_size=len(cohort_scores),
+        cohort_label=_format_percentile_cohort_label(user.golf_level, club_type),
+        median=median,
+        club_type=club_type,
+        golf_level=user.golf_level,
+        computed_at=now,
+    )
 
 
 # ==================================================================

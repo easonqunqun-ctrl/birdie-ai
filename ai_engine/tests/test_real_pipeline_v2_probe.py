@@ -717,6 +717,153 @@ def test_rewrite_to_internal_url_passthrough_when_endpoints_missing_or_equal(mon
     assert _rewrite_to_internal_url(url) == url
 
 
+# ============================================================
+# P2-W15-D · EXTRA_INTERNAL_URL_REWRITES 泛化（COS / OSS / 第三方）
+# ============================================================
+
+
+def _patch_extra_rewrites(monkeypatch, value: str) -> None:
+    """Helper · 改 settings.EXTRA_INTERNAL_URL_REWRITES."""
+    from app import config
+
+    monkeypatch.setattr(config.settings, "EXTRA_INTERNAL_URL_REWRITES", value)
+
+
+def test_extra_rewrite_single_pair_cos_style(monkeypatch):
+    """W15-D · 配 1 对 COS 公网→内网映射，命中 → 改写成内网."""
+    from app.pipeline.real_pipeline_v2 import _rewrite_to_internal_url
+
+    # MinIO 那对正常配（不应干扰 COS）
+    _patch_minio_endpoints(
+        monkeypatch,
+        internal="http://minio:9000",
+        public="https://api.birdieai.cn/minio",
+    )
+    _patch_extra_rewrites(
+        monkeypatch,
+        "https://cos.ap-guangzhou.myqcloud.com=http://internal-cos:443",
+    )
+
+    rewritten = _rewrite_to_internal_url(
+        "https://cos.ap-guangzhou.myqcloud.com/bucket/path/x.mp4?sign=abc"
+    )
+    assert rewritten == "http://internal-cos:443/bucket/path/x.mp4?sign=abc"
+
+
+def test_extra_rewrite_multi_pairs_first_match_wins(monkeypatch):
+    """W15-D · 多对映射用 `;` 分隔，按声明顺序首个命中即返回."""
+    from app.pipeline.real_pipeline_v2 import _rewrite_to_internal_url
+
+    _patch_minio_endpoints(
+        monkeypatch,
+        internal="http://minio:9000",
+        public="https://api.birdieai.cn/minio",
+    )
+    _patch_extra_rewrites(
+        monkeypatch,
+        (
+            "https://cos.example.com=http://internal-cos:443;"
+            "https://oss.example.cn=http://internal-oss:443"
+        ),
+    )
+
+    # 第二对命中
+    assert (
+        _rewrite_to_internal_url("https://oss.example.cn/b/x.mp4")
+        == "http://internal-oss:443/b/x.mp4"
+    )
+    # 第一对命中
+    assert (
+        _rewrite_to_internal_url("https://cos.example.com/b/x.mp4")
+        == "http://internal-cos:443/b/x.mp4"
+    )
+    # 都不命中
+    assert (
+        _rewrite_to_internal_url("https://kodo.example.io/b/x.mp4")
+        == "https://kodo.example.io/b/x.mp4"
+    )
+
+
+def test_extra_rewrite_minio_takes_precedence_over_extra(monkeypatch):
+    """W15-D · MinIO pair 始终是第一个尝试；与 extra 同时命中也走 MinIO 路径.
+
+    生产场景：万一两对配置 PUBLIC 重叠（不应该但理论可能），保持
+    向后兼容 W13-C 行为，MinIO 优先。
+    """
+    from app.pipeline.real_pipeline_v2 import _rewrite_to_internal_url
+
+    _patch_minio_endpoints(
+        monkeypatch,
+        internal="http://minio:9000",
+        public="https://api.birdieai.cn",
+    )
+    # extra 故意配同样 PUBLIC 但映射到不同 internal —— MinIO 应该胜出
+    _patch_extra_rewrites(
+        monkeypatch,
+        "https://api.birdieai.cn=http://wrong-target:9999",
+    )
+
+    rewritten = _rewrite_to_internal_url("https://api.birdieai.cn/some/path.mp4")
+    assert rewritten.startswith("http://minio:9000")
+    assert "wrong-target" not in rewritten
+
+
+def test_extra_rewrite_malformed_pairs_skipped_silently(monkeypatch):
+    """W15-D · 格式非法的 pair（无 `=` / 任一端空 / 两端相等）跳过，不抛."""
+    from app.pipeline.real_pipeline_v2 import _rewrite_to_internal_url
+
+    _patch_minio_endpoints(
+        monkeypatch,
+        internal="",  # MinIO 那对作废，避免干扰
+        public="",
+    )
+    _patch_extra_rewrites(
+        monkeypatch,
+        (
+            "no-equals-here;"
+            "=missing-public;"
+            "missing-internal=;"
+            "https://same.com=https://same.com;"
+            "  ;"  # 全空白
+            "https://valid.example.com=http://valid-int:443"
+        ),
+    )
+
+    # 唯一合法的那对生效
+    assert (
+        _rewrite_to_internal_url("https://valid.example.com/x.mp4")
+        == "http://valid-int:443/x.mp4"
+    )
+    # 非法的不工作
+    assert (
+        _rewrite_to_internal_url("https://same.com/x.mp4")
+        == "https://same.com/x.mp4"
+    )
+
+
+def test_extra_rewrite_empty_string_means_minio_only(monkeypatch):
+    """W15-D · EXTRA_INTERNAL_URL_REWRITES 为空（默认配置）等价于只用 MinIO 那对."""
+    from app.pipeline.real_pipeline_v2 import _rewrite_to_internal_url
+
+    _patch_minio_endpoints(
+        monkeypatch,
+        internal="http://minio:9000",
+        public="https://api.birdieai.cn/minio",
+    )
+    _patch_extra_rewrites(monkeypatch, "")
+
+    # MinIO 命中
+    assert (
+        _rewrite_to_internal_url("https://api.birdieai.cn/minio/bucket/x.mp4")
+        == "http://minio:9000/bucket/x.mp4"
+    )
+    # COS 因为没配 extra，不命中
+    assert (
+        _rewrite_to_internal_url("https://cos.example.com/x.mp4")
+        == "https://cos.example.com/x.mp4"
+    )
+
+
 def test_probe_video_warnings_calls_ffprobe_with_internal_url(monkeypatch):
     """W13-C 端到端 · _probe_video_warnings 把 public URL 改写成 internal 才喂 ffprobe.
 

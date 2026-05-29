@@ -374,6 +374,48 @@ class AnalysisProgressResponse(BaseModel):
     points: list[AnalysisProgressPoint]
 
 
+class ScorePercentileResponse(BaseModel):
+    """P2-W16-A · ENG-05 · 同水平+同器材的得分分位（"你击败了 X% 同水平用户"）.
+
+    设计要点
+    --------
+    - **cohort 维度**：``golf_level`` （User 表，beginner/amateur/intermediate/advanced
+      等）+ ``club_type``。用户未填 ``golf_level`` 时不限定 level，回落到"全部 club_type
+      cohort"。
+    - **样本量阈值**：``cohort_size < MIN_COHORT_SIZE`` 时 ``percentile = null``，
+      客户端隐藏分位 UI（避免拿 1-2 个对比就出"击败 50%"这种误导）。
+    - **基准**：每个对照用户取其**最近一条**同 club_type 完成态分析的 ``overall_score``
+      （不是平均，避免老用户被早期低分拉低）。
+    - **性能**：DB 端 1 次查询出 cohort 分数列表，Python 算 percentile / median；
+      cohort 上限 1000 行（`MAX_COHORT_ROWS`），防止热门 club_type 单查询爆。
+    - **隐私**：响应只暴露聚合（cohort_size / median / percentile），不暴露
+      他人 user_id / 具体分数。
+    """
+
+    user_score: int | None = Field(
+        ..., description="当前用户最近一次该 club_type 的综合分；无任何分析时 null"
+    )
+    percentile: int | None = Field(
+        ...,
+        ge=0,
+        le=100,
+        description="击败 N% 同水平+同器材用户（向下取整 0-100）；样本不足时 null",
+    )
+    cohort_size: int = Field(
+        ..., ge=0, description="参与对比的同水平+同器材用户数（不含当前用户）"
+    )
+    cohort_label: str = Field(
+        ...,
+        description="人话化 cohort 描述，如「中级 / 七号铁」；客户端可直接展示",
+    )
+    median: int | None = Field(
+        None, description="cohort 中位数（P50）；样本不足时 null"
+    )
+    club_type: str
+    golf_level: str | None = Field(None, description="当前用户的水平；未填时为 null")
+    computed_at: datetime
+
+
 __all__ = [
     "STAGE_ETA_SECONDS",
     "SWING_STAGE_TIMELINE",
@@ -398,6 +440,7 @@ __all__ = [
     "PhaseScore",
     "PhaseWindow",
     "RecommendationItem",
+    "ScorePercentileResponse",
     "ShareCardResponse",
     "UploadTokenRequest",
     "UploadTokenResponse",

@@ -216,6 +216,100 @@ describe('request · 网络异常文案映射', () => {
       expect((e as RequestError).message).toBe('网络异常，请稍后重试')
     }
   })
+
+  // P2-W17-A · 错码扩展（微信真机 errcode + iOS CFNetwork）
+  test('errcode:-100（代理拒绝）→ 提示关闭代理/VPN', async () => {
+    T.request.mockRejectedValueOnce({
+      errMsg: 'request:fail errcode:-100 proxy connection failed',
+    })
+    try {
+      await request({ url: '/x' })
+      fail('should throw')
+    } catch (e) {
+      expect((e as RequestError).message).toMatch(/代理|VPN/)
+    }
+  })
+
+  test('errcode:-99（TCP 连接被拒）→ 提示关闭代理/VPN', async () => {
+    T.request.mockRejectedValueOnce({ errMsg: 'request:fail errcode:-99' })
+    try {
+      await request({ url: '/x' })
+      fail('should throw')
+    } catch (e) {
+      expect((e as RequestError).message).toMatch(/代理|VPN/)
+    }
+  })
+
+  test('errcode:-2（HTTP 协议错误）→ 「响应不规范」', async () => {
+    T.request.mockRejectedValueOnce({ errMsg: 'request:fail errcode:-2' })
+    try {
+      await request({ url: '/x' })
+      fail('should throw')
+    } catch (e) {
+      expect((e as RequestError).message).toMatch(/响应不规范|联系运维/)
+    }
+  })
+
+  test('iOS CFNetwork errno=-1003（cannot find host）→ 「找不到服务器地址」', async () => {
+    T.request.mockRejectedValueOnce({
+      errMsg: 'request:fail CFURLErrorDomain errno=-1003 cannot find host',
+    })
+    try {
+      await request({ url: '/x' })
+      fail('should throw')
+    } catch (e) {
+      expect((e as RequestError).message).toMatch(/找不到服务器/)
+    }
+  })
+
+  test('iOS errno=-1009（无网络）→ 「当前没有网络连接」', async () => {
+    T.request.mockRejectedValueOnce({
+      errMsg: 'request:fail errno=-1009 not connected to internet',
+    })
+    try {
+      await request({ url: '/x' })
+      fail('should throw')
+    } catch (e) {
+      expect((e as RequestError).message).toMatch(/没有网络连接/)
+    }
+  })
+})
+
+describe('request · HTTP 429 速率限制', () => {
+  test('HTTP 429 + 空 body → toast 「请求过于频繁」+ http_server_error kind', async () => {
+    T.request.mockResolvedValueOnce({
+      statusCode: 429,
+      data: null,
+      header: { 'x-request-id': 'rid-429' },
+    })
+    try {
+      await request({ url: '/x' })
+      fail('should throw')
+    } catch (e) {
+      expect(isRequestError(e)).toBe(true)
+      expect((e as RequestError).kind).toBe('http_server_error')
+      expect((e as RequestError).status).toBe(429)
+      expect((e as RequestError).message).toMatch(/频繁|稍后/)
+    }
+    expect(T.showToast).toHaveBeenCalledWith(
+      expect.objectContaining({ title: expect.stringMatching(/频繁|稍后/) }),
+    )
+  })
+
+  test('HTTP 429 + silent → 不 toast', async () => {
+    T.request.mockResolvedValueOnce({
+      statusCode: 429,
+      data: null,
+      header: {},
+    })
+    try {
+      await request({ url: '/x', silent: true })
+      fail('should throw')
+    } catch (e) {
+      expect((e as RequestError).status).toBe(429)
+    }
+    expect(T.showToast).not.toHaveBeenCalled()
+  })
 })
 
 describe('describeIntermittentRequestFailure / describePageLoadFailure', () => {

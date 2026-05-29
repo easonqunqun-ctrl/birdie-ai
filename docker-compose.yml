@@ -243,17 +243,20 @@ services:
 
   # 占位收件人：alertmanager-to-wechat-bot 还没接入前，先 echo 看 alert payload
   # 真接生产渠道（企业微信群机器人）走 W18+，把 alertmanager.yml receivers 的 url 改即可
+  #
+  # W15-A 修正：原 ealen/echo-server 在腾讯云国内镜像源 unknown error，
+  # 换 mendhak/http-https-echo（默认 8080，环境变量改 9094）。两者都是把请求体回显，功能等价。
   webhook-echo:
-    image: ealen/echo-server:latest
+    image: mendhak/http-https-echo:31
     container_name: xiaoniao-webhook-echo
     restart: unless-stopped
     profiles: ["monitoring"]
     environment:
-      PORT: "9094"
-      LOGS__IGNORE__PING: "true"
+      HTTP_PORT: "9094"
+      LOG_IGNORE_PATH: "/ping"
     ports:
       - "127.0.0.1:9094:9094"
-    mem_limit: 16m
+    mem_limit: 32m
 
 volumes:
   postgres_data:

@@ -9,7 +9,7 @@ from app.core.database import get_db
 from app.core.exceptions import BadRequestError, NotFoundError
 from app.models.user import User
 from app.models.user_profile_v2 import MAX_CLUBS_PER_USER
-from app.schemas.analysis import AnalysisProgressResponse
+from app.schemas.analysis import AnalysisProgressResponse, ScorePercentileResponse
 from app.schemas.base import APIResponse, ok
 from app.schemas.user import (
     AccountDeletionRequest,
@@ -143,6 +143,33 @@ async def get_analysis_progress(
 ):
     wd = window_days if window_days and window_days > 0 else None
     data = await analysis_service.get_user_analysis_progress(db, user, window_days=wd)
+    return ok(data)
+
+
+@router.get(
+    "/me/score-percentile",
+    summary="P2-W16-A · 同水平+同器材的得分分位（你击败了 X% 同水平用户）",
+    response_model=APIResponse[ScorePercentileResponse],
+)
+async def get_score_percentile(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    club_type: str = Query(
+        ...,
+        min_length=1,
+        max_length=20,
+        description="必传；不同球杆得分分布差异大，cohort 必须按 club_type 分组",
+    ),
+):
+    """ENG-05 · 训练页"你击败了 X% 同水平用户"信号源.
+
+    - cohort：同 ``user.golf_level`` + 同 ``club_type`` 的其他用户最近一次综合分
+    - 样本量 < 5 → ``percentile = null``，客户端隐藏分位 UI（避免误导）
+    - 隐私：响应只暴露聚合（cohort_size / median / percentile），不暴露他人 user_id
+    """
+    data = await analysis_service.get_user_score_percentile(
+        db, user, club_type=club_type
+    )
     return ok(data)
 
 

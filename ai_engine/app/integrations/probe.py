@@ -70,12 +70,49 @@ def sanitize_probe_url(url: str) -> str:
     return url if q_idx < 0 else url[:q_idx]
 
 
+def _iter_rewrite_pairs() -> list[tuple[str, str]]:
+    """W15-D · 把所有 `(public, internal)` 改写对收集成有序列表（MinIO 优先）.
+
+    返回顺序：
+    1. MinIO（MINIO_PUBLIC_ENDPOINT → MINIO_ENDPOINT）—— 历史 W13-C 行为，始终第一
+    2. EXTRA_INTERNAL_URL_REWRITES 解析出的额外对（W18+ 切 COS / OSS / 第三方）
+
+    解析规则：
+    - 分号 `;` 分隔多对；空白 / 空对忽略
+    - 每对 `<public>=<internal>` 用第一个 `=` 切分（避免 URL 里的 `=` 干扰）
+    - 任一端缺失 / 两端相等（无意义改写）→ 跳过
+    """
+    pairs: list[tuple[str, str]] = []
+
+    pub = (settings.MINIO_PUBLIC_ENDPOINT or "").rstrip("/")
+    internal = (settings.MINIO_ENDPOINT or "").rstrip("/")
+    if pub and internal and pub != internal:
+        pairs.append((pub, internal))
+
+    extra_raw = getattr(settings, "EXTRA_INTERNAL_URL_REWRITES", "") or ""
+    for chunk in extra_raw.split(";"):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        if "=" not in chunk:
+            log.warning("rewrite_pair_invalid_no_equals", extra={"chunk": chunk})
+            continue
+        p, i = chunk.split("=", 1)
+        p = p.strip().rstrip("/")
+        i = i.strip().rstrip("/")
+        if not p or not i or p == i:
+            continue
+        pairs.append((p, i))
+
+    return pairs
+
+
 def rewrite_to_internal_url(url: str) -> str:
-    """W13-C · 把公网 video_url 改写成容器内网 URL，避免 ffprobe 绕公网回环.
+    """W13-C / W15-D · 把公网 video_url 改写成容器内网 URL，避免 ffprobe 绕公网回环.
 
     详见 docs/release-notes/minio-ffprobe-5xx-rca.md。
 
-    例子：
+    例子（MinIO）：
     ::
 
         input  = "https://api.birdieai.cn/minio/xiaoniao-videos/uploads/x.mp4"
@@ -83,19 +120,25 @@ def rewrite_to_internal_url(url: str) -> str:
         output = "http://minio:9000/xiaoniao-videos/uploads/x.mp4"
                   └─ MINIO_ENDPOINT = http://minio:9000 ─┘
 
-    链路从"ai_engine → 公网 DNS → CVM nginx → /minio/ → minio:9000" (4 跳)
-    缩短到"ai_engine → docker 内网 → minio:9000" (1 跳)。
+    例子（W15-D · COS / 第三方）：
+    ::
 
-    不命中 / endpoint 缺失 / 两者相等（dev 本机）→ 原样返回，仍走 W12-3 retry 兜底。
-    保留 query string（X-Amz-Signature 等）以兼容签名 URL。
+        EXTRA_INTERNAL_URL_REWRITES=https://cos.example.com=http://internal-cos:443
+
+        input  = "https://cos.example.com/bucket/path/x.mp4"
+        output = "http://internal-cos:443/bucket/path/x.mp4"
+
+    链路从 4 跳（公网 DNS → CVM nginx → /minio/ → minio:9000）缩短到 1 跳（docker 内网）。
+
+    不命中（任何 pair） / endpoint 缺失 / 两端相等（dev 本机） → 原样返回，
+    走 W12-3 retry 兜底。保留 query string（X-Amz-Signature 等）以兼容签名 URL。
     """
-    pub = (settings.MINIO_PUBLIC_ENDPOINT or "").rstrip("/")
-    internal = (settings.MINIO_ENDPOINT or "").rstrip("/")
-    if not pub or not internal or pub == internal:
+    if not url:
         return url
-    if not url.startswith(pub + "/"):
-        return url
-    return internal + url[len(pub):]
+    for pub, internal in _iter_rewrite_pairs():
+        if url.startswith(pub + "/"):
+            return internal + url[len(pub):]
+    return url
 
 
 # ----------------------------------------------------------------------

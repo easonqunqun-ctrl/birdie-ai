@@ -59,4 +59,25 @@ export const userService = {
       }[]
     }>(`/users/me/analysis-progress${qs}`)
   },
+  /**
+   * P2-W16-A · ENG-05 · 同水平+同器材的得分分位（你击败 X% 同水平用户）.
+   *
+   * 服务端策略：
+   * - cohort 同 ``user.golf_level`` + 同 ``club_type`` 的其他用户最近一次综合分
+   * - cohort_size < 5 → ``percentile = null``，前端**必须**隐藏分位 UI
+   *   （别拿 1-2 个对比就出"击败 50%"骗自己）
+   * - 用户没填 ``golf_level`` 时 cohort 不限定 level（"全部水平"）
+   */
+  getScorePercentile(clubType: string) {
+    return http.get<{
+      user_score: number | null
+      percentile: number | null
+      cohort_size: number
+      cohort_label: string
+      median: number | null
+      club_type: string
+      golf_level: string | null
+      computed_at: string
+    }>(`/users/me/score-percentile?club_type=${encodeURIComponent(clubType)}`)
+  },
 }

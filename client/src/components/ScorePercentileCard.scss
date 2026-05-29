@@ -1,0 +1,101 @@
+/* P2-W16-B · ENG-05 · 同水平+同器材分位卡片样式
+ *
+ * 沿用 W13-A 的 trust-tier-legend 配色 / radius / 间距规范，
+ * 不引新色板，CSS 变量来自 client/src/app.scss 的视觉规范源.
+ */
+
+.score-percentile-card {
+  margin-top: 16rpx;
+  padding: 24rpx 24rpx 20rpx;
+  background: var(--color-bg-elevated);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+
+  &__head {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16rpx;
+  }
+
+  &__title {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    font-weight: 500;
+  }
+
+  &__slot {
+    flex-shrink: 0;
+  }
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4rpx;
+  }
+
+  /* 颜色梯度（W16-B）：金/主色/灰 三档 */
+  &__pct {
+    font-size: 64rpx;
+    font-weight: 700;
+    line-height: 1.1;
+
+    &--gold {
+      color: var(--color-gold);
+    }
+
+    &--primary {
+      color: var(--color-primary);
+    }
+
+    &--muted {
+      color: var(--color-text-secondary);
+    }
+  }
+
+  &__sub {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+  }
+
+  &__meta {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    justify-content: space-around;
+    padding-top: 16rpx;
+    border-top: 1rpx solid var(--color-border-soft, rgba(0, 0, 0, 0.06));
+  }
+
+  &__meta-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4rpx;
+    flex: 1;
+  }
+
+  &__meta-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+  }
+
+  &__meta-value {
+    font-size: var(--font-size-md);
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
+
+  &__meta-divider {
+    width: 1rpx;
+    background: var(--color-border-soft, rgba(0, 0, 0, 0.06));
+    margin: 0 8rpx;
+  }
+}

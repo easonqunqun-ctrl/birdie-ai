@@ -18,6 +18,10 @@ import PracticeCalendar from '@/components/PracticeCalendar'
 import '@/components/PracticeCalendar.scss'
 import ProgressLineChart from '@/components/ProgressLineChart'
 import '@/components/ProgressLineChart.scss'
+import ScorePercentileCard, {
+  type ScorePercentileData,
+} from '@/components/ScorePercentileCard'
+import '@/components/ScorePercentileCard.scss'
 import TrustTierLegend from '@/components/TrustTierLegend'
 import '@/components/TrustTierLegend.scss'
 import VideoCard from '@/components/VideoCard'
@@ -65,6 +69,8 @@ const TrainingPage: FC = () => {
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)
   const [submittingTaskId, setSubmittingTaskId] = useState<string | null>(null)
   const [progressPoints, setProgressPoints] = useState<ProgressPoint[]>([])
+  /** P2-W16-B · ENG-05 · 同水平+同器材分位（cohort_size<5 时服务端把 percentile 设 null，前端自动隐藏整卡） */
+  const [percentileData, setPercentileData] = useState<ScorePercentileData | null>(null)
   /** 进步曲线时间窗：0=不按天截断（服务端全量至 max_points）；90=近 90 天 */
   const [progressWindowDays, setProgressWindowDays] = useState<0 | 90>(90)
   /** 折线图维度：综合分或六维之一 */
@@ -127,6 +133,29 @@ const TrainingPage: FC = () => {
     }
   }, [token, progressWindowDays])
 
+  /**
+   * P2-W16-B · 拉同水平分位卡数据.
+   *
+   * club_type 选取策略：从 progressPoints 找最近一个 ProgressPoint，但 ProgressPoint
+   * schema 暂未透传 club_type。MVP 期固定查 ``iron_7``（最常用 7 号铁）；W17+ 加切换器
+   * 时再让父组件透传 clubType。
+   *
+   * cohort_size < 5 时服务端把 percentile 设 null，<ScorePercentileCard /> 整卡自动不渲染。
+   */
+  const loadPercentile = useCallback(async () => {
+    if (!token) return
+    if (!useUserStore.getState().user?.is_member) {
+      setPercentileData(null)
+      return
+    }
+    try {
+      const res = await userService.getScorePercentile('iron_7')
+      setPercentileData(res)
+    } catch {
+      setPercentileData(null)
+    }
+  }, [token])
+
   const loadPracticeCurve = useCallback(async () => {
     if (!token) return
     if (!useUserStore.getState().user?.is_member) {
@@ -177,13 +206,15 @@ const TrainingPage: FC = () => {
       .finally(() => {
         void loadProgress()
         void loadPracticeCurve()
+        void loadPercentile()
       })
   })
 
   useEffect(() => {
     if (!token || !user?.is_member) return
     void loadProgress()
-  }, [token, user?.is_member, progressWindowDays, loadProgress])
+    void loadPercentile()
+  }, [token, user?.is_member, progressWindowDays, loadProgress, loadPercentile])
 
   useEffect(() => {
     if (!token || !user?.is_member) return
@@ -311,6 +342,8 @@ const TrainingPage: FC = () => {
         {/* P2-W13-A：仅当当前曲线包含 V2 报告点（tier 存在）才显示图例；
             全 V1 报告时不显示，避免给老用户看到无用色块 */}
         <TrustTierLegend hasV2Points={chartSeries.some((p) => p.tier)} />
+        {/* P2-W16-B：同水平+同器材分位卡（cohort_size<5 时服务端 percentile=null，整卡不渲染） */}
+        <ScorePercentileCard data={percentileData} />
         {progressNarrative ? (
           <Text className='training__progress-narrative'>{progressNarrative}</Text>
         ) : null}

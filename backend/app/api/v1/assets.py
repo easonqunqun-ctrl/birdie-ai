@@ -70,16 +70,38 @@ def _parse_single_range(spec: str, size: int) -> tuple[int, int]:
     return start, end
 
 
-@router.get("/assets/image/{key:path}")
+@router.api_route("/assets/image/{key:path}", methods=["GET", "HEAD"])
 def proxy_image(
+    request: Request,
     key: str,
     storage: MinioStorageClient = Depends(get_minio_storage),
 ) -> Response:
-    """从 MinIO 内部端点返回图片字节流（同源代理）。"""
+    """从 MinIO 内部端点返回图片字节流（同源代理）。
+
+    `HEAD`：仅返回头部（`Content-Type` / `Content-Length` / `Cache-Control`），
+    用于 CDN 健康检查 / 客户端 prefetch / nginx upstream check（W15-B 加）。
+    """
     if not any(key.startswith(p) for p in ALLOWED_IMAGE_PREFIXES):
         raise HTTPException(status_code=404, detail="not_found")
     if _traversal_segments(key):
         raise HTTPException(status_code=404, detail="not_found")
+
+    if request.method == "HEAD":
+        try:
+            stat = storage._internal.stat_object(storage.bucket, key)
+        except S3Error as e:
+            if e.code in {"NoSuchKey", "NoSuchBucket"} or "404" in str(e):
+                raise HTTPException(status_code=404, detail="not_found") from None
+            logger.exception("proxy_image: minio stat failed key=%s", key)
+            raise HTTPException(status_code=502, detail="upstream_error") from e
+        return Response(
+            status_code=200,
+            media_type=stat.content_type or "image/jpeg",
+            headers={
+                "Content-Length": str(stat.size),
+                "Cache-Control": _IMAGE_CACHE_CONTROL,
+            },
+        )
 
     try:
         resp = storage._internal.get_object(storage.bucket, key)

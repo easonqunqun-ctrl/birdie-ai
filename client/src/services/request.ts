@@ -160,6 +160,41 @@ function friendlyNetworkMessage(raw: string, requestUrl?: string): string {
     return '请求已取消'
   }
 
+  // P2-W17-A · errcode 模式扩展（必须在 fail+connect 通配前）
+  // 来源：微信开放文档「wx.request 错误码」+ 实战 issue 收集
+  // - -100 / -99：网络代理 / TCP 连接被拒（常见：用户开了 Surge 抓包没装证书）
+  // - -2：底层 HTTP 协议错误（响应头 / chunked 编码异常）
+  if (
+    lower.includes('errcode:-100') ||
+    lower.includes('errcode:-99') ||
+    r.includes('代理') ||
+    lower.includes('proxy connection failed')
+  ) {
+    return '无法连接服务器（疑似网络代理），请关闭抓包/VPN 后重试'
+  }
+  if (lower.includes('errcode:-2') || lower.includes('protocol error')) {
+    return '服务器响应不规范，请稍后重试或联系运维'
+  }
+
+  // P2-W17-A · iOS CFNetwork 错码细分（真机才出现，模拟器无）
+  // - errno=-1003 cannot find host
+  // - errno=-1004 cannot connect
+  // - errno=-1009 not connected to internet（注意此分支必须在 fail+connection 通配前，
+  //   否则 "not connected" 会被 "fail+connection" 错误吃掉）
+  if (
+    lower.includes('errno=-1009') ||
+    lower.includes('not connected to internet')
+  ) {
+    return '当前没有网络连接，请检查 Wi-Fi / 蜂窝网络'
+  }
+  if (
+    lower.includes('errno=-1003') ||
+    lower.includes('cannot find host') ||
+    lower.includes('cfurlerrordomain')
+  ) {
+    return '找不到服务器地址，请检查 API 域名是否正确'
+  }
+
   if (lower.includes('interrupted') || lower.includes('connection reset')) {
     return '网络连接中断，请稍后重试'
   }
@@ -243,6 +278,26 @@ export async function request<T = unknown>(opts: RequestOptions): Promise<T> {
     handleUnauthorized()
     throw new RequestError('http_unauthorized', '未登录或登录已过期', {
       status: 401,
+    })
+  }
+
+  // P2-W17-A · HTTP 429（Too Many Requests）单独识别
+  // 后端如果回了统一信封（带 code 4xx）会在 body.code !== 0 分支 toast 业务文案；
+  // 但 429 经常没有 JSON 信封（nginx limit_req_zone 直接拦截），statusCode=429 + 空 body
+  // 现在的代码会落到 'bad_response' 分支 toast"响应格式错误"——对用户没意义。
+  // 这里前置识别：429 总是 toast"请求过于频繁"，并保留 RequestError 让 hook 能 retry 退避。
+  if (res.statusCode === 429) {
+    const rid429 = extractResponseRequestId(res.header, undefined)
+    const msg = '请求过于频繁，请稍后再试'
+    if (!opts.silent && rid429) {
+      console.warn('[request:rate_limit]', opts.url, 'request_id=', rid429)
+    }
+    if (!opts.silent) {
+      Taro.showToast({ title: msg, icon: 'none' })
+    }
+    throw new RequestError('http_server_error', msg, {
+      status: 429,
+      requestId: rid429,
     })
   }
 
