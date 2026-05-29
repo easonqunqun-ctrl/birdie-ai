@@ -289,7 +289,8 @@ def score_from_analysis(
 def count_today_attempts(*, attempts: int, updated_at: datetime | None) -> int:
     """当日已尝试次数：跨日归零（progress.attempts 仅在 updated_at 为今天时有效）."""
 
-    from datetime import UTC, datetime as dt
+    from datetime import UTC
+    from datetime import datetime as dt
 
     if updated_at is None:
         return 0
