@@ -7,7 +7,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-CoachLevelLiteral = Literal["pga", "china_pga", "regional", "club_pro"]
+CoachLevelLiteral = Literal["pga", "china_pga", "regional", "club_pro", "seed"]
+CoachApplyLevelLiteral = Literal["pga", "china_pga", "regional", "club_pro"]
 CoachProfileStatusLiteral = Literal["pending", "active", "rejected", "paused"]
 CoachReviewStatusLiteral = Literal["pending", "approved", "rejected", "need_more"]
 CoachReviewDecisionLiteral = Literal["approved", "rejected", "need_more"]
@@ -35,7 +36,7 @@ class CoachMaterialItem(BaseModel):
 
 class CoachProfileApply(BaseModel):
     display_name: str = Field(..., min_length=1, max_length=60)
-    level: CoachLevelLiteral
+    level: CoachApplyLevelLiteral
     bio: str | None = Field(None, max_length=2000)
     avatar_url: str | None = Field(None, max_length=512)
     specialties: list[str] = Field(default_factory=list, max_length=12)
@@ -94,17 +95,48 @@ class CoachVerificationListResponse(BaseModel):
     total: int
 
 
+class CoachProfileListResponse(BaseModel):
+    items: list[CoachProfileRead]
+    total: int
+
+
+class CoachSeedLevelUpdate(BaseModel):
+    level: CoachLevelLiteral
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class GrantSeedPremiumRequest(BaseModel):
+    valid_days: int = Field(default=365, ge=1, le=730)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class GrantSeedPremiumResponse(BaseModel):
+    user_id: str
+    membership_type: str
+    membership_expires_at: datetime
+    granted_days: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 __all__ = [
+    "CoachApplyLevelLiteral",
     "CoachCertificationItem",
     "CoachLevelLiteral",
     "CoachMaterialItem",
     "CoachProfileApply",
     "CoachProfileBrief",
+    "CoachProfileListResponse",
     "CoachProfileRead",
     "CoachProfileStatusLiteral",
     "CoachReviewDecisionLiteral",
     "CoachReviewStatusLiteral",
+    "CoachSeedLevelUpdate",
     "CoachVerificationListResponse",
     "CoachVerificationRead",
     "CoachVerificationReview",
+    "GrantSeedPremiumRequest",
+    "GrantSeedPremiumResponse",
 ]
