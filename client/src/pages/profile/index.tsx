@@ -12,6 +12,7 @@ import {
   PHASE2_MEETUP_ENABLED_FLAG,
   PHASE2_PROFILE_V2_ENABLED_FLAG,
   PHASE2_PROS_ENABLED_FLAG,
+  PHASE2_YARDAGE_BOOK_ENABLED_FLAG,
 } from '@/constants/flags'
 import type { GolfLevel, PrimaryGoal, WeeklyFreq } from '@/types/api'
 import { coachStudentsService } from '@/services/coachStudentsService'
@@ -248,6 +249,16 @@ const ProfilePage: FC = () => {
             >
               <Text className='profile__menu-icon'>🏌️</Text>
               <Text className='profile__menu-label'>我的装备</Text>
+              <Text className='profile__menu-arrow'>›</Text>
+            </View>
+          )}
+          {PHASE2_YARDAGE_BOOK_ENABLED_FLAG && PHASE2_PROFILE_V2_ENABLED_FLAG && (
+            <View
+              className='profile__menu-item'
+              onClick={() => Taro.navigateTo({ url: '/pages/profile/yardage-book/index' })}
+            >
+              <Text className='profile__menu-icon'>📏</Text>
+              <Text className='profile__menu-label'>个人 yardage book</Text>
               <Text className='profile__menu-arrow'>›</Text>
             </View>
           )}

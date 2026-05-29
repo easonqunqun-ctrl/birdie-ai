@@ -40,32 +40,8 @@ const YardageBookPage: FC = () => {
     void load()
   }, [load])
 
-  const handleEdit = async (club: YardageBookClubItem) => {
-    const label =
-      CLUB_TYPE_LABEL[club.club_type as keyof typeof CLUB_TYPE_LABEL] || club.club_type
-    const current = club.my_yards != null ? String(club.my_yards) : ''
-    // 小程序 showModal 无 editable 类型；用 prompt 类输入页成本高，此处用简化二次确认 + 预设码数
-    const presets = [120, 130, 140, 150, 160, 170, 180, 200, 220, 240]
-    const nearest =
-      club.my_yards != null
-        ? presets.reduce((a, b) =>
-            Math.abs(b - club.my_yards!) < Math.abs(a - club.my_yards!) ? b : a,
-          )
-        : 150
-    const res = await Taro.showModal({
-      title: `设置 ${label} 码数`,
-      content: current
-        ? `当前 ${current} 码。确认设为 ${nearest} 码？（完整编辑请稍后在装备页维护）`
-        : `确认设为 ${nearest} 码？`,
-    })
-    if (!res.confirm) return
-    try {
-      await yardageBookService.updateMine([{ club_id: club.club_id, self_yardage_m: nearest }])
-      Taro.showToast({ title: '已保存', icon: 'success' })
-      await load()
-    } catch (e) {
-      Taro.showToast({ title: e instanceof Error ? e.message : '保存失败', icon: 'none' })
-    }
+  const handleEdit = () => {
+    Taro.navigateTo({ url: '/pages/profile/clubs' })
   }
 
   return (
@@ -104,9 +80,9 @@ const YardageBookPage: FC = () => {
                 <Button
                   className='yardage-book__edit-btn'
                   size='mini'
-                  onClick={() => handleEdit(club)}
+                  onClick={handleEdit}
                 >
-                  编辑
+                  去装备编辑
                 </Button>
               </View>
             </View>

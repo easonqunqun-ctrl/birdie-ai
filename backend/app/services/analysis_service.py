@@ -478,6 +478,14 @@ async def create_analysis(
     if mode == "chipping" and not settings.PHASE2_CHIPPING_MODE_ENABLED:
         raise BadRequestError(message="切杆模式尚未开放")
 
+    target_yardage: int | None = None
+    if payload.target_yardage is not None:
+        if not settings.PHASE2_YARDAGE_BOOK_ENABLED:
+            raise BadRequestError(message="目标码数尚未开放")
+        if mode != "full_swing":
+            raise BadRequestError(message="仅全挥杆分析可填写目标码数")
+        target_yardage = payload.target_yardage
+
     # 1) 取凭证上下文 & 归属校验
     raw = await redis.get(UPLOAD_TOKEN_REDIS_KEY.format(upload_id=payload.upload_id))
     if raw is None:
@@ -553,6 +561,7 @@ async def create_analysis(
         camera_angle=payload.camera_angle,
         club_type=payload.club_type,
         analysis_mode=mode,
+        target_yardage=target_yardage,
         status="pending",
         stage=None,
         stage_progress=0,
