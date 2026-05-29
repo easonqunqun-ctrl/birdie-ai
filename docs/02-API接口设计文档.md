@@ -1757,6 +1757,25 @@ GET  /v1/coach/sessions/recaps?page=&page_size=
 
 **客户端**：`coachRecapService`；`pages/coach/session-recap`（选学员 → 生成汇总 → 导出 PDF）；「我的」教练模式「教学报告」入口。
 
+### 5A.10 教练 UGC 内容审核（M8-08）
+
+**无新增 C 端 API**；Admin：
+
+```
+GET  /v1/admin/moderation/queue?limit=
+POST /v1/admin/moderation/queue/{queue_id}/review   Body: { action: "approve"|"reject", note? }
+```
+
+**灰度**：`PHASE2_COACH_CONTENT_MODERATION_ENABLED`；关闭时 M8-04 文字批注 / M8-05 `coach_note` 保持自动 `approved` 可见。
+
+**语义**：
+- 教练 `text` 批注 / 作业 `coach_note` 写入后触发文本审核（provider 默认 `mock`；腾讯云占位回落 mock）。
+- 通过 → `audit_status=approved` + `is_visible=true`；拒绝 → `rejected` + 学员不可见；边缘/供应商故障 → `manual_review` 或 `pending` + 入 `moderation_queue`（SLA `CONTENT_MODERATION_SLA_HOURS`，默认 24h）。
+- Fail-safe：API 故障时默认 **不可见**（`pending`），不会出现未审核内容直出学员端。
+- 学员侧 `GET /analyses/{id}/coach-annotations` 与训练计划 `coach_note` 仅展示审核通过内容。
+
+**Mock 验收标记**（单测 / 联调）：文本含 `BLOCK_TEST` → 拒；`REVIEW_TEST` → 人工复核；`FAIL_TEST` → pending fail-safe。
+
 ---
 
 ## 5B、球手对比库（/pros · M12，灰度 `PHASE2_PROS_ENABLED`）
@@ -1800,7 +1819,7 @@ GET    /v1/analyses/{analysis_id}/coach-annotations     学员侧可见批注（
 **灰度**：`PHASE2_COACH_ANNOTATIONS_ENABLED`；`video_ref` 额外要求 `PHASE2_PROS_ENABLED`。教练写端点须 JWT **`role=coach`** + 已审核教练（M8-01）或 seed 白名单；**须与报告所属学员存在 `active` 师生关系**（M8-03），否则 **40312**。
 
 **类型**：
-- `text`：必填 `text_content`（≤500 字）；MVP 默认 `audit_status=approved` / `is_visible=true`（完整内容安全审核见 M8-08）。
+- `text`：必填 `text_content`（≤500 字）；`PHASE2_COACH_CONTENT_MODERATION_ENABLED=true` 时默认 `pending` / 不可见，审核通过后学员可见（M8-08）。
 - `video_ref`：必填 `pro_clip_id`；引用已发布 pro clip，默认 `audit_status=approved` / `is_visible=true`。
 
 **客户端**：`coachAnnotationService`；`pages/coach/analysis-annotate`（文字 + 职业镜头）；报告页 `CoachTextAnnotationCard` + `ProClipReferenceCard` +「看对比」跳转 `pro-compare`。

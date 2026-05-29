@@ -100,6 +100,7 @@ def _to_clip_ref_read(
         annotation_type=ann.annotation_type,  # type: ignore[arg-type]
         pro_clip_id=ann.pro_clip_id,
         text_content=ann.text_content,
+        audit_status=ann.audit_status,
         is_visible=ann.is_visible,
         created_at=ann.created_at,
         clip=ProSwingClipRead.model_validate(clip) if clip else None,
@@ -141,6 +142,10 @@ async def create_annotation(
         )
         db.add(ann)
         await db.flush()
+        if text_content:
+            from app.services.content_moderation_service import moderate_annotation_text
+
+            await moderate_annotation_text(db, annotation=ann, text=text_content)
         logger.info(
             "coach_annotation_created",
             annotation_id=ann.id,
@@ -168,11 +173,14 @@ async def create_annotation(
             annotation_type="text",
             pro_clip_id=None,
             text_content=text_content,
-            audit_status="approved",
-            is_visible=True,
+            audit_status="pending",
+            is_visible=False,
         )
         db.add(ann)
         await db.flush()
+        from app.services.content_moderation_service import moderate_annotation_text
+
+        await moderate_annotation_text(db, annotation=ann, text=text_content)
         logger.info(
             "coach_annotation_created",
             annotation_id=ann.id,

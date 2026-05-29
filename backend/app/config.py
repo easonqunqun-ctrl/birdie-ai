@@ -207,6 +207,12 @@ class Settings(BaseSettings):
     PHASE2_COACH_RECAP_ENABLED: bool = False
     COACH_RECAP_PDF_URL_TTL_SECONDS: int = 86400
 
+    # M8-08 教练 UGC 内容审核；默认 false（关闭时保持 M8-04 自动 approved）。
+    PHASE2_COACH_CONTENT_MODERATION_ENABLED: bool = False
+    CONTENT_MODERATION_PROVIDER: str = "mock"
+    CONTENT_MODERATION_TIMEOUT_SEC: int = 3
+    CONTENT_MODERATION_SLA_HOURS: int = 24
+
     # M13 球友约球
     # 上线前需 DEP-05 法律意见书到位（M13-09 服务协议 / 未成年保护）。
     PHASE2_MEETUP_ENABLED: bool = False

@@ -24,6 +24,7 @@ class CoachAnnotationRead(BaseModel):
     annotation_type: CoachAnnotationTypeLiteral
     pro_clip_id: str | None
     text_content: str | None
+    audit_status: str | None = None
     is_visible: bool
     created_at: datetime
 
