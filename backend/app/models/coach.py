@@ -1,6 +1,6 @@
 """M8-04 / M12-09 · 教练报告批注（MVP：video_ref 引用职业镜头）."""
 
-from sqlalchemy import Boolean, ForeignKey, Index, String, Text
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Index, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -44,4 +44,43 @@ class AnalysisAnnotation(Base, TimestampMixin):
     __table_args__ = (
         Index("idx_ann_analysis_visible", "analysis_id", "is_visible"),
         Index("idx_ann_coach", "coach_user_id", "created_at"),
+    )
+
+
+class CoachStudentRelation(Base, TimestampMixin):
+    """教练-学员绑定（M8-03 最小子集；M13-10 旁观守门）."""
+
+    __tablename__ = "coach_student_relations"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    coach_user_id: Mapped[str] = mapped_column(
+        String(32),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    student_user_id: Mapped[str] = mapped_column(
+        String(32),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="active", server_default="'active'"
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('active', 'inactive')",
+            name="chk_csr_status",
+        ),
+        CheckConstraint(
+            "coach_user_id != student_user_id",
+            name="chk_csr_not_self",
+        ),
+        UniqueConstraint(
+            "coach_user_id",
+            "student_user_id",
+            name="uq_csr_coach_student",
+        ),
+        Index("idx_csr_coach_status", "coach_user_id", "status"),
+        Index("idx_csr_student_status", "student_user_id", "status"),
     )

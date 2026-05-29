@@ -1740,6 +1740,22 @@ POST /v1/meetups/safety/mock-identity       仅 WECHAT_MOCK_LOGIN
 - `user_profiles_v2.privacy_payload` 扩展：`meetup_tos_accepted_at`、`gender_preference`（`any` / `same` / `coach_only`；女性默认 `same`）。
 - 协议正文：`docs/legal/tos-m13.md`；客户端 `MeetupTosModal` 首次强提醒（不可遮罩关闭）。
 
+### 5C.5 教练旁观约球（M13-10）
+
+```
+GET   /v1/coach/students/{student_id}/meetups?page=&page_size=
+PATCH /v1/meetups/safety/spectator-optin    Body: { coach_spectator_optin: bool }
+```
+
+**守门**：
+- 教练须在 `COACH_COURSE_USER_IDS` 白名单，且与学员存在 `coach_student_relations.status=active` 绑定。
+- 学员须已满足 M13-09 合规（实名 + 协议），且 `privacy_payload.coach_spectator_optin=true`（默认 false）。
+- 返回邀请列表时对方 `user_id` 去识别（`usr_redacted`），`contact_payload` 不返回。
+
+**错误码**：**40336** 学员未授权教练旁观约球记录。
+
+**客户端**：`coachSpectatorService`；约球列表页学员 opt-in 开关；`pages/coach/student-meetups` 教练「近期约球」卡。
+
 ---
 
 ## 六、支付模块（/payments）

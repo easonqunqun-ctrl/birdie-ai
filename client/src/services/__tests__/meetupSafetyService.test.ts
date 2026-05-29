@@ -31,4 +31,12 @@ describe('meetupSafetyService', () => {
       gender_preference: undefined,
     })
   })
+
+  it('updates spectator opt-in', async () => {
+    http.patch.mockResolvedValue({ coach_spectator_optin: true })
+    await meetupSafetyService.updateSpectatorOptin(true)
+    expect(http.patch).toHaveBeenCalledWith('/meetups/safety/spectator-optin', {
+      coach_spectator_optin: true,
+    })
+  })
 })

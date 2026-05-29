@@ -22,6 +22,7 @@ export default defineAppConfig({
     'pages/analysis/pro-compare',
     'pages/coach/index',
     'pages/coach/analysis-annotate',
+    'pages/coach/student-meetups',
     'pages/training/index',
     'pages/profile/index',
     'pages/profile/edit',
