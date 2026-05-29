@@ -2,6 +2,7 @@
 
 只暴露**已发布**的球手 / 镜头给小程序：
 - ``GET /v1/pros`` — 列出 ``is_active=True`` 的球手
+- ``GET /v1/pros/topics/current`` — 当前每周精选（M12-06）
 - ``GET /v1/pros/{player_id}`` — 单球手详情
 - ``GET /v1/pros/{player_id}/clips?camera_angle=...`` — 该球手的 published clips
 
@@ -29,6 +30,8 @@ from app.schemas.pro_library import (
     CameraAngleLiteral,
     ProPlayerRead,
     ProSwingClipRead,
+    ProTopicClipItemRead,
+    ProTopicRead,
 )
 from app.services import pro_library_service
 
@@ -40,6 +43,28 @@ def _ensure_pros_enabled() -> None:
 
     if not settings.PHASE2_PROS_ENABLED:
         raise NotFoundError(code=40406, message="球手对比库未开放")
+
+
+async def _topic_to_read(db: AsyncSession, topic) -> ProTopicRead:
+    items = await pro_library_service.load_topic_clip_items(db, topic)
+    return ProTopicRead(
+        id=topic.id,
+        code=topic.code,
+        title=topic.title,
+        subtitle=topic.subtitle,
+        banner_url=topic.banner_url,
+        summary=topic.summary,
+        clip_ids=list(topic.clip_ids or []),
+        week_starts_at=topic.week_starts_at,
+        published_at=topic.published_at,
+        clips=[
+            ProTopicClipItemRead(
+                clip=ProSwingClipRead.model_validate(clip),
+                player=ProPlayerRead.model_validate(player),
+            )
+            for clip, player in items
+        ],
+    )
 
 
 @router.get(
@@ -58,6 +83,23 @@ async def list_players(
     _ensure_pros_enabled()
     players = await pro_library_service.list_active_players(db)
     return ok([ProPlayerRead.model_validate(p) for p in players])
+
+
+@router.get(
+    "/topics/current",
+    summary="获取当前每周精选（M12-06）",
+    response_model=APIResponse[ProTopicRead | None],
+)
+async def get_current_weekly_topic(
+    db: AsyncSession = Depends(get_db),
+):
+    """返回当前生效的 published 专题；无专题时 ``data=null``（非 404）."""
+
+    _ensure_pros_enabled()
+    topic = await pro_library_service.get_current_published_topic(db)
+    if topic is None:
+        return ok(None)
+    return ok(await _topic_to_read(db, topic))
 
 
 @router.get(

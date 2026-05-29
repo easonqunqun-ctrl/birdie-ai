@@ -116,6 +116,30 @@ class ProTopicCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class ProTopicClipItemRead(BaseModel):
+    """M12-06 · 精选专题内单条镜头 + 球手."""
+
+    clip: ProSwingClipRead
+    player: ProPlayerRead
+
+
+class ProTopicRead(BaseModel):
+    """M12-06 · 每周精选专题读模型."""
+
+    id: str
+    code: str
+    title: str
+    subtitle: str | None = None
+    banner_url: str | None = None
+    summary: str | None = None
+    clip_ids: list[str] = Field(default_factory=list)
+    week_starts_at: date | None = None
+    published_at: datetime | None = None
+    clips: list[ProTopicClipItemRead] = Field(default_factory=list)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class UserProMatchCreate(BaseModel):
     analysis_id: str = Field(..., max_length=32)
     matched_clip_id: str = Field(..., max_length=32)
@@ -162,7 +186,9 @@ __all__ = [
     "ProPlayerRead",
     "ProSwingClipCreate",
     "ProSwingClipRead",
+    "ProTopicClipItemRead",
     "ProTopicCreate",
+    "ProTopicRead",
     "UserProMatchCreate",
     "UserProMatchRead",
 ]

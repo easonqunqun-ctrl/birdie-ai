@@ -149,3 +149,38 @@ async def test_get_clips_returns_only_published(
     # 只应看到 seed 的 published clip，未发布的草稿不出现
     assert len(items) == 1
     assert items[0]["is_published"] is True
+
+
+@pytest.mark.asyncio
+async def test_get_current_topic_404_when_flag_off(
+    client: AsyncClient, pros_disabled: None
+) -> None:
+    resp = await client.get("/v1/pros/topics/current")
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_get_current_topic_null_when_empty(
+    client: AsyncClient, pros_enabled: None
+) -> None:
+    resp = await client.get("/v1/pros/topics/current")
+    assert resp.status_code == 200
+    assert resp.json()["data"] is None
+
+
+@pytest.mark.asyncio
+async def test_get_current_topic_returns_seeded(
+    client: AsyncClient, pros_enabled: None
+) -> None:
+    async with AsyncSessionLocal() as db:
+        await svc.seed_initial_pros(db)
+        await svc.seed_initial_weekly_topic(db)
+        await db.commit()
+
+    resp = await client.get("/v1/pros/topics/current")
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data is not None
+    assert data["code"] == "demo_weekly_m12"
+    assert len(data["clips"]) >= 1
+    assert data["clips"][0]["player"]["name"] == "Demo Pro · 内置示例"

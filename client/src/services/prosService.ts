@@ -5,7 +5,7 @@
  * - GET /v1/pros
  * - GET /v1/pros/{player_id}
  * - GET /v1/pros/{player_id}/clips?camera_angle=&club_type=
- * - GET /v1/analyses/{analysis_id}/pro-matches?limit=&record=  （M12-04）
+ * - GET /v1/pros/topics/current  （M12-06 每周精选）
  *
  * 灰度
  * ----
@@ -74,6 +74,24 @@ export interface ProMatchQuery {
   record?: boolean
 }
 
+export interface ProTopicClipItemRead {
+  clip: ProSwingClipRead
+  player: ProPlayerRead
+}
+
+export interface ProTopicRead {
+  id: string
+  code: string
+  title: string
+  subtitle: string | null
+  banner_url: string | null
+  summary: string | null
+  clip_ids: string[]
+  week_starts_at: string | null
+  published_at: string | null
+  clips: ProTopicClipItemRead[]
+}
+
 export const prosService = {
   list() {
     return http.get<ProPlayerRead[]>('/pros')
@@ -94,5 +112,8 @@ export const prosService = {
     if (query.record != null) qs.push(`record=${query.record ? 'true' : 'false'}`)
     const tail = qs.length ? `?${qs.join('&')}` : ''
     return http.get<ProMatchResultRead>(`/analyses/${analysisId}/pro-matches${tail}`)
+  },
+  currentTopic() {
+    return http.get<ProTopicRead | null>('/pros/topics/current')
   },
 }

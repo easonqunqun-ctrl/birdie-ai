@@ -102,4 +102,24 @@ describe('prosService', () => {
     expect(url).toContain('limit=3')
     expect(url).toContain('record=false')
   })
+
+  test('currentTopic → GET /pros/topics/current', async () => {
+    T.request.mockResolvedValueOnce(
+      ok({
+        id: 'pt_abc',
+        code: 'demo_weekly',
+        title: '本周精选',
+        subtitle: '副标题',
+        banner_url: null,
+        summary: '摘要',
+        clip_ids: ['psc_1'],
+        week_starts_at: '2026-05-26',
+        published_at: '2026-05-26T00:00:00Z',
+        clips: [],
+      }),
+    )
+    const res = await prosService.currentTopic()
+    expect(res?.title).toBe('本周精选')
+    expect(T.request.mock.calls[0][0].url).toMatch(/\/pros\/topics\/current$/)
+  })
 })
