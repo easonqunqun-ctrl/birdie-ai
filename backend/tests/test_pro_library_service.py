@@ -337,3 +337,8 @@ async def test_seed_initial_pros_is_idempotent() -> None:
         clips = await svc.list_published_clips(db, player_id=first[0].id)
         assert len(clips) == 1
         assert clips[0].is_published is True
+        evo = (clips[0].features_snapshot or {}).get("evolution_poses")
+        assert evo
+        assert "early_extension" in evo
+        assert "chicken_wing" in evo
+        assert "reverse_spine" in evo

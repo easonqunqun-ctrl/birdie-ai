@@ -7,6 +7,8 @@ import { View, Text, Video, Image, Button, ScrollView } from '@tarojs/components
 import Taro, { useRouter } from '@tarojs/taro'
 import DualRadarChart from '@/components/DualRadarChart'
 import '@/components/DualRadarChart.scss'
+import SkeletonAnimation from '@/components/SkeletonAnimation'
+import '@/components/SkeletonAnimation.scss'
 import { PHASE2_PROS_ENABLED_FLAG } from '@/constants/flags'
 import { CAMERA_ANGLE_LABEL, CLUB_TYPE_LABEL } from '@/types/analysis'
 import type { AnalysisReportResponse } from '@/types/analysis'
@@ -19,6 +21,7 @@ import {
   buildUserRadarAxes,
   proScoresAreReferenceOnly,
 } from '@/utils/proCompareRadar'
+import { resolveEvolutionScene } from '@/utils/proEvolutionPose'
 import { resolveReportPlaybackSrc } from '@/utils/reportPlayback'
 import './pro-compare.scss'
 
@@ -34,6 +37,7 @@ const ProComparePage: FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [report, setReport] = useState<AnalysisReportResponse | null>(null)
   const [matchItem, setMatchItem] = useState<ProMatchItemRead | null>(null)
+  const [morphProgress, setMorphProgress] = useState(0)
 
   useEffect(() => {
     if (!PHASE2_PROS_ENABLED_FLAG) {
@@ -104,6 +108,25 @@ const ProComparePage: FC = () => {
   const proReferenceOnly = matchItem
     ? proScoresAreReferenceOnly(matchItem.clip)
     : false
+  const evolutionScene = useMemo(() => {
+    if (!report || !matchItem) return null
+    return resolveEvolutionScene(report, matchItem.clip)
+  }, [report, matchItem])
+
+  useEffect(() => {
+    if (evolutionScene || userAxes.length === 0 || proAxes.length === 0) return
+    let frame = 0
+    let cancelled = false
+    const id = setInterval(() => {
+      if (cancelled) return
+      frame = (frame + 1) % 120
+      setMorphProgress(frame / 119)
+    }, 40)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+    }
+  }, [evolutionScene, userAxes.length, proAxes.length])
 
   if (loading) {
     return (
@@ -195,6 +218,32 @@ const ProComparePage: FC = () => {
         </View>
 
         <Text className='pro-compare__credit'>来源：{clip.source_credit}</Text>
+
+        <View className='pro-compare__section'>
+          <Text className='pro-compare__section-title'>追平演化示意</Text>
+          {evolutionScene ? (
+            <SkeletonAnimation
+              start={evolutionScene.userPose}
+              end={evolutionScene.proPose}
+              caption={evolutionScene.label}
+            />
+          ) : userAxes.length > 0 && proAxes.length > 0 ? (
+            <>
+              <Text className='pro-compare__section-hint'>
+                暂无骨骼 pose 数据，以雷达渐变示意「向职业参考靠近」的方向。
+              </Text>
+              <DualRadarChart
+                primaryAxes={userAxes}
+                secondaryAxes={proAxes}
+                primaryLabel='你'
+                secondaryLabel={player.name}
+                morphProgress={morphProgress}
+              />
+            </>
+          ) : (
+            <Text className='pro-compare__section-hint'>暂无演化示意数据</Text>
+          )}
+        </View>
 
         {userAxes.length > 0 && proAxes.length > 0 && (
           <View className='pro-compare__section'>
