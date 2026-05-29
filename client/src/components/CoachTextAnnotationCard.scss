@@ -1,0 +1,23 @@
+.coach-text-ann {
+  display: flex;
+  flex-direction: column;
+  padding: 24rpx;
+  margin-bottom: 16rpx;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1rpx solid var(--color-border);
+
+  &__label {
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    color: var(--color-gold);
+    margin-bottom: 12rpx;
+  }
+
+  &__body {
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    line-height: 1.6;
+    white-space: pre-wrap;
+  }
+}

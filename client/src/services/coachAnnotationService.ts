@@ -1,5 +1,5 @@
 /**
- * M12-09 · 教练报告批注（video_ref 引用职业镜头）。
+ * M8-04 / M12-09 · 教练报告批注（text + video_ref）。
  */
 
 import type { ProPlayerRead, ProSwingClipRead } from '@/services/prosService'
@@ -25,6 +25,10 @@ export interface CoachVideoRefCreate {
   text_content?: string
 }
 
+export interface CoachTextCreate {
+  text_content: string
+}
+
 export const coachAnnotationService = {
   listForAnalysis(analysisId: string) {
     return http.get<CoachAnnotationClipRef[]>(
@@ -43,6 +47,15 @@ export const coachAnnotationService = {
         annotation_type: 'video_ref',
         pro_clip_id: body.pro_clip_id,
         text_content: body.text_content ?? null,
+      },
+    )
+  },
+  createText(analysisId: string, body: CoachTextCreate) {
+    return http.post<CoachAnnotationClipRef>(
+      `/coach/analyses/${analysisId}/annotations`,
+      {
+        annotation_type: 'text',
+        text_content: body.text_content,
       },
     )
   },

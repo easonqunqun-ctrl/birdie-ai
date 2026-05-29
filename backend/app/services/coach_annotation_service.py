@@ -1,4 +1,4 @@
-"""M8-04 / M12-09 · 教练报告批注 service（MVP：video_ref）."""
+"""M8-04 / M12-09 · 教练报告批注 service."""
 
 from __future__ import annotations
 
@@ -16,14 +16,28 @@ from app.models.user import User
 from app.schemas.coach_annotation import CoachAnnotationClipRefRead, CoachAnnotationCreate
 from app.schemas.pro_library import ProPlayerRead, ProSwingClipRead
 from app.services import pro_library_service
-from app.services.coach_course_service import assert_coach_course_author
+from app.services.coach_course_service import assert_coach_course_author, coach_course_user_ids
+from app.services.coach_student_service import require_active_relation
 
 logger = get_logger("coach_annotation")
+
+TEXT_CONTENT_MAX_LEN = 500
 
 
 def ensure_coach_annotations_enabled() -> None:
     if not settings.PHASE2_COACH_ANNOTATIONS_ENABLED:
         raise NotFoundError(code=40406, message="教练批注功能未开放")
+
+
+async def _assert_coach_can_manage(db: AsyncSession, *, coach: User) -> None:
+    if coach.id in coach_course_user_ids():
+        return
+    if settings.PHASE2_COACH_ENABLED:
+        from app.services.coach_profile_service import assert_active_coach
+
+        await assert_active_coach(db, user=coach)
+        return
+    assert_coach_course_author(coach)
 
 
 async def _get_analysis(db: AsyncSession, *, analysis_id: str) -> SwingAnalysis:
@@ -43,6 +57,13 @@ async def _get_analysis(db: AsyncSession, *, analysis_id: str) -> SwingAnalysis:
     return analysis
 
 
+async def _assert_coach_can_annotate_analysis(
+    db: AsyncSession, *, coach: User, analysis: SwingAnalysis
+) -> None:
+    await _assert_coach_can_manage(db, coach=coach)
+    await require_active_relation(db, coach=coach, student_id=analysis.user_id)
+
+
 async def _resolve_clip_ref(
     db: AsyncSession, clip_id: str | None
 ) -> tuple[ProSwingClip | None, ProPlayer | None, bool]:
@@ -55,6 +76,15 @@ async def _resolve_clip_ref(
     if player is None or not player.is_active:
         return None, None, True
     return clip, player, False
+
+
+def _normalize_text_content(raw: str | None) -> str | None:
+    text = (raw or "").strip()
+    if not text:
+        return None
+    if len(text) > TEXT_CONTENT_MAX_LEN:
+        raise BadRequestError(code=40001, message=f"文字批注不超过 {TEXT_CONTENT_MAX_LEN} 字")
+    return text
 
 
 def _to_clip_ref_read(
@@ -86,43 +116,68 @@ async def create_annotation(
     payload: CoachAnnotationCreate,
 ) -> CoachAnnotationClipRefRead:
     ensure_coach_annotations_enabled()
-    assert_coach_course_author(coach)
-    if not settings.PHASE2_PROS_ENABLED:
-        raise NotFoundError(code=40406, message="球手对比库未开放")
-
     analysis = await _get_analysis(db, analysis_id=analysis_id)
-    # MVP：教练白名单用户可批注任意已完成分析（M8-03 师生关系就位后收紧）
+    await _assert_coach_can_annotate_analysis(db, coach=coach, analysis=analysis)
 
-    if payload.annotation_type != "video_ref":
-        raise BadRequestError(code=40001, message="当前仅支持 video_ref 批注")
-    if not payload.pro_clip_id:
-        raise BadRequestError(code=40001, message="video_ref 须提供 pro_clip_id")
+    if payload.annotation_type == "video_ref":
+        if not settings.PHASE2_PROS_ENABLED:
+            raise NotFoundError(code=40406, message="球手对比库未开放")
+        if not payload.pro_clip_id:
+            raise BadRequestError(code=40001, message="video_ref 须提供 pro_clip_id")
+        clip, player, unavailable = await _resolve_clip_ref(db, payload.pro_clip_id)
+        if unavailable or clip is None:
+            raise NotFoundError(code=40406, message="职业镜头不存在或已下架")
+        text_content = _normalize_text_content(payload.text_content)
+        ann = AnalysisAnnotation(
+            id=new_id("can"),
+            coach_user_id=coach.id,
+            student_user_id=analysis.user_id,
+            analysis_id=analysis.id,
+            annotation_type="video_ref",
+            pro_clip_id=clip.id,
+            text_content=text_content,
+            audit_status="approved",
+            is_visible=True,
+        )
+        db.add(ann)
+        await db.flush()
+        logger.info(
+            "coach_annotation_created",
+            annotation_id=ann.id,
+            analysis_id=analysis.id,
+            annotation_type="video_ref",
+            clip_id=clip.id,
+            coach_id=coach.id,
+        )
+        return _to_clip_ref_read(ann, clip, player, clip_unavailable=False)
 
-    clip, player, unavailable = await _resolve_clip_ref(db, payload.pro_clip_id)
-    if unavailable or clip is None:
-        raise NotFoundError(code=40406, message="职业镜头不存在或已下架")
+    if payload.annotation_type == "text":
+        text_content = _normalize_text_content(payload.text_content)
+        if text_content is None:
+            raise BadRequestError(code=40001, message="文字批注不能为空")
+        ann = AnalysisAnnotation(
+            id=new_id("can"),
+            coach_user_id=coach.id,
+            student_user_id=analysis.user_id,
+            analysis_id=analysis.id,
+            annotation_type="text",
+            pro_clip_id=None,
+            text_content=text_content,
+            audit_status="approved",
+            is_visible=True,
+        )
+        db.add(ann)
+        await db.flush()
+        logger.info(
+            "coach_annotation_created",
+            annotation_id=ann.id,
+            analysis_id=analysis.id,
+            annotation_type="text",
+            coach_id=coach.id,
+        )
+        return _to_clip_ref_read(ann, None, None, clip_unavailable=False)
 
-    ann = AnalysisAnnotation(
-        id=new_id("can"),
-        coach_user_id=coach.id,
-        student_user_id=analysis.user_id,
-        analysis_id=analysis.id,
-        annotation_type="video_ref",
-        pro_clip_id=clip.id,
-        text_content=(payload.text_content or "").strip() or None,
-        audit_status="approved",
-        is_visible=True,
-    )
-    db.add(ann)
-    await db.flush()
-    logger.info(
-        "coach_annotation_created",
-        annotation_id=ann.id,
-        analysis_id=analysis.id,
-        clip_id=clip.id,
-        coach_id=coach.id,
-    )
-    return _to_clip_ref_read(ann, clip, player, clip_unavailable=False)
+    raise BadRequestError(code=40001, message="当前仅支持 text / video_ref 批注")
 
 
 async def list_coach_annotations(
@@ -132,12 +187,15 @@ async def list_coach_annotations(
     analysis_id: str,
 ) -> list[CoachAnnotationClipRefRead]:
     ensure_coach_annotations_enabled()
-    assert_coach_course_author(coach)
-    await _get_analysis(db, analysis_id=analysis_id)
+    analysis = await _get_analysis(db, analysis_id=analysis_id)
+    await _assert_coach_can_annotate_analysis(db, coach=coach, analysis=analysis)
 
     rows = await db.execute(
         select(AnalysisAnnotation)
-        .where(AnalysisAnnotation.analysis_id == analysis_id)
+        .where(
+            AnalysisAnnotation.analysis_id == analysis_id,
+            AnalysisAnnotation.coach_user_id == coach.id,
+        )
         .order_by(AnalysisAnnotation.created_at.desc())
     )
     out: list[CoachAnnotationClipRefRead] = []
@@ -179,7 +237,7 @@ async def delete_annotation(
     annotation_id: str,
 ) -> None:
     ensure_coach_annotations_enabled()
-    assert_coach_course_author(coach)
+    await _assert_coach_can_manage(db, coach=coach)
     row = await db.execute(
         select(AnalysisAnnotation).where(AnalysisAnnotation.id == annotation_id)
     )
@@ -188,17 +246,15 @@ async def delete_annotation(
         raise NotFoundError(code=40404, message="批注不存在")
     if ann.coach_user_id != coach.id:
         raise ForbiddenError(code=40301, message="无权删除该批注")
+    analysis = await _get_analysis(db, analysis_id=ann.analysis_id)
+    await require_active_relation(db, coach=coach, student_id=analysis.user_id)
     await db.delete(ann)
 
 
 def can_user_coach_annotate(user: User) -> bool:
     if not settings.PHASE2_COACH_ANNOTATIONS_ENABLED:
         return False
-    try:
-        assert_coach_course_author(user)
-    except ForbiddenError:
-        return False
-    return True
+    return user.id in coach_course_user_ids()
 
 
 __all__ = [

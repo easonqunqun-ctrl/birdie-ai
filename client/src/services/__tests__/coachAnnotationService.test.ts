@@ -31,4 +31,19 @@ describe('coachAnnotationService', () => {
       text_content: null,
     })
   })
+
+  test('createText → POST /coach/analyses/{id}/annotations', async () => {
+    T.request.mockResolvedValueOnce({
+      statusCode: 200,
+      data: { code: 0, data: { id: 'can_2', annotation_type: 'text' } },
+    })
+    await coachAnnotationService.createText('ana_x', { text_content: '注意送杆' })
+    const sent = T.request.mock.calls[0][0]
+    expect(sent.method).toBe('POST')
+    expect(sent.url).toMatch(/\/coach\/analyses\/ana_x\/annotations$/)
+    expect(sent.data).toEqual({
+      annotation_type: 'text',
+      text_content: '注意送杆',
+    })
+  })
 })
