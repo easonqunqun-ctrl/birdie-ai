@@ -1,0 +1,26 @@
+{
+  "version": "v1-calibration-stub",
+  "description": "ENG-04 issue 检测 F1 回归 stub：复用合成 Pose（非授权顶尖素材）。expected_issues 为当前 diagnose 行为快照（behavioral snapshot），用于 CI 端到端冒烟 + 防止规则/阈值改动悄悄改变检出集合；**非人工标注 ground truth**。触发条件满足（争议样本≥20，见 wait-for-triggers-checklist §2.7）后，用真实授权样本 + 人工标注替换 clips，并 --out-baseline 重新生成 calibration_baseline.json。",
+  "clips": [
+    {
+      "ecs_clip_id": "ci_teaching_ideal",
+      "pose_profile": "ideal_swing",
+      "expected_issues": ["chicken_wing", "early_extension", "steep_shoulder", "under_rotation"]
+    },
+    {
+      "ecs_clip_id": "ci_amateur_solid",
+      "pose_profile": "amateur_solid",
+      "expected_issues": ["chicken_wing", "loss_of_posture", "steep_shoulder", "under_rotation"]
+    },
+    {
+      "ecs_clip_id": "ci_top_amateur_early_ext",
+      "pose_profile": "early_extension_swing",
+      "expected_issues": ["chicken_wing", "early_extension", "steep_shoulder", "under_rotation"]
+    },
+    {
+      "ecs_clip_id": "ci_dispute_sway",
+      "pose_profile": "sway_swing",
+      "expected_issues": ["chicken_wing", "steep_shoulder", "under_rotation"]
+    }
+  ]
+}
