@@ -37,12 +37,14 @@ from app.schemas.user_profile_v2 import (
     UserProfileV2Read,
     UserProfileV2Update,
 )
+from app.schemas.yardage_book import YardageBookResponse, YardageBookUpdateRequest
 from app.services import (
     account_deletion_service,
     analysis_service,
     quota_service,
     user_clubs_service,
     user_profile_v2_service,
+    yardage_book_service,
 )
 from app.services import coach_profile_service as coach_prof_svc
 from app.services import coach_student_service as csr_svc
@@ -56,6 +58,11 @@ def _ensure_profile_v2_enabled() -> None:
     """守门：未启用 PHASE2_PROFILE_V2_ENABLED 直接 404，不暴露端点（kickoff §4.2 + 与 M9-02 / M9-03 共用）."""
     if not settings.PHASE2_PROFILE_V2_ENABLED:
         raise NotFoundError(code=40404, message="二期画像功能未开放")
+
+
+def _ensure_yardage_book_enabled() -> None:
+    if not settings.PHASE2_YARDAGE_BOOK_ENABLED:
+        raise NotFoundError(code=40404, message="yardage book 未开放")
 
 
 @router.get(
@@ -297,6 +304,41 @@ async def delete_my_club(
     await user_clubs_service.delete_club(db, user, club_id)
     await db.commit()
     return ok({"id": club_id, "deleted": True})
+
+
+# ==================== P2-M10-03 yardage book ====================
+
+
+@router.get(
+    "/me/yardage-book",
+    summary="个人 yardage book（P2-M10-03）",
+    response_model=APIResponse[YardageBookResponse],
+)
+async def get_my_yardage_book(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    _ensure_yardage_book_enabled()
+    _ensure_profile_v2_enabled()
+    data = await yardage_book_service.get_yardage_book(user=user, db=db)
+    return ok(data)
+
+
+@router.put(
+    "/me/yardage-book",
+    summary="批量更新自填码数",
+    response_model=APIResponse[YardageBookResponse],
+)
+async def update_my_yardage_book(
+    payload: YardageBookUpdateRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    _ensure_yardage_book_enabled()
+    _ensure_profile_v2_enabled()
+    data = await yardage_book_service.update_yardage_book(user=user, payload=payload, db=db)
+    await db.commit()
+    return ok(data)
 
 
 # ==================== P2-M9-03 onboarding 2.0（profile-v2 PATCH 语义） ====================

@@ -65,6 +65,8 @@ class SwingAnalysis(Base, TimestampMixin):
     analysis_mode: Mapped[str] = mapped_column(
         String(20), nullable=False, default="full_swing", server_default="'full_swing'"
     )
+    # M10-03：用户声明的目标码数（yard），供 yardage book 历史反推
+    target_yardage: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # M7-14：评分管线版本标记。
     # 不做"二次评分"。
