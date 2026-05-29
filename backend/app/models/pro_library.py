@@ -226,9 +226,15 @@ class UserProFavorite(Base):
         server_default="NOW()",
     )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    training_task_id: Mapped[str | None] = mapped_column(
+        String(32),
+        ForeignKey("training_tasks.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     __table_args__ = (
         Index("idx_upf_user", "user_id", "created_at"),
+        Index("idx_upf_training_task", "training_task_id"),
     )
 
 

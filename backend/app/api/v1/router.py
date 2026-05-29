@@ -19,6 +19,7 @@ from app.api.v1 import (
     meetup_responses,
     meetups,
     payments,
+    pro_favorites,
     pros,
     security,
     shares,
@@ -53,6 +54,7 @@ api_router.include_router(coach_annotations.router, prefix="/coach", tags=["教�
 api_router.include_router(lessons.router, prefix="/lessons", tags=["课程"])
 # M12-02 球手对比库（公开读端点）；写入仍在 service 层 / 后续 admin 工具
 api_router.include_router(pros.router, prefix="/pros", tags=["球手对比库"])
+api_router.include_router(pro_favorites.router, prefix="/users/me", tags=["球手对比库"])
 # M13-02 球场 nearby 搜索
 api_router.include_router(venues.router, prefix="/venues", tags=["约球"])
 # M13-03 约球邀请创建 / 撤回 / 列表

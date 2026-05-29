@@ -461,6 +461,27 @@
     color: var(--color-primary);
   }
 
+  &__pro-section {
+    margin-bottom: 12rpx;
+  }
+
+  &__pro-section-title {
+    font-size: 30rpx;
+    font-weight: 700;
+    color: var(--color-gold-dark);
+    display: block;
+    margin-bottom: 8rpx;
+    padding: 0 4rpx;
+  }
+
+  &__section-divider {
+    font-size: 28rpx;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    display: block;
+    margin: 8rpx 4rpx 16rpx;
+  }
+
   /* ================= 按日分组 ================= */
   &__day {
     margin-bottom: 20rpx;
@@ -501,6 +522,25 @@
       border-color: var(--color-task-done-border);
       border-left-color: var(--color-accent-mint);
     }
+
+    &--pro {
+      border-left-color: var(--color-gold);
+    }
+  }
+
+  &__task-warn {
+    font-size: 24rpx;
+    color: var(--color-warning);
+    margin-top: 6rpx;
+    display: block;
+  }
+
+  &__task-pro-hint {
+    font-size: 28rpx;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+    margin-bottom: 14rpx;
+    display: block;
   }
 
   &__task-head {

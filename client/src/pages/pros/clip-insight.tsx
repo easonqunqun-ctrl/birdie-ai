@@ -12,6 +12,7 @@ import {
   type ProClipAnnotationRead,
   type ProSwingClipRead,
 } from '@/services/prosService'
+import { proFavoritesService } from '@/services/proFavoritesService'
 import { formatPgcTimeMarker } from '@/utils/pgcTimeMarker'
 import './clip-insight.scss'
 
@@ -29,6 +30,9 @@ const ClipInsightPage: FC = () => {
   const [annotations, setAnnotations] = useState<ProClipAnnotationRead[]>([])
   const [insight, setInsight] = useState('')
   const [insightLoading, setInsightLoading] = useState(false)
+  const [favorited, setFavorited] = useState(false)
+  const [favoriteBusy, setFavoriteBusy] = useState(false)
+  const [tryItBusy, setTryItBusy] = useState(false)
 
   const load = useCallback(async () => {
     if (!clipId || !playerId) {
@@ -53,12 +57,18 @@ const ClipInsightPage: FC = () => {
       setClip(matched)
       setPlayerName(player.name)
       setAnnotations(ann.filter((a) => a.annotation_type === 'text'))
+      if (token) {
+        const favs = await proFavoritesService.list()
+        setFavorited(favs.some((f) => f.clip_id === clipId))
+      } else {
+        setFavorited(false)
+      }
       setLoading(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : '加载失败')
       setLoading(false)
     }
-  }, [clipId, playerId])
+  }, [clipId, playerId, token])
 
   useEffect(() => {
     if (!PHASE2_PROS_ENABLED_FLAG) {
@@ -68,6 +78,58 @@ const ClipInsightPage: FC = () => {
     }
     void load()
   }, [load])
+
+  const ensureLogin = () => {
+    if (token) return true
+    Taro.navigateTo({ url: '/pages/login/index' })
+    return false
+  }
+
+  const handleToggleFavorite = async () => {
+    if (!ensureLogin() || !clipId || favoriteBusy) return
+    setFavoriteBusy(true)
+    try {
+      if (favorited) {
+        await proFavoritesService.remove(clipId)
+        setFavorited(false)
+        Taro.showToast({ title: '已取消收藏', icon: 'none' })
+      } else {
+        await proFavoritesService.add({ clip_id: clipId })
+        setFavorited(true)
+        Taro.showToast({ title: '已收藏', icon: 'success' })
+      }
+    } catch (e) {
+      Taro.showToast({
+        title: e instanceof Error ? e.message : '操作失败',
+        icon: 'none',
+      })
+    } finally {
+      setFavoriteBusy(false)
+    }
+  }
+
+  const handleTryIt = async () => {
+    if (!ensureLogin() || !clipId || tryItBusy) return
+    setTryItBusy(true)
+    try {
+      const res = await proFavoritesService.tryIt(clipId)
+      setFavorited(true)
+      Taro.showToast({
+        title: res.created ? '已加入本周训练' : '训练任务已存在',
+        icon: 'success',
+      })
+      setTimeout(() => {
+        Taro.switchTab({ url: '/pages/training/index' }).catch(() => undefined)
+      }, 800)
+    } catch (e) {
+      Taro.showToast({
+        title: e instanceof Error ? e.message : '创建失败',
+        icon: 'none',
+      })
+    } finally {
+      setTryItBusy(false)
+    }
+  }
 
   const handleGenerateInsight = async () => {
     if (!token) {
@@ -116,6 +178,23 @@ const ClipInsightPage: FC = () => {
           {clip.club_type} · {clip.camera_angle === 'face_on' ? '正面' : '侧线'}
           {clip.overall_score != null ? ` · ${clip.overall_score} 分` : ''}
         </Text>
+      </View>
+
+      <View className='clip-insight__actions'>
+        <View
+          className={`clip-insight__action clip-insight__action--fav ${
+            favorited ? 'clip-insight__action--fav-on' : ''
+          }`}
+          onClick={() => void handleToggleFavorite()}
+        >
+          <Text>{favorited ? '❤️ 已收藏' : '🤍 收藏'}</Text>
+        </View>
+        <View
+          className='clip-insight__action clip-insight__action--try'
+          onClick={() => void handleTryIt()}
+        >
+          <Text>{tryItBusy ? '生成中…' : '想试试看'}</Text>
+        </View>
       </View>
 
       <View className='clip-insight__section'>

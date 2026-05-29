@@ -221,7 +221,16 @@ const TrainingPage: FC = () => {
     void loadPracticeCurve()
   }, [token, user?.is_member, practiceMonthKey, loadPracticeCurve])
 
-  const grouped = useMemo(() => groupByDate(plan?.tasks ?? []), [plan])
+  const { proTasks, standardTasks } = useMemo(() => {
+    const all = plan?.tasks ?? []
+    return {
+      proTasks: all.filter((t) => t.task_kind === 'pro_clip_try_it'),
+      standardTasks: all.filter((t) => t.task_kind !== 'pro_clip_try_it'),
+    }
+  }, [plan])
+
+  const groupedPro = useMemo(() => groupByDate(proTasks), [proTasks])
+  const grouped = useMemo(() => groupByDate(standardTasks), [standardTasks])
   const progressPercent = useMemo(() => {
     if (!plan || plan.total_tasks === 0) return 0
     return Math.round((plan.completed_tasks / plan.total_tasks) * 100)
@@ -488,6 +497,94 @@ const TrainingPage: FC = () => {
     }
   }
 
+  const renderTaskCard = (task: TrainingTaskItem) => {
+    const drill = getDrillDetail(task.drill_id)
+    const drillVideo = getDrillVideoDetail(task.drill_id)
+    const isExpanded = expandedTaskId === task.id
+    const isDone = task.status === 'completed'
+    const isProTryIt = task.task_kind === 'pro_clip_try_it'
+    const displayName =
+      isProTryIt && task.pro_player_name
+        ? `对照 ${task.pro_player_name} 的挥杆`
+        : drill.name
+    return (
+      <View
+        key={task.id}
+        className={`training__task ${isDone ? 'is-done' : ''} ${
+          isProTryIt ? 'training__task--pro' : ''
+        }`}
+      >
+        <View
+          className='training__task-head'
+          onClick={() => setExpandedTaskId(isExpanded ? null : task.id)}
+        >
+          <View className='training__task-head-main'>
+            <Text className='training__task-name'>
+              {isDone ? '✅ ' : ''}
+              {displayName}
+            </Text>
+            <Text className='training__task-meta'>
+              {isProTryIt ? '对照球手 · ' : ''}
+              {drill.duration_minutes} 分钟 · {drill.difficulty} · {drill.sets} 组
+            </Text>
+            {isProTryIt && task.pro_clip_unavailable && (
+              <Text className='training__task-warn'>参考镜头已下架，任务仍可完成</Text>
+            )}
+          </View>
+          <Text className='training__task-arrow'>{isExpanded ? '收起' : '展开'}</Text>
+        </View>
+
+        {isExpanded && (
+          <View className='training__task-body'>
+            {isProTryIt && (
+              <Text className='training__task-pro-hint'>
+                参考职业镜头，用相同杆型与机位拍摄一条自己的挥杆，完成后打卡。
+              </Text>
+            )}
+            {drillVideo && (
+              <View className='training__task-video'>
+                <VideoCard
+                  attachment={{
+                    type: 'video_card',
+                    drill_id: task.drill_id,
+                    title: drillVideo.title,
+                  }}
+                />
+              </View>
+            )}
+            <Text className='training__task-desc'>{drill.description}</Text>
+            <View className='training__steps'>
+              {drill.steps.map((step, idx) => (
+                <View key={idx} className='training__step'>
+                  <Text className='training__step-index'>{idx + 1}</Text>
+                  <Text className='training__step-text'>{step}</Text>
+                </View>
+              ))}
+            </View>
+            {!isDone ? (
+              <Button
+                className='training__task-cta'
+                type='primary'
+                loading={submittingTaskId === task.id}
+                onClick={() => handleComplete(task.id)}
+              >
+                {submittingTaskId === task.id ? '提交中...' : '完成打卡'}
+              </Button>
+            ) : (
+              <Text className='training__task-completed-label'>
+                已于{' '}
+                {task.completed_at
+                  ? new Date(task.completed_at).toLocaleDateString()
+                  : ''}{' '}
+                完成
+              </Text>
+            )}
+          </View>
+        )}
+      </View>
+    )
+  }
+
   if (!initialized) {
     return (
       <View className='training training--empty'>
@@ -582,90 +679,32 @@ const TrainingPage: FC = () => {
         </View>
       )}
 
+      {groupedPro.length > 0 && (
+        <View className='training__pro-section'>
+          <Text className='training__pro-section-title'>对照球手训练</Text>
+          {groupedPro.map(({ date, tasks }) => (
+            <View key={`pro-${date}`} className='training__day'>
+              <View className='training__day-header'>
+                <Text className='training__day-label'>{formatDayLabel(date)}</Text>
+                <Text className='training__day-count'>{tasks.length} 个任务</Text>
+              </View>
+              {tasks.map((task) => renderTaskCard(task))}
+            </View>
+          ))}
+        </View>
+      )}
+
+      {grouped.length > 0 && groupedPro.length > 0 && (
+        <Text className='training__section-divider'>分析驱动训练</Text>
+      )}
+
       {grouped.map(({ date, tasks }) => (
         <View key={date} className='training__day'>
           <View className='training__day-header'>
             <Text className='training__day-label'>{formatDayLabel(date)}</Text>
             <Text className='training__day-count'>{tasks.length} 个任务</Text>
           </View>
-          {tasks.map((task) => {
-            const drill = getDrillDetail(task.drill_id)
-            const drillVideo = getDrillVideoDetail(task.drill_id)
-            const isExpanded = expandedTaskId === task.id
-            const isDone = task.status === 'completed'
-            return (
-              <View
-                key={task.id}
-                className={`training__task ${isDone ? 'is-done' : ''}`}
-              >
-                <View
-                  className='training__task-head'
-                  onClick={() =>
-                    setExpandedTaskId(isExpanded ? null : task.id)
-                  }
-                >
-                  <View className='training__task-head-main'>
-                    <Text className='training__task-name'>
-                      {isDone ? '✅ ' : ''}
-                      {drill.name}
-                    </Text>
-                    <Text className='training__task-meta'>
-                      {drill.duration_minutes} 分钟 · {drill.difficulty} ·{' '}
-                      {drill.sets} 组
-                    </Text>
-                  </View>
-                  <Text className='training__task-arrow'>
-                    {isExpanded ? '收起' : '展开'}
-                  </Text>
-                </View>
-
-                {isExpanded && (
-                  <View className='training__task-body'>
-                    {drillVideo && (
-                      <View className='training__task-video'>
-                        <VideoCard
-                          attachment={{
-                            type: 'video_card',
-                            drill_id: task.drill_id,
-                            title: drillVideo.title,
-                          }}
-                        />
-                      </View>
-                    )}
-                    <Text className='training__task-desc'>
-                      {drill.description}
-                    </Text>
-                    <View className='training__steps'>
-                      {drill.steps.map((step, idx) => (
-                        <View key={idx} className='training__step'>
-                          <Text className='training__step-index'>{idx + 1}</Text>
-                          <Text className='training__step-text'>{step}</Text>
-                        </View>
-                      ))}
-                    </View>
-                    {!isDone ? (
-                      <Button
-                        className='training__task-cta'
-                        type='primary'
-                        loading={submittingTaskId === task.id}
-                        onClick={() => handleComplete(task.id)}
-                      >
-                        {submittingTaskId === task.id ? '提交中...' : '完成打卡'}
-                      </Button>
-                    ) : (
-                      <Text className='training__task-completed-label'>
-                        已于{' '}
-                        {task.completed_at
-                          ? new Date(task.completed_at).toLocaleDateString()
-                          : ''}{' '}
-                        完成
-                      </Text>
-                    )}
-                  </View>
-                )}
-              </View>
-            )
-          })}
+          {tasks.map((task) => renderTaskCard(task))}
         </View>
       ))}
       </View>

@@ -15,7 +15,7 @@
 -------------------
 本路由仅交付读端点。匹配见 ``GET /v1/analyses/{id}/pro-matches``（M12-04）；
 PGC 解说 / LLM 解读见 ``GET/POST /v1/pros/clips/{id}/...``（M12-07）；
-``favorite_clip`` / 收藏列表等按需后续 PR。
+收藏 / 想试试看见 ``/v1/users/me/pros/favorites``（M12-10）。
 """
 
 from __future__ import annotations

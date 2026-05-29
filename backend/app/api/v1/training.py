@@ -23,8 +23,62 @@ from app.schemas.training import (
     DrillDetail,
     PracticeLogItem,
     TrainingPlanDetail,
+    TrainingTaskItem,
 )
+from app.services import pro_favorites_service as fav_svc
 from app.services import training_service
+
+
+async def _plan_to_detail(
+    db: AsyncSession, user: User, plan
+) -> TrainingPlanDetail:
+    tasks = sorted(plan.tasks, key=lambda t: (t.scheduled_date, t.sort_order))
+    refs = await fav_svc.load_pro_clip_refs_for_tasks(
+        db, user_id=user.id, task_ids=[t.id for t in tasks]
+    )
+    task_items = []
+    for task in tasks:
+        ref = refs.get(task.id)
+        if ref:
+            clip_id, player_name, unavailable = ref
+            task_items.append(
+                training_service.training_task_to_item(
+                    task,
+                    pro_clip_id=clip_id,
+                    pro_player_name=player_name,
+                    pro_clip_unavailable=unavailable,
+                )
+            )
+        else:
+            task_items.append(training_service.training_task_to_item(task))
+    return TrainingPlanDetail(
+        id=plan.id,
+        user_id=plan.user_id,
+        week_start=plan.week_start,
+        week_end=plan.week_end,
+        source_analysis_id=plan.source_analysis_id,
+        ai_summary=plan.ai_summary,
+        total_tasks=plan.total_tasks,
+        completed_tasks=plan.completed_tasks,
+        tasks=task_items,
+        created_at=plan.created_at,
+    )
+
+
+async def _task_to_item(db: AsyncSession, user: User, task) -> TrainingTaskItem:
+    refs = await fav_svc.load_pro_clip_refs_for_tasks(
+        db, user_id=user.id, task_ids=[task.id]
+    )
+    ref = refs.get(task.id)
+    if ref:
+        clip_id, player_name, unavailable = ref
+        return training_service.training_task_to_item(
+            task,
+            pro_clip_id=clip_id,
+            pro_player_name=player_name,
+            pro_clip_unavailable=unavailable,
+        )
+    return training_service.training_task_to_item(task)
 
 router = APIRouter()
 me_router = APIRouter()
@@ -43,21 +97,7 @@ async def get_current_plan(
     plan = await training_service.get_current_week_plan(db, user)
     if plan is None:
         return ok(None)
-    # tasks 已经通过 selectinload 加载
-    tasks = sorted(plan.tasks, key=lambda t: (t.scheduled_date, t.sort_order))
-    detail = TrainingPlanDetail(
-        id=plan.id,
-        user_id=plan.user_id,
-        week_start=plan.week_start,
-        week_end=plan.week_end,
-        source_analysis_id=plan.source_analysis_id,
-        ai_summary=plan.ai_summary,
-        total_tasks=plan.total_tasks,
-        completed_tasks=plan.completed_tasks,
-        tasks=[training_service.training_task_to_item(t) for t in tasks],
-        created_at=plan.created_at,
-    )
-    return ok(detail)
+    return ok(await _plan_to_detail(db, user, plan))
 
 
 # ==================== /training-plan/from-analysis/{analysis_id} ====================
@@ -85,21 +125,7 @@ async def add_to_plan_from_analysis(
         db, analysis_id=analysis_id, user=user
     )
     await db.commit()
-    # plan.tasks 已经在 service 内 selectinload，无需再 refresh
-    tasks = sorted(plan.tasks, key=lambda t: (t.scheduled_date, t.sort_order))
-    detail = TrainingPlanDetail(
-        id=plan.id,
-        user_id=plan.user_id,
-        week_start=plan.week_start,
-        week_end=plan.week_end,
-        source_analysis_id=plan.source_analysis_id,
-        ai_summary=plan.ai_summary,
-        total_tasks=plan.total_tasks,
-        completed_tasks=plan.completed_tasks,
-        tasks=[training_service.training_task_to_item(t) for t in tasks],
-        created_at=plan.created_at,
-    )
-    return ok(detail)
+    return ok(await _plan_to_detail(db, user, plan))
 
 
 # ==================== /training-plan/tasks/{task_id}/complete ====================
@@ -128,7 +154,7 @@ async def complete_task(
 
     return ok(
         CompleteTaskResponse(
-            task=training_service.training_task_to_item(task),
+            task=await _task_to_item(db, user, task),
             current_streak_days=user.current_streak_days or 0,
             plan_completed_tasks=plan.completed_tasks,
             plan_total_tasks=plan.total_tasks,
