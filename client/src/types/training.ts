@@ -17,6 +17,10 @@ export interface TrainingTaskItem {
   status: TaskStatus
   completed_at: string | null
   verification_analysis_id: string | null
+  task_kind?: 'standard' | 'pro_clip_try_it'
+  pro_clip_id?: string | null
+  pro_player_name?: string | null
+  pro_clip_unavailable?: boolean
 }
 
 export interface TrainingPlanDetail {

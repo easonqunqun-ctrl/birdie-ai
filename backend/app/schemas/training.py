@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 TaskStatus = Literal["pending", "completed"]
+TaskKind = Literal["standard", "pro_clip_try_it"]
 Difficulty = Literal["easy", "medium", "hard"]
 
 
@@ -38,6 +39,10 @@ class TrainingTaskItem(BaseModel):
     status: TaskStatus
     completed_at: datetime | None = None
     verification_analysis_id: str | None = None
+    task_kind: TaskKind = "standard"
+    pro_clip_id: str | None = None
+    pro_player_name: str | None = None
+    pro_clip_unavailable: bool = False
 
 
 class TrainingPlanDetail(BaseModel):

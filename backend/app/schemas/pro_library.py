@@ -199,6 +199,28 @@ class ProMatchResultRead(BaseModel):
     recorded_match_id: str | None = None
 
 
+class ProFavoriteCreate(BaseModel):
+    clip_id: str = Field(..., max_length=32)
+    note: str | None = Field(default=None, max_length=500)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ProFavoriteItemRead(BaseModel):
+    clip_id: str
+    note: str | None = None
+    training_task_id: str | None = None
+    created_at: datetime
+    clip: ProSwingClipRead
+    player: ProPlayerRead
+    clip_unavailable: bool = False
+
+
+class ProTryItResponse(BaseModel):
+    training_task_id: str
+    created: bool
+
+
 __all__ = [
     "AnnotationTypeLiteral",
     "CameraAngleLiteral",
@@ -206,6 +228,8 @@ __all__ = [
     "LicenseStatusLiteral",
     "ProClipAnnotationCreate",
     "ProClipAnnotationRead",
+    "ProFavoriteCreate",
+    "ProFavoriteItemRead",
     "ProMatchItemRead",
     "ProMatchResultRead",
     "ProPgcInsightRequest",
@@ -217,6 +241,7 @@ __all__ = [
     "ProTopicClipItemRead",
     "ProTopicCreate",
     "ProTopicRead",
+    "ProTryItResponse",
     "UserProMatchCreate",
     "UserProMatchRead",
 ]

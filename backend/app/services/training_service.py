@@ -43,7 +43,13 @@ MAX_TASKS_PER_ANALYSIS = 5
 log = logging.getLogger(__name__)
 
 
-def training_task_to_item(task: TrainingTask) -> TrainingTaskItem:
+def training_task_to_item(
+    task: TrainingTask,
+    *,
+    pro_clip_id: str | None = None,
+    pro_player_name: str | None = None,
+    pro_clip_unavailable: bool = False,
+) -> TrainingTaskItem:
     """ORM → Pydantic；非法 `status` 降级，避免 model_validate 抛错导致 HTTP 500。"""
     raw = task.status or ""
     status: Literal["pending", "completed"] = "completed" if raw == "completed" else "pending"
@@ -52,6 +58,9 @@ def training_task_to_item(task: TrainingTask) -> TrainingTaskItem:
             "invalid_training_task_status_coerced",
             extra={"task_id": task.id, "raw_status": raw},
         )
+    task_kind: Literal["standard", "pro_clip_try_it"] = (
+        "pro_clip_try_it" if pro_clip_id else "standard"
+    )
     return TrainingTaskItem(
         id=task.id,
         plan_id=task.plan_id,
@@ -61,6 +70,10 @@ def training_task_to_item(task: TrainingTask) -> TrainingTaskItem:
         status=status,
         completed_at=task.completed_at,
         verification_analysis_id=task.verification_analysis_id,
+        task_kind=task_kind,
+        pro_clip_id=pro_clip_id,
+        pro_player_name=pro_player_name,
+        pro_clip_unavailable=pro_clip_unavailable,
     )
 
 
@@ -304,6 +317,46 @@ async def get_current_week_plan(db: AsyncSession, user: User) -> TrainingPlan | 
         )
     )
     return (await db.execute(stmt)).scalar_one_or_none()
+
+
+async def ensure_current_week_plan(db: AsyncSession, user_id: str) -> TrainingPlan:
+    """确保当周训练计划存在（无 issue 也可建空 plan，供 pro try-it 等追加任务）."""
+
+    today = _china_today()
+    monday, sunday = week_bounds(today)
+
+    stmt = (
+        select(TrainingPlan)
+        .options(selectinload(TrainingPlan.tasks))
+        .where(
+            TrainingPlan.user_id == user_id,
+            TrainingPlan.week_start == monday,
+        )
+    )
+    plan = (await db.execute(stmt)).scalar_one_or_none()
+    if plan is not None:
+        return plan
+
+    candidate = TrainingPlan(
+        id=new_id("plan"),
+        user_id=user_id,
+        week_start=monday,
+        week_end=sunday,
+        source_analysis_id=None,
+        total_tasks=0,
+        completed_tasks=0,
+    )
+    db.add(candidate)
+    try:
+        async with db.begin_nested():
+            await db.flush()
+    except IntegrityError:
+        plan = (await db.execute(stmt)).scalar_one_or_none()
+        if plan is None:
+            raise
+    else:
+        plan = candidate
+    return plan
 
 
 async def add_analysis_to_weekly_plan(

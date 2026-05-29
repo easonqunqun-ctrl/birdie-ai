@@ -1647,6 +1647,26 @@ GET    /v1/analyses/{analysis_id}/coach-annotations     学员侧可见批注（
 
 **`GET /v1/users/me`** 响应新增 `can_coach_annotate: bool`（白名单 + 灰度）。
 
+### 5B.4 收藏 / 想试试看（M12-10）
+
+```
+POST   /v1/users/me/pros/favorites              Body: { clip_id, note? }
+DELETE /v1/users/me/pros/favorites/{clip_id}
+GET    /v1/users/me/pros/favorites
+POST   /v1/users/me/pros/favorites/{clip_id}/try-it
+```
+
+**灰度**：`PHASE2_PROS_ENABLED=false` → **404**（`40406`）。写端点需 JWT。
+
+**语义**：
+- **收藏**：对已发布镜头幂等写入 `user_pro_favorites`；取消收藏删除行。
+- **列表**：按 `created_at` 倒序，展开 `{ clip, player }`；镜头/球手下架时 `clip_unavailable=true`（记录保留）。
+- **try-it**：自动收藏（若未收藏）；为当周计划追加一条 `drill_half_swing` 任务（`scheduled_date = min(今天+3天, 本周日)`）；同 clip 已有 **pending** 任务时幂等返回原 `training_task_id`（`created=false`）。收藏行写入 `training_task_id` 关联。
+
+**训练计划读端点扩展**：`GET /v1/users/me/training-plan/current` 的 `tasks[]` 新增可选字段 `task_kind`（`standard` | `pro_clip_try_it`）、`pro_clip_id`、`pro_player_name`、`pro_clip_unavailable`（由 `user_pro_favorites.training_task_id` 反查）。
+
+**客户端**：`proFavoritesService`；`pages/pros/clip-insight` 收藏 ❤️ +「想试试看」→ 训练 Tab；`pages/training/index`「对照球手训练」分组。
+
 ---
 
 ## 六、支付模块（/payments）
