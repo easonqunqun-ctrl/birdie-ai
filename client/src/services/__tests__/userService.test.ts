@@ -131,3 +131,25 @@ describe('userService.getAnalysisProgress · querystring', () => {
     expect(T.request.mock.calls[0][0].url).not.toContain('?')
   })
 })
+
+describe('userService.getScorePercentile', () => {
+  test('encodes club_type query param', async () => {
+    T.request.mockResolvedValueOnce(
+      ok({
+        user_score: 82,
+        percentile: 0.65,
+        cohort_size: 12,
+        cohort_label: '同水平',
+        median: 78,
+        club_type: 'iron_7',
+        golf_level: 'beginner',
+        computed_at: '2026-05-29T00:00:00Z',
+      }),
+    )
+    const res = await userService.getScorePercentile('iron_7')
+    expect(T.request.mock.calls[0][0].url).toContain(
+      '/users/me/score-percentile?club_type=iron_7',
+    )
+    expect(res.percentile).toBe(0.65)
+  })
+})
