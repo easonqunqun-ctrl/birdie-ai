@@ -32,7 +32,8 @@
 | **W18+** | probe rewrite + 自检脚本就位 | 切 COS / OSS / 第三方对象存储 | 改 env → 跑 `cos_switch_selfcheck.py` 校验 → 重启 | DevOps |
 | **W19+** | 朋友圈封面 layout 就位 | 产品决定接入 timeline 海报 | 实现 drawPosterTimeline + 接 poster.tsx | 客户端工程 |
 | **M7-11-cal** | 推杆 pipeline 链路就位（W22-W25） | ECS 推杆 ≥10 段人工标注就位 | 回填 `putting/constants.py` ideal 区间 + 验 AC-3（与教练人评 r≥0.7） | AI 工程 |
-| **M7-11-dx** | 推杆诊断 5 条已上 | M7-09 杆/球追踪 or 手腕角序列特征就位 | 补 putter-lift / 手腕翻折 / 回摆过短 / 减速击球 / 瞄准偏移 等诊断 | AI 工程 |
+| **M7-11-dx** | 推杆诊断 5 条已上 | M7-09 杆/球追踪 or 手腕角序列特征就位 | 补 putter-lift / 手腕翻折 / 回摆过短 / 减速/瞄准偏移 等诊断 | AI 工程 |
+| **M7-12-cal** | 切杆 pipeline 链路就位 | ECS 切杆 ≥10 段人工标注就位 | 回填 `chipping/constants.py` ideal + 验 AC-2（r≥0.65） | AI 工程 |
 
 ---
 
@@ -210,6 +211,16 @@
 2. 每条配阈值 + 单测；现有 5 条（钟摆/头部/杆面/急/慢）已上线
 
 > 当前 5 条诊断全部基于已落地的 4 特征，可上线可测；剩余项**缺信号**，不硬凑。
+
+### 2.14 M7-12-cal · 切杆特征 ideal 区间 ECS 标定
+
+**触发条件**：
+- [ ] ECS 采集到切杆视频 ≥10 段，且每段有教练人评分
+
+**触发后动作**：
+1. 跑 pipeline 抽取 3 特征落 CSV
+2. 校准 `ai_engine/app/pipeline/chipping/constants.py` ideal 区间（当前 v0.1 占位）
+3. 验 **AC-2**：overall 与教练人评 **r≥0.65**
 
 ---
 
