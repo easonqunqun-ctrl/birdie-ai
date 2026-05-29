@@ -39,6 +39,8 @@ export interface CreateAnalysisRequest {
   club_type: ClubType
   /** M10-01：分析模式；默认 full_swing */
   mode?: AnalysisMode
+  /** M10-03：全挥杆目标码数（可选），供 yardage book 历史反推 */
+  target_yardage?: number
 }
 
 export interface CreateAnalysisResponse {

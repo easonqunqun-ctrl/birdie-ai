@@ -80,6 +80,12 @@ class CreateAnalysisRequest(BaseModel):
         default="full_swing",
         description="分析模式：full_swing（默认）/ putting / chipping",
     )
+    target_yardage: int | None = Field(
+        default=None,
+        ge=1,
+        le=400,
+        description="本次击球目标码数（码）；仅 full_swing 且 `PHASE2_YARDAGE_BOOK_ENABLED` 时有效，供 yardage book 反推",
+    )
 
 
 class CreateAnalysisResponse(BaseModel):

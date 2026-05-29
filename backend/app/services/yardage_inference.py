@@ -43,6 +43,6 @@ async def infer_yardage_for_club(
     rows = [int(r) for r in (await db.execute(stmt)).scalars().all() if r is not None]
     if len(rows) < MIN_INFERENCE_SAMPLES:
         return None
-    avg = int(round(statistics.mean(rows)))
+    avg = round(statistics.mean(rows))
     std = float(statistics.pstdev(rows)) if len(rows) > 1 else 0.0
     return YardageInference(avg=avg, std=std, sample_count=len(rows))

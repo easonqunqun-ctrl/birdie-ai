@@ -10,7 +10,7 @@
  */
 
 import { FC, useEffect, useMemo, useState } from 'react'
-import { View, Text, Button, ScrollView } from '@tarojs/components'
+import { View, Text, Button, ScrollView, Input } from '@tarojs/components'
 import Taro, { useRouter } from '@tarojs/taro'
 import { analysisService, uploadLikelyNeedsFreshToken } from '@/services/analysisService'
 import { checkVideoFirstFrame } from '@/services/mediaCheck'
@@ -34,7 +34,7 @@ import {
 } from '@/types/analysis'
 import type { AnalysisMode } from '@/types/analysis'
 import type { CameraAngle, ClubType } from '@/types/api'
-import { PHASE2_CHIPPING_MODE_ENABLED_FLAG, PHASE2_PUTTING_MODE_ENABLED_FLAG } from '@/constants/flags'
+import { PHASE2_CHIPPING_MODE_ENABLED_FLAG, PHASE2_PUTTING_MODE_ENABLED_FLAG, PHASE2_YARDAGE_BOOK_ENABLED_FLAG } from '@/constants/flags'
 import { CHIPPING_CLUB_HINT } from '@/constants/chippingLabels'
 import ModeSelector from '@/components/ModeSelector'
 import '@/components/ModeSelector.scss'
@@ -82,6 +82,7 @@ const AnalysisParamsPage: FC = () => {
   const [cameraAngle, setCameraAngle] = useState<CameraAngle>('face_on')
   const [clubType, setClubType] = useState<ClubType>('iron_7')
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('full_swing')
+  const [targetYardage, setTargetYardage] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [phase, setPhase] = useState<
@@ -277,11 +278,19 @@ const AnalysisParamsPage: FC = () => {
 
       setPhase('creating')
       Taro.showLoading({ title: '创建分析任务' })
+      const parsedYardage = targetYardage.trim() ? Number.parseInt(targetYardage.trim(), 10) : NaN
       const created = await analysisService.createAnalysis({
         upload_id: token.upload_id,
         camera_angle: cameraAngle,
         club_type: clubType,
         mode: analysisMode,
+        ...(analysisMode === 'full_swing' &&
+        PHASE2_YARDAGE_BOOK_ENABLED_FLAG &&
+        Number.isFinite(parsedYardage) &&
+        parsedYardage >= 1 &&
+        parsedYardage <= 400
+          ? { target_yardage: parsedYardage }
+          : {}),
       })
 
       Taro.hideLoading()
@@ -438,6 +447,22 @@ const AnalysisParamsPage: FC = () => {
           ))}
         </ScrollView>
       </View>
+
+      {analysisMode === 'full_swing' && PHASE2_YARDAGE_BOOK_ENABLED_FLAG && (
+        <View className='params__section'>
+          <Text className='params__section-title'>目标码数（可选）</Text>
+          <Text className='params__section-hint'>
+            填写本次击球目标距离，满 5 次后可自动反推个人 yardage book
+          </Text>
+          <Input
+            className='params__yardage-input'
+            type='number'
+            placeholder='例如 150'
+            value={targetYardage}
+            onInput={(e) => setTargetYardage(e.detail.value)}
+          />
+        </View>
+      )}
 
       <View className='params__footer'>
         {phase === 'uploading' && (
