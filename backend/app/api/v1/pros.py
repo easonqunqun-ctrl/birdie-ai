@@ -12,9 +12,8 @@
 
 写端点 / 收藏 / 匹配
 -------------------
-本 PR 仅交付读端点。``add_clip`` / ``favorite_clip`` / ``record_match`` 等仍只
-在 ``pro_library_service`` 里；后续 M12-04（收藏 / 历史）/ M12-05（PGC 解说）
-按需新增对应路由。
+本路由仅交付读端点。匹配见 ``GET /v1/analyses/{id}/pro-matches``（M12-04）；
+``favorite_clip`` / 收藏列表等按需后续 PR；M12-05（PGC 解说）按需扩展。
 """
 
 from __future__ import annotations

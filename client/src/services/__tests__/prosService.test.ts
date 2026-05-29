@@ -74,4 +74,32 @@ describe('prosService', () => {
     await prosService.clips('pp_x', { club_type: 'iron 7' })
     expect(T.request.mock.calls[0][0].url).toContain('club_type=iron%207')
   })
+
+  test('matchForAnalysis → GET /analyses/{id}/pro-matches', async () => {
+    T.request.mockResolvedValueOnce(
+      ok({
+        analysis_id: 'ana_abc',
+        matches: [],
+        recorded_match_id: null,
+      }),
+    )
+    await prosService.matchForAnalysis('ana_abc')
+    const sent = T.request.mock.calls[0][0]
+    expect(sent.method).toBe('GET')
+    expect(sent.url).toMatch(/\/analyses\/ana_abc\/pro-matches$/)
+  })
+
+  test('matchForAnalysis with limit and record=false → query string', async () => {
+    T.request.mockResolvedValueOnce(
+      ok({
+        analysis_id: 'ana_x',
+        matches: [],
+        recorded_match_id: null,
+      }),
+    )
+    await prosService.matchForAnalysis('ana_x', { limit: 3, record: false })
+    const url: string = T.request.mock.calls[0][0].url
+    expect(url).toContain('limit=3')
+    expect(url).toContain('record=false')
+  })
 })

@@ -5,6 +5,7 @@
  * - GET /v1/pros
  * - GET /v1/pros/{player_id}
  * - GET /v1/pros/{player_id}/clips?camera_angle=&club_type=
+ * - GET /v1/analyses/{analysis_id}/pro-matches?limit=&record=  （M12-04）
  *
  * 灰度
  * ----
@@ -55,6 +56,24 @@ export interface ListClipsQuery {
   club_type?: string
 }
 
+export interface ProMatchItemRead {
+  match_score: number
+  match_details: Record<string, unknown>
+  clip: ProSwingClipRead
+  player: ProPlayerRead
+}
+
+export interface ProMatchResultRead {
+  analysis_id: string
+  matches: ProMatchItemRead[]
+  recorded_match_id: string | null
+}
+
+export interface ProMatchQuery {
+  limit?: number
+  record?: boolean
+}
+
 export const prosService = {
   list() {
     return http.get<ProPlayerRead[]>('/pros')
@@ -68,5 +87,12 @@ export const prosService = {
     if (query.club_type) qs.push(`club_type=${encodeURIComponent(query.club_type)}`)
     const tail = qs.length ? `?${qs.join('&')}` : ''
     return http.get<ProSwingClipRead[]>(`/pros/${playerId}/clips${tail}`)
+  },
+  matchForAnalysis(analysisId: string, query: ProMatchQuery = {}) {
+    const qs: string[] = []
+    if (query.limit != null) qs.push(`limit=${query.limit}`)
+    if (query.record != null) qs.push(`record=${query.record ? 'true' : 'false'}`)
+    const tail = qs.length ? `?${qs.join('&')}` : ''
+    return http.get<ProMatchResultRead>(`/analyses/${analysisId}/pro-matches${tail}`)
   },
 }

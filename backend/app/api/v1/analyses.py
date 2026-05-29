@@ -7,6 +7,7 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_current_user_optional
+from app.api.v1.pros import _ensure_pros_enabled
 from app.core.database import get_db
 from app.core.redis import get_redis
 from app.integrations.minio import MinioStorageClient, get_minio_storage
@@ -26,8 +27,9 @@ from app.schemas.analysis import (
     UploadTokenResponse,
 )
 from app.schemas.base import APIResponse, ok
-from app.services import analysis_service
-from app.services.analysis_service import FREE_HISTORY_VISIBLE_LIMIT
+from app.schemas.pro_library import ProMatchItemRead, ProMatchResultRead, ProPlayerRead, ProSwingClipRead
+from app.services import analysis_service, pro_match_service
+from app.services.analysis_service import FREE_HISTORY_VISIBLE_LIMIT, _load_owned
 from app.services.sample_fixture import build_sample_report
 from app.services.share_card_service import ensure_share_wxa_code_url
 
@@ -172,6 +174,48 @@ async def get_analysis_report(
 ):
     result = await analysis_service.get_report(analysis_id=analysis_id, user=user, db=db)
     return ok(result)
+
+
+@router.get(
+    "/{analysis_id}/pro-matches",
+    summary="匹配最相似的职业球手镜头（M12-04）",
+    response_model=APIResponse[ProMatchResultRead],
+)
+async def get_analysis_pro_matches(
+    analysis_id: str,
+    limit: int = Query(5, ge=1, le=10, description="返回 Top-N 匹配"),
+    record: bool = Query(
+        True, description="是否将 Top-1 写入 user_pro_match_history"
+    ),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    _ensure_pros_enabled()
+    analysis = await _load_owned(db, analysis_id, user)
+    matches, history = await pro_match_service.match_analysis_to_pro_clips(
+        db,
+        user_id=user.id,
+        analysis=analysis,
+        limit=limit,
+        record=record,
+    )
+    await db.commit()
+    items = [
+        ProMatchItemRead(
+            match_score=m.match_score,
+            match_details=m.match_details,
+            clip=ProSwingClipRead.model_validate(m.clip),
+            player=ProPlayerRead.model_validate(m.player),
+        )
+        for m in matches
+    ]
+    return ok(
+        ProMatchResultRead(
+            analysis_id=analysis_id,
+            matches=items,
+            recorded_match_id=history.id if history else None,
+        )
+    )
 
 
 @router.delete(
