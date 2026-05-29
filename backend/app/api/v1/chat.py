@@ -36,7 +36,7 @@ from fastapi.responses import StreamingResponse
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, resolve_request_role
 from app.constants.chat_quick_questions import QUICK_QUESTIONS
 from app.core.database import get_db
 from app.core.rate_limit import check_chat_send_rate
@@ -239,6 +239,7 @@ async def send_message(
     request: Request,
     stream: bool | None = Query(default=None, description="false 强制 JSON；默认 SSE"),
     user: User = Depends(get_current_user),
+    request_role: str = Depends(resolve_request_role),
     db: AsyncSession = Depends(get_db),
     redis: Redis = Depends(get_redis),
 ):
@@ -247,14 +248,24 @@ async def send_message(
 
     if not _wants_sse(request, stream):
         result = await chat_service.send_message_sync(
-            user=user, session_id=session_id, content=payload.content, db=db
+            user=user,
+            session_id=session_id,
+            content=payload.content,
+            db=db,
+            request_role=request_role,
+            redis=redis,
         )
         await db.commit()
         return ok(result, message="发送成功")
 
     # SSE 流式：**先**做权限/配额/落 user_msg（任何 4xx 在开流前就抛出）
     prepared = await chat_service.prepare_turn(
-        db=db, user=user, session_id=session_id, content=payload.content
+        db=db,
+        user=user,
+        session_id=session_id,
+        content=payload.content,
+        request_role=request_role,
+        redis=redis,
     )
     if prepared.boundary_assistant is not None:
         gen = chat_service.stream_boundary_reply(

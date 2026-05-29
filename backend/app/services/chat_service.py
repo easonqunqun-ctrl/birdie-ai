@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from redis.asyncio import Redis
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -373,7 +374,13 @@ async def _build_llm_messages(
 
 
 async def prepare_turn(
-    *, db: AsyncSession, user: User, session_id: str, content: str
+    *,
+    db: AsyncSession,
+    user: User,
+    session_id: str,
+    content: str,
+    request_role: str | None = None,
+    redis: Redis | None = None,
 ) -> PreparedTurn:
     """发消息前置流程（同步/流式共用；**必须在 SSE 开流前调用**）:
 
@@ -433,7 +440,9 @@ async def prepare_turn(
             boundary_assistant=assistant_msg,
         )
 
-    quota = await quota_service.consume_chat_quota(db, user)
+    quota = await quota_service.consume_chat_quota(
+        db, user, request_role=request_role, redis=redis
+    )
 
     user_msg = ChatMessage(
         id=new_id("msg"),
@@ -535,6 +544,8 @@ async def send_message_sync(
     content: str,
     db: AsyncSession,
     llm_client: AbstractLLMClient | None = None,
+    request_role: str | None = None,
+    redis: Redis | None = None,
 ) -> SendMessageResponse:
     """发消息并等 LLM 全部回完再整条返回（非流式 JSON）.
 
@@ -548,7 +559,12 @@ async def send_message_sync(
     from app.core.exceptions import AIChatServiceError
 
     prepared = await prepare_turn(
-        db=db, user=user, session_id=session_id, content=content
+        db=db,
+        user=user,
+        session_id=session_id,
+        content=content,
+        request_role=request_role,
+        redis=redis,
     )
 
     if prepared.boundary_assistant is not None:

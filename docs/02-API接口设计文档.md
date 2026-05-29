@@ -1776,6 +1776,21 @@ POST /v1/admin/moderation/queue/{queue_id}/review   Body: { action: "approve"|"r
 
 **Mock 验收标记**（单测 / 联调）：文本含 `BLOCK_TEST` → 拒；`REVIEW_TEST` → 人工复核；`FAIL_TEST` → pending fail-safe。
 
+### 5A.11 教练侧无配额（M8-09）
+
+**无新增 C 端 API**；复用既有分析 / 对话扣减 hook。
+
+**角色来源**（配额短路判定）：
+- 优先级 1：请求头 `X-Role: coach|user`
+- 优先级 2：JWT `role` claim（M8-02 角色切换再签发）
+
+**语义**：
+- `COACH_QUOTA_BYPASS_ENABLED=true` 且 `request_role=coach` 且 `coach_profiles.status=active` → **不扣** `analysis_quotas` / `chat_quotas`；仍写 Redis 日计数 `coach_abuse:{user_id}:{date}:{quota_type}`。
+- 超限（默认分析 1000 / 对话 2000 次·日）→ **400**（`40001`，「教练今日调用已达上限」）；服务端日志 `coach_quota_abuse_limit`。
+- 非 active 教练或 `request_role=user` → 走一期 strict 配额逻辑。
+
+**配置**：`COACH_QUOTA_BYPASS_ENABLED`（默认 true）、`COACH_ANALYSIS_DAILY_LIMIT`、`COACH_CHAT_DAILY_LIMIT`。
+
 ---
 
 ## 5B、球手对比库（/pros · M12，灰度 `PHASE2_PROS_ENABLED`）

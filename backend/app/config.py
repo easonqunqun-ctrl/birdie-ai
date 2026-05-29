@@ -213,6 +213,11 @@ class Settings(BaseSettings):
     CONTENT_MODERATION_TIMEOUT_SEC: int = 3
     CONTENT_MODERATION_SLA_HOURS: int = 24
 
+    # M8-09 教练角色免扣配额 + 日限风控。
+    COACH_QUOTA_BYPASS_ENABLED: bool = True
+    COACH_ANALYSIS_DAILY_LIMIT: int = 1000
+    COACH_CHAT_DAILY_LIMIT: int = 2000
+
     # M13 球友约球
     # 上线前需 DEP-05 法律意见书到位（M13-09 服务协议 / 未成年保护）。
     PHASE2_MEETUP_ENABLED: bool = False
