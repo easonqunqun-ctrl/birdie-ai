@@ -59,6 +59,8 @@ import RadarChart, { RadarAxis } from '@/components/RadarChart'
 import '@/components/RadarChart.scss'
 import ProClipReferenceCard from '@/components/ProClipReferenceCard'
 import '@/components/ProClipReferenceCard.scss'
+import CoachTextAnnotationCard from '@/components/CoachTextAnnotationCard'
+import '@/components/CoachTextAnnotationCard.scss'
 import TrustBadge from '@/components/TrustBadge'
 import '@/components/TrustBadge.scss'
 import CameraAngleAlert from '@/components/CameraAngleAlert'
@@ -404,7 +406,9 @@ const ReportPage: FC = () => {
     }).catch(toastTabNavigationFailure)
   }
 
-  const canCoachAnnotate = Boolean(user?.can_coach_annotate)
+  const canCoachAnnotate = Boolean(user?.can_coach_annotate || user?.is_active_coach)
+  const coachTextAnnotations = coachAnnotations.filter((ann) => ann.annotation_type === 'text')
+  const coachClipAnnotations = coachAnnotations.filter((ann) => ann.annotation_type === 'video_ref')
 
   const goScoreGuide = () => {
     Taro.navigateTo({ url: '/pages/help/score-guide?from=report' }).catch(toastTabNavigationFailure)
@@ -885,12 +889,23 @@ const ReportPage: FC = () => {
         </View>
       )}
 
-      {coachAnnotations.length > 0 && !isSample && (
+      {coachTextAnnotations.length > 0 && !isSample && (
+        <View className='report__section'>
+          <View className='report__section-header'>
+            <Text className='report__section-title'>教练点评</Text>
+          </View>
+          {coachTextAnnotations.map((ann) => (
+            <CoachTextAnnotationCard key={ann.id} annotation={ann} />
+          ))}
+        </View>
+      )}
+
+      {coachClipAnnotations.length > 0 && !isSample && (
         <View className='report__section'>
           <View className='report__section-header'>
             <Text className='report__section-title'>教练参考素材</Text>
           </View>
-          {coachAnnotations.map((ann) => (
+          {coachClipAnnotations.map((ann) => (
             <ProClipReferenceCard
               key={ann.id}
               annotation={ann}
@@ -1066,7 +1081,7 @@ const ReportPage: FC = () => {
         )}
         {canCoachAnnotate && !isSample && (
           <Button className='report__footer-btn' onClick={handleGoCoachAnnotate}>
-            📎 引用职业镜头
+            📝 教练批注
           </Button>
         )}
         <Button className='report__footer-btn' onClick={handleAskCoach}>

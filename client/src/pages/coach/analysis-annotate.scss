@@ -39,6 +39,30 @@
     font-weight: 600;
     color: var(--color-text);
     margin-bottom: 16rpx;
+
+    &--spaced {
+      margin-top: 32rpx;
+    }
+  }
+
+  &__textarea {
+    width: 100%;
+    min-height: 180rpx;
+    padding: 20rpx 24rpx;
+    border-radius: var(--radius-md);
+    border: 1rpx solid var(--color-border);
+    background: var(--color-surface);
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    box-sizing: border-box;
+  }
+
+  &__submit-text {
+    margin-top: 16rpx;
+    margin-bottom: 24rpx;
+    background: var(--color-primary);
+    color: var(--color-text-on-primary);
+    font-size: var(--font-size-base);
   }
 
   &__add {

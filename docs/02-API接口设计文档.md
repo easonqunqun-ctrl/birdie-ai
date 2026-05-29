@@ -1735,20 +1735,24 @@ POST /v1/pros/clips/{clip_id}/pgc-insight
 
 **客户端**：`prosService.annotations()` / `prosService.pgcInsight()`；`pages/pros/detail` 镜头卡片「解说」→ `pages/pros/clip-insight`；职业对比页可带 `analysisId` query。
 
-### 5B.3 教练批注引用职业镜头（M12-09 · 依赖 M8-04 骨架）
+### 5B.3 教练批注（M8-04 · text / video_ref；M12-09 职业镜头引用）
 
 ```
-POST   /v1/coach/analyses/{analysis_id}/annotations     Body: { annotation_type: "video_ref", pro_clip_id }
+POST   /v1/coach/analyses/{analysis_id}/annotations     Body: { annotation_type: "text"|"video_ref", text_content?, pro_clip_id? }
 GET    /v1/coach/analyses/{analysis_id}/annotations     教练侧列表（含 clip/player 展开）
 DELETE /v1/coach/annotations/{annotation_id}
 GET    /v1/analyses/{analysis_id}/coach-annotations     学员侧可见批注（is_visible + approved）
 ```
 
-**灰度**：`PHASE2_COACH_ANNOTATIONS_ENABLED` + `PHASE2_PROS_ENABLED`；教练写端点额外要求 `COACH_COURSE_USER_IDS` 白名单（M8-01 就位前）。`video_ref` 引用已发布 pro clip，默认 `audit_status=approved` / `is_visible=true`。
+**灰度**：`PHASE2_COACH_ANNOTATIONS_ENABLED`；`video_ref` 额外要求 `PHASE2_PROS_ENABLED`。教练写端点须 JWT **`role=coach`** + 已审核教练（M8-01）或 seed 白名单；**须与报告所属学员存在 `active` 师生关系**（M8-03），否则 **40312**。
 
-**客户端**：`coachAnnotationService`；`ProClipPicker` + `pages/coach/analysis-annotate`；报告页 `ProClipReferenceCard` +「看对比」跳转 `pro-compare`。
+**类型**：
+- `text`：必填 `text_content`（≤500 字）；MVP 默认 `audit_status=approved` / `is_visible=true`（完整内容安全审核见 M8-08）。
+- `video_ref`：必填 `pro_clip_id`；引用已发布 pro clip，默认 `audit_status=approved` / `is_visible=true`。
 
-**`GET /v1/users/me`** 响应新增 `can_coach_annotate: bool`（白名单 + 灰度）。
+**客户端**：`coachAnnotationService`；`pages/coach/analysis-annotate`（文字 + 职业镜头）；报告页 `CoachTextAnnotationCard` + `ProClipReferenceCard` +「看对比」跳转 `pro-compare`。
+
+**`GET /v1/users/me`** 响应 `can_coach_annotate: bool`（seed 白名单 + 灰度）；已审核教练另见 `is_active_coach`。
 
 ### 5B.4 收藏 / 想试试看（M12-10）
 
