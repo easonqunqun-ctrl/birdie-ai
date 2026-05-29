@@ -9,6 +9,7 @@ from app.config import settings
 from app.core.database import AsyncSessionLocal
 from app.core.security import new_id
 from app.models.user import User
+from tests.meetup_test_helpers import prepare_meetup_access
 
 
 @pytest.fixture
@@ -70,6 +71,7 @@ async def test_create_and_list_invitation_round_trip(
     """A 给 B 发邀请 → A 在自己列表看到 (role=inviter, status=pending)."""
 
     other_id = await _make_other_user()
+    await prepare_meetup_access(client, auth_headers)
     create_resp = await client.post(
         "/v1/meetups/invitations",
         json={"invitee_user_id": other_id, "message": "hi"},
@@ -106,6 +108,7 @@ async def test_create_invitation_rejects_self(
     # 拿当前用户 id
     me = await client.get("/v1/users/me", headers=auth_headers)
     me_id = me.json()["data"]["id"]
+    await prepare_meetup_access(client, auth_headers)
     resp = await client.post(
         "/v1/meetups/invitations",
         json={"invitee_user_id": me_id},
@@ -124,6 +127,7 @@ async def test_cancel_invitation_round_trip(
     """创建 → 撤回 → 列表显示 cancelled."""
 
     other_id = await _make_other_user()
+    await prepare_meetup_access(client, auth_headers)
     create_resp = await client.post(
         "/v1/meetups/invitations",
         json={"invitee_user_id": other_id},
@@ -147,6 +151,7 @@ async def test_list_status_filter(
     """status=cancelled 只返已撤回的."""
 
     other_id = await _make_other_user()
+    await prepare_meetup_access(client, auth_headers)
     # 创建 + 撤回 1 个
     r1 = await client.post(
         "/v1/meetups/invitations",

@@ -122,6 +122,27 @@ class MeetupCreditTooLowError(ForbiddenError):
     message = "约球信用分不足，暂不可发起邀请"
 
 
+class MeetupMinorBlockedError(ForbiddenError):
+    """M13-09 · 14 岁以下不可使用约球."""
+
+    code = 40332
+    message = "14 岁以下不开放约球功能"
+
+
+class MeetupIdentityRequiredError(ForbiddenError):
+    """M13-09 · 未完成手机号实名 / 年龄信息."""
+
+    code = 40333
+    message = "请先完成手机号实名"
+
+
+class MeetupTosRequiredError(ForbiddenError):
+    """M13-09 · 未同意约球服务协议增量."""
+
+    code = 40334
+    message = "请先阅读并同意约球服务协议"
+
+
 class ConflictError(AppException):
     """资源状态冲突（如分析尚未完成就去取报告）."""
 

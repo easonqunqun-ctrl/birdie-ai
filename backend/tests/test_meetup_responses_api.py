@@ -10,6 +10,7 @@ from app.core.database import AsyncSessionLocal
 from app.core.security import new_id
 from app.models.meetup import MeetupInvitation
 from app.models.user import User
+from tests.meetup_test_helpers import prepare_meetup_access
 
 
 @pytest.fixture
@@ -82,6 +83,7 @@ async def test_accept_happy_path_with_contact(
 ) -> None:
     me_id = await _current_user_id(client, auth_headers)
     inv_id, _ = await _make_invitation_for_user(me_id)
+    await prepare_meetup_access(client, auth_headers)
 
     resp = await client.post(
         f"/v1/meetups/invitations/{inv_id}/accept",
@@ -116,6 +118,7 @@ async def test_accept_rejects_non_invitee(
         db.add(other_invitee)
         await db.commit()
     inv_id, _ = await _make_invitation_for_user(other_invitee.id)
+    await prepare_meetup_access(client, auth_headers)
 
     resp = await client.post(
         f"/v1/meetups/invitations/{inv_id}/accept", headers=auth_headers
@@ -134,6 +137,7 @@ async def test_accept_rejects_contact_with_phone(
 
     me_id = await _current_user_id(client, auth_headers)
     inv_id, _ = await _make_invitation_for_user(me_id)
+    await prepare_meetup_access(client, auth_headers)
 
     resp = await client.post(
         f"/v1/meetups/invitations/{inv_id}/accept",
@@ -152,6 +156,7 @@ async def test_decline_happy_path(
 ) -> None:
     me_id = await _current_user_id(client, auth_headers)
     inv_id, _ = await _make_invitation_for_user(me_id)
+    await prepare_meetup_access(client, auth_headers)
 
     resp = await client.post(
         f"/v1/meetups/invitations/{inv_id}/decline", headers=auth_headers
@@ -170,6 +175,7 @@ async def test_accept_idempotency_via_status_check(
 
     me_id = await _current_user_id(client, auth_headers)
     inv_id, _ = await _make_invitation_for_user(me_id)
+    await prepare_meetup_access(client, auth_headers)
     r1 = await client.post(
         f"/v1/meetups/invitations/{inv_id}/accept", headers=auth_headers
     )

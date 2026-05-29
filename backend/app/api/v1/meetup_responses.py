@@ -28,9 +28,8 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
-from app.config import settings
+from app.api.v1.meetup_guard import ensure_meetup_user_ready
 from app.core.database import get_db
-from app.core.exceptions import NotFoundError
 from app.core.redis import get_redis
 from app.models.user import User
 from app.schemas.base import APIResponse, ok
@@ -39,11 +38,6 @@ from app.services import meetup_risk_service as risk_svc
 from app.services import meetup_service
 
 router = APIRouter()
-
-
-def _ensure_meetup_enabled() -> None:
-    if not settings.PHASE2_MEETUP_ENABLED:
-        raise NotFoundError(code=40406, message="约球功能未开放")
 
 
 # ==================== POST /v1/meetups/invitations/{id}/accept ====================
@@ -71,7 +65,7 @@ async def accept_meetup_invitation(
     后续推送由 M13-04 完成。
     """
 
-    _ensure_meetup_enabled()
+    await ensure_meetup_user_ready(db, user=user)
     inv = await meetup_service.accept_invitation(
         db,
         invitation_id=invitation_id,
@@ -100,7 +94,7 @@ async def decline_meetup_invitation(
 ):
     """非 invitee → 40330；非 pending → 幂等返回当前状态."""
 
-    _ensure_meetup_enabled()
+    await ensure_meetup_user_ready(db, user=user)
     inv = await meetup_service.decline_invitation(
         db, invitation_id=invitation_id, user_id=user.id
     )
