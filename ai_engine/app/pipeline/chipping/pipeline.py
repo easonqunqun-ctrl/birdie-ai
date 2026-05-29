@@ -78,6 +78,7 @@ async def run_chipping_analysis(req: AnalyzeRequest) -> AnalyzeResult:
         analysis_mode="chipping",
         overall_score=scores["overall"],
         phase_scores=phase_scores,
+        mode_feature_scores=scores["features"],
         phase_timestamps=None,
         issues=issues,
         skeleton_video_url=skeleton_url,

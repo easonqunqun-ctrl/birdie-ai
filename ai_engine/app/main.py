@@ -304,6 +304,11 @@ def _mock_chipping_result(req: AnalyzeRequest) -> AnalyzeResult:
         analysis_mode="chipping",
         overall_score=80,
         phase_scores=phase_scores,
+        mode_feature_scores={
+            "half_swing_amplitude": 78,
+            "face_open_angle": 82,
+            "contact_point_quality": 80,
+        },
         issues=[],
         duration_ms=0,
     )

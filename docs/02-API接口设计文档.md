@@ -818,6 +818,7 @@ GET /v1/analyses/{analysis_id}
 - **`quality_warnings`**：`string[]`，AI 引擎返回的**非阻断**拍摄质量提示（machine codes，如 `low_light`、`camera_shake`），入库列 `swing_analyses.quality_warnings`（JSONB）。与失败态 `error` 互斥存在；空数组表示无附加提示。客户端展示文案见 `client/src/constants/qualityWarnings.ts`，产品与话术真源见 [`docs/20` §4.3～§4.4](./20-AI引擎产品力迭代设计.md)。
 - **`analysis_mode`**：`full_swing` / `putting` / `chipping`；入库 `swing_analyses.analysis_mode`（M10-01）。
 - **`putting_features`**：仅 `analysis_mode=putting` 时返回 4 维度分（`pendulum_stability` / `head_stability` / `face_alignment` / `tempo_ratio`）；来源 `swing_analyses.mode_feature_scores`（M10-01）。`phase_scores` 在同 mode 下为推杆 4 阶段（setup/backstroke/impact/follow），与全挥杆 6 阶段不同构。
+- **`chipping_features`**：仅 `analysis_mode=chipping` 时返回 3 维度分（`half_swing_amplitude` / `face_open_angle` / `contact_point_quality`）；同样来源 `mode_feature_scores`（M10-02）。
 
 ---
 

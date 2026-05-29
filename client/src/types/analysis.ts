@@ -145,6 +145,8 @@ export interface AnalysisReportResponse {
   analysis_mode?: AnalysisMode | null
   /** M10-01：推杆专属 4 维度；仅 analysis_mode=putting */
   putting_features?: Record<string, PhaseScore> | null
+  /** M10-02：切杆专属 3 维度；仅 analysis_mode=chipping */
+  chipping_features?: Record<string, PhaseScore> | null
   video_url: string
   /** 视频时长（秒）；backend 会返回 decimal 转 float */
   video_duration?: number | null
