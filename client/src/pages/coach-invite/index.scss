@@ -1,0 +1,96 @@
+.coach-invite {
+  min-height: 100%;
+  padding: 24rpx;
+  background: var(--color-bg-page);
+  box-sizing: border-box;
+
+  &--blocked {
+    padding-top: 160rpx;
+    text-align: center;
+    color: var(--color-text-secondary);
+    font-size: 32rpx;
+  }
+
+  &__section {
+    background: var(--color-bg-card);
+    border: 1rpx solid var(--color-border);
+    border-radius: 20rpx;
+    padding: 24rpx;
+    margin-bottom: 16rpx;
+    box-shadow: var(--shadow-xs);
+  }
+
+  &__section-title {
+    display: block;
+    font-size: 34rpx;
+    font-weight: 700;
+    color: var(--color-primary);
+    margin-bottom: 16rpx;
+  }
+
+  &__name {
+    display: block;
+    font-size: 32rpx;
+    color: var(--color-text-primary);
+    font-weight: 600;
+  }
+
+  &__message {
+    display: block;
+    margin-top: 8rpx;
+    font-size: 28rpx;
+    color: var(--color-text-tertiary);
+    line-height: 1.45;
+  }
+
+  &__empty {
+    font-size: 28rpx;
+    color: var(--color-text-tertiary);
+  }
+
+  &__card {
+    padding: 16rpx 0;
+    border-bottom: 1rpx solid var(--color-border);
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  &__actions {
+    display: flex;
+    flex-direction: row;
+    gap: 12rpx;
+    margin-top: 16rpx;
+  }
+
+  &__accept,
+  &__reject,
+  &__ghost {
+    flex: 1;
+    border-radius: 16rpx !important;
+    font-size: 28rpx !important;
+
+    &::after {
+      border: none !important;
+    }
+  }
+
+  &__accept {
+    background: var(--color-primary) !important;
+    color: var(--color-on-primary) !important;
+  }
+
+  &__reject {
+    background: var(--color-bg-page) !important;
+    color: var(--color-text-secondary) !important;
+    border: 1rpx solid var(--color-border) !important;
+  }
+
+  &__ghost {
+    margin-top: 16rpx !important;
+    background: var(--color-bg-page) !important;
+    color: var(--color-primary) !important;
+    border: 1rpx solid var(--color-border) !important;
+  }
+}

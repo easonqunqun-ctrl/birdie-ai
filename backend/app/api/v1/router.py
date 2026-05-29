@@ -12,6 +12,7 @@ from app.api.v1 import (
     coach_courses,
     coach_profile,
     coach_spectator,
+    coach_students,
     common,
     course_certificates,
     courses,
@@ -59,6 +60,7 @@ api_router.include_router(
 api_router.include_router(coach_annotations.router, prefix="/coach", tags=["教练"])
 api_router.include_router(coach_profile.router, prefix="/coach", tags=["教练"])
 api_router.include_router(coach_spectator.router, prefix="/coach", tags=["教练"])
+api_router.include_router(coach_students.router, prefix="/coach", tags=["教练"])
 api_router.include_router(admin_coach.router, prefix="/admin", tags=["管理"])
 api_router.include_router(lessons.router, prefix="/lessons", tags=["课程"])
 # M12-02 球手对比库（公开读端点）；写入仍在 service 层 / 后续 admin 工具

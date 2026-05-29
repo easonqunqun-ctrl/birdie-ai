@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -134,7 +134,7 @@ class AnalysisAnnotation(Base, TimestampMixin):
 
 
 class CoachStudentRelation(Base, TimestampMixin):
-    """教练-学员绑定（M8-03 最小子集；M13-10 旁观守门）."""
+    """教练-学员双向 opt-in 绑定（M8-03）；M13-10 旁观守门复用 active 关系."""
 
     __tablename__ = "coach_student_relations"
 
@@ -150,23 +150,41 @@ class CoachStudentRelation(Base, TimestampMixin):
         nullable=False,
     )
     status: Mapped[str] = mapped_column(
-        String(16), nullable=False, default="active", server_default="'active'"
+        String(20), nullable=False, default="pending", server_default="'pending'"
     )
+    visibility_payload: Mapped[dict] = mapped_column(
+        JSONB, default=dict, server_default="{}"
+    )
+    invited_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default="NOW()"
+    )
+    invite_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ended_by_user_id: Mapped[str | None] = mapped_column(
+        String(32),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    pause_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         CheckConstraint(
-            "status IN ('active', 'inactive')",
+            "status IN ('pending', 'active', 'paused', 'ended')",
             name="chk_csr_status",
         ),
         CheckConstraint(
             "coach_user_id != student_user_id",
             name="chk_csr_not_self",
         ),
-        UniqueConstraint(
-            "coach_user_id",
-            "student_user_id",
-            name="uq_csr_coach_student",
-        ),
         Index("idx_csr_coach_status", "coach_user_id", "status"),
         Index("idx_csr_student_status", "student_user_id", "status"),
+        Index(
+            "uq_csr_pending_active",
+            "coach_user_id",
+            "student_user_id",
+            unique=True,
+            postgresql_where="status IN ('pending', 'active')",
+        ),
     )

@@ -1,0 +1,53 @@
+.coach-visibility {
+  min-height: 100%;
+  padding: 24rpx;
+  background: var(--color-bg-page);
+  box-sizing: border-box;
+
+  &--blocked {
+    padding-top: 160rpx;
+    text-align: center;
+    color: var(--color-text-secondary);
+    font-size: 32rpx;
+  }
+
+  &__hint {
+    display: block;
+    font-size: 28rpx;
+    color: var(--color-text-tertiary);
+    line-height: 1.5;
+    margin-bottom: 20rpx;
+  }
+
+  &__row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20rpx;
+    background: var(--color-bg-card);
+    border: 1rpx solid var(--color-border);
+    border-radius: 16rpx;
+    padding: 20rpx 22rpx;
+    margin-bottom: 12rpx;
+  }
+
+  &__text {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__label {
+    display: block;
+    font-size: 30rpx;
+    color: var(--color-text-primary);
+    font-weight: 600;
+  }
+
+  &__tag {
+    display: inline-block;
+    margin-top: 6rpx;
+    font-size: 24rpx;
+    color: var(--color-error);
+  }
+}

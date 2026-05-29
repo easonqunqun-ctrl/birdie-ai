@@ -238,6 +238,36 @@
     line-height: 1.45;
   }
 
+  &__coach-banner {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16rpx;
+    margin: 16rpx 24rpx 0;
+    padding: 18rpx 22rpx;
+    border-radius: 18rpx;
+    background: rgba(26, 35, 126, 0.08);
+    border: 1rpx solid var(--color-border);
+
+    &:active {
+      opacity: 0.85;
+    }
+  }
+
+  &__coach-banner-text {
+    flex: 1;
+    font-size: 28rpx;
+    color: var(--color-primary);
+    font-weight: 600;
+  }
+
+  &__coach-banner-action {
+    font-size: 28rpx;
+    color: var(--color-accent-mint);
+    font-weight: 600;
+  }
+
   /* ================= 通用 section ================= */
   &__section {
     background: var(--color-bg-card);
