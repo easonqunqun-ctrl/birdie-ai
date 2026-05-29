@@ -68,6 +68,12 @@ describe('storage · 用户协议同意（合规底线）', () => {
     expect(storage.hasAgreedCurrentTerms()).toBe(false)
   })
 
+  test('clearAgreedTerms 清除记录', () => {
+    storage.setAgreedTerms(CURRENT_TERMS_VERSION)
+    storage.clearAgreedTerms()
+    expect(storage.getAgreedTerms()).toBeNull()
+  })
+
   test('被外部写脏的 record 应被忽略', () => {
     ;(Taro as any).setStorageSync('agreed_terms', 'corrupted')
     expect(storage.getAgreedTerms()).toBeNull()
@@ -76,10 +82,27 @@ describe('storage · 用户协议同意（合规底线）', () => {
   })
 })
 
+describe('storage · Role（M8-02）', () => {
+  test('默认 user；setRole coach 可读回', () => {
+    expect(storage.getRole()).toBe('user')
+    storage.setRole('coach')
+    expect(storage.getRole()).toBe('coach')
+    storage.setRole('user')
+    expect(storage.getRole()).toBe('user')
+  })
+
+  test('clearRole 清除后回退 user', () => {
+    storage.setRole('coach')
+    storage.clearRole()
+    expect(storage.getRole()).toBe('user')
+  })
+})
+
 describe('storage · clearAuthSession 范围（防误删合规标记）', () => {
-  test('只清 token + user，保留协议同意与引导标记', () => {
+  test('只清 token + user + role，保留协议同意与引导标记', () => {
     storage.setToken('t')
     storage.setUser({ id: 1 })
+    storage.setRole('coach')
     storage.setAgreedTerms(CURRENT_TERMS_VERSION)
     storage.markAnalysisGuideSeen()
 
@@ -87,6 +110,7 @@ describe('storage · clearAuthSession 范围（防误删合规标记）', () => 
 
     expect(storage.getToken()).toBe('')
     expect(storage.getUser()).toBeNull()
+    expect(storage.getRole()).toBe('user')
     expect(storage.hasAgreedCurrentTerms()).toBe(true)
     expect(storage.hasSeenAnalysisGuide()).toBe(true)
   })

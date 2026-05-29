@@ -191,6 +191,24 @@ describe('userStore.fetchMe', () => {
     expect(useUserStore.getState().user).toBeNull()
   })
 
+  test('coach 身份但用户不再 active → 降级为 user', async () => {
+    useUserStore.setState({
+      token: 'jwt',
+      user: { id: 1, is_active_coach: true } as any,
+      currentRole: 'coach',
+      initialized: true,
+    })
+    storage.setToken('jwt')
+    storage.setRole('coach')
+    mockedGetMe.mockResolvedValueOnce({ id: 1, is_active_coach: false })
+
+    await useUserStore.getState().fetchMe()
+
+    expect(useUserStore.getState().currentRole).toBe('user')
+    expect(storage.getRole()).toBe('user')
+    expect(mockedApplyTabBarRole).toHaveBeenCalledWith('user')
+  })
+
   test('5xx → 保留上一快照（不打断 tab 静默刷新）', async () => {
     useUserStore.setState({ token: 'jwt', user: { id: 1, nickname: 'old' } as any })
     mockedGetMe.mockRejectedValueOnce(
