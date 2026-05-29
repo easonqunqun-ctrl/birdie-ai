@@ -10,6 +10,7 @@ from app.models.base import Base
 from app.models.chat import ChatMessage, ChatQuota, ChatSession
 from app.models.coach import (
     AnalysisAnnotation,
+    CoachAssignedTask,
     CoachProfile,
     CoachStudentRelation,
     CoachVerification,
@@ -48,6 +49,7 @@ __all__ = [
     "ChatMessage",
     "ChatQuota",
     "ChatSession",
+    "CoachAssignedTask",
     "CoachProfile",
     "CoachStudentRelation",
     "CoachVerification",

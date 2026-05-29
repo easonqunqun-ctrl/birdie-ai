@@ -17,10 +17,14 @@ export interface TrainingTaskItem {
   status: TaskStatus
   completed_at: string | null
   verification_analysis_id: string | null
-  task_kind?: 'standard' | 'pro_clip_try_it'
+  task_kind?: 'standard' | 'pro_clip_try_it' | 'coach_assigned'
   pro_clip_id?: string | null
   pro_player_name?: string | null
   pro_clip_unavailable?: boolean
+  coach_user_id?: string | null
+  coach_display_name?: string | null
+  coach_target_count?: number | null
+  coach_note?: string | null
 }
 
 export interface TrainingPlanDetail {

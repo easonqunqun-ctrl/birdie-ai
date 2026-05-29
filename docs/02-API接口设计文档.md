@@ -1704,6 +1704,24 @@ PUT  /v1/users/me/coach/{relation_id}/visibility   Body: { handicap?, body?, ...
 
 **客户端**：`coachStudentsService`；`pages/coach/students/index` + `students-invite`；`pages/coach-invite/index`；`pages/profile/coach-visibility`；「我的」待处理邀请 banner。
 
+### 5A.7 教练作业派发（M8-05）
+
+```
+POST /v1/coach/tasks/assign     Body: { student_user_id, source_type: "drill", drill_id, target_week, target_count, coach_note? }
+GET  /v1/coach/tasks?student_id=&status=
+```
+
+**灰度**：`PHASE2_COACH_TASKS_ENABLED` + `PHASE2_COACH_ENABLED`；教练写端点须 JWT **`role=coach`** + 已审核教练；**须 active 师生关系**（M8-03），否则 **40312**。
+
+**语义**：
+- 派发时在学员当周（`target_week` 归一化为周一）训练计划追加 `training_tasks` 条目，并写入 `coach_assigned_tasks`（1:1 关联 `training_task_id`）。
+- 学员 `GET /users/me/training-plan/current` 的 `tasks[]` 对教练作业附加 `task_kind=coach_assigned`、`coach_display_name`、`coach_target_count`、`coach_note`。
+- 学员 `POST /training-plan/tasks/{id}/complete` 成功后，关联的 `coach_assigned_tasks.status` 同步为 `done`。
+- MVP 仅支持 `source_type=drill`；`custom_video` 与微信订阅通知留 M8-08 / 运营模板申请。
+- 每教练每日派发上限 `COACH_TASK_MAX_PER_DAY`（默认 50），超出 → **40001**。
+
+**客户端**：`coachTaskService`；`pages/coach/task-assign`；「我的学员」active 卡片「布置作业」；训练 Tab「教练布置的任务」分组。
+
 ---
 
 ## 5B、球手对比库（/pros · M12，灰度 `PHASE2_PROS_ENABLED`）

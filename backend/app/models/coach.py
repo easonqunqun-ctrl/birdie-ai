@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, Text
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -187,4 +187,63 @@ class CoachStudentRelation(Base, TimestampMixin):
             unique=True,
             postgresql_where="status IN ('pending', 'active')",
         ),
+    )
+
+
+class CoachAssignedTask(Base, TimestampMixin):
+    """教练派发给学员的训练任务（M8-05）."""
+
+    __tablename__ = "coach_assigned_tasks"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    coach_user_id: Mapped[str] = mapped_column(
+        String(32),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    student_user_id: Mapped[str] = mapped_column(
+        String(32),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    relation_id: Mapped[str] = mapped_column(
+        String(32),
+        ForeignKey("coach_student_relations.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    source_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    drill_id: Mapped[str | None] = mapped_column(
+        String(32),
+        ForeignKey("drills.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    target_week: Mapped[date] = mapped_column(Date, nullable=False)
+    target_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    target_issue: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    coach_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    training_task_id: Mapped[str | None] = mapped_column(
+        String(32),
+        ForeignKey("training_tasks.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="assigned", server_default="'assigned'"
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "source_type IN ('drill', 'custom_video')",
+            name="chk_cat_source_type",
+        ),
+        CheckConstraint(
+            "status IN ('assigned', 'started', 'done', 'expired')",
+            name="chk_cat_status",
+        ),
+        CheckConstraint(
+            "target_count >= 1 AND target_count <= 99",
+            name="chk_cat_target_count",
+        ),
+        Index("idx_cat_student_week", "student_user_id", "target_week"),
+        Index("idx_cat_coach_created", "coach_user_id", "created_at"),
     )

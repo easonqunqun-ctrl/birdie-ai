@@ -221,13 +221,18 @@ const TrainingPage: FC = () => {
     void loadPracticeCurve()
   }, [token, user?.is_member, practiceMonthKey, loadPracticeCurve])
 
-  const { proTasks, standardTasks } = useMemo(() => {
+  const { coachTasks, proTasks, standardTasks } = useMemo(() => {
     const all = plan?.tasks ?? []
     return {
+      coachTasks: all.filter((t) => t.task_kind === 'coach_assigned'),
       proTasks: all.filter((t) => t.task_kind === 'pro_clip_try_it'),
-      standardTasks: all.filter((t) => t.task_kind !== 'pro_clip_try_it'),
+      standardTasks: all.filter(
+        (t) => t.task_kind !== 'pro_clip_try_it' && t.task_kind !== 'coach_assigned',
+      ),
     }
   }, [plan])
+
+  const groupedCoach = useMemo(() => groupByDate(coachTasks), [coachTasks])
 
   const groupedPro = useMemo(() => groupByDate(proTasks), [proTasks])
   const grouped = useMemo(() => groupByDate(standardTasks), [standardTasks])
@@ -503,6 +508,7 @@ const TrainingPage: FC = () => {
     const isExpanded = expandedTaskId === task.id
     const isDone = task.status === 'completed'
     const isProTryIt = task.task_kind === 'pro_clip_try_it'
+    const isCoachAssigned = task.task_kind === 'coach_assigned'
     const displayName =
       isProTryIt && task.pro_player_name
         ? `对照 ${task.pro_player_name} 的挥杆`
@@ -512,7 +518,7 @@ const TrainingPage: FC = () => {
         key={task.id}
         className={`training__task ${isDone ? 'is-done' : ''} ${
           isProTryIt ? 'training__task--pro' : ''
-        }`}
+        } ${isCoachAssigned ? 'training__task--coach' : ''}`}
       >
         <View
           className='training__task-head'
@@ -524,9 +530,18 @@ const TrainingPage: FC = () => {
               {displayName}
             </Text>
             <Text className='training__task-meta'>
+              {isCoachAssigned && task.coach_display_name
+                ? `${task.coach_display_name} 布置 · `
+                : ''}
+              {isCoachAssigned && task.coach_target_count
+                ? `目标 ${task.coach_target_count} 次 · `
+                : ''}
               {isProTryIt ? '对照球手 · ' : ''}
               {drill.duration_minutes} 分钟 · {drill.difficulty} · {drill.sets} 组
             </Text>
+            {isCoachAssigned && task.coach_note ? (
+              <Text className='training__task-coach-note'>{task.coach_note}</Text>
+            ) : null}
             {isProTryIt && task.pro_clip_unavailable && (
               <Text className='training__task-warn'>参考镜头已下架，任务仍可完成</Text>
             )}
@@ -679,6 +694,21 @@ const TrainingPage: FC = () => {
         </View>
       )}
 
+      {groupedCoach.length > 0 && (
+        <View className='training__coach-section'>
+          <Text className='training__coach-section-title'>教练布置的任务</Text>
+          {groupedCoach.map(({ date, tasks }) => (
+            <View key={`coach-${date}`} className='training__day'>
+              <View className='training__day-header'>
+                <Text className='training__day-label'>{formatDayLabel(date)}</Text>
+                <Text className='training__day-count'>{tasks.length} 个任务</Text>
+              </View>
+              {tasks.map((task) => renderTaskCard(task))}
+            </View>
+          ))}
+        </View>
+      )}
+
       {groupedPro.length > 0 && (
         <View className='training__pro-section'>
           <Text className='training__pro-section-title'>对照球手训练</Text>
@@ -694,7 +724,7 @@ const TrainingPage: FC = () => {
         </View>
       )}
 
-      {grouped.length > 0 && groupedPro.length > 0 && (
+      {grouped.length > 0 && (groupedCoach.length > 0 || groupedPro.length > 0) && (
         <Text className='training__section-divider'>分析驱动训练</Text>
       )}
 

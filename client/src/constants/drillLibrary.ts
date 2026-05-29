@@ -278,3 +278,6 @@ const DRILL_FALLBACK: DrillDetail = {
 export function getDrillDetail(drillId: string): DrillDetail {
   return DRILL_MAP[drillId] ?? { ...DRILL_FALLBACK, drill_id: drillId, name: drillId }
 }
+
+/** 教练派发作业等场景使用的静态动作列表（与后端 seed 对齐） */
+export const DRILL_CATALOG: readonly DrillDetail[] = DRILLS

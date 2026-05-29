@@ -465,6 +465,31 @@
     margin-bottom: 12rpx;
   }
 
+  &__coach-section {
+    margin-bottom: 12rpx;
+  }
+
+  &__coach-section-title {
+    font-size: 30rpx;
+    font-weight: 700;
+    color: var(--color-primary);
+    display: block;
+    margin-bottom: 8rpx;
+    padding: 0 4rpx;
+  }
+
+  &__task--coach {
+    border-left: 6rpx solid var(--color-gold);
+  }
+
+  &__task-coach-note {
+    display: block;
+    margin-top: 8rpx;
+    font-size: 26rpx;
+    color: var(--color-text-secondary);
+    line-height: 1.45;
+  }
+
   &__pro-section-title {
     font-size: 30rpx;
     font-weight: 700;

@@ -6,7 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 TaskStatus = Literal["pending", "completed"]
-TaskKind = Literal["standard", "pro_clip_try_it"]
+TaskKind = Literal["standard", "pro_clip_try_it", "coach_assigned"]
 Difficulty = Literal["easy", "medium", "hard"]
 
 
@@ -43,6 +43,10 @@ class TrainingTaskItem(BaseModel):
     pro_clip_id: str | None = None
     pro_player_name: str | None = None
     pro_clip_unavailable: bool = False
+    coach_user_id: str | None = None
+    coach_display_name: str | None = None
+    coach_target_count: int | None = None
+    coach_note: str | None = None
 
 
 class TrainingPlanDetail(BaseModel):

@@ -49,6 +49,10 @@ def training_task_to_item(
     pro_clip_id: str | None = None,
     pro_player_name: str | None = None,
     pro_clip_unavailable: bool = False,
+    coach_user_id: str | None = None,
+    coach_display_name: str | None = None,
+    coach_target_count: int | None = None,
+    coach_note: str | None = None,
 ) -> TrainingTaskItem:
     """ORM → Pydantic；非法 `status` 降级，避免 model_validate 抛错导致 HTTP 500。"""
     raw = task.status or ""
@@ -58,8 +62,10 @@ def training_task_to_item(
             "invalid_training_task_status_coerced",
             extra={"task_id": task.id, "raw_status": raw},
         )
-    task_kind: Literal["standard", "pro_clip_try_it"] = (
-        "pro_clip_try_it" if pro_clip_id else "standard"
+    task_kind: Literal["standard", "pro_clip_try_it", "coach_assigned"] = (
+        "coach_assigned"
+        if coach_user_id
+        else ("pro_clip_try_it" if pro_clip_id else "standard")
     )
     return TrainingTaskItem(
         id=task.id,
@@ -74,6 +80,10 @@ def training_task_to_item(
         pro_clip_id=pro_clip_id,
         pro_player_name=pro_player_name,
         pro_clip_unavailable=pro_clip_unavailable,
+        coach_user_id=coach_user_id,
+        coach_display_name=coach_display_name,
+        coach_target_count=coach_target_count,
+        coach_note=coach_note,
     )
 
 
