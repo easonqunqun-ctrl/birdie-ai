@@ -337,7 +337,7 @@ def test_run_real_analysis_v2_merges_probe_and_angle_warnings(monkeypatch):
     )
 
     # 2) 模拟 run_real_analysis 返回一个已经被 enrich 注入了 angle warning 的 result
-    async def fake_run(req, *, diagnose_fn, enrichment_fn):  # noqa: ARG001
+    async def fake_run(req, *, diagnose_fn, enrichment_fn, club_aware_scoring=False):  # noqa: ARG001
         return AnalyzeResult(
             analysis_id=req.analysis_id,
             status="completed",

@@ -63,12 +63,23 @@ def score_feature(
     return int(round(84 * (1 - deviation / tolerance)))
 
 
-def score_phase(features: dict[str, float], phase: str) -> int:
+def score_phase(
+    features: dict[str, float],
+    phase: str,
+    *,
+    club_category: ClubCategory | None = None,
+) -> int:
     """阶段分 = 该阶段内各特征分加权之和。
 
     Args:
         features: {name: value}，至少覆盖该阶段的所有特征（缺失记为 0 分）
         phase: phase key
+        club_category: W22 待办 #2（``w22-driver-phase-weights-calibration.md`` §6）。
+            提供时 per-feature ideal 区间按球杆类别取（``ideal_for_category``）；
+            ``None`` → 走 V1 单套 ideal（``constants.FEATURES``）。
+            **iron / putter / 未 override 的特征都回落 V1ideal**，故 7 铁报告分数
+            V1↔V2、接入前后均不跳变（灰度安全，与 ``score_overall`` 同口径）。
+            tolerance / weight 仍取 ``constants.FEATURES``，本期只标定 ideal 区间。
 
     Returns:
         0-100
@@ -77,15 +88,26 @@ def score_phase(features: dict[str, float], phase: str) -> int:
     if not phase_feats:
         return 0
 
+    ideal_for = None
+    if club_category is not None:
+        # 延迟 import：避免 club_profiles ↔ constants 顶层耦合，仅传 category 时触发。
+        from app.pipeline.club_profiles import ideal_for_category
+
+        ideal_for = ideal_for_category
+
     total = 0.0
     for meta in phase_feats:
         if meta["name"] not in features:
             s = 0
         else:
+            if ideal_for is not None:
+                ideal_min, ideal_max = ideal_for(meta["name"], club_category)
+            else:
+                ideal_min, ideal_max = meta["ideal_min"], meta["ideal_max"]
             s = score_feature(
                 features[meta["name"]],
-                meta["ideal_min"],
-                meta["ideal_max"],
+                ideal_min,
+                ideal_max,
                 meta["tolerance"],
             )
         total += s * meta["weight"]
@@ -130,6 +152,12 @@ def weakest_phase(phase_scores: dict[str, int]) -> str:
     return PHASE_ORDER[0]
 
 
-def score_all_phases(features: dict[str, float]) -> dict[str, int]:
-    """一次性算 6 个阶段分。"""
-    return {p: score_phase(features, p) for p in PHASE_ORDER}
+def score_all_phases(
+    features: dict[str, float],
+    *,
+    club_category: ClubCategory | None = None,
+) -> dict[str, int]:
+    """一次性算 6 个阶段分。``club_category`` 透传给 ``score_phase``（见其文档）。"""
+    return {
+        p: score_phase(features, p, club_category=club_category) for p in PHASE_ORDER
+    }

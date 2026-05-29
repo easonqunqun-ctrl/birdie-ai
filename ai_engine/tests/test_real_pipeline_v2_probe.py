@@ -303,7 +303,7 @@ def test_run_real_analysis_v2_merges_probe_warnings_into_result(monkeypatch):
         probe_mod, "_ffprobe_extended", lambda _: _probe(codec="hevc", has_audio=True)
     )
 
-    async def _fake_v1(req, *, diagnose_fn=None, enrichment_fn=None):
+    async def _fake_v1(req, *, diagnose_fn=None, enrichment_fn=None, club_aware_scoring=False):
         return AnalyzeResult(
             analysis_id=req.analysis_id,
             status="completed",
@@ -401,7 +401,7 @@ def test_run_real_analysis_v2_appends_fallback_when_v2_resources_missing(
     )
     from app.pipeline.real_pipeline import PipelineCtx
 
-    async def _fake_v1(req, *, diagnose_fn=None, enrichment_fn=None):
+    async def _fake_v1(req, *, diagnose_fn=None, enrichment_fn=None, club_aware_scoring=False):
         result = AnalyzeResult(
             analysis_id=req.analysis_id,
             status="completed",

@@ -70,8 +70,16 @@ iron 基线（= V1 单套 `PHASE_WEIGHTS`）：`setup .15 / backswing .20 / top 
     **iron / putter / 未知 → V1 单套兜底，分数不变**（iron 套 == V1 → 7 铁 V1↔V2 不跳变）。
   - 守门测试：`test_run_real_analysis_club_aware_scoring_default_false`（锁 V1 默认 False）、
     `test_v2_entry_enables_club_aware_scoring`（验 V2 入口打开开关），见 `tests/test_real_pipeline_v2.py`。
-- [ ] `ideal_for_category`（M7-05 §4.2 单特征 ideal 标尺）接进 `score_phase`——
-  本次只接了相位权重维度，per-feature ideal 区间仍走 V1。
+- [x] **`ideal_for_category`（M7-05 §4.2 单特征 ideal 标尺）接进 `score_phase`，同 V2-only 灰度门**：
+  `score_phase(features, phase, *, club_category=None)` / `score_all_phases(..., club_category=None)`
+  提供类别时 per-feature ideal 区间按球杆类别取（`ideal_for_category`），`run_real_analysis`
+  在 `club_aware_scoring=True`（仅 V2）时把同一 `club_category` 一并传入。
+  - 灰度安全：iron / putter / 未 override 的特征都回落 V1 ideal，**每个阶段分 == V1** →
+    7 铁 V1↔V2、接入前后不跳变；仅 driver/wood/hybrid/wedge 在被 override 的特征上变化。
+  - 守门测试：`test_score_phase_iron_equals_v1_gray_release_safe`、
+    `test_score_phase_driver_uses_category_ideal_band`、`test_score_all_phases_threads_club_category`
+    （`tests/test_scoring.py`）。
+  - 注：tolerance / weight 仍取 `constants.FEATURES`，本期只标定 ideal 区间维度。
 - [ ] angle 维度（`angle_profiles.phase_weights_for` / `ideal_for_angle`）同样尚未接入 scoring；
   kickoff 的「(angle, category) 二维笛卡尔积」需定**两维 override 的优先级**后再合并。
 - [ ] driver 报告分数纳入 V1↔V2 灰度对比，确认无异常跳变。
