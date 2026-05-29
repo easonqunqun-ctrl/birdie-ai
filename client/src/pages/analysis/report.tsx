@@ -67,6 +67,8 @@ import CameraAngleAlert from '@/components/CameraAngleAlert'
 import '@/components/CameraAngleAlert.scss'
 import PuttingReport from '@/pages/analysis/components/PuttingReport'
 import '@/pages/analysis/components/PuttingReport.scss'
+import ChippingReport from '@/pages/analysis/components/ChippingReport'
+import '@/pages/analysis/components/ChippingReport.scss'
 import './report.scss'
 
 const VIDEO_ID = 'report-video'
@@ -304,6 +306,7 @@ const ReportPage: FC = () => {
   const scoreLevel = report?.score_level ?? scoreLevelFromScore(report?.overall_score)
   const levelMeta = scoreLevel ? SCORE_LEVEL_META[scoreLevel] : null
   const isPuttingReport = (report?.analysis_mode || 'full_swing') === 'putting'
+  const isChippingReport = (report?.analysis_mode || 'full_swing') === 'chipping'
 
   // ---------------- 事件 ----------------
   const seekTo = useCallback((seconds: number) => {
@@ -846,6 +849,14 @@ const ReportPage: FC = () => {
           <PuttingReport
             phaseScores={report.phase_scores}
             puttingFeatures={report.putting_features}
+            onTapPhase={(key) => tapPhase(key)}
+          />
+        </View>
+      ) : isChippingReport ? (
+        <View className='report__section'>
+          <ChippingReport
+            phaseScores={report.phase_scores}
+            chippingFeatures={report.chipping_features}
             onTapPhase={(key) => tapPhase(key)}
           />
         </View>

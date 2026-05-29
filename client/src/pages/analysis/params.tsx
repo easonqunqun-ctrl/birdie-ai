@@ -35,6 +35,7 @@ import {
 import type { AnalysisMode } from '@/types/analysis'
 import type { CameraAngle, ClubType } from '@/types/api'
 import { PHASE2_CHIPPING_MODE_ENABLED_FLAG, PHASE2_PUTTING_MODE_ENABLED_FLAG } from '@/constants/flags'
+import { CHIPPING_CLUB_HINT } from '@/constants/chippingLabels'
 import ModeSelector from '@/components/ModeSelector'
 import '@/components/ModeSelector.scss'
 import './params.scss'
@@ -123,6 +124,12 @@ const AnalysisParamsPage: FC = () => {
       setCameraAngle('face_on')
     } else if (analysisMode === 'chipping' && clubType === 'putter') {
       setClubType('wedge')
+    }
+  }, [analysisMode, clubType])
+
+  useEffect(() => {
+    if (analysisMode === 'chipping' && !CHIPPING_CLUB_HINT.includes(clubType as typeof CHIPPING_CLUB_HINT[number])) {
+      Taro.showToast({ title: '切杆建议选 wedge 或 8/9 号铁', icon: 'none' })
     }
   }, [analysisMode, clubType])
 
