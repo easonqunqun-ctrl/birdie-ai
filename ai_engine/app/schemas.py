@@ -12,10 +12,10 @@ class AnalyzeRequest(BaseModel):
     video_url: str = Field(..., description="视频文件 URL（COS/MinIO）")
     camera_angle: Literal["face_on", "down_the_line"]
     club_type: str = Field(..., description="球杆类型")
-    # P2-M7-11：分析模式。full_swing=全挥杆（默认，向后兼容）；putting=推杆独立 pipeline。
-    mode: Literal["full_swing", "putting"] = Field(
+    # P2-M7-11/12：分析模式。full_swing=全挥杆（默认）；putting/chipping 独立 pipeline。
+    mode: Literal["full_swing", "putting", "chipping"] = Field(
         default="full_swing",
-        description="分析模式：full_swing 全挥杆（默认）/ putting 推杆。mode 与 club_type 不匹配回 50123",
+        description="分析模式：full_swing / putting / chipping；与 club_type 不匹配回 50123",
     )
     callback_url: str | None = Field(default=None, description="完成后回调后端的 URL")
     # M7-14：后端传 user_id 用于灰度分桶；未传时所有请求走 V1
@@ -81,9 +81,8 @@ class AnalyzeResult(BaseModel):
     status: Literal["completed", "failed"]
     # M7-14：每份报告显式带版本号；V1 默认 "v1"，V2 路径写 "v2"（FR-1）
     engine_version: Literal["v1", "v2"] = "v1"
-    # P2-M7-11：分析模式回显。full_swing（默认，向后兼容）/ putting。
-    # putting 模式下 phase_scores 键为 setup/backstroke/impact/follow，phase_timestamps 为空。
-    analysis_mode: Literal["full_swing", "putting"] = "full_swing"
+    # P2-M7-11/12：分析模式回显。putting/chipping 的 phase_scores 键与 full_swing 不同构。
+    analysis_mode: Literal["full_swing", "putting", "chipping"] = "full_swing"
     overall_score: int | None = None
     phase_scores: dict[str, PhaseScore] | None = None
     phase_timestamps: PhaseTimestamps | None = None

@@ -113,9 +113,10 @@ async def analyze(req: AnalyzeRequest) -> AnalyzeResult:
     M7-14：每次请求按 ``user_id_hint`` 哈希分桶决定走 V1 / V2。
 
     P2-M7-11：``mode=putting`` 走推杆独立 pipeline；mode 与 club_type 不匹配早失败 50123。
+    P2-M7-12：``mode=chipping`` 走切杆独立 pipeline。
     """
 
-    # 0) P2-M7-11：mode 与 club_type 不匹配 → 50123 早失败
+    # 0) mode 与 club_type 不匹配 → 50123 早失败
     mismatch = _mode_club_mismatch(req)
     if mismatch is not None:
         log.warning(
@@ -132,9 +133,11 @@ async def analyze(req: AnalyzeRequest) -> AnalyzeResult:
             error_message=mismatch.user_message,
         )
 
-    # 0.5) P2-M7-11：推杆 mode 独立 pipeline（不走 V1/V2 全挥杆灰度分桶）
+    # 0.5) 短杆 mode 独立 pipeline（不进 V1/V2 全挥杆灰度分桶）
     if req.mode == "putting":
         return await _run_putting_analyze(req)
+    if req.mode == "chipping":
+        return await _run_chipping_analyze(req)
 
     # 1) 路由判定（mock 模式优先；真实模式按灰度分桶）
     if settings.AI_ENGINE_MOCK_MODE:
@@ -208,17 +211,17 @@ async def analyze(req: AnalyzeRequest) -> AnalyzeResult:
 
 
 def _mode_club_mismatch(req: AnalyzeRequest) -> ModeClubMismatchError | None:
-    """P2-M7-11：mode 与 club_type 不匹配检测。
-
-    - ``mode=putting`` 但球杆不是 putter → 50123
-    - ``mode=full_swing`` 但球杆是 putter → 50123（推杆请用推杆模式）
-    """
+    """mode 与 club_type 双向校验（50123）。"""
     from app.pipeline.club_profiles import to_club_category
 
     category = to_club_category(req.club_type)
     if req.mode == "putting" and category != "putter":
         return ModeClubMismatchError(
             f"mode=putting but club_type={req.club_type!r} (category={category})"
+        )
+    if req.mode == "chipping" and category != "wedge":
+        return ModeClubMismatchError(
+            f"mode=chipping but club_type={req.club_type!r} (category={category})"
         )
     if req.mode == "full_swing" and category == "putter":
         return ModeClubMismatchError(
@@ -277,6 +280,59 @@ async def _run_putting_analyze(req: AnalyzeRequest) -> AnalyzeResult:
         status=result.status,
         overall_score=result.overall_score,
         analysis_mode="putting",
+        latency_ms=round(latency_ms, 1),
+    )
+    return result
+
+
+def _mock_chipping_result(req: AnalyzeRequest) -> AnalyzeResult:
+    from app.pipeline.chipping.constants import CHIPPING_PHASE_LABELS, CHIPPING_PHASE_ORDER
+
+    phase_scores = {
+        p: PhaseScore(score=80, label=CHIPPING_PHASE_LABELS[p], is_weakest=(p == "impact"))
+        for p in CHIPPING_PHASE_ORDER
+    }
+    return AnalyzeResult(
+        analysis_id=req.analysis_id,
+        status="completed",
+        analysis_mode="chipping",
+        overall_score=80,
+        phase_scores=phase_scores,
+        issues=[],
+        duration_ms=0,
+    )
+
+
+async def _run_chipping_analyze(req: AnalyzeRequest) -> AnalyzeResult:
+    started_at = time.perf_counter()
+    if settings.AI_ENGINE_MOCK_MODE:
+        result = _mock_chipping_result(req)
+    else:
+        try:
+            from app.pipeline.chipping.pipeline import run_chipping_analysis
+
+            result = await run_chipping_analysis(req)
+        except PipelineError as exc:
+            log.warning(
+                "chipping_pipeline_error",
+                analysis_id=req.analysis_id,
+                code=exc.code,
+                error=str(exc),
+            )
+            result = AnalyzeResult(
+                analysis_id=req.analysis_id,
+                status="failed",
+                analysis_mode="chipping",
+                error_code=exc.code,
+                error_message=exc.user_message,
+            )
+    latency_ms = (time.perf_counter() - started_at) * 1000
+    log.info(
+        "analyze_done",
+        analysis_id=req.analysis_id,
+        status=result.status,
+        overall_score=result.overall_score,
+        analysis_mode="chipping",
         latency_ms=round(latency_ms, 1),
     )
     return result
