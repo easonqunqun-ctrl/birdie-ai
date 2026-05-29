@@ -328,6 +328,31 @@ async def _lift_current_quotas_to_unlimited(db: AsyncSession, user: User) -> Non
     await db.flush()
 
 
+async def grant_complimentary_membership(
+    db: AsyncSession,
+    user: User,
+    *,
+    duration_days: int,
+    plan_type: str = "yearly",
+) -> datetime:
+    """运营/BD 赠送会员（无订单）；续期策略与 ``_mark_paid`` 一致."""
+
+    if plan_type not in {"monthly", "yearly", "family"}:
+        raise BadRequestError(code=40001, message=f"不支持的套餐：{plan_type}")
+    now = datetime.now(UTC)
+    base = user.membership_expires_at
+    if base is None or base <= now:
+        base = now
+    new_end = base + timedelta(days=duration_days)
+    if user.membership_expires_at is None or user.membership_expires_at <= now:
+        user.membership_started_at = now
+    user.membership_type = plan_type
+    user.membership_expires_at = new_end
+    await _lift_current_quotas_to_unlimited(db, user)
+    await db.flush()
+    return new_end
+
+
 # ==================== 会员状态读取 ====================
 def is_member(user: User, *, now: datetime | None = None) -> bool:
     """判断当前是否为**有效**会员。纯函数，不写库。"""

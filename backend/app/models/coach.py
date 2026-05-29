@@ -43,7 +43,7 @@ class CoachProfile(Base, TimestampMixin):
             name="chk_cp_status",
         ),
         CheckConstraint(
-            "level IN ('pga', 'china_pga', 'regional', 'club_pro')",
+            "level IN ('pga', 'china_pga', 'regional', 'club_pro', 'seed')",
             name="chk_cp_level",
         ),
         Index("idx_cp_status", "status", "applied_at"),

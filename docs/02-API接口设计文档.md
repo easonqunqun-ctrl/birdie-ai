@@ -1791,6 +1791,23 @@ POST /v1/admin/moderation/queue/{queue_id}/review   Body: { action: "approve"|"r
 
 **配置**：`COACH_QUOTA_BYPASS_ENABLED`（默认 true）、`COACH_ANALYSIS_DAILY_LIMIT`、`COACH_CHAT_DAILY_LIMIT`。
 
+### 5A.12 种子教练 BD（M8-10）
+
+**Admin API**（须 `ADMIN_USER_IDS`）：
+
+```
+GET   /v1/admin/coach/profiles?level=seed&status=active&limit=
+PATCH /v1/admin/coach/profiles/{coach_user_id}/level          Body: { level: "seed"|... }
+POST  /v1/admin/coach/profiles/{coach_user_id}/grant-seed-premium   Body: { valid_days?: 365 }
+```
+
+**语义**：
+- `coach_profiles.level` 新增枚举值 `seed`（仅 Admin 可写；C 端申请不可选）。
+- 仅 `level=seed` 且 `status=active` 的教练可调用 `grant-seed-premium`：写入 `users.membership_type=yearly`、续期 `membership_expires_at`（默认 +365 天），并抬升当月/当日配额为无限。
+- BD 脚本：`tools/scripts/grant_seed_coach_premium.py --coach-id <user_id> [--days 365]`（直连 service，无需 Admin JWT）。
+
+**运营侧（代码外）**：NPS 问卷 / 飞书多维表看板见 `docs/release-notes/p2-m8-10-seed-coach-bd-kickoff.md`。
+
 ---
 
 ## 5B、球手对比库（/pros · M12，灰度 `PHASE2_PROS_ENABLED`）
