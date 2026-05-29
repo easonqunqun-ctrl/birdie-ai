@@ -157,7 +157,7 @@ def test_phase_weights_for_category_returns_copy_not_reference():
 
 
 def test_driver_vs_iron_differs_in_at_least_3_phases():
-    """W19 DoD：driver vs iron 至少 3 个 phase 差异 ≥ 0.03。"""
+    """W19 DoD：driver vs iron 至少 3 个 phase 差异 ≥ 0.03（W22 driver 标定后达标）。"""
     assert category_weight_diff_count("driver", "iron") >= 3
 
 

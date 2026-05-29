@@ -757,7 +757,11 @@ async def run_real_analysis_v2(req: AnalyzeRequest) -> AnalyzeResult:
     probe_warnings = _probe_video_warnings(req.video_url)
 
     result = await run_real_analysis(
-        req, diagnose_fn=diagnose_impl, enrichment_fn=enrichment_impl
+        req,
+        diagnose_fn=diagnose_impl,
+        enrichment_fn=enrichment_impl,
+        # W22：球杆相位权重只在 V2 生效，跟随 version_router 的 5%→25%→50% 灰度爬坡
+        club_aware_scoring=True,
     )
 
     # 合并所有 engine_warnings：probe 探测 + fallback 占位（若有）

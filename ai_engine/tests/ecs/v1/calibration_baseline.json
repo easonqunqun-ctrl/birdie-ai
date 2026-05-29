@@ -1,0 +1,11 @@
+{
+  "version": "v1-calibration-stub",
+  "macro_f1": 1.0,
+  "per_type_f1": {
+    "chicken_wing": 1.0,
+    "early_extension": 1.0,
+    "loss_of_posture": 1.0,
+    "steep_shoulder": 1.0,
+    "under_rotation": 1.0
+  }
+}

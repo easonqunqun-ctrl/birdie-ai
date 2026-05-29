@@ -153,7 +153,9 @@ def test_quality_warnings_from_pose_codes() -> None:
 
     keypoints = np.zeros((10, 33, 3), dtype=np.float32)
     visibility = np.full((10, 33), 0.8, dtype=np.float32)
-    visibility[:, 11:17] = 0.45
+    # _CORE_SWING_LANDMARKS 含上半身(肩/肘/腕 11-16)与下半身(髋/膝/踝 23-28)，
+    # 取这些核心点均值与 0.55 比较；遮挡需覆盖到核心点才会触发 partial_occlusion。
+    visibility[:, 11:29] = 0.45
     valid_mask = visibility.mean(axis=1) >= 0.5
     pose = PoseResult(
         keypoints=keypoints,

@@ -38,6 +38,7 @@ from app.pipeline.diagnose import DiagnosedIssue, diagnose
 from app.pipeline.features import extract_features
 from app.pipeline.phases import PhaseSegmentResult, segment_phases
 from app.pipeline.pose import PoseResult, estimate_poses, quality_warnings_from_pose
+from app.pipeline.club_profiles import to_club_category
 from app.pipeline.preprocess import preprocess_video, quality_warnings_from_preprocess
 from app.pipeline.recommend import recommend
 from app.pipeline.scoring import score_all_phases, score_overall, weakest_phase
@@ -92,6 +93,7 @@ async def run_real_analysis(
     *,
     diagnose_fn: DiagnoseFn | None = None,
     enrichment_fn: EnrichmentFn | None = None,
+    club_aware_scoring: bool = False,
 ) -> AnalyzeResult:
     """真实分析主入口（替换 mock_pipeline.run_mock_analysis）。
 
@@ -146,9 +148,21 @@ async def run_real_analysis(
     # 4. 特征抽取
     features = extract_features(pose_result.keypoints, phases)
 
-    # 5. 评分
-    phase_scores_int = score_all_phases(features)
-    overall = score_overall(phase_scores_int)
+    # 5. 评分（W22：``club_aware_scoring`` 仅由 V2 入口打开，搭 version_router 灰度爬坡；
+    #    V1 默认 False → 两 profile 维度都 None → 阶段分用 V1 ideal、综合分用单套 PHASE_WEIGHTS，
+    #    生产路径字节不变。打开时按 (机位, 球杆类别) 二维合成 per-feature ideal（阶段分）+
+    #    相位权重（综合分）：ideal 优先级 category>angle>V1；权重 = V1+两维 delta 叠加。
+    #    iron+无机位==V1；真实分析机位必填，故 V2 桶分数会带机位 delta（仅灰度桶）。)
+    club_category = (
+        to_club_category(getattr(req, "club_type", None)) if club_aware_scoring else None
+    )
+    camera_angle = getattr(req, "camera_angle", None) if club_aware_scoring else None
+    phase_scores_int = score_all_phases(
+        features, club_category=club_category, camera_angle=camera_angle
+    )
+    overall = score_overall(
+        phase_scores_int, club_category=club_category, camera_angle=camera_angle
+    )
     weakest = weakest_phase(phase_scores_int)
 
     # 6. 诊断（V1 默认 ``diagnose``；V2 灰度桶可注入 ``diagnose_v2``）

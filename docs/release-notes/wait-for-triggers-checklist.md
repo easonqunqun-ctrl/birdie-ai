@@ -22,14 +22,14 @@
 |---|---|---|---|---|
 | **O-01** | 已完成 | 体验版用户 ≥ 100 / 周活 ≥ 30 | 跑 NPS 调研 + 上「邀请有礼」运营 | 运营 |
 | **O-04** | 已完成 | 教练 SaaS 上线（W19+） | 切「教练抽审」入口 | 产品 |
-| **P-02** | 已完成 | 真实非高尔夫视频上传 ≥ 5 例 | 调 ENG-02 阈值 + 提 PR | AI 工程 |
+| **P-02** | 已完成（评估脚本就位） | 真实非高尔夫视频上传 ≥ 5 例 | 跑 `precheck_threshold_eval.py` → 调阈值 + 提 PR | AI 工程 |
 | **W14-C** | runbook 就位 | V1/V2 真实流量分析 ≥ 20 case | 跑 v1_v2_diff.py + 出周报 | AI 工程 |
 | **Q-B5** | 工程就位 | 商户产品自动续费签约通过 | 接 papay sign 流程 | 产品 + 财务 |
 | **Q-D1** | 工程就位 | RN 端首发版本 (M3+) | 跑 client-check-rn 全栈 | 客户端工程 |
-| **ENG-04** | 标定集就位 | 争议样本累计 ≥ 20 | 进 ECS 标定回归 + 跑 yaml 调参 | AI 工程 |
+| **ENG-04** | 标定集 + 回归脚本就位 | 争议样本累计 ≥ 20 | 替换标定集 → 跑 `calibration_regression.py` F1 门禁 + 调 yaml | AI 工程 |
 | **ENG-06** | 模板就位 | v2_count ≥ 5 且 1 条争议反馈/周 | 周更模板 → eng-06 系列 docs | 运营 + AI 工程 |
 | **W18+** | 监控栈就位 | webhook-echo → 企业微信群机器人 | 改 alertmanager.yml receivers | DevOps |
-| **W18+** | probe rewrite 就位 | 切 COS / OSS / 第三方对象存储 | 改 EXTRA_INTERNAL_URL_REWRITES env | DevOps |
+| **W18+** | probe rewrite + 自检脚本就位 | 切 COS / OSS / 第三方对象存储 | 改 env → 跑 `cos_switch_selfcheck.py` 校验 → 重启 | DevOps |
 | **W19+** | 朋友圈封面 layout 就位 | 产品决定接入 timeline 海报 | 实现 drawPosterTimeline + 接 poster.tsx | 客户端工程 |
 
 ---
@@ -68,9 +68,16 @@
 - [ ] 真实用户上传非高尔夫视频 ≥ 5 例（看 ENG-02 metrics `pre_check_rejected_count`）
 
 **触发后动作**：
-1. 抽这 5 例 video，跑 `ai_engine/scripts/precheck_threshold_eval.py`（待写）
-2. 对比"AI 拒绝"vs"人工标注"，看 false positive / negative
-3. 调 `pre_check.py` 阈值 + 提 PR
+1. 抽这 5 例 video，人工补 `label`（block/pass）列成 CSV，跑 `ai_engine/scripts/precheck_threshold_eval.py`（**✅ 已就位**，纯逻辑 `app/pipeline/precheck_eval.py`，单测 `tests/test_precheck_eval.py`）：
+   ```bash
+   # 容器内
+   python scripts/precheck_threshold_eval.py \
+       --input-csv samples_labeled.csv \
+       --out-csv reports/precheck_eval.csv \
+       --report-md reports/precheck_eval.md
+   ```
+2. 报告直接给混淆矩阵：**FP=误杀**（拦了正常视频，伤体验）/ **FN=漏拦**（放过该拦的，浪费配额），并按 `error_code` 分桶定位调哪个硬门槛
+3. 调 `app/pipeline/precheck.py`（沿用 `preprocess.py` 的硬门槛常量）阈值 + 提 PR
 
 ### 2.4 W14-C · V1/V2 Diff 真实流量
 
@@ -110,11 +117,23 @@
 **触发条件**：
 - [ ] 争议样本累计 ≥ 20 条（来自 ENG-06 周报汇总）
 
-**触发后动作**：
-1. 把 20 条样本入 `docs/20` ECS 标定集
-2. 跑 `ai_engine/scripts/calibration_regression.py`（待写）
-3. 任何 issue 类型 F1 score 跌幅 > 5% → block PR
-4. 调 yaml 阈值后，标定 F1 必须**全员**回到 baseline
+**触发后动作**（脚本 **✅ 已就位**：纯逻辑 `app/ecs/calibration.py`，CLI `scripts/calibration_regression.py`，单测 `tests/test_calibration.py`，CI 端到端冒烟跑随仓库分发的 stub 标定集）：
+1. 把 20 条样本（真实授权 + 人工标注 `expected_issues`）替换 `tests/ecs/v1/calibration_manifest.json` 的 clips，并重生成 baseline：
+   ```bash
+   python scripts/calibration_regression.py \
+       --manifest tests/ecs/v1/calibration_manifest.json \
+       --out-baseline tests/ecs/v1/calibration_baseline.json
+   ```
+2. 改 yaml 阈值后跑回归门禁（任一 issue 类型 F1 跌幅 > 5% → **退出码 1，block PR**）：
+   ```bash
+   python scripts/calibration_regression.py \
+       --manifest tests/ecs/v1/calibration_manifest.json \
+       --baseline tests/ecs/v1/calibration_baseline.json \
+       --report-md reports/calibration_regression.md
+   ```
+3. 调 yaml 阈值后，标定 F1 必须**全员**回到 baseline（门禁绿灯）
+
+> **注**：当前 `calibration_manifest.json` 是**合成 Pose 行为快照 stub**（非授权人工标注），与既有 `manifest.json` / `baseline_snapshot.json`（scoring 漂移）的合成约定一致——只为把 F1 harness 端到端跑通 + CI 防回归。触发后用真实授权样本替换。本线与 `app/ecs/regression.py`（scoring 漂移）**正交**。
 
 ### 2.8 ENG-06 · 争议样本周更
 
@@ -137,14 +156,24 @@
 **触发条件**：
 - [ ] 业务侧决定从 MinIO 切到腾讯云 COS / 阿里云 OSS / 七牛 KODO 之一
 
-**触发后动作**：
-1. 在 `.env.local` 加：
+**触发后动作**（自检脚本 **✅ 已就位**：`ai_engine/scripts/cos_switch_selfcheck.py`，纯逻辑可单测 `tests/test_cos_switch_selfcheck.py`）：
+1. 在 `.env.local` 加（多对用 `;` 分隔）：
    ```
    EXTRA_INTERNAL_URL_REWRITES=https://cos.example.com=http://internal-cos:443
    ```
-2. 重启 ai_engine
-3. 验证 `v2_probe_errors_5xx_after_retries` 仍为 0
-4. 9/9 单测应该不需要改（已覆盖泛化路径）
+2. **重启前**先离线自检（不发网络，只校验 env 改写配置 + 退出码门禁）——typo / 漏域名会让公网 URL 悄悄不改写、重现 W13-C 5xx：
+   ```bash
+   # 容器内：用真实 .env 校验一条 COS 示例 URL 会被改写到内网，否则退出码 1
+   python scripts/cos_switch_selfcheck.py \
+       --url 'https://cos.ap-guangzhou.myqcloud.com/birdie/uploads/x.mp4' \
+       --expect-internal 'http://internal-cos:443' --require-match
+   # what-if：不动真实 env，先试候选配置
+   python scripts/cos_switch_selfcheck.py --rewrites '<候选 EXTRA_INTERNAL_URL_REWRITES>' \
+       --url '<示例公网 URL>' --require-match --strict-config
+   ```
+3. 重启 ai_engine
+4. 验证 `v2_probe_errors_5xx_after_retries` 仍为 0
+5. 单测已覆盖泛化路径（rewrite 逻辑 + 本自检脚本），切换本身**不需要改代码**
 
 ### 2.11 W19+ 朋友圈封面海报
 

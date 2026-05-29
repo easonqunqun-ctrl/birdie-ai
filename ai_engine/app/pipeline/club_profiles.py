@@ -85,12 +85,18 @@ def unknown_club_type_warning(club_type: str | None) -> EngineWarning | None:
 # putter 缺席（M7-11 推杆 pipeline 负责）
 # ============================================================
 
+# driver（W22 标定）：开球木球架高、上升击球，力量来自宽上杆 + 下杆速度/顺序；
+# setup / impact 精度权重相对低于铁杆与挖起杆（球架高，触球容错更大）。
+# 相对 iron 基线（.15/.20/.15/.25/.15/.10）在 setup/backswing/downswing/impact 4 个相位
+# 差异 ≥0.03，满足 W19 DoD「driver vs iron ≥3 相位差异」。
+# 数值为领域知识驱动的标定初值；真实 ECS 争议样本（ENG-04 触发条≥20）到位后二次校准。
+# 详 docs/release-notes/w22-driver-phase-weights-calibration.md。
 PHASE_WEIGHTS_DRIVER: dict[str, float] = {
-    "setup": 0.13,
-    "backswing": 0.20,
+    "setup": 0.11,
+    "backswing": 0.23,
     "top": 0.15,
-    "downswing": 0.28,
-    "impact": 0.14,
+    "downswing": 0.29,
+    "impact": 0.12,
     "follow_through": 0.10,
 }
 

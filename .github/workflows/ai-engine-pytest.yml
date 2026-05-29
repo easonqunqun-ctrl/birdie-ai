@@ -1,0 +1,47 @@
+name: AI Engine Pytest
+
+# 背景：此前 ai_engine 在 CI 只有 `ai-engine-ecs-regression.yml` 跑 3 个 ECS 文件，
+# 全量 pytest（scoring / score_profiles / real_pipeline_v2 / club_profiles / camera_angle …）
+# 只在本地 `make ai-engine-test` 跑、CI 不跑 → W22 球杆/机位标尺等大量守门测试没被 CI 护住。
+# 本工作流镜像 `make ai-engine-test`：装 ffmpeg → uv sync → 生成合成视频 → 全量 pytest。
+# 缺 real/*.mp4（版权受限）的测试会自动 skip，不影响门禁。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ai_engine/**'
+      - '.github/workflows/ai-engine-pytest.yml'
+  pull_request:
+    paths:
+      - 'ai_engine/**'
+      - '.github/workflows/ai-engine-pytest.yml'
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ai_engine
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ffmpeg (合成测试视频用)
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Setup Python
+        run: uv python install 3.11
+
+      - name: Sync dependencies
+        run: uv sync --group dev
+
+      - name: Generate synthetic test videos
+        run: bash tests/fixtures/generate_synthetic.sh
+
+      - name: Full pytest suite
+        run: uv run pytest -q --tb=short

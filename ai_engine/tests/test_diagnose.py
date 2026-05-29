@@ -31,8 +31,30 @@ def _fake_phases(fps: float = 30.0) -> PhaseSegmentResult:
 
 
 def _ideal_features() -> dict[str, float]:
-    """所有特征都在 ideal 中点：应该诊断出 0 条 issue（无问题挥杆）。"""
-    return {f["name"]: (f["ideal_min"] + f["ideal_max"]) / 2 for f in FEATURES}
+    """构造一套真正『无问题挥杆』特征：每条 rule 都落在安全区间。
+
+    不能简单取各特征 ideal 区间中点——区间是『评分容差带』（配合 tolerance 给分），
+    比 diagnose 各 rule 的『良好』阈值宽。例如 shoulder_rotation_top 区间 30-95、
+    中点 62.5，会落进 under_rotation(<75) 的触发区；finish_height 区间 -0.20~0.15、
+    中点 -0.025，会落进 chicken_wing(>-0.05) 的触发区。这里按 rule 的无问题条件取值。
+    """
+    feats = {f["name"]: (f["ideal_min"] + f["ideal_max"]) / 2 for f in FEATURES}
+    feats.update(
+        {
+            "shoulder_rotation_top": 90.0,  # under(<75)/over(>105) 之间
+            "x_factor": 40.0,  # steep(<25)/flat(>60)/over_the_top(<55) 安全
+            "downswing_sequence": 4.0,  # sway_lead(<-2)/over_the_top(seq<0) 安全
+            "wrist_release_timing": 0.65,  # casting(<0.40) 安全
+            "spine_angle_impact_delta": 2.0,  # early_extension(>8)/loss_of_posture 安全
+            "head_lateral_shift": 0.02,  # sway_slide(>0.12)/loss_of_posture 安全
+            "top_wrist_position": 0.25,  # reverse_spine(<0) 安全
+            "left_arm_straightness": 175.0,  # chicken_wing(arm<150) 安全
+            "finish_height": -0.10,  # chicken_wing(finish_h>-0.05) 安全
+            "finish_balance": 0.01,  # hanging_back(>0.04) 安全
+            "knee_flexion_setup": 158.0,  # open_stance(>170) 安全
+        }
+    )
+    return feats
 
 
 def test_diagnose_ideal_swing_no_issues() -> None:
