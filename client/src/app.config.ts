@@ -45,7 +45,10 @@ export default defineAppConfig({
     'pages/meetup/index',
     'pages/meetup/detail',
     'pages/meetup/feedback',
-    'pages/meetup/create'
+    'pages/meetup/create',
+    'pages/meetup/events/index',
+    'pages/meetup/events/create',
+    'pages/meetup/events/detail',
   ],
   /**
    * 说明：真机上 wx.request **单次等待完整响应**仍有约 60s 量级上限；

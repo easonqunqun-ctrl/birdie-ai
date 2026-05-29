@@ -1,0 +1,53 @@
+.meetup-event-create {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 24rpx 28rpx 48rpx;
+  background: var(--color-bg);
+  box-sizing: border-box;
+
+  &__label {
+    margin-top: 24rpx;
+    margin-bottom: 12rpx;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+  }
+
+  &__input {
+    background: var(--color-bg-card);
+    border-radius: var(--radius-md);
+    padding: 20rpx 24rpx;
+    font-size: var(--font-size-md);
+  }
+
+  &__tpl {
+    background: var(--color-bg-card);
+    border-radius: var(--radius-md);
+    padding: 24rpx;
+    margin-bottom: 16rpx;
+    border: 2rpx solid transparent;
+
+    &--active {
+      border-color: var(--color-primary);
+    }
+  }
+
+  &__tpl-title {
+    font-size: var(--font-size-md);
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
+
+  &__tpl-desc {
+    margin-top: 8rpx;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+  }
+
+  &__submit {
+    margin-top: 48rpx;
+    background: var(--color-primary);
+    color: var(--color-on-primary, #fff);
+    border-radius: var(--radius-md);
+  }
+}
