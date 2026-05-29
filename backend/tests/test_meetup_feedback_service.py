@@ -47,7 +47,7 @@ async def _accepted_invitation(db: AsyncSession):
 @pytest.mark.asyncio
 async def test_duplicate_feedback_rejected() -> None:
     async with AsyncSessionLocal() as db:
-        a, b, inv = await _accepted_invitation(db)
+        a, _b, inv = await _accepted_invitation(db)
         payload = MeetupFeedbackSubmit(
             invitation_id=inv.id, rating=5, tags=["on_time"]
         )
