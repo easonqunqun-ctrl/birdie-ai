@@ -20,17 +20,19 @@ P2-M7-05 落了 5 套 `PHASE_WEIGHTS_BY_CATEGORY`，但 driver 那套是 **v0.1 
   见 `wait-for-triggers-checklist.md` §2.7），目前未满足。本次为**领域知识初值**，
   真实数据到位后二次校准回填。
 
-## 3. 关键事实：当前对线上评分零影响
+## 3. 标定本身对 V1 线上评分零影响（接入策略见 §6）
 
-`phase_weights_for_category` / `PHASE_WEIGHTS_DRIVER` **目前只在 `club_profiles.py`
-内部被引用，尚未接入 scoring / diagnose 链路**（kickoff 计划的「(angle, category) 二维
-组合由 scoring.py 接入」属后续步骤）。因此本次改权重：
+> 注：本节描述的是**改权重表那一步**的影响面。权重表随后已按 §6 接进 scoring，
+> 但**仅在 V2 桶生效**，V1 生产路径仍不受影响。
 
-- 不改变任何实际分析报告的分数 → 无评分漂移、不触发 `test_ecs_regression.py` 基线回归；
+`PHASE_WEIGHTS_DRIVER` 改值这一步：
+
+- 不改变任何 V1 分析报告的分数 → 无评分漂移、不触发 `test_ecs_regression.py` 基线回归；
 - 只影响 `category_weight_diff_count`（差异度计数）→ 让 W19 DoD 测试转绿。
 
-接入评分链路时，需把 driver 报告分数纳入灰度对比（参考 kickoff R-02：7 铁 V1↔V2 不跳变
-的同类约定），届时再评估 driver 用户分数变化是否符合预期。
+接进 scoring 时（§6）通过 `club_aware_scoring` 开关把球杆相位权重限定在 V2 桶，
+V1 用户分数不变；driver 报告分数纳入 V1↔V2 灰度对比（参考 kickoff R-02：7 铁 V1↔V2
+不跳变的同类约定）。
 
 ## 4. 权重对照
 
@@ -57,13 +59,17 @@ iron 基线（= V1 单套 `PHASE_WEIGHTS`）：`setup .15 / backswing .20 / top 
 
 ## 6. 接入评分进度
 
-- [x] **W22 把 `phase_weights_for_category` 接进 `scoring.py`**（本次）：
-  `score_overall(phase_scores, *, club_category=None)` 按球杆类别选相位权重；
-  `run_real_analysis`（V1/V2 共用入口）用 `to_club_category(req.club_type)` 派生类别传入。
-  - 行为变化范围：**仅 driver / wood / hybrid / wedge** 综合分按各自相位权重重算；
-    **iron / putter / 未知 → V1 单套兜底，分数不变**。
-  - 因评分在 V1/V2 共用主体里，**V1 路径同样生效**（即对所有 driver 用户即时生效，
-    非仅 V2 灰度桶）。如需仅灰度生效，应在 V2 注入层再加开关——当前未做，列为决策点。
+- [x] **W22 把 `phase_weights_for_category` 接进 `scoring.py`，且仅 V2 生效**（本次）：
+  `score_overall(phase_scores, *, club_category=None)` 按球杆类别选相位权重。
+  - **灰度门**：`run_real_analysis` 新增 `club_aware_scoring: bool = False` 开关，
+    **默认 False → club_category=None → 单套 PHASE_WEIGHTS，V1 生产路径字节不变**；
+    `run_real_analysis_v2` 调用时传 `club_aware_scoring=True`，用 `to_club_category(req.club_type)`
+    派生类别。**球杆相位权重因此只在 V2 桶生效，跟随 `version_router` 的 5%→25%→50% 灰度爬坡**，
+    不再像初版那样对全量 V1 用户即时生效（回应「为什么不直接 V2」的决策点，已收口）。
+  - 行为变化范围：V2 桶内 **仅 driver / wood / hybrid / wedge** 综合分按各自相位权重重算；
+    **iron / putter / 未知 → V1 单套兜底，分数不变**（iron 套 == V1 → 7 铁 V1↔V2 不跳变）。
+  - 守门测试：`test_run_real_analysis_club_aware_scoring_default_false`（锁 V1 默认 False）、
+    `test_v2_entry_enables_club_aware_scoring`（验 V2 入口打开开关），见 `tests/test_real_pipeline_v2.py`。
 - [ ] `ideal_for_category`（M7-05 §4.2 单特征 ideal 标尺）接进 `score_phase`——
   本次只接了相位权重维度，per-feature ideal 区间仍走 V1。
 - [ ] angle 维度（`angle_profiles.phase_weights_for` / `ideal_for_angle`）同样尚未接入 scoring；

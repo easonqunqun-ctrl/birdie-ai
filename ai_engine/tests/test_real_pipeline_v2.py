@@ -211,3 +211,51 @@ def test_run_real_analysis_accepts_custom_diagnose_fn(monkeypatch) -> None:
     # 默认走 V1 ``diagnose``
     assert rp_mod.DiagnoseFn is not None  # type alias 已定义
     # 真实端到端测试在 ai_engine integration suite 中按需手动跑（依赖视频素材）
+
+
+def test_run_real_analysis_club_aware_scoring_default_false() -> None:
+    """W22 灰度安全：``run_real_analysis`` 的 ``club_aware_scoring`` 默认 False。
+
+    默认 False → club_category=None → 单套 PHASE_WEIGHTS，V1 生产路径字节不变。
+    锁住默认值，防止有人误把球杆相位权重在 V1 全量打开（绕过 version_router 灰度）。
+    """
+    import inspect
+
+    from app.pipeline.real_pipeline import run_real_analysis
+
+    sig = inspect.signature(run_real_analysis)
+    assert sig.parameters["club_aware_scoring"].default is False
+
+
+@pytest.mark.asyncio
+async def test_v2_entry_enables_club_aware_scoring(monkeypatch) -> None:
+    """W22：``run_real_analysis_v2`` 调用 V1 入口时打开 ``club_aware_scoring``。
+
+    球杆相位权重只在 V2 桶生效，跟随 version_router 灰度爬坡。不真跑 pipeline：
+    桩掉 ``run_real_analysis`` 抓 kwargs、桩掉 ffprobe 探测，避免 mediapipe/视频依赖。
+    """
+    from types import SimpleNamespace
+
+    from app.pipeline import real_pipeline as rp1
+    from app.pipeline import real_pipeline_v2 as rp2
+    from app.schemas import AnalyzeRequest
+
+    captured: dict = {}
+
+    async def _fake_run(req, **kwargs):  # noqa: ANN001, ANN202
+        captured.update(kwargs)
+        return SimpleNamespace(engine_warnings=None)
+
+    # run_real_analysis 在 v2 里是函数级 import，桩源模块属性即可命中
+    monkeypatch.setattr(rp1, "run_real_analysis", _fake_run)
+    monkeypatch.setattr(rp2, "_probe_video_warnings", lambda _url: [])
+
+    req = AnalyzeRequest(
+        analysis_id="t-w22",
+        video_url="http://example/v.mp4",
+        camera_angle="face_on",
+        club_type="driver",
+    )
+    await rp2.run_real_analysis_v2(req)
+
+    assert captured.get("club_aware_scoring") is True

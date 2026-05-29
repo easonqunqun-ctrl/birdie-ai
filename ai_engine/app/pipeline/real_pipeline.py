@@ -93,6 +93,7 @@ async def run_real_analysis(
     *,
     diagnose_fn: DiagnoseFn | None = None,
     enrichment_fn: EnrichmentFn | None = None,
+    club_aware_scoring: bool = False,
 ) -> AnalyzeResult:
     """真实分析主入口（替换 mock_pipeline.run_mock_analysis）。
 
@@ -147,9 +148,12 @@ async def run_real_analysis(
     # 4. 特征抽取
     features = extract_features(pose_result.keypoints, phases)
 
-    # 5. 评分（W22：综合分按球杆类别选相位权重；iron / 未知 / putter → V1 单套兜底，
-    #    iron 套 == V1 → 7 铁报告分数接入前后不跳变。仅 driver/wood/hybrid/wedge 综合分变化。）
-    club_category = to_club_category(getattr(req, "club_type", None))
+    # 5. 评分（W22：``club_aware_scoring`` 仅由 V2 入口打开，搭 version_router 灰度爬坡；
+    #    V1 默认 False → club_category=None → 单套 PHASE_WEIGHTS，生产路径字节不变。
+    #    打开时 iron/putter/未知仍走 V1 套兜底，仅 driver/wood/hybrid/wedge 综合分变化。）
+    club_category = (
+        to_club_category(getattr(req, "club_type", None)) if club_aware_scoring else None
+    )
     phase_scores_int = score_all_phases(features)
     overall = score_overall(phase_scores_int, club_category=club_category)
     weakest = weakest_phase(phase_scores_int)
