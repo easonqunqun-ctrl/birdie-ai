@@ -19,6 +19,7 @@ export default defineAppConfig({
     'pages/analysis/poster',
     'pages/analysis/history',
     'pages/analysis/compare',
+    'pages/analysis/pro-compare',
     'pages/coach/index',
     'pages/training/index',
     'pages/profile/index',

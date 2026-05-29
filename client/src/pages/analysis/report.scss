@@ -852,4 +852,30 @@
     display: block;
     line-height: 1.6;
   }
+
+  &__pro-match {
+    border-color: var(--color-gold-soft);
+  }
+
+  &__pro-match-name {
+    font-size: 30rpx;
+    font-weight: 700;
+    color: var(--color-primary);
+    display: block;
+    margin-bottom: 8rpx;
+  }
+
+  &__pro-match-meta {
+    font-size: 24rpx;
+    color: var(--color-text-secondary);
+    line-height: 1.45;
+    display: block;
+    margin-bottom: 16rpx;
+  }
+
+  &__pro-match-btn {
+    font-size: 28rpx;
+    background: var(--color-primary);
+    color: var(--color-text-on-primary);
+  }
 }

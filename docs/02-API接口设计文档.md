@@ -822,7 +822,9 @@ GET /v1/analyses/{analysis_id}/pro-matches?limit=5&record=true
 }
 ```
 
-**匹配逻辑（v0.1 启发式）**：同 `club_type` 硬过滤 → `overall_score` / `phase_scores` 相似度加权 → 机位一致 +15 分。客户端 service：`prosService.matchForAnalysis()`；并排对比 UI 见 M12-05。
+**匹配逻辑（v0.1 启发式）**：同 `club_type` 硬过滤 → `overall_score` / `phase_scores` 相似度加权 → 机位一致 +15 分。客户端 service：`prosService.matchForAnalysis()`。
+
+**UI（M12-05）**：报告页展示 Top-1 匹配卡片 → `pages/analysis/pro-compare?id={analysis_id}&clipId={clip_id}`（并排双视频 + 双序列雷达叠加 + 六维分差表）。预览匹配时建议 `record=false`，进入对比页时再写历史（可选）。
 
 ---
 
