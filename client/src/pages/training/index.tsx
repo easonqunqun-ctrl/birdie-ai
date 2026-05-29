@@ -34,7 +34,7 @@ import { useMembershipExpiringSoonModalOnShow } from '@/hooks/useMembershipExpir
 import { getDrillDetail } from '@/constants/drillLibrary'
 import { getDrillVideoDetail } from '@/constants/drillVideoLibrary'
 import { PHASE_COLOR, PHASE_LABEL, PHASE_ORDER, type SwingPhaseKey } from '@/constants/phaseLabels'
-import { PAYMENT_ENABLED_FLAG } from '@/constants/flags'
+import { PAYMENT_ENABLED_FLAG, PHASE2_TRAINING_CATEGORIES_ENABLED_FLAG } from '@/constants/flags'
 import type {
   PracticeLogItem,
   TrainingPlanDetail,
@@ -83,6 +83,20 @@ const TrainingPage: FC = () => {
   const [practiceMonthKey, setPracticeMonthKey] = useState(() => monthKeyNow())
   const [practiceCalendar, setPracticeCalendar] = useState<PracticeCalendarGrid>(() =>
     buildPracticeCalendarGrid(monthKeyNow(), new Map()),
+  )
+  const [drillCategoryFilter, setDrillCategoryFilter] = useState<
+    'all' | 'full_swing' | 'putting' | 'chipping'
+  >('all')
+
+  const matchesDrillCategory = useCallback(
+    (task: TrainingTaskItem) => {
+      if (!PHASE2_TRAINING_CATEGORIES_ENABLED_FLAG || drillCategoryFilter === 'all') {
+        return true
+      }
+      const cat = getDrillDetail(task.drill_id).category || 'full_swing'
+      return cat === drillCategoryFilter
+    },
+    [drillCategoryFilter],
   )
 
   const load = useCallback(async () => {
@@ -227,10 +241,13 @@ const TrainingPage: FC = () => {
       coachTasks: all.filter((t) => t.task_kind === 'coach_assigned'),
       proTasks: all.filter((t) => t.task_kind === 'pro_clip_try_it'),
       standardTasks: all.filter(
-        (t) => t.task_kind !== 'pro_clip_try_it' && t.task_kind !== 'coach_assigned',
+        (t) =>
+          t.task_kind !== 'pro_clip_try_it' &&
+          t.task_kind !== 'coach_assigned' &&
+          matchesDrillCategory(t),
       ),
     }
-  }, [plan])
+  }, [plan, matchesDrillCategory])
 
   const groupedCoach = useMemo(() => groupByDate(coachTasks), [coachTasks])
 
@@ -691,6 +708,32 @@ const TrainingPage: FC = () => {
         <View className='training__summary'>
           <Text className='training__summary-title'>教练本周提示</Text>
           <Text className='training__summary-body'>{plan.ai_summary}</Text>
+        </View>
+      )}
+
+      {PHASE2_TRAINING_CATEGORIES_ENABLED_FLAG && (
+        <View className='training__category-filter'>
+          {(
+            [
+              ['all', '全部'],
+              ['full_swing', '全挥杆'],
+              ['putting', '推杆'],
+              ['chipping', '切杆'],
+            ] as const
+          ).map(([key, label]) => (
+            <View
+              key={key}
+              className={[
+                'training__category-chip',
+                drillCategoryFilter === key ? 'training__category-chip--active' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+              onClick={() => setDrillCategoryFilter(key)}
+            >
+              <Text>{label}</Text>
+            </View>
+          ))}
         </View>
       )}
 

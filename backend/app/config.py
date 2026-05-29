@@ -224,6 +224,8 @@ class Settings(BaseSettings):
     PHASE2_CHIPPING_MODE_ENABLED: bool = False
     # M10-03 个人 yardage book（依赖 M9-02 user_clubs + target_yardage 反推）。
     PHASE2_YARDAGE_BOOK_ENABLED: bool = False
+    # M10-05 训练计划按 issue 类目匹配 drill category。
+    PHASE2_TRAINING_CATEGORIES_ENABLED: bool = False
 
     # M13 球友约球
     # 上线前需 DEP-05 法律意见书到位（M13-09 服务协议 / 未成年保护）。

@@ -32,10 +32,11 @@ from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import BadRequestError, ForbiddenError, NotFoundError
 from app.core.security import new_id
+from app.config import settings
 from app.models.analysis import AnalysisIssue, SwingAnalysis
 from app.models.training import Drill, PracticeLog, TrainingPlan, TrainingTask
 from app.models.user import User
-from app.schemas.training import TrainingTaskItem
+from app.services.training.issue_category import category_for_issue
 
 # 每次分析至多生成几个任务（issues 去重后截断）
 MAX_TASKS_PER_ANALYSIS = 5
@@ -139,6 +140,10 @@ async def _resolve_drill_ids_for_issues(
             )
             .order_by(Drill.sort_order)
         )
+        if settings.PHASE2_TRAINING_CATEGORIES_ENABLED:
+            cat = category_for_issue(issue_type)
+            if cat:
+                stmt = stmt.where(Drill.category == cat)
         rows = (await db.execute(stmt)).scalars().all()
         for drill_id in rows:
             if drill_id in seen:

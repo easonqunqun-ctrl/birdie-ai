@@ -1,0 +1,26 @@
+# M10-05 · issue type → drill category（与 ai_engine 诊断 type 对齐）
+putting_unstable_pendulum: putting
+putting_head_moved: putting
+putting_face_open: putting
+putting_rushed_tempo: putting
+putting_slow_tempo: putting
+
+chipping_over_swing: chipping
+chipping_decel: chipping
+chipping_scoop: chipping
+chipping_chunked: chipping
+chipping_thin: chipping
+chipping_alignment_off: chipping
+
+casting: full_swing
+over_the_top: full_swing
+early_extension: full_swing
+chicken_wing: full_swing
+sway: full_swing
+loss_of_balance: full_swing
+setup_posture: full_swing
+spine_angle_loss: full_swing
+overswing: full_swing
+reverse_pivot: full_swing
+weight_shift_poor: full_swing
+grip_weak: full_swing

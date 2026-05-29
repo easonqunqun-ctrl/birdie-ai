@@ -36,6 +36,14 @@
 | **M7-12-cal** | 切杆 pipeline 链路就位 | ECS 切杆 ≥10 段人工标注就位 | 回填 `chipping/constants.py` ideal + 验 AC-2（r≥0.65） | AI 工程 |
 | **M7-13-ui** | 多挥识别引擎链路就位（W28-W29） | 产品确认 select-swing UX + M10 训练页入口排期 | 客户端 `select-swing.tsx` + ffmpeg 缩略图 + `selected_swing_index` 回传 | 客户端 + AI 工程 |
 | **M11-06-auth** | 教练定制课程写 API 就位（白名单） | M8-01 教练认证 + 角色切换就位 | 白名单切 `is_coach` 校验；教练端课程编辑 UI（M8） | 后端 + 客户端 |
+| **M10-04-videos** | drill 库 25 条 + category 就位 | DEP-02 教练 BD + DEP-03 拍摄团队交付 12–17 段示范视频 | 回填 `drills.video_url` + `DRILL_VIDEO_ALIGNED_IDS` 灰度名单 | 教研 + 运营 |
+| **M7-01-ecs** | ECS v2 标定集骨架 | ≥50 段全挥杆 + 推杆/切杆各 ≥10 段教练标注 | 训练 ECS v2 + 回填 ideal/threshold | AI 工程 |
+| **M7-07-nn** | NN 本体占位（W23–W30） | 标定集 + ML 基建（GPU/训练管线） | 替换 rule-based 分段/评分子模块 | AI 工程 |
+| **M7-08-features** | 新特征设计 doc 就位 | ECS 特征相关性验收 | 接入 V2 feature 矩阵 | AI 工程 |
+| **M7-09-tracking** | YOLO 杆/球追踪 stub | 标注集 + 微调权重 | 替换 wrist-proxy 杆面/触球特征 | AI 工程 |
+| **M7-15-feedback** | 反馈池 schema stub | 产品定反馈 UX + 存储合规 | 启用 in-app 纠错回流 | 产品 + AI 工程 |
+| **M7-16-llm** | LLM 个性化 prompt stub | DeepSeek/Qwen key + 隐私评审 | 报告话术个性化 | AI 工程 |
+| **M14-store** | RN 1:1 / IAP 备忘 doc | App Store + 安卓市场资质 + Apple IAP 合同 | 上架发版 runbook 执行 | 运营 + 客户端 |
 
 ---
 
