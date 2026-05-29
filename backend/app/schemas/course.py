@@ -29,6 +29,53 @@ class CourseCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class CoachCourseCreate(BaseModel):
+    """M11-06 · 教练创建课程（``created_by_user_id`` 由服务端注入）."""
+
+    code: str | None = Field(None, min_length=1, max_length=40)
+    title: str = Field(..., min_length=1, max_length=100)
+    subtitle: str | None = Field(None, max_length=200)
+    cover_url: str | None = Field(None, max_length=512)
+    stage: int = Field(..., ge=1, le=7)
+    sort_order: int = 0
+    is_member_only: bool = False
+    description: str | None = None
+    learning_objectives: list[str] = Field(default_factory=list, max_length=20)
+    estimated_minutes: int = Field(60, ge=1, le=600)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class CoachCourseUpdate(BaseModel):
+    title: str | None = Field(None, max_length=100)
+    subtitle: str | None = Field(None, max_length=200)
+    cover_url: str | None = Field(None, max_length=512)
+    sort_order: int | None = None
+    is_member_only: bool | None = None
+    description: str | None = None
+    learning_objectives: list[str] | None = Field(None, max_length=20)
+    estimated_minutes: int | None = Field(None, ge=1, le=600)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class CoachLessonCreate(BaseModel):
+    """M11-06 · 教练为自有课程添加课时（``course_id`` 来自路径）."""
+
+    code: str = Field(..., min_length=1, max_length=40)
+    title: str = Field(..., min_length=1, max_length=100)
+    sort_order: int = Field(..., ge=0)
+    duration_minutes: int = Field(15, ge=1, le=180)
+    video_url: str | None = Field(None, max_length=512)
+    transcript: str | None = None
+    drill_ids: list[str] = Field(default_factory=list, max_length=20)
+    pro_clip_ids: list[str] = Field(default_factory=list, max_length=20)
+    quiz_payload: dict | None = None
+    pass_criteria: dict = Field(default_factory=dict)
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class CourseUpdate(BaseModel):
     title: str | None = Field(None, max_length=100)
     subtitle: str | None = Field(None, max_length=200)
@@ -165,6 +212,9 @@ class UserCourseStageRead(BaseModel):
 __all__ = [
     "CertificateDetailRead",
     "CertificateRead",
+    "CoachCourseCreate",
+    "CoachCourseUpdate",
+    "CoachLessonCreate",
     "CourseCreate",
     "CourseLessonsResponse",
     "CourseRead",

@@ -180,6 +180,10 @@ class Settings(BaseSettings):
     # 默认 false，M11-03 学习路径 UI 上线时切 true。
     PHASE2_COURSES_ENABLED: bool = False
 
+    # M11-06 教练定制课程写端点；M8 教练认证就位前用 user_id 白名单（逗号分隔 usr_xxx）。
+    # 空字符串 = 无人可写（端点仍 404/403，不暴露存在性给非白名单）。
+    COACH_COURSE_USER_IDS: str = ""
+
     # M12 球手对比库（pro_players + pro_swing_clips 等 6 张表）；默认 false，
     # M12-03 资源库 tab UI 上线时切 true。
     PHASE2_PROS_ENABLED: bool = False
