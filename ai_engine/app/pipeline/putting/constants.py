@@ -97,12 +97,26 @@ PUTTING_FEATURE_WEIGHTS: dict[str, float] = {
     f["name"]: f["weight"] for f in PUTTING_FEATURES
 }
 
+# 阶段 → 贡献特征映射（W24 scoring 用，做阶段分展示）。
+# 钟摆/头部稳定是「整段挥动」量，故 setup/backstroke/follow 都纳入；face_alignment 锚 impact。
+PUTTING_PHASE_FEATURE_MAP: dict[str, list[str]] = {
+    "setup": ["pendulum_stability", "head_stability"],
+    "backstroke": ["pendulum_stability", "head_stability", "tempo_ratio"],
+    "impact": ["face_alignment"],
+    "follow": ["pendulum_stability", "head_stability"],
+}
+
 
 def putting_feature_meta(name: str) -> PuttingFeatureMeta:
     for f in PUTTING_FEATURES:
         if f["name"] == name:
             return f
     raise KeyError(f"未知推杆特征 {name}；全集见 PUTTING_FEATURES")
+
+
+assert set(PUTTING_PHASE_FEATURE_MAP) == set(PUTTING_PHASE_ORDER), (
+    "PUTTING_PHASE_FEATURE_MAP keys != PUTTING_PHASE_ORDER"
+)
 
 
 # ---- 启动期一致性守门（与 full_swing constants 同款 assert） ----

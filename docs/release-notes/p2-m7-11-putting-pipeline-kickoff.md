@@ -172,3 +172,4 @@ Response: { analysis_mode: 'putting', putting_features: {...}, putting_score: 78
 | --- | --- | --- |
 | v0.1 | 2026-05-25 | 初版 |
 | v0.1-w22 | 2026-05-29 | **W22 落地**：putting 子包骨架（`__init__`/`constants`/`phases` 数据结构）+ 4 个专属特征（`features.py`）+ 单测（`tests/test_putting_features.py`）。`phases` 分割本体 / scoring / diagnose / main 路由 / 50123 仍排 W23-W25。**单位口径**：kickoff §3.2 的 px 阈值改写为 pipeline 既有归一化 `[0,1]`，ideal 为 v0.1 占位待 ECS 标定（AC-3）。`face_alignment` 用双腕连线近似杆面，待 M7-09 杆追踪替换。 |
+| v0.1-w23w24 | 2026-05-29 | **W23+W24 落地**：`phases.segment_putting_phases` 4 阶段分割本体（lead 腕速度活跃窗口 → impact 取速度峰 → backstroke 顶点取回摆-impact 间速度极小帧；阈值 `PUTTING_MIN_MOTION_SPEED=0.003` 低于全挥）+ `scoring.score_putting`（单边「越小越好」评分 + tempo 双边带；输出 overall + per-feature + per-phase，overall 按 `PUTTING_FEATURE_WEIGHTS` 加权）；新增 `tests/test_putting_phases.py` + `tests/test_putting_scoring.py`。diagnose 8 条 + main `mode=putting` 路由 + 50123 + docs/02 排 W25。 |
