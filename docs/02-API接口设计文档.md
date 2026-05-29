@@ -418,6 +418,48 @@ GET /v1/users/me
 
 ---
 
+### 2.4.1 个人 yardage book（P2-M10-03）
+
+需 `PHASE2_YARDAGE_BOOK_ENABLED` + `PHASE2_PROFILE_V2_ENABLED`（依赖用户装备清单）。
+
+```
+GET /v1/users/me/yardage-book
+PUT /v1/users/me/yardage-book
+```
+
+**GET 成功响应 `data`**：
+
+```json
+{
+  "clubs": [
+    {
+      "club_id": "ucl_abc",
+      "club_type": "iron_7",
+      "nickname": "主力 7 号铁",
+      "my_yards": 150,
+      "std_yards": null,
+      "sample_count": 0,
+      "source": "self"
+    }
+  ]
+}
+```
+
+- `source`：`self` 自填（`user_clubs.self_yardage_m`）/ `inferred` 历史反推 / `none` 采样不足。
+- 反推规则：同 `club_type` 下 `swing_analyses.target_yardage` 非空样本 ≥5，取最近 50 条均值。
+
+**PUT 请求体**：
+
+```json
+{
+  "clubs": [
+    { "club_id": "ucl_abc", "self_yardage_m": 155 }
+  ]
+}
+```
+
+---
+
 ### 2.5 更新用户信息
 
 ```
@@ -637,7 +679,8 @@ POST /v1/analyses
   "upload_id": "upl_abc123（必填，上传凭证 ID）",
   "camera_angle": "face_on | down_the_line（必填）",
   "club_type": "driver | fairway_wood | iron_3 | iron_4 | iron_5 | iron_6 | iron_7 | iron_8 | iron_9 | wedge | putter | unknown（必填）",
-  "mode": "full_swing | putting | chipping（可选，默认 full_swing；需 `PHASE2_PUTTING_MODE_ENABLED` / `PHASE2_CHIPPING_MODE_ENABLED` 灰度开启）"
+  "mode": "full_swing | putting | chipping（可选，默认 full_swing；需 `PHASE2_PUTTING_MODE_ENABLED` / `PHASE2_CHIPPING_MODE_ENABLED` 灰度开启）",
+  "target_yardage": "integer 1-400（可选；仅 full_swing 且 `PHASE2_YARDAGE_BOOK_ENABLED` 时写入 `swing_analyses.target_yardage`，供 yardage book 反推）"
 }
 ```
 

@@ -190,6 +190,16 @@
     }
   }
 
+  &__yardage-input {
+    margin-top: 16rpx;
+    padding: 20rpx 24rpx;
+    background: var(--color-bg-card);
+    border-radius: var(--radius-md);
+    font-size: 32rpx;
+    color: var(--color-text-primary);
+    border: 1rpx solid var(--color-border);
+  }
+
   /* 底部提交 */
   &__footer {
     position: fixed;
