@@ -2,9 +2,10 @@
  * P2-M13-05 · 约球邀请列表
  */
 
-import { FC, useCallback, useState } from 'react'
+import { FC, useCallback, useEffect, useState } from 'react'
 import { View, Text, ScrollView, Button } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
+import MeetupTosModal from '@/components/MeetupTosModal'
 import { PHASE2_MEETUP_ENABLED_FLAG } from '@/constants/flags'
 import {
   INVITATION_STATUS_LABEL,
@@ -12,6 +13,7 @@ import {
   type MeetupListRole,
 } from '@/constants/meetup'
 import { meetupService, type MeetupInvitationRead } from '@/services/meetupService'
+import { meetupSafetyService } from '@/services/meetupSafetyService'
 import { useUserStore } from '@/store/userStore'
 import './index.scss'
 
@@ -29,8 +31,11 @@ const MeetupListPage: FC = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [items, setItems] = useState<MeetupInvitationRead[]>([])
+  const [showTos, setShowTos] = useState(false)
+  const [meetupReady, setMeetupReady] = useState(false)
 
   const load = useCallback(async () => {
+    if (!meetupReady) return
     setLoading(true)
     setError(null)
     try {
@@ -41,7 +46,25 @@ const MeetupListPage: FC = () => {
     } finally {
       setLoading(false)
     }
-  }, [role])
+  }, [role, meetupReady])
+
+  const checkSafety = useCallback(async () => {
+    try {
+      const status = await meetupSafetyService.status()
+      if (!status.can_use_meetup) {
+        setShowTos(true)
+        setMeetupReady(false)
+        return
+      }
+      setMeetupReady(true)
+      setShowTos(false)
+    } catch (e) {
+      Taro.showToast({
+        title: e instanceof Error ? e.message : '合规检查失败',
+        icon: 'none',
+      })
+    }
+  }, [])
 
   useDidShow(() => {
     if (!PHASE2_MEETUP_ENABLED_FLAG) {
@@ -49,8 +72,12 @@ const MeetupListPage: FC = () => {
       setTimeout(() => Taro.navigateBack({ delta: 1 }), 1200)
       return
     }
-    void load()
+    void checkSafety()
   })
+
+  useEffect(() => {
+    if (meetupReady) void load()
+  }, [meetupReady, load])
 
   const roleLabel = (it: MeetupInvitationRead): string => {
     if (!userId) return ''
@@ -154,6 +181,14 @@ const MeetupListPage: FC = () => {
           发起约球
         </Button>
       </View>
+      <MeetupTosModal
+        visible={showTos}
+        onAccepted={() => {
+          setMeetupReady(true)
+          setShowTos(false)
+        }}
+        onRejected={() => Taro.navigateBack()}
+      />
     </View>
   )
 }

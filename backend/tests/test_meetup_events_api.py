@@ -6,24 +6,12 @@ import pytest
 from httpx import AsyncClient
 
 from app.config import settings
+from tests.meetup_test_helpers import prepare_meetup_access
 
 
 @pytest.fixture
 def meetup_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "PHASE2_MEETUP_ENABLED", True)
-
-
-async def _make_other_user() -> str:
-    async with AsyncSessionLocal() as db:
-        u = User(
-            id=new_id("usr"),
-            wechat_openid=f"o_{new_id('mock')}",
-            nickname="other",
-            invite_code=new_id("inv")[-6:].upper(),
-        )
-        db.add(u)
-        await db.commit()
-        return u.id
 
 
 @pytest.mark.asyncio
@@ -32,6 +20,7 @@ async def test_list_event_templates(
     auth_headers: dict[str, str],
     meetup_enabled: None,
 ) -> None:
+    await prepare_meetup_access(client, auth_headers)
     resp = await client.get("/v1/meetups/events/templates", headers=auth_headers)
     assert resp.status_code == 200
     body = resp.json()
@@ -46,6 +35,7 @@ async def test_create_and_join_event_flow(
     auth_headers: dict[str, str],
     meetup_enabled: None,
 ) -> None:
+    await prepare_meetup_access(client, auth_headers)
     create = await client.post(
         "/v1/meetups/events",
         json={
@@ -57,7 +47,6 @@ async def test_create_and_join_event_flow(
     assert create.status_code == 200
     event_id = create.json()["data"]["id"]
 
-    # join as current user
     join = await client.post(
         f"/v1/meetups/events/{event_id}/join",
         headers=auth_headers,

@@ -23,9 +23,8 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
-from app.config import settings
+from app.api.v1.meetup_guard import ensure_meetup_user_ready
 from app.core.database import get_db
-from app.core.exceptions import NotFoundError
 from app.core.redis import get_redis
 from app.models.user import User
 from app.schemas.base import APIResponse, ok
@@ -40,11 +39,6 @@ from app.services import meetup_service
 
 router = APIRouter()
 me_router = APIRouter()
-
-
-def _ensure_meetup_enabled() -> None:
-    if not settings.PHASE2_MEETUP_ENABLED:
-        raise NotFoundError(code=40406, message="约球功能未开放")
 
 
 # ==================== POST /v1/meetups/invitations ====================
@@ -65,7 +59,7 @@ async def create_meetup_invitation(
     M13-06 风控：信用分 / 冷却 / 接受率 / 日上限 → 40339 / 42920 / 42921。
     """
 
-    _ensure_meetup_enabled()
+    await ensure_meetup_user_ready(db, user=user)
     cfg = await risk_svc.assert_can_send_invitation(db, redis, user=user)
     inv = await meetup_service.create_invitation(
         db, inviter_user_id=user.id, payload=payload
@@ -88,7 +82,7 @@ async def cancel_meetup_invitation(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    _ensure_meetup_enabled()
+    await ensure_meetup_user_ready(db, user=user)
     inv = await meetup_service.cancel_invitation(
         db, invitation_id=invitation_id, user_id=user.id
     )
@@ -120,7 +114,7 @@ async def list_my_meetup_invitations(
     已经过期的邀请变为 ``expired``，不依赖 cron job。
     """
 
-    _ensure_meetup_enabled()
+    await ensure_meetup_user_ready(db, user=user)
     # 懒清理过期邀请（每次拉列表都顺手做一遍；O(过期数)，对中小流量足够）
     await meetup_service.expire_overdue_invitations(db)
 

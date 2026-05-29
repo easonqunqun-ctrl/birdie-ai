@@ -6,9 +6,8 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
-from app.config import settings
+from app.api.v1.meetup_guard import ensure_meetup_user_ready
 from app.core.database import get_db
-from app.core.exceptions import NotFoundError
 from app.models.user import User
 from app.schemas.base import APIResponse, ok
 from app.schemas.meetup import (
@@ -23,11 +22,6 @@ router = APIRouter()
 me_router = APIRouter()
 
 
-def _ensure_meetup_enabled() -> None:
-    if not settings.PHASE2_MEETUP_ENABLED:
-        raise NotFoundError(code=40406, message="约球功能未开放")
-
-
 @router.post(
     "/feedbacks",
     summary="提交约球互评（M13-07）",
@@ -38,7 +32,7 @@ async def submit_meetup_feedback(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    _ensure_meetup_enabled()
+    await ensure_meetup_user_ready(db, user=user)
     fb = await feedback_svc.submit_feedback(
         db, reviewer_user_id=user.id, payload=payload
     )
@@ -56,7 +50,7 @@ async def list_meetup_feedbacks_for_invitation(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    _ensure_meetup_enabled()
+    await ensure_meetup_user_ready(db, user=user)
     items = await feedback_svc.list_feedbacks_for_invitation(
         db, viewer_user_id=user.id, invitation_id=invitation_id
     )
@@ -79,7 +73,7 @@ async def get_meetup_feedback_eligibility(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    _ensure_meetup_enabled()
+    await ensure_meetup_user_ready(db, user=user)
     data = await feedback_svc.get_feedback_eligibility(
         db, user_id=user.id, invitation_id=invitation_id
     )
@@ -96,6 +90,6 @@ async def list_my_meetup_feedbacks(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    _ensure_meetup_enabled()
+    await ensure_meetup_user_ready(db, user=user)
     items = await feedback_svc.list_my_feedbacks(db, user_id=user.id, limit=limit)
     return ok(MeetupFeedbackListResponse(items=items, total=len(items)))

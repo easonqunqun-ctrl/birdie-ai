@@ -1724,6 +1724,22 @@ POST /v1/meetups/events/{id}/submit-score
 
 **客户端**：`meetupEventService`；`pages/meetup/events/*`；约球列表「挑战赛」入口。
 
+### 5C.4 约球合规（M13-09）
+
+```
+GET  /v1/meetups/safety/tos
+GET  /v1/meetups/safety/status
+POST /v1/meetups/safety/accept-tos          Body: { gender_preference? }
+PATCH /v1/meetups/safety/preferences         Body: { gender_preference }
+POST /v1/meetups/safety/mock-identity       仅 WECHAT_MOCK_LOGIN
+```
+
+**规则**：
+- 所有 M13 业务端点（venues / invitations / events / feedbacks）经 `ensure_meetup_access`：须已同意协议 + 实名 + 年龄 ≥14。
+- **40332** 未满 14 岁；**40333** 未完成手机号实名 / 缺少出生日期；**40334** 未同意约球协议。
+- `user_profiles_v2.privacy_payload` 扩展：`meetup_tos_accepted_at`、`gender_preference`（`any` / `same` / `coach_only`；女性默认 `same`）。
+- 协议正文：`docs/legal/tos-m13.md`；客户端 `MeetupTosModal` 首次强提醒（不可遮罩关闭）。
+
 ---
 
 ## 六、支付模块（/payments）

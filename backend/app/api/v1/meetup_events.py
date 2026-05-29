@@ -6,9 +6,8 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
-from app.config import settings
+from app.api.v1.meetup_guard import ensure_meetup_user_ready
 from app.core.database import get_db
-from app.core.exceptions import NotFoundError
 from app.models.user import User
 from app.schemas.base import APIResponse, ok
 from app.schemas.meetup import (
@@ -24,11 +23,6 @@ from app.services.meetup_event_rules import EVENT_RULE_TEMPLATES
 router = APIRouter()
 
 
-def _ensure_meetup_enabled() -> None:
-    if not settings.PHASE2_MEETUP_ENABLED:
-        raise NotFoundError(code=40406, message="约球功能未开放")
-
-
 @router.get(
     "/events/templates",
     summary="挑战赛模板列表（M13-08）",
@@ -36,8 +30,9 @@ def _ensure_meetup_enabled() -> None:
 )
 async def list_event_templates(
     user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    _ensure_meetup_enabled()
+    await ensure_meetup_user_ready(db, user=user)
     items = [
         EventTemplateRead(
             code=t.code,
@@ -61,7 +56,7 @@ async def create_meetup_event(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    _ensure_meetup_enabled()
+    await ensure_meetup_user_ready(db, user=user)
     event = await event_svc.create_event(
         db, organizer_user_id=user.id, payload=payload
     )
@@ -84,7 +79,7 @@ async def list_meetup_events(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    _ensure_meetup_enabled()
+    await ensure_meetup_user_ready(db, user=user)
     events, total = await event_svc.list_events(
         db, page=page, page_size=page_size, status=status
     )
@@ -114,7 +109,7 @@ async def get_meetup_event(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    _ensure_meetup_enabled()
+    await ensure_meetup_user_ready(db, user=user)
     event = await event_svc.get_event(db, event_id=event_id)
     data = await event_svc.event_to_read_dict(
         db, event=event, viewer_user_id=user.id
@@ -132,7 +127,7 @@ async def join_meetup_event(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    _ensure_meetup_enabled()
+    await ensure_meetup_user_ready(db, user=user)
     await event_svc.join_event(db, event_id=event_id, user_id=user.id)
     await db.commit()
     event = await event_svc.get_event(db, event_id=event_id)
@@ -153,7 +148,7 @@ async def submit_meetup_event_score(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    _ensure_meetup_enabled()
+    await ensure_meetup_user_ready(db, user=user)
     await event_svc.submit_score(
         db, event_id=event_id, user_id=user.id, payload=payload
     )

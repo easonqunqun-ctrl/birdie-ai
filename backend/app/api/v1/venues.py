@@ -17,10 +17,12 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
+from app.api.deps import get_current_user
+from app.api.v1.meetup_guard import ensure_meetup_user_ready
 from app.core.database import get_db
 from app.core.exceptions import NotFoundError
 from app.models.meetup import Venue
+from app.models.user import User
 from app.schemas.base import APIResponse, ok
 from app.schemas.meetup import (
     VenueNearbyItem,
@@ -31,11 +33,6 @@ from app.schemas.meetup import (
 from app.services import meetup_service
 
 router = APIRouter()
-
-
-def _ensure_meetup_enabled() -> None:
-    if not settings.PHASE2_MEETUP_ENABLED:
-        raise NotFoundError(code=40406, message="约球功能未开放")
 
 
 @router.get(
@@ -58,11 +55,12 @@ async def get_nearby_venues(
         ge=1,
         le=meetup_service.MAX_NEARBY_LIMIT,
     ),
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """按距离升序返回半径内 active venues 及 distance_km."""
 
-    _ensure_meetup_enabled()
+    await ensure_meetup_user_ready(db, user=user)
     pairs = await meetup_service.search_nearby_venues(
         db,
         latitude=lat,
@@ -95,9 +93,10 @@ async def get_nearby_venues(
 )
 async def get_venue_detail(
     venue_id: str,
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    _ensure_meetup_enabled()
+    await ensure_meetup_user_ready(db, user=user)
     venue = await db.get(Venue, venue_id)
     if venue is None or venue.status != "active":
         raise NotFoundError(code=40406, message="场地不存在或已下架")

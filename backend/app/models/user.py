@@ -66,6 +66,13 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
         Integer, nullable=False, default=100, server_default="100"
     )
 
+    # M13-09 约球实名 / 未成年保护 / 女性安全匹配
+    birth_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    phone_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    gender: Mapped[str | None] = mapped_column(String(16), nullable=True)
+
     # 账号注销（MVP §3.4）：非空且 <= now 时清理；两条触发路径：
     #   1) 懒清理：`get_user_by_id` 用户下次发请求时触发（`user_service.py`）
     #   2) Beat 兜底：`xiaoniao.purge_due_account_deletions` 每小时扫一次（`tasks/account_tasks.py`），
@@ -99,6 +106,10 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
         CheckConstraint(
             "meetup_credit_score BETWEEN 0 AND 100",
             name="chk_users_meetup_credit_score",
+        ),
+        CheckConstraint(
+            "gender IS NULL OR gender IN ('female', 'male', 'other')",
+            name="chk_users_gender",
         ),
         Index("idx_users_invite_code", "invite_code"),
         Index(

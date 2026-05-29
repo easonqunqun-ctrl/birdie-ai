@@ -194,6 +194,8 @@ class Settings(BaseSettings):
     # M13 球友约球
     # 上线前需 DEP-05 法律意见书到位（M13-09 服务协议 / 未成年保护）。
     PHASE2_MEETUP_ENABLED: bool = False
+    # M13-09：mock 登录用户自动补齐成年实名（CI / 本地）；生产须 false
+    MEETUP_MOCK_IDENTITY_VERIFIED: bool = True
 
     # M13-06 约球风控阈值（可被 Redis meetup:risk:config 覆盖）
     MEETUP_RISK_DAILY_LIMIT_FREE: int = 5
