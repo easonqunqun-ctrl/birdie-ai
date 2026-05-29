@@ -99,6 +99,29 @@ class RateLimitError(AppException):
     message = "操作过于频繁，请稍后再试"
 
 
+class MeetupInviteLimitError(AppException):
+    """M13-06 · 约球邀请日上限."""
+
+    code = 42920
+    http_status = 429
+    message = "今日约球邀请已达上限"
+
+
+class MeetupInviteCooldownError(AppException):
+    """M13-06 · 接受率过低 / 连续被拒冷却."""
+
+    code = 42921
+    http_status = 429
+    message = "约球邀请冷却中，请稍后再试"
+
+
+class MeetupCreditTooLowError(ForbiddenError):
+    """M13-06 · 信用分不足不可发起邀请."""
+
+    code = 40339
+    message = "约球信用分不足，暂不可发起邀请"
+
+
 class ConflictError(AppException):
     """资源状态冲突（如分析尚未完成就去取报告）."""
 

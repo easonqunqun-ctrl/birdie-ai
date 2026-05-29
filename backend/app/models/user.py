@@ -61,6 +61,11 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
 
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # M13-06 约球信用分（初始 100；M13-07 互评驱动增减）
+    meetup_credit_score: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=100, server_default="100"
+    )
+
     # 账号注销（MVP §3.4）：非空且 <= now 时清理；两条触发路径：
     #   1) 懒清理：`get_user_by_id` 用户下次发请求时触发（`user_service.py`）
     #   2) Beat 兜底：`xiaoniao.purge_due_account_deletions` 每小时扫一次（`tasks/account_tasks.py`），
@@ -90,6 +95,10 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
         CheckConstraint(
             "membership_type IN ('free', 'monthly', 'yearly', 'family')",
             name="chk_membership_type",
+        ),
+        CheckConstraint(
+            "meetup_credit_score BETWEEN 0 AND 100",
+            name="chk_users_meetup_credit_score",
         ),
         Index("idx_users_invite_code", "invite_code"),
         Index(

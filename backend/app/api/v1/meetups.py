@@ -19,12 +19,14 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.config import settings
 from app.core.database import get_db
 from app.core.exceptions import NotFoundError
+from app.core.redis import get_redis
 from app.models.user import User
 from app.schemas.base import APIResponse, ok
 from app.schemas.meetup import (
@@ -33,6 +35,7 @@ from app.schemas.meetup import (
     InvitationRead,
     InvitationStatusLiteral,
 )
+from app.services import meetup_risk_service as risk_svc
 from app.services import meetup_service
 
 router = APIRouter()
@@ -54,15 +57,21 @@ async def create_meetup_invitation(
     payload: InvitationCreate,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
 ):
     """当前登录用户作为 inviter，发起约球邀请.
 
     服务层守门：``invitee_user_id == inviter_user_id`` → 40331（不能给自己发）。
+    M13-06 风控：信用分 / 冷却 / 接受率 / 日上限 → 40339 / 42920 / 42921。
     """
 
     _ensure_meetup_enabled()
+    cfg = await risk_svc.assert_can_send_invitation(db, redis, user=user)
     inv = await meetup_service.create_invitation(
         db, inviter_user_id=user.id, payload=payload
+    )
+    await risk_svc.finalize_invitation_sent(
+        db, redis, invitation=inv, inviter=user, config=cfg
     )
     await db.commit()
     return ok(InvitationRead.model_validate(inv))

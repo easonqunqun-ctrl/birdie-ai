@@ -195,6 +195,15 @@ class Settings(BaseSettings):
     # 上线前需 DEP-05 法律意见书到位（M13-09 服务协议 / 未成年保护）。
     PHASE2_MEETUP_ENABLED: bool = False
 
+    # M13-06 约球风控阈值（可被 Redis meetup:risk:config 覆盖）
+    MEETUP_RISK_DAILY_LIMIT_FREE: int = 5
+    MEETUP_RISK_DAILY_LIMIT_MEMBER: int = 10
+    MEETUP_RISK_ACCEPT_RATE_THRESHOLD: float = 0.10
+    MEETUP_RISK_ACCEPT_RATE_MIN_SAMPLES: int = 10
+    MEETUP_RISK_CONSECUTIVE_DECLINE_LIMIT: int = 3
+    MEETUP_RISK_COOLDOWN_HOURS: int = 24
+    MEETUP_RISK_CREDIT_MIN_TO_INVITE: int = 60
+
     # ==================== 业务规则 ====================
     FREE_USER_MONTHLY_ANALYSES: int = 3
     FREE_USER_DAILY_CHATS: int = 5
