@@ -12,11 +12,15 @@ from __future__ import annotations
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
 
 from app.config import settings
 from app.core.database import AsyncSessionLocal
+from app.integrations.llm import FakeLLMClient
+from app.models.pro_library import ProSwingClip
 from app.schemas.pro_library import ProPlayerCreate
 from app.services import pro_library_service as svc
+from app.services import pro_pgc_service as pgc_svc
 
 
 @pytest.fixture
@@ -184,3 +188,62 @@ async def test_get_current_topic_returns_seeded(
     assert data["code"] == "demo_weekly_m12"
     assert len(data["clips"]) >= 1
     assert data["clips"][0]["player"]["name"] == "Demo Pro · 内置示例"
+
+
+@pytest.mark.asyncio
+async def test_list_clip_annotations_returns_seeded(
+    client: AsyncClient,
+    pros_enabled: None,
+) -> None:
+    async with AsyncSessionLocal() as db:
+        await svc.seed_initial_pros(db)
+        await pgc_svc.seed_initial_pgc_annotations(db)
+        clip = (
+            await db.execute(
+                select(ProSwingClip).where(ProSwingClip.is_published.is_(True))
+            )
+        ).scalar_one()
+        await db.commit()
+        clip_id = clip.id
+
+    resp = await client.get(f"/v1/pros/clips/{clip_id}/annotations")
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert len(data) >= 3
+    assert data[0]["annotation_type"] == "text"
+
+
+@pytest.mark.asyncio
+async def test_pgc_insight_requires_auth(
+    client: AsyncClient, pros_enabled: None
+) -> None:
+    resp = await client.post("/v1/pros/clips/psc_any/pgc-insight", json={})
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_pgc_insight_happy_path(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    pros_enabled: None,
+    use_fake_llm: FakeLLMClient,
+) -> None:
+    use_fake_llm.set_reply("职业节奏更从容，你可对标上杆顶点。")
+    async with AsyncSessionLocal() as db:
+        await svc.seed_initial_pros(db)
+        await pgc_svc.seed_initial_pgc_annotations(db)
+        clip = (
+            await db.execute(
+                select(ProSwingClip).where(ProSwingClip.is_published.is_(True))
+            )
+        ).scalar_one()
+        await db.commit()
+        clip_id = clip.id
+
+    resp = await client.post(
+        f"/v1/pros/clips/{clip_id}/pgc-insight",
+        headers=auth_headers,
+        json={},
+    )
+    assert resp.status_code == 200, resp.text
+    assert "职业节奏" in resp.json()["data"]["insight"]

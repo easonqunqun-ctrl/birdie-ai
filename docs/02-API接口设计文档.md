@@ -1619,6 +1619,19 @@ GET /v1/pros/topics/current
 
 **客户端**：`prosService.currentTopic()`；`pages/pros/index` 顶部 banner → `pages/pros/topic` 详情。
 
+### 5B.2 镜头 PGC 解说与 AI 解读（M12-07）
+
+```
+GET  /v1/pros/clips/{clip_id}/annotations
+POST /v1/pros/clips/{clip_id}/pgc-insight
+```
+
+**annotations**：**无需登录**；`PHASE2_PROS_ENABLED=false` → **404**（`40406`）。返回该镜头已发布且 `is_visible=true` 的解说列表（`annotation_type`：`text` / `voice` / `sketch`），按 `time_marker_ms` 升序。
+
+**pgc-insight**：**需 JWT**；同上灰度门控。请求体可选 `{ "analysis_id": "ana_xxx" }`，用于把用户分析报告摘要带入 LLM prompt；无 `analysis_id` 时仅基于镜头 PGC 与特征快照生成对比提示。响应 `{ clip_id, insight }`（Markdown 纯文本）。
+
+**客户端**：`prosService.annotations()` / `prosService.pgcInsight()`；`pages/pros/detail` 镜头卡片「解说」→ `pages/pros/clip-insight`；职业对比页可带 `analysisId` query。
+
 ---
 
 ## 六、支付模块（/payments）

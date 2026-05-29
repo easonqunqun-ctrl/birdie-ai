@@ -271,6 +271,16 @@ const ProComparePage: FC = () => {
             className='pro-compare__btn'
             onClick={() =>
               Taro.navigateTo({
+                url: `/pages/pros/clip-insight?clipId=${encodeURIComponent(clip.id)}&playerId=${encodeURIComponent(player.id)}&analysisId=${encodeURIComponent(analysisId)}`,
+              })
+            }
+          >
+            查看 PGC 解说
+          </Button>
+          <Button
+            className='pro-compare__btn'
+            onClick={() =>
+              Taro.navigateTo({
                 url: `/pages/pros/detail?id=${encodeURIComponent(player.id)}`,
               })
             }

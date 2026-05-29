@@ -14,7 +14,8 @@
 写端点 / 收藏 / 匹配
 -------------------
 本路由仅交付读端点。匹配见 ``GET /v1/analyses/{id}/pro-matches``（M12-04）；
-``favorite_clip`` / 收藏列表等按需后续 PR；M12-05（PGC 解说）按需扩展。
+PGC 解说 / LLM 解读见 ``GET/POST /v1/pros/clips/{id}/...``（M12-07）；
+``favorite_clip`` / 收藏列表等按需后续 PR。
 """
 
 from __future__ import annotations
@@ -22,18 +23,24 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_current_user
 from app.config import settings
 from app.core.database import get_db
 from app.core.exceptions import NotFoundError
+from app.integrations.llm import get_llm_client
+from app.models.user import User
 from app.schemas.base import APIResponse, ok
 from app.schemas.pro_library import (
     CameraAngleLiteral,
+    ProClipAnnotationRead,
+    ProPgcInsightRequest,
+    ProPgcInsightResponse,
     ProPlayerRead,
     ProSwingClipRead,
     ProTopicClipItemRead,
     ProTopicRead,
 )
-from app.services import pro_library_service
+from app.services import pro_library_service, pro_pgc_service
 
 router = APIRouter()
 
@@ -100,6 +107,43 @@ async def get_current_weekly_topic(
     if topic is None:
         return ok(None)
     return ok(await _topic_to_read(db, topic))
+
+
+@router.get(
+    "/clips/{clip_id}/annotations",
+    summary="列出镜头 PGC 解说（M12-07）",
+    response_model=APIResponse[list[ProClipAnnotationRead]],
+)
+async def list_clip_pgc_annotations(
+    clip_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    _ensure_pros_enabled()
+    items = await pro_pgc_service.list_clip_annotations(db, clip_id)
+    return ok([ProClipAnnotationRead.model_validate(a) for a in items])
+
+
+@router.post(
+    "/clips/{clip_id}/pgc-insight",
+    summary="LLM 生成职业镜头对比解读（M12-07）",
+    response_model=APIResponse[ProPgcInsightResponse],
+)
+async def generate_clip_pgc_insight(
+    clip_id: str,
+    body: ProPgcInsightRequest | None = None,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    _ensure_pros_enabled()
+    req = body or ProPgcInsightRequest()
+    insight = await pro_pgc_service.generate_pgc_insight(
+        db,
+        clip_id=clip_id,
+        user_id=user.id,
+        analysis_id=req.analysis_id,
+        llm_client=get_llm_client(),
+    )
+    return ok(ProPgcInsightResponse(clip_id=clip_id, insight=insight))
 
 
 @router.get(

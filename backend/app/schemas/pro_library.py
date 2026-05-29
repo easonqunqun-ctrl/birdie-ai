@@ -103,6 +103,31 @@ class ProClipAnnotationCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class ProClipAnnotationRead(BaseModel):
+    """M12-07 · PGC 解说读模型."""
+
+    id: str
+    clip_id: str
+    annotation_type: AnnotationTypeLiteral
+    content: str | None = None
+    time_marker_ms: int | None = None
+    is_visible: bool
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProPgcInsightRequest(BaseModel):
+    analysis_id: str | None = Field(None, max_length=32)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ProPgcInsightResponse(BaseModel):
+    clip_id: str
+    insight: str
+
+
 class ProTopicCreate(BaseModel):
     code: str = Field(..., min_length=1, max_length=40)
     title: str = Field(..., min_length=1, max_length=100)
@@ -180,8 +205,11 @@ __all__ = [
     "HandednessLiteral",
     "LicenseStatusLiteral",
     "ProClipAnnotationCreate",
+    "ProClipAnnotationRead",
     "ProMatchItemRead",
     "ProMatchResultRead",
+    "ProPgcInsightRequest",
+    "ProPgcInsightResponse",
     "ProPlayerCreate",
     "ProPlayerRead",
     "ProSwingClipCreate",

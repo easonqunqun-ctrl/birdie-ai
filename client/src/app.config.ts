@@ -40,6 +40,7 @@ export default defineAppConfig({
     'pages/pros/index',
     'pages/pros/detail',
     'pages/pros/topic',
+    'pages/pros/clip-insight',
     'pages/meetup/index',
     'pages/meetup/detail',
     'pages/meetup/create'

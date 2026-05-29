@@ -122,4 +122,39 @@ describe('prosService', () => {
     expect(res?.title).toBe('本周精选')
     expect(T.request.mock.calls[0][0].url).toMatch(/\/pros\/topics\/current$/)
   })
+
+  test('annotations → GET /pros/clips/{id}/annotations', async () => {
+    T.request.mockResolvedValueOnce(
+      ok([
+        {
+          id: 'pca_1',
+          clip_id: 'psc_1',
+          annotation_type: 'text',
+          content: '上杆顶点',
+          time_marker_ms: 1200,
+          is_visible: true,
+          created_at: '2026-05-29T00:00:00Z',
+        },
+      ]),
+    )
+    const res = await prosService.annotations('psc_1')
+    expect(res[0].content).toBe('上杆顶点')
+    expect(T.request.mock.calls[0][0].method).toBe('GET')
+    expect(T.request.mock.calls[0][0].url).toMatch(/\/pros\/clips\/psc_1\/annotations$/)
+  })
+
+  test('pgcInsight → POST /pros/clips/{id}/pgc-insight with analysis_id', async () => {
+    T.request.mockResolvedValueOnce(
+      ok({
+        clip_id: 'psc_1',
+        insight: '保持脊柱角',
+      }),
+    )
+    const res = await prosService.pgcInsight('psc_1', { analysis_id: 'ana_x' })
+    expect(res.insight).toBe('保持脊柱角')
+    const sent = T.request.mock.calls[0][0]
+    expect(sent.method).toBe('POST')
+    expect(sent.url).toMatch(/\/pros\/clips\/psc_1\/pgc-insight$/)
+    expect(sent.data).toEqual({ analysis_id: 'ana_x' })
+  })
 })

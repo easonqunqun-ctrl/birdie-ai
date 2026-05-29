@@ -200,16 +200,29 @@ const ProDetailPage: FC = () => {
                   来源：{clip.source_credit}
                 </Text>
               </View>
-              <View
-                className='pro-detail__clip-cta'
-                onClick={() =>
-                  Taro.showToast({
-                    title: '视频播放将在后续版本上线',
-                    icon: 'none',
-                  })
-                }
-              >
-                <Text>▶</Text>
+              <View className='pro-detail__clip-actions'>
+                <View
+                  className='pro-detail__clip-cta pro-detail__clip-cta--pgc'
+                  onClick={(e) => {
+                    e.stopPropagation?.()
+                    Taro.navigateTo({
+                      url: `/pages/pros/clip-insight?clipId=${encodeURIComponent(clip.id)}&playerId=${encodeURIComponent(playerId || player.id)}`,
+                    })
+                  }}
+                >
+                  <Text>解说</Text>
+                </View>
+                <View
+                  className='pro-detail__clip-cta'
+                  onClick={() =>
+                    Taro.showToast({
+                      title: '视频播放将在后续版本上线',
+                      icon: 'none',
+                    })
+                  }
+                >
+                  <Text>▶</Text>
+                </View>
               </View>
             </View>
           ))

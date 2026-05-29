@@ -6,6 +6,8 @@
  * - GET /v1/pros/{player_id}
  * - GET /v1/pros/{player_id}/clips?camera_angle=&club_type=
  * - GET /v1/pros/topics/current  （M12-06 每周精选）
+ * - GET /v1/pros/clips/{clip_id}/annotations  （M12-07 PGC）
+ * - POST /v1/pros/clips/{clip_id}/pgc-insight  （M12-07 LLM）
  *
  * 灰度
  * ----
@@ -92,6 +94,27 @@ export interface ProTopicRead {
   clips: ProTopicClipItemRead[]
 }
 
+export type ProAnnotationType = 'text' | 'voice' | 'sketch'
+
+export interface ProClipAnnotationRead {
+  id: string
+  clip_id: string
+  annotation_type: ProAnnotationType
+  content: string | null
+  time_marker_ms: number | null
+  is_visible: boolean
+  created_at: string
+}
+
+export interface ProPgcInsightQuery {
+  analysis_id?: string
+}
+
+export interface ProPgcInsightResponse {
+  clip_id: string
+  insight: string
+}
+
 export const prosService = {
   list() {
     return http.get<ProPlayerRead[]>('/pros')
@@ -115,5 +138,13 @@ export const prosService = {
   },
   currentTopic() {
     return http.get<ProTopicRead | null>('/pros/topics/current')
+  },
+  annotations(clipId: string) {
+    return http.get<ProClipAnnotationRead[]>(`/pros/clips/${clipId}/annotations`)
+  },
+  pgcInsight(clipId: string, query: ProPgcInsightQuery = {}) {
+    return http.post<ProPgcInsightResponse>(`/pros/clips/${clipId}/pgc-insight`, {
+      analysis_id: query.analysis_id ?? null,
+    })
   },
 }
