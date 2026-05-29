@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,12 +29,14 @@ from app.schemas.coach_student import (
     CoachStudentVisibilityUpdate,
     StudentCoachOverviewResponse,
 )
+from app.services import user_profile_v2_service as profile_v2_svc
 from app.services.coach_course_service import assert_coach_course_author, coach_course_user_ids
 from app.services.user_service import get_user_by_id, get_user_by_invite_code
 
 logger = get_logger("coach_student")
 
 ACTIVE_LIKE_STATUSES = ("pending", "active", "paused")
+PENDING_INVITE_TTL_DAYS = 60
 
 
 def ensure_coach_module_enabled() -> None:
@@ -48,7 +50,100 @@ def _merge_visibility(payload: dict | None) -> dict[str, bool]:
         for key in VISIBILITY_FIELD_KEYS:
             if key in payload:
                 merged[key] = bool(payload[key])
+    # injuries 永不对教练开放（PIPL / kickoff R-01）
+    merged["injuries"] = False
     return merged
+
+
+async def expire_stale_pending_invitations(db: AsyncSession) -> int:
+    """pending 超过 60 天未响应 → ended（kickoff §3.3）."""
+
+    cutoff = datetime.now(UTC) - timedelta(days=PENDING_INVITE_TTL_DAYS)
+    rows = (
+        await db.execute(
+            select(CoachStudentRelation).where(
+                CoachStudentRelation.status == "pending",
+                CoachStudentRelation.invited_at < cutoff,
+            )
+        )
+    ).scalars().all()
+    if not rows:
+        return 0
+    now = datetime.now(UTC)
+    for relation in rows:
+        relation.status = "ended"
+        relation.ended_at = now
+        relation.ended_by_user_id = None
+    await db.flush()
+    logger.info("coach_student_pending_expired", count=len(rows))
+    return len(rows)
+
+
+async def _build_shared_field_value(
+    db: AsyncSession, *, student_id: str, field: str
+) -> object | None:
+    user = await get_user_by_id(db, student_id)
+    profile = await profile_v2_svc.get_profile(db, student_id)
+
+    if field == "handicap":
+        data: dict[str, object] = {}
+        if profile:
+            if profile.handicap_official is not None:
+                data["handicap_official"] = float(profile.handicap_official)
+            if profile.handicap_self is not None:
+                data["handicap_self"] = float(profile.handicap_self)
+            if profile.handicap_source:
+                data["handicap_source"] = profile.handicap_source
+        if user.golf_level:
+            data["golf_level"] = user.golf_level
+        return data or None
+
+    if field == "body":
+        if profile is None:
+            return None
+        body = {
+            key: getattr(profile, key)
+            for key in ("height_cm", "weight_kg", "handedness")
+            if getattr(profile, key) is not None
+        }
+        return body or None
+
+    if field == "injuries":
+        raise CoachStudentFieldNotVisibleError()
+
+    if field == "goals":
+        goals: dict[str, object] = {}
+        if user.primary_goals:
+            goals["primary_goals"] = list(user.primary_goals)
+        if profile and profile.mid_long_goals:
+            goals["mid_long_goals"] = list(profile.mid_long_goals)
+        return goals or None
+
+    if field == "training_preference":
+        if profile is None:
+            return None
+        pref: dict[str, object] = {}
+        if profile.training_preference:
+            pref["training_preference"] = profile.training_preference
+        if profile.training_preference_meta:
+            pref["training_preference_meta"] = dict(profile.training_preference_meta)
+        if profile.weekly_target_sessions is not None:
+            pref["weekly_target_sessions"] = profile.weekly_target_sessions
+        return pref or None
+
+    if field == "frequent_venues":
+        venues, _missing = await profile_v2_svc.list_favorite_venues(db, user_id=student_id)
+        return [
+            {
+                "id": venue.id,
+                "name": venue.name,
+                "city": venue.city,
+                "venue_type": venue.venue_type,
+            }
+            for venue in venues
+        ]
+
+    raise BadRequestError(code=40002, message="不支持的字段")
 
 
 def _user_brief(user: User, *, display_name: str | None = None) -> CoachStudentUserBrief:
@@ -185,6 +280,7 @@ async def invite_student(
     payload: CoachStudentInviteRequest,
 ) -> CoachStudentRelationRead:
     ensure_coach_module_enabled()
+    await expire_stale_pending_invitations(db)
     await _assert_coach_can_manage(db, coach=coach)
     student_id = await _resolve_student_id(
         db,
@@ -233,7 +329,11 @@ async def list_coach_students(
     status: str | None = None,
 ) -> CoachStudentListResponse:
     ensure_coach_module_enabled()
+    await expire_stale_pending_invitations(db)
     await _assert_coach_can_manage(db, coach=coach)
+    valid_statuses = {"pending", "active", "paused", "ended"}
+    if status and status not in valid_statuses:
+        raise BadRequestError(code=40002, message="不支持的 status 筛选")
     stmt = select(CoachStudentRelation).where(CoachStudentRelation.coach_user_id == coach.id)
     if status:
         stmt = stmt.where(CoachStudentRelation.status == status)
@@ -249,6 +349,7 @@ async def get_student_coach_overview(
     db: AsyncSession, *, student: User
 ) -> StudentCoachOverviewResponse:
     ensure_coach_module_enabled()
+    await expire_stale_pending_invitations(db)
     rows = (
         await db.execute(
             select(CoachStudentRelation)
@@ -276,6 +377,7 @@ async def accept_relation(
     db: AsyncSession, *, student: User, relation_id: str
 ) -> CoachStudentRelationRead:
     ensure_coach_module_enabled()
+    await expire_stale_pending_invitations(db)
     relation = await _get_relation_for_user(db, relation_id=relation_id, user=student)
     if relation.student_user_id != student.id:
         raise CoachStudentRelationError()
@@ -365,7 +467,8 @@ async def get_shared_field_for_coach(
     visibility = _merge_visibility(relation.visibility_payload)
     if not visibility.get(field, False):
         raise CoachStudentFieldNotVisibleError()
-    return CoachStudentSharedFieldResponse(field=field, visible=True, value=None)
+    value = await _build_shared_field_value(db, student_id=student_id, field=field)
+    return CoachStudentSharedFieldResponse(field=field, visible=True, value=value)
 
 
 async def ensure_relation(
@@ -414,10 +517,12 @@ async def ensure_relation(
 
 
 __all__ = [
+    "PENDING_INVITE_TTL_DAYS",
     "accept_relation",
     "end_relation",
     "ensure_coach_module_enabled",
     "ensure_relation",
+    "expire_stale_pending_invitations",
     "get_shared_field_for_coach",
     "get_student_coach_overview",
     "invite_student",

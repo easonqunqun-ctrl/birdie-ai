@@ -326,6 +326,16 @@ const ProfilePage: FC = () => {
           {PHASE2_COACH_ENABLED_FLAG && user?.is_active_coach && currentRole === 'coach' && (
             <View
               className='profile__menu-item'
+              onClick={() => Taro.navigateTo({ url: '/pages/coach/students/index' })}
+            >
+              <Text className='profile__menu-icon'>👥</Text>
+              <Text className='profile__menu-label'>我的学员</Text>
+              <Text className='profile__menu-arrow'>›</Text>
+            </View>
+          )}
+          {PHASE2_COACH_ENABLED_FLAG && user?.is_active_coach && currentRole === 'coach' && (
+            <View
+              className='profile__menu-item'
               onClick={() => Taro.navigateTo({ url: '/pages/coach/students-invite' })}
             >
               <Text className='profile__menu-icon'>🧑‍🎓</Text>

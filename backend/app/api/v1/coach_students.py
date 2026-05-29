@@ -46,6 +46,7 @@ async def list_coach_students(
     db: AsyncSession = Depends(get_db),
 ):
     data = await csr_svc.list_coach_students(db, coach=coach, status=status)
+    await db.commit()
     return ok(data)
 
 

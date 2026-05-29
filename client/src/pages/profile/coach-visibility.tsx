@@ -44,15 +44,6 @@ const CoachVisibilityPage: FC = () => {
 
   const onToggle = async (key: string, checked: boolean) => {
     if (!relation || saving) return
-    const field = COACH_VISIBILITY_FIELDS.find((f) => f.key === key)
-    if (field?.sensitive && checked) {
-      const modal = await Taro.showModal({
-        title: '高敏感信息',
-        content: '伤病信息属于高敏感字段，确认对教练开放？',
-        confirmText: '确认开放',
-      })
-      if (!modal.confirm) return
-    }
     setSaving(true)
     try {
       const updated = await coachStudentsService.updateVisibility(relation.id, {
@@ -99,15 +90,12 @@ const CoachVisibilityPage: FC = () => {
   return (
     <View className='coach-visibility'>
       <Text className='coach-visibility__hint'>
-        默认所有字段对教练不可见。开启后，教练才可查看对应信息。
+        默认所有字段对教练不可见。开启后，教练才可查看对应信息。伤病信息不对教练开放。
       </Text>
       {COACH_VISIBILITY_FIELDS.map((field) => (
         <View key={field.key} className='coach-visibility__row'>
           <View className='coach-visibility__text'>
             <Text className='coach-visibility__label'>{field.label}</Text>
-            {field.sensitive ? (
-              <Text className='coach-visibility__tag'>高敏感</Text>
-            ) : null}
           </View>
           <Switch
             checked={Boolean(payload[field.key])}

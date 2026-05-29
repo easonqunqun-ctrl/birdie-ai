@@ -24,6 +24,7 @@ export default defineAppConfig({
     'pages/coach/analysis-annotate',
     'pages/coach/student-meetups',
     'pages/coach/students-invite',
+    'pages/coach/students/index',
     'pages/coach/apply',
     'pages/training/index',
     'pages/profile/index',

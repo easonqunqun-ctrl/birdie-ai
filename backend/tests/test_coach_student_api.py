@@ -124,11 +124,25 @@ async def test_invite_accept_end_happy_path(
     )
     assert vis.status_code == 200, vis.text
 
+    from app.core.database import AsyncSessionLocal
+    from app.schemas.user_profile_v2 import UserProfileV2Update
+    from app.services import user_profile_v2_service as profile_v2_svc
+
+    async with AsyncSessionLocal() as db:
+        await profile_v2_svc.upsert_profile(
+            db,
+            user_id=student_id,
+            payload=UserProfileV2Update(handicap_self=12, handicap_source="self"),
+        )
+        await db.commit()
+
     shared_ok = await client.get(
         f"/v1/coach/students/{student_id}/shared-profile?field=handicap",
         headers=coach_headers,
     )
     assert shared_ok.status_code == 200, shared_ok.text
+    assert shared_ok.json()["data"]["value"] is not None
+    assert shared_ok.json()["data"]["value"].get("handicap_self") == 12.0
 
     end = await client.post(
         f"/v1/users/me/coach/{relation_id}/end",
@@ -202,3 +216,40 @@ async def test_student_reject_invite(
     )
     assert reject.status_code == 200, reject.text
     assert reject.json()["data"]["status"] == "ended"
+
+
+@pytest.mark.asyncio
+async def test_pending_invite_expires_after_60_days(
+    client: AsyncClient,
+    coach_enabled: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from app.core.database import AsyncSessionLocal
+    from app.models.coach import CoachStudentRelation
+    from app.services import coach_student_service as csr_svc
+
+    coach_id, coach_headers = await _login(client, suffix=new_id("ce")[-8:])
+    student_id, student_headers = await _login(client, suffix=new_id("se")[-8:])
+    monkeypatch.setattr(settings, "COACH_COURSE_USER_IDS", coach_id)
+
+    coach_headers = await _switch_coach_role(client, coach_headers)
+    invite = await client.post(
+        "/v1/coach/students/invite",
+        json={"student_user_id": student_id},
+        headers=coach_headers,
+    )
+    assert invite.status_code == 200, invite.text
+    relation_id = invite.json()["data"]["id"]
+
+    stale_time = datetime.now(UTC) - timedelta(days=csr_svc.PENDING_INVITE_TTL_DAYS + 1)
+    async with AsyncSessionLocal() as db:
+        relation = await db.get(CoachStudentRelation, relation_id)
+        assert relation is not None
+        relation.invited_at = stale_time
+        await db.commit()
+
+    overview = await client.get("/v1/users/me/coach", headers=student_headers)
+    assert overview.status_code == 200
+    assert overview.json()["data"]["pending"] == []

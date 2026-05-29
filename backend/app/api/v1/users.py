@@ -446,6 +446,7 @@ async def get_my_coach_overview(
 ):
     csr_svc.ensure_coach_module_enabled()
     data = await csr_svc.get_student_coach_overview(db, student=user)
+    await db.commit()
     return ok(data)
 
 

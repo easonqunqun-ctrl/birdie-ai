@@ -1694,11 +1694,15 @@ PUT  /v1/users/me/coach/{relation_id}/visibility   Body: { handicap?, body?, ...
 
 **状态机**：`pending` →（学员 accept）→ `active`；`pending` →（reject）→ `ended`；`active|paused|pending` →（任一方 end）→ `ended`。
 
-**约束**：一学员同时最多 1 条 `pending|active` 关系（跨教练）；违反 → **40915**。`visibility_payload` 默认全 false；`injuries` 不可设为 true（**40010**）。
+**约束**：一学员同时最多 1 条 `pending|active` 关系（跨教练）；违反 → **40915**。`visibility_payload` 默认全 false；`injuries` 不可设为 true（**40010**，UI 不展示该开关）。
+
+**pending 过期**：超过 60 天未 accept/reject 的邀请，在列表/概览读取时惰性置为 `ended`。
+
+**shared-profile**：`GET .../shared-profile?field=` 在可见性通过后返回真实字段值（来自 `user_profiles_v2` / `users`；`injuries` 永不可读 → **40313**）。
 
 **错误码**：**40312** 师生关系不存在或已结束；**40313** 学员未授权该字段；**40915** 学员已有活跃教练。
 
-**客户端**：`coachStudentsService`；`pages/coach/students-invite`；`pages/coach-invite/index`；`pages/profile/coach-visibility`；「我的」待处理邀请 banner。
+**客户端**：`coachStudentsService`；`pages/coach/students/index` + `students-invite`；`pages/coach-invite/index`；`pages/profile/coach-visibility`；「我的」待处理邀请 banner。
 
 ---
 
