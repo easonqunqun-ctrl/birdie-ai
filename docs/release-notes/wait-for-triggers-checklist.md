@@ -34,6 +34,7 @@
 | **M7-11-cal** | 推杆 pipeline 链路就位（W22-W25） | ECS 推杆 ≥10 段人工标注就位 | 回填 `putting/constants.py` ideal 区间 + 验 AC-3（与教练人评 r≥0.7） | AI 工程 |
 | **M7-11-dx** | 推杆诊断 5 条已上 | M7-09 杆/球追踪 or 手腕角序列特征就位 | 补 putter-lift / 手腕翻折 / 回摆过短 / 减速/瞄准偏移 等诊断 | AI 工程 |
 | **M7-12-cal** | 切杆 pipeline 链路就位 | ECS 切杆 ≥10 段人工标注就位 | 回填 `chipping/constants.py` ideal + 验 AC-2（r≥0.65） | AI 工程 |
+| **M7-13-ui** | 多挥识别引擎链路就位（W28-W29） | 产品确认 select-swing UX + M10 训练页入口排期 | 客户端 `select-swing.tsx` + ffmpeg 缩略图 + `selected_swing_index` 回传 | 客户端 + AI 工程 |
 
 ---
 
@@ -221,6 +222,19 @@
 1. 跑 pipeline 抽取 3 特征落 CSV
 2. 校准 `ai_engine/app/pipeline/chipping/constants.py` ideal 区间（当前 v0.1 占位）
 3. 验 **AC-2**：overall 与教练人评 **r≥0.65**
+
+### 2.15 M7-13-ui · 多挥候选 UI + 缩略图
+
+**触发条件**（任一）：
+- [ ] 产品确认 select-swing 交互稿（kickoff §3.4）
+- [ ] M10 训练扩展页排期就位（与推杆/切杆 UI 同批）
+
+**触发后动作**：
+1. 客户端新增 `pages/analysis/select-swing.tsx`：展示 `swing_candidates` + 试挥标签 + 默认勾选第一段非试挥
+2. AI 工程 / 后端：ffmpeg 按候选区间抽帧缩略图（kickoff W30）
+3. 分析请求回传 `selected_swing_index`；已有引擎字段 `swing_candidates` / `50122` 无需再改
+
+> 引擎侧 W28-W29（`multi_swing.py` + full_swing 路由 + 50122 + 单测）已合；UI 与 ECS 准确率验收（AC-1/AC-3）等真实样本。
 
 ---
 

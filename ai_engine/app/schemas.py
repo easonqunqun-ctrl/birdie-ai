@@ -28,6 +28,23 @@ class AnalyzeRequest(BaseModel):
         default=None,
         description="强制指定 engine_version，跳过灰度分桶；仅运维/单测使用",
     )
+    # P2-M7-13：多挥视频中用户指定的候选段索引（0-based）；None → 自动选第一段非试挥
+    selected_swing_index: int | None = Field(
+        default=None,
+        ge=0,
+        description="多挥视频要分析的段索引；省略则引擎自动选第一段非试挥",
+    )
+
+
+class SwingCandidateItem(BaseModel):
+    """P2-M7-13 · 单段挥杆候选（供客户端 select-swing UI 消费）。"""
+
+    start_frame: int
+    end_frame: int
+    is_practice: bool
+    confidence: float = Field(ge=0.0, le=1.0)
+    start_time_sec: float
+    end_time_sec: float
 
 
 class PhaseScore(BaseModel):
@@ -120,6 +137,15 @@ class AnalyzeResult(BaseModel):
     feature_confidences: dict[str, float] = Field(
         default_factory=dict,
         description="P2-M7-06 每特征 confidence（feature_name → 0-1）",
+    )
+    # P2-M7-13：多挥候选列表 + 实际分析段索引（单段视频为空列表 / index=0）
+    swing_candidates: list[SwingCandidateItem] = Field(
+        default_factory=list,
+        description="检测到的挥杆候选段；客户端 select-swing UI 用",
+    )
+    selected_swing_index: int | None = Field(
+        default=None,
+        description="本次分析使用的候选段索引（0-based）",
     )
 
 
