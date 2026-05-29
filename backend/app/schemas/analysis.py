@@ -174,6 +174,8 @@ class AnalysisReportResponse(BaseModel):
     analysis_mode: AnalysisMode = "full_swing"
     # M10-01：推杆 mode 专属 4 维度分；仅 analysis_mode=putting 时有值
     putting_features: dict[str, PhaseScore] | None = None
+    # M10-02：切杆 mode 专属 3 维度分；仅 analysis_mode=chipping 时有值
+    chipping_features: dict[str, PhaseScore] | None = None
     # M7-14：报告永久按落库 engine_version 渲染。客户端按值开关 V2 新字段（如 confidence）。
     engine_version: Literal["v1", "v2"] = "v1"
 

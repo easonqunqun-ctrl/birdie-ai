@@ -19,6 +19,11 @@ from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.constants.chipping import (
+    CHIPPING_FEATURE_LABELS,
+    CHIPPING_FEATURE_ORDER,
+    CHIPPING_FEATURE_PRIMARY_PHASE,
+)
 from app.constants.putting import (
     PUTTING_FEATURE_LABELS,
     PUTTING_FEATURE_ORDER,
@@ -662,6 +667,49 @@ def _build_putting_features(analysis: SwingAnalysis) -> dict[str, PhaseScore] | 
     return out
 
 
+def _build_chipping_features(analysis: SwingAnalysis) -> dict[str, PhaseScore] | None:
+    """切杆 mode 专属 3 维度；优先 mode_feature_scores，缺失时从 phase_scores 兜底。"""
+    if getattr(analysis, "analysis_mode", "full_swing") != "chipping":
+        return None
+
+    raw = getattr(analysis, "mode_feature_scores", None)
+    if isinstance(raw, dict) and raw:
+        out: dict[str, PhaseScore] = {}
+        for name in CHIPPING_FEATURE_ORDER:
+            val = raw.get(name)
+            if isinstance(val, int):
+                out[name] = PhaseScore(
+                    score=val,
+                    label=CHIPPING_FEATURE_LABELS.get(name, name),
+                )
+        if out:
+            weakest = min(out, key=lambda k: out[k].score)
+            for k in out:
+                out[k] = out[k].model_copy(update={"is_weakest": k == weakest})
+            return out
+
+    phase_scores = analysis.phase_scores if isinstance(analysis.phase_scores, dict) else {}
+    if not phase_scores:
+        return None
+
+    out = {}
+    for name in CHIPPING_FEATURE_ORDER:
+        phase_key = CHIPPING_FEATURE_PRIMARY_PHASE.get(name, "impact")
+        ps = phase_scores.get(phase_key)
+        score_val = ps.get("score") if isinstance(ps, dict) else None
+        if isinstance(score_val, int):
+            out[name] = PhaseScore(
+                score=score_val,
+                label=CHIPPING_FEATURE_LABELS.get(name, name),
+            )
+    if not out:
+        return None
+    weakest = min(out, key=lambda k: out[k].score)
+    for k in out:
+        out[k] = out[k].model_copy(update={"is_weakest": k == weakest})
+    return out
+
+
 async def get_report(*, analysis_id: str, user: User, db: AsyncSession) -> AnalysisReportResponse:
     from app.core.exceptions import ConflictError
 
@@ -731,6 +779,7 @@ async def get_report(*, analysis_id: str, user: User, db: AsyncSession) -> Analy
         club_type=analysis.club_type,  # type: ignore[arg-type]
         analysis_mode=getattr(analysis, "analysis_mode", None) or "full_swing",  # type: ignore[arg-type]
         putting_features=_build_putting_features(analysis),
+        chipping_features=_build_chipping_features(analysis),
         engine_version=(
             getattr(analysis, "engine_version", None) or "v1"
         ),  # type: ignore[arg-type]
