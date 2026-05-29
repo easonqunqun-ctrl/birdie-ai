@@ -28,6 +28,13 @@ export const userService = {
       { timeout: AUTH_READ_TIMEOUT_MS },
     )
   },
+  roleSwitch(role: 'user' | 'coach') {
+    return http.post<{ token: string; expires_in: number; role: 'user' | 'coach' }>(
+      '/auth/role-switch',
+      { role },
+      { timeout: AUTH_READ_TIMEOUT_MS },
+    )
+  },
   getMe() {
     return http.get<User>('/users/me', { timeout: AUTH_READ_TIMEOUT_MS })
   },

@@ -42,6 +42,7 @@ const Taro = {
   reLaunch: jest.fn(noopAsync),
   switchTab: jest.fn(noopAsync),
   navigateBack: jest.fn(noopAsync),
+  setTabBarItem: jest.fn(noopAsync),
 
   // ===== UI =====
   showToast: jest.fn(noopAsync),

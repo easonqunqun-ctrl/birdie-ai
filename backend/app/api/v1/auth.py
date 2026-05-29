@@ -3,12 +3,17 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_token_payload
+from app.api.deps import get_current_user, get_token_payload
+from app.config import settings
 from app.core.database import get_db
-from app.core.security import create_access_token
+from app.core.exceptions import CoachRoleSwitchError, NotFoundError
+from app.core.security import create_access_token, token_role
 from app.integrations.wechat import code2session, oauth2_access_token_app
+from app.models.user import User
+from app.schemas.auth import RoleSwitchRequest, RoleSwitchResponse
 from app.schemas.base import APIResponse, ok
 from app.schemas.user import TokenRefreshResponse, WechatLoginRequest, WechatLoginResponse
+from app.services import coach_profile_service as coach_prof_svc
 from app.services import user_service
 from app.services.user_presenter import build_user_response
 
@@ -41,6 +46,7 @@ async def wechat_login(
         user_id=user.id,
         openid=user.wechat_subject_for_jwt(),
         membership=user.membership_type,
+        role="user",
     )
 
     return ok(
@@ -78,6 +84,7 @@ async def wechat_open_login(
         user_id=user.id,
         openid=user.wechat_subject_for_jwt(),
         membership=user.membership_type,
+        role="user",
     )
 
     return ok(
@@ -106,5 +113,36 @@ async def refresh_token(
         user_id=user.id,
         openid=user.wechat_subject_for_jwt(),
         membership=user.membership_type,
+        role=token_role(payload),
     )
     return ok(TokenRefreshResponse(token=token, expires_in=expires_in))
+
+
+@router.post(
+    "/role-switch",
+    summary="切换 user/coach 身份（M8-02）",
+    response_model=APIResponse[RoleSwitchResponse],
+)
+async def role_switch(
+    body: RoleSwitchRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not settings.PHASE2_COACH_ENABLED:
+        raise NotFoundError(code=40406, message="教练功能未开放")
+    if body.role == "coach":
+        try:
+            await coach_prof_svc.assert_active_coach(db, user=user)
+        except Exception as exc:
+            from app.core.exceptions import CoachNotVerifiedError
+
+            if isinstance(exc, CoachNotVerifiedError):
+                raise CoachRoleSwitchError() from exc
+            raise
+    token, expires_in = create_access_token(
+        user_id=user.id,
+        openid=user.wechat_subject_for_jwt(),
+        membership=user.membership_type,
+        role=body.role,
+    )
+    return ok(RoleSwitchResponse(token=token, expires_in=expires_in, role=body.role))

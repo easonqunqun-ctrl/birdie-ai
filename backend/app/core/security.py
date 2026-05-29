@@ -30,8 +30,11 @@ def create_access_token(
     openid: str,
     membership: str = "free",
     extra: dict[str, Any] | None = None,
+    *,
+    role: str = "user",
 ) -> tuple[str, int]:
     """签发 JWT。返回 (token, expires_in_seconds)."""
+
     expires_delta = timedelta(days=settings.JWT_ACCESS_TOKEN_EXPIRE_DAYS)
     now = datetime.now(UTC)
     expire_at = now + expires_delta
@@ -40,6 +43,7 @@ def create_access_token(
         "sub": user_id,
         "openid": openid,
         "membership": membership,
+        "role": role,
         "iat": int(now.timestamp()),
         "exp": int(expire_at.timestamp()),
     }
@@ -48,6 +52,13 @@ def create_access_token(
 
     token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
     return token, int(expires_delta.total_seconds())
+
+
+def token_role(payload: dict[str, Any]) -> str:
+    """JWT 内角色；缺省 user（兼容旧 token）."""
+
+    role = payload.get("role")
+    return role if role in {"user", "coach"} else "user"
 
 
 def decode_access_token(token: str) -> dict[str, Any]:

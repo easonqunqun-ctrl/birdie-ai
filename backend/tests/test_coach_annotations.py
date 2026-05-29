@@ -18,6 +18,7 @@ from app.services import pro_library_service as pro_svc
 def coach_ann_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "PHASE2_COACH_ANNOTATIONS_ENABLED", True)
     monkeypatch.setattr(settings, "PHASE2_PROS_ENABLED", True)
+    monkeypatch.setattr(settings, "PHASE2_COACH_ENABLED", True)
 
 
 @pytest.fixture
@@ -74,6 +75,14 @@ async def test_coach_video_ref_happy_path(
     user_id = login.json()["data"]["user"]["id"]
     headers = {"Authorization": f"Bearer {login.json()['data']['token']}"}
     monkeypatch.setattr(settings, "COACH_COURSE_USER_IDS", user_id)
+
+    switch = await client.post(
+        "/v1/auth/role-switch",
+        json={"role": "coach"},
+        headers=headers,
+    )
+    assert switch.status_code == 200, switch.text
+    headers = {"Authorization": f"Bearer {switch.json()['data']['token']}"}
 
     analysis_id = await _seed_completed_analysis(user_id=user_id)
     async with AsyncSessionLocal() as db:

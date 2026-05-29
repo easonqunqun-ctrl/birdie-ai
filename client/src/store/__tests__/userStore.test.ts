@@ -17,7 +17,11 @@ jest.mock('@/services/userService', () => ({
   userService: {
     getMe: jest.fn(),
     wechatLogin: jest.fn(),
+    roleSwitch: jest.fn(),
   },
+}))
+jest.mock('@/utils/tabBarRole', () => ({
+  applyTabBarRole: jest.fn(),
 }))
 jest.mock('@/adapters/login', () => ({
   nativeLogin: jest.fn(),
@@ -25,17 +29,21 @@ jest.mock('@/adapters/login', () => ({
 
 // 引入后才会有 mock 句柄
 import { userService } from '@/services/userService'
+import { applyTabBarRole } from '@/utils/tabBarRole'
 import { nativeLogin } from '@/adapters/login'
 import { useUserStore } from '@/store/userStore'
 
 const mockedGetMe = userService.getMe as jest.Mock
 const mockedWechatLogin = userService.wechatLogin as jest.Mock
+const mockedRoleSwitch = userService.roleSwitch as jest.Mock
 const mockedNativeLogin = nativeLogin as jest.Mock
+const mockedApplyTabBarRole = applyTabBarRole as jest.Mock
 
 function resetStore() {
   useUserStore.setState({
     token: '',
     user: null,
+    currentRole: 'user',
     loading: false,
     initialized: false,
   })
@@ -46,7 +54,9 @@ beforeEach(() => {
   resetStore()
   mockedGetMe.mockReset()
   mockedWechatLogin.mockReset()
+  mockedRoleSwitch.mockReset()
   mockedNativeLogin.mockReset()
+  mockedApplyTabBarRole.mockReset()
 })
 
 describe('userStore.bootstrap', () => {
@@ -195,6 +205,39 @@ describe('userStore.fetchMe', () => {
   })
 })
 
+describe('userStore.setRole', () => {
+  test('成功 → 更新 token/role/storage + TabBar', async () => {
+    mockedRoleSwitch.mockResolvedValueOnce({
+      token: 'coach_jwt',
+      expires_in: 7200,
+      role: 'coach',
+    })
+
+    await useUserStore.getState().setRole('coach')
+
+    expect(mockedRoleSwitch).toHaveBeenCalledWith('coach')
+    expect(storage.getToken()).toBe('coach_jwt')
+    expect(storage.getRole()).toBe('coach')
+    expect(useUserStore.getState().currentRole).toBe('coach')
+    expect(mockedApplyTabBarRole).toHaveBeenCalledWith('coach')
+  })
+})
+
+describe('userStore.bootstrap · coach role 降级', () => {
+  test('cached coach 但用户不再 active → 重置为 user', async () => {
+    storage.setToken('jwt')
+    storage.setRole('coach')
+    storage.setUser({ id: 1, is_active_coach: false })
+    mockedGetMe.mockResolvedValueOnce({ id: 1, is_active_coach: false })
+
+    await useUserStore.getState().bootstrap()
+
+    expect(useUserStore.getState().currentRole).toBe('user')
+    expect(storage.getRole()).toBe('user')
+    expect(mockedApplyTabBarRole).toHaveBeenCalledWith('user')
+  })
+})
+
 describe('userStore.logout · 不动协议同意', () => {
   test('logout 只清账号身份，保留 agreed_terms 与 analysis_guide_seen', () => {
     storage.setToken('jwt')
@@ -207,6 +250,7 @@ describe('userStore.logout · 不动协议同意', () => {
 
     expect(useUserStore.getState().token).toBe('')
     expect(useUserStore.getState().user).toBeNull()
+    expect(useUserStore.getState().currentRole).toBe('user')
     expect(storage.getToken()).toBe('')
     expect(storage.hasAgreedCurrentTerms()).toBe(true)
     expect(storage.hasSeenAnalysisGuide()).toBe(true)
