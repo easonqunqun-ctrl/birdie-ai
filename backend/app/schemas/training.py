@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 TaskStatus = Literal["pending", "completed"]
 TaskKind = Literal["standard", "pro_clip_try_it", "coach_assigned"]
 Difficulty = Literal["easy", "medium", "hard"]
+DrillCategory = Literal["full_swing", "putting", "chipping", "short_game", "general"]
 
 
 class DrillDetail(BaseModel):
@@ -17,6 +18,7 @@ class DrillDetail(BaseModel):
 
     id: str
     name: str
+    category: DrillCategory = "full_swing"
     target_issues: list[str] = Field(default_factory=list)
     description: str
     steps: list[str] = Field(default_factory=list)

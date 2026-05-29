@@ -215,7 +215,8 @@ drills_router = APIRouter()
     response_model=APIResponse[list[DrillDetail]],
 )
 async def list_drills(
+    category: str | None = Query(default=None, description="按类目筛选：full_swing/putting/chipping"),
     db: AsyncSession = Depends(get_db),
 ) -> APIResponse[list[DrillDetail]]:
-    drills = await training_service.list_drills(db)
+    drills = await training_service.list_drills(db, category=category)
     return ok([DrillDetail.model_validate(d) for d in drills])
