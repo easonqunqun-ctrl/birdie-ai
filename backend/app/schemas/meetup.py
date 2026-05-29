@@ -132,6 +132,24 @@ class FeedbackCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class MeetupFeedbackSubmit(BaseModel):
+    """M13-07 · POST /meetups/feedbacks（reviewee 由服务端推断）."""
+
+    invitation_id: str = Field(..., max_length=32)
+    rating: int = Field(..., ge=1, le=5)
+    tags: list[str] = Field(default_factory=list, max_length=8)
+    comment: str | None = Field(None, max_length=500)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class MeetupFeedbackEligibility(BaseModel):
+    can_submit: bool
+    opens_at: str | None = None
+    has_submitted: bool
+    peer_visible: bool
+
+
 class FeedbackRead(BaseModel):
     id: str
     invitation_id: str
@@ -145,6 +163,12 @@ class FeedbackRead(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class MeetupFeedbackListResponse(BaseModel):
+    items: list[FeedbackRead]
+    total: int
+    invitation_id: str | None = None
 
 
 class EventCreate(BaseModel):
@@ -185,6 +209,9 @@ __all__ = [
     "InvitationListResponse",
     "InvitationRead",
     "InvitationStatusLiteral",
+    "MeetupFeedbackEligibility",
+    "MeetupFeedbackListResponse",
+    "MeetupFeedbackSubmit",
     "ParticipationStatusLiteral",
     "VenueCreate",
     "VenueNearbyItem",

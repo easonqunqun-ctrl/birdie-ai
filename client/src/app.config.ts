@@ -44,6 +44,7 @@ export default defineAppConfig({
     'pages/pros/clip-insight',
     'pages/meetup/index',
     'pages/meetup/detail',
+    'pages/meetup/feedback',
     'pages/meetup/create'
   ],
   /**

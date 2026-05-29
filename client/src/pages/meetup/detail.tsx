@@ -8,6 +8,10 @@ import Taro, { useDidShow, useRouter } from '@tarojs/taro'
 import { PHASE2_MEETUP_ENABLED_FLAG } from '@/constants/flags'
 import { INVITATION_STATUS_LABEL } from '@/constants/meetup'
 import { meetupService, type MeetupInvitationRead } from '@/services/meetupService'
+import {
+  meetupFeedbackService,
+  type MeetupFeedbackEligibility,
+} from '@/services/meetupFeedbackService'
 import { useUserStore } from '@/store/userStore'
 import './detail.scss'
 
@@ -29,6 +33,9 @@ const MeetupDetailPage: FC = () => {
   const [item, setItem] = useState<MeetupInvitationRead | null>(null)
   const [acceptNote, setAcceptNote] = useState('')
   const [acceptMeetAt, setAcceptMeetAt] = useState('')
+  const [feedbackElig, setFeedbackElig] = useState<MeetupFeedbackEligibility | null>(
+    null,
+  )
 
   const load = useCallback(async () => {
     if (!invitationId) {
@@ -46,6 +53,16 @@ const MeetupDetailPage: FC = () => {
         setItem(null)
       } else {
         setItem(found)
+        if (found.status === 'accepted') {
+          try {
+            const elig = await meetupFeedbackService.eligibility(found.id)
+            setFeedbackElig(elig)
+          } catch {
+            setFeedbackElig(null)
+          }
+        } else {
+          setFeedbackElig(null)
+        }
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : '加载失败')
@@ -73,6 +90,11 @@ const MeetupDetailPage: FC = () => {
   const canAccept = item?.status === 'pending' && isInvitee
   const canDecline = item?.status === 'pending' && isInvitee
   const canCancel = item?.status === 'pending' && isInviter
+
+  const canFeedback =
+    item?.status === 'accepted' &&
+    feedbackElig &&
+    (feedbackElig.can_submit || feedbackElig.has_submitted)
 
   const refreshItem = (next: MeetupInvitationRead) => {
     setItem(next)
@@ -245,6 +267,18 @@ const MeetupDetailPage: FC = () => {
             onClick={() => void handleCancel()}
           >
             撤回邀请
+          </Button>
+        )}
+        {canFeedback && (
+          <Button
+            className='meetup-detail__btn meetup-detail__btn--primary'
+            onClick={() =>
+              Taro.navigateTo({
+                url: `/pages/meetup/feedback?invitationId=${encodeURIComponent(item.id)}`,
+              })
+            }
+          >
+            {feedbackElig?.has_submitted ? '查看互评' : '去评价'}
           </Button>
         )}
       </View>

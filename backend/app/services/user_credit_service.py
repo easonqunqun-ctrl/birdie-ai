@@ -21,15 +21,31 @@ def get_meetup_credit_score(user: User) -> int:
 
 
 def credit_delta_from_feedback(*, rating: int, tags: list[str]) -> int:
-    """互评 → 信用分变动（对齐 M13-06 kickoff §3.3）."""
+    """互评 → 信用分变动（对齐 M13-07 kickoff §3.3 + M13-06 评分基线）."""
 
     delta = 5 * (rating - 3)
     tag_set = {t.strip().lower() for t in tags if t}
-    if "no_show" in tag_set:
-        delta -= 10
-    if "on_time" in tag_set:
-        delta += 2
-    return delta
+    alias = {
+        "守时": "on_time",
+        "punctual": "on_time",
+        "友好": "friendly",
+        "教学耐心": "patient_teaching",
+        "失约": "no_show",
+        "言语不当": "rude",
+        "verbal_abuse": "rude",
+    }
+    tag_bonus = {
+        "on_time": 2,
+        "friendly": 1,
+        "patient_teaching": 2,
+        "no_show": -10,
+        "rude": -15,
+        "late": -1,
+    }
+    for raw in tag_set:
+        key = alias.get(raw, raw)
+        delta += tag_bonus.get(key, 0)
+    return max(-20, min(20, delta))
 
 
 def apply_credit_delta(user: User, delta: int) -> int:

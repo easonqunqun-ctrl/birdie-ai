@@ -44,7 +44,7 @@ from app.schemas.meetup import (
     InvitationRead,
     VenueCreate,
 )
-from app.services import user_credit_service as credit_svc
+from app.services import meetup_feedback_service as feedback_svc
 
 # Nearby 搜索硬上限：避免恶意客户端用极大 radius 把全国 venue 都拉下来。
 MAX_NEARBY_RADIUS_KM: float = 100.0
@@ -406,74 +406,25 @@ async def expire_overdue_invitations(db: AsyncSession) -> int:
 # ---------------- feedback / credit ----------------
 
 
-_RATING_TO_CREDIT_DELTA: dict[int, Decimal] = {
-    1: Decimal("-5"),
-    2: Decimal("-2"),
-    3: Decimal("0"),
-    4: Decimal("2"),
-    5: Decimal("5"),
-}
-
-
 def calculate_credit_delta(rating: int, tags: list[str]) -> Decimal:
-    """简单算法：rating 基线 + 每个负向 tag -1（capped -10..+10）."""
-
-    base = _RATING_TO_CREDIT_DELTA.get(rating, Decimal("0"))
-    negative = {"no_show", "rude", "late", "danger"}
-    penalty = Decimal("-1") * sum(1 for t in tags if t in negative)
-    delta = base + penalty
-    if delta < Decimal("-10"):
-        delta = Decimal("-10")
-    if delta > Decimal("10"):
-        delta = Decimal("10")
-    return delta
+    return feedback_svc.calculate_feedback_credit_delta(rating=rating, tags=tags)
 
 
 async def submit_feedback(
     db: AsyncSession, *, reviewer_user_id: str, payload: FeedbackCreate
 ) -> MeetupFeedback:
-    if reviewer_user_id == payload.reviewee_user_id:
-        raise BadRequestError(code=40331, message="不能给自己写反馈")
-    inv = await db.get(MeetupInvitation, payload.invitation_id)
-    if inv is None:
-        raise NotFoundError(code=40406, message="邀请不存在")
-    if inv.status != "accepted":
-        raise BadRequestError(
-            code=40903,
-            message="只能对 accepted 的邀请提交反馈",
-            detail=inv.status,
-        )
-    if reviewer_user_id not in {inv.inviter_user_id, inv.invitee_user_id}:
-        raise ForbiddenError(code=40330, message="非约球当事人无法反馈")
+    from app.schemas.meetup import MeetupFeedbackSubmit
 
-    delta = calculate_credit_delta(payload.rating, payload.tags)
-    fb = MeetupFeedback(
-        id=new_id("mfb"),
-        invitation_id=payload.invitation_id,
-        reviewer_user_id=reviewer_user_id,
-        reviewee_user_id=payload.reviewee_user_id,
-        rating=payload.rating,
-        tags=list(payload.tags),
-        credit_delta=delta,
-        comment=payload.comment,
-    )
-    db.add(fb)
-    await credit_svc.apply_feedback_to_user_credit(
+    return await feedback_svc.submit_feedback(
         db,
-        user_id=payload.reviewee_user_id,
-        rating=payload.rating,
-        tags=list(payload.tags),
+        reviewer_user_id=reviewer_user_id,
+        payload=MeetupFeedbackSubmit(
+            invitation_id=payload.invitation_id,
+            rating=payload.rating,
+            tags=list(payload.tags),
+            comment=payload.comment,
+        ),
     )
-    await db.flush()
-    logger.info(
-        "meetup_feedback_submitted",
-        feedback_id=fb.id,
-        reviewer=reviewer_user_id,
-        reviewee=payload.reviewee_user_id,
-        rating=payload.rating,
-        credit_delta=str(delta),
-    )
-    return fb
 
 
 # ---------------- self-organized events ----------------

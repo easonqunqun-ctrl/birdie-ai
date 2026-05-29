@@ -41,6 +41,7 @@ from sqlalchemy import (
     SmallInteger,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -210,14 +211,20 @@ class MeetupFeedback(Base, TimestampMixin):
     __table_args__ = (
         CheckConstraint("rating BETWEEN 1 AND 5", name="chk_mfb_rating"),
         CheckConstraint(
-            "credit_delta BETWEEN -10 AND 10",
+            "credit_delta BETWEEN -20 AND 20",
             name="chk_mfb_credit_delta",
         ),
         CheckConstraint(
             "reviewer_user_id != reviewee_user_id",
             name="chk_mfb_no_self",
         ),
+        UniqueConstraint(
+            "invitation_id",
+            "reviewer_user_id",
+            name="uq_mfb_invitation_reviewer",
+        ),
         Index("idx_mfb_reviewee", "reviewee_user_id", "created_at"),
+        Index("idx_mfb_invitation", "invitation_id"),
     )
 
 

@@ -10,7 +10,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -211,8 +211,20 @@ async def test_feedback_only_for_accepted_invitations() -> None:
                     rating=4,
                 ),
             )
-        # accept 后可以反馈
-        await svc.accept_invitation(db, invitation_id=inv.id, user_id=b.id)
+        # accept 后需等 24h
+        inv = await svc.accept_invitation(db, invitation_id=inv.id, user_id=b.id)
+        with pytest.raises(BadRequestError):
+            await svc.submit_feedback(
+                db,
+                reviewer_user_id=a.id,
+                payload=FeedbackCreate(
+                    invitation_id=inv.id,
+                    reviewee_user_id=b.id,
+                    rating=4,
+                ),
+            )
+        inv.accepted_at = datetime.now(UTC) - timedelta(hours=25)
+        await db.flush()
         fb = await svc.submit_feedback(
             db,
             reviewer_user_id=a.id,
@@ -220,7 +232,7 @@ async def test_feedback_only_for_accepted_invitations() -> None:
                 invitation_id=inv.id,
                 reviewee_user_id=b.id,
                 rating=4,
-                tags=["punctual"],
+                tags=["on_time"],
             ),
         )
         assert fb.rating == 4
@@ -238,7 +250,9 @@ async def test_feedback_only_by_participants() -> None:
             inviter_user_id=a.id,
             payload=InvitationCreate(invitee_user_id=b.id),
         )
-        await svc.accept_invitation(db, invitation_id=inv.id, user_id=b.id)
+        inv = await svc.accept_invitation(db, invitation_id=inv.id, user_id=b.id)
+        inv.accepted_at = datetime.now(UTC) - timedelta(hours=25)
+        await db.flush()
         with pytest.raises(ForbiddenError):
             await svc.submit_feedback(
                 db,
