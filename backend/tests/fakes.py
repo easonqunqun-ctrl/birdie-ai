@@ -59,6 +59,12 @@ class FakeMinioStorage:
     def get_object_url(self, key: str) -> str:
         return f"http://localhost:9000/{self.bucket}/{key}"
 
+    def presign_get_url(
+        self, key: str, *, expires_in_seconds: int = 3600
+    ) -> tuple[str, datetime]:
+        expires_at = datetime.now(UTC) + timedelta(seconds=expires_in_seconds)
+        return f"http://localhost:9000/{self.bucket}/{key}?sig=fake", expires_at
+
 
 class FakeAIEngine:
     """测试替身：代替 `app.integrations.ai_engine.AIEngineClient`.

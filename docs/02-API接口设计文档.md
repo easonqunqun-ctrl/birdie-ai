@@ -1740,6 +1740,23 @@ GET /v1/coach/students/{student_id}/dashboard
 
 **客户端**：`coachStudentsService.dashboardList()` / `dashboardDetail()`；`pages/coach/students/index` 看板指标 + `pages/coach/students/detail` 详情；看板 API 未开放时列表页回退 `GET /coach/students?status=active`。
 
+### 5A.9 教练教学报告（M8-07）
+
+```
+POST /v1/coach/sessions/recap
+POST /v1/coach/sessions/{recap_id}/export-pdf
+GET  /v1/coach/sessions/recaps?page=&page_size=
+```
+
+**灰度**：`PHASE2_COACH_RECAP_ENABLED` + `PHASE2_COACH_ENABLED`；教练写端点须 JWT **`role=coach`** + 已审核教练；所选学员须 **active 师生关系**，分析报告须属于对应学员且 `status=completed`。
+
+**语义**：
+- `POST .../recap`：按 `student_ids` + `analysis_ids` 拉取 issue 数据，LLM 生成 Markdown 汇总；质量门控（每位学员名 + issue 名须出现）不通过则回退模板填空。
+- `POST .../export-pdf`：reportlab 生成 PDF（45° 重复水印：教练名 + coach_id 后 6 位 + 品牌 + 时间），上传对象存储并返回 GET 预签名 URL（TTL `COACH_RECAP_PDF_URL_TTL_SECONDS`，默认 24h）。
+- `GET .../recaps`：分页列出历史报告；过期 PDF 链接返回 `pdf_url=null`。
+
+**客户端**：`coachRecapService`；`pages/coach/session-recap`（选学员 → 生成汇总 → 导出 PDF）；「我的」教练模式「教学报告」入口。
+
 ---
 
 ## 5B、球手对比库（/pros · M12，灰度 `PHASE2_PROS_ENABLED`）

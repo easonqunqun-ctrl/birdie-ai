@@ -203,6 +203,10 @@ class Settings(BaseSettings):
     # M8-06 教练学员看板；默认 false。
     PHASE2_COACH_DASHBOARD_ENABLED: bool = False
 
+    # M8-07 教练教学报告（LLM 汇总 + PDF）；默认 false。
+    PHASE2_COACH_RECAP_ENABLED: bool = False
+    COACH_RECAP_PDF_URL_TTL_SECONDS: int = 86400
+
     # M13 球友约球
     # 上线前需 DEP-05 法律意见书到位（M13-09 服务协议 / 未成年保护）。
     PHASE2_MEETUP_ENABLED: bool = False
