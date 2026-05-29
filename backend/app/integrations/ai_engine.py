@@ -31,6 +31,7 @@ class AIEngineClient:
         video_url: str,
         camera_angle: str,
         club_type: str,
+        mode: str = "full_swing",
         user_id_hint: str | None = None,
         force_engine_version: str | None = None,
     ) -> dict:
@@ -39,6 +40,7 @@ class AIEngineClient:
             "video_url": video_url,
             "camera_angle": camera_angle,
             "club_type": club_type,
+            "mode": mode,
         }
         # M7-14：传 user_id 让 ai_engine 做灰度分桶；老 ai_engine 容器忽略未知字段
         if user_id_hint:

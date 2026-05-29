@@ -101,6 +101,12 @@ const config: UserConfigExport = {
     PHASE2_COACH_ENABLED: JSON.stringify(
       process.env.TARO_APP_PHASE2_COACH_ENABLED === 'true',
     ),
+    PHASE2_PUTTING_MODE_ENABLED: JSON.stringify(
+      process.env.TARO_APP_PHASE2_PUTTING_MODE_ENABLED === 'true',
+    ),
+    PHASE2_CHIPPING_MODE_ENABLED: JSON.stringify(
+      process.env.TARO_APP_PHASE2_CHIPPING_MODE_ENABLED === 'true',
+    ),
     /** 逗号分隔的订阅消息模板 ID；空则 `requestSubscribeMessage` 不调用 */
     SUBSCRIBE_TEMPLATES: JSON.stringify(process.env.TARO_APP_SUBSCRIBE_TMPL_IDS || ''),
     /** 顺序：1 分析完成 2 会员已到期 3 会员即将到期（到期前 N 天，与后端第三模板一致） */

@@ -33,6 +33,7 @@ AnalysisStage = Literal[
     "generating",
 ]
 IssueSeverity = Literal["high", "medium", "low"]
+AnalysisMode = Literal["full_swing", "putting", "chipping"]
 
 
 # ==================== 3.1 POST /v1/analyses/upload-token ====================
@@ -75,6 +76,10 @@ class CreateAnalysisRequest(BaseModel):
     upload_id: str = Field(..., description="POST /upload-token 返回的 upload_id")
     camera_angle: CameraAngle
     club_type: ClubType
+    mode: AnalysisMode = Field(
+        default="full_swing",
+        description="分析模式：full_swing（默认）/ putting / chipping",
+    )
 
 
 class CreateAnalysisResponse(BaseModel):
@@ -166,6 +171,9 @@ class AnalysisReportResponse(BaseModel):
     status: AnalysisStatus
     camera_angle: CameraAngle
     club_type: ClubType
+    analysis_mode: AnalysisMode = "full_swing"
+    # M10-01：推杆 mode 专属 4 维度分；仅 analysis_mode=putting 时有值
+    putting_features: dict[str, PhaseScore] | None = None
     # M7-14：报告永久按落库 engine_version 渲染。客户端按值开关 V2 新字段（如 confidence）。
     engine_version: Literal["v1", "v2"] = "v1"
 

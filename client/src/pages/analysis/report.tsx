@@ -65,6 +65,8 @@ import TrustBadge from '@/components/TrustBadge'
 import '@/components/TrustBadge.scss'
 import CameraAngleAlert from '@/components/CameraAngleAlert'
 import '@/components/CameraAngleAlert.scss'
+import PuttingReport from '@/pages/analysis/components/PuttingReport'
+import '@/pages/analysis/components/PuttingReport.scss'
 import './report.scss'
 
 const VIDEO_ID = 'report-video'
@@ -301,6 +303,7 @@ const ReportPage: FC = () => {
 
   const scoreLevel = report?.score_level ?? scoreLevelFromScore(report?.overall_score)
   const levelMeta = scoreLevel ? SCORE_LEVEL_META[scoreLevel] : null
+  const isPuttingReport = (report?.analysis_mode || 'full_swing') === 'putting'
 
   // ---------------- 事件 ----------------
   const seekTo = useCallback((seconds: number) => {
@@ -837,37 +840,47 @@ const ReportPage: FC = () => {
         )}
       </View>
 
-      {/* ==================== 3. 六维雷达 ==================== */}
-      {radarAxes.length > 0 && (
+      {/* ==================== 3. 六维雷达 / 推杆专属 ==================== */}
+      {isPuttingReport ? (
         <View className='report__section'>
-          <View className='report__section-header'>
-            <Text className='report__section-title'>六维评分</Text>
-            <Text className='report__section-hint'>点击顶点查看阶段</Text>
-          </View>
-          <RadarChart axes={radarAxes} onTapAxis={tapPhase} />
-          <View className='report__phase-list'>
-            {PHASE_ORDER.map((key) => {
-              const ps = report.phase_scores?.[key]
-              if (!ps) return null
-              return (
-                <View
-                  key={key}
-                  className={[
-                    'report__phase-item',
-                    ps.is_weakest ? 'report__phase-item--weakest' : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                  onClick={() => tapPhase(key)}
-                >
-                  <Text className='report__phase-name'>{PHASE_FULL_LABEL[key]}</Text>
-                  <Text className='report__phase-score'>{ps.score}</Text>
-                  {ps.is_weakest && <Text className='report__phase-badge'>最需改进</Text>}
-                </View>
-              )
-            })}
-          </View>
+          <PuttingReport
+            phaseScores={report.phase_scores}
+            puttingFeatures={report.putting_features}
+            onTapPhase={(key) => tapPhase(key)}
+          />
         </View>
+      ) : (
+        radarAxes.length > 0 && (
+          <View className='report__section'>
+            <View className='report__section-header'>
+              <Text className='report__section-title'>六维评分</Text>
+              <Text className='report__section-hint'>点击顶点查看阶段</Text>
+            </View>
+            <RadarChart axes={radarAxes} onTapAxis={tapPhase} />
+            <View className='report__phase-list'>
+              {PHASE_ORDER.map((key) => {
+                const ps = report.phase_scores?.[key]
+                if (!ps) return null
+                return (
+                  <View
+                    key={key}
+                    className={[
+                      'report__phase-item',
+                      ps.is_weakest ? 'report__phase-item--weakest' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                    onClick={() => tapPhase(key)}
+                  >
+                    <Text className='report__phase-name'>{PHASE_FULL_LABEL[key]}</Text>
+                    <Text className='report__phase-score'>{ps.score}</Text>
+                    {ps.is_weakest && <Text className='report__phase-badge'>最需改进</Text>}
+                  </View>
+                )
+              })}
+            </View>
+          </View>
+        )
       )}
 
       {proMatchTop && !isSample && (

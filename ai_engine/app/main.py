@@ -244,6 +244,12 @@ def _mock_putting_result(req: AnalyzeRequest) -> AnalyzeResult:
         analysis_mode="putting",
         overall_score=82,
         phase_scores=phase_scores,
+        mode_feature_scores={
+            "pendulum_stability": 84,
+            "head_stability": 80,
+            "face_alignment": 78,
+            "tempo_ratio": 86,
+        },
         issues=[],
         duration_ms=0,
     )

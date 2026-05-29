@@ -152,6 +152,7 @@ async def _run_swing_analysis_async(analysis_id: str) -> None:
                     video_url=meta["video_url"],
                     camera_angle=meta["camera_angle"],
                     club_type=meta["club_type"],
+                    mode=meta.get("analysis_mode") or "full_swing",
                     # M7-14：传 user_id 让 ai_engine 做灰度分桶
                     user_id_hint=meta.get("user_id"),
                 )
@@ -228,6 +229,7 @@ async def _mark_processing(analysis_id: str) -> dict | None:
             "video_url": analysis.video_url,
             "camera_angle": analysis.camera_angle,
             "club_type": analysis.club_type,
+            "analysis_mode": getattr(analysis, "analysis_mode", None) or "full_swing",
             "created_at": analysis.created_at,
         }
 
@@ -325,6 +327,16 @@ async def _mark_completed(analysis_id: str, engine_result: dict) -> None:
         engine_version = engine_result.get("engine_version")
         if isinstance(engine_version, str) and engine_version in {"v1", "v2"}:
             analysis.engine_version = engine_version
+        am = engine_result.get("analysis_mode")
+        if isinstance(am, str) and am in {"full_swing", "putting", "chipping"}:
+            analysis.analysis_mode = am
+        mfs = engine_result.get("mode_feature_scores")
+        if isinstance(mfs, dict):
+            analysis.mode_feature_scores = {
+                str(k): int(v)
+                for k, v in mfs.items()
+                if isinstance(v, int)
+            } or None
         analysis.overall_score = engine_result.get("overall_score")
         analysis.phase_scores = _dump_phase_scores(engine_result.get("phase_scores"))
         analysis.phase_timestamps = _dump_phase_timestamps(engine_result.get("phase_timestamps"))

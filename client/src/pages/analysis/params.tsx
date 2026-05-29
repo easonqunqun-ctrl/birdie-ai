@@ -32,7 +32,11 @@ import {
   CLUB_TYPE_LABEL,
   VIDEO_CONSTRAINTS,
 } from '@/types/analysis'
+import type { AnalysisMode } from '@/types/analysis'
 import type { CameraAngle, ClubType } from '@/types/api'
+import { PHASE2_CHIPPING_MODE_ENABLED_FLAG, PHASE2_PUTTING_MODE_ENABLED_FLAG } from '@/constants/flags'
+import ModeSelector from '@/components/ModeSelector'
+import '@/components/ModeSelector.scss'
 import './params.scss'
 
 const CAMERA_ANGLES: CameraAngle[] = ['face_on', 'down_the_line']
@@ -76,6 +80,7 @@ const AnalysisParamsPage: FC = () => {
 
   const [cameraAngle, setCameraAngle] = useState<CameraAngle>('face_on')
   const [clubType, setClubType] = useState<ClubType>('iron_7')
+  const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('full_swing')
   const [submitting, setSubmitting] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [phase, setPhase] = useState<
@@ -87,6 +92,50 @@ const AnalysisParamsPage: FC = () => {
 
   const setCurrent = useAnalysisStore((s) => s.setCurrent)
   const fetchMe = useUserStore((s) => s.fetchMe)
+
+  const modeOptions = useMemo(
+    () => [
+      { value: 'full_swing' as const, label: '全挥杆', icon: '⛳' },
+      {
+        value: 'putting' as const,
+        label: '推杆',
+        icon: '🎯',
+        disabled: !PHASE2_PUTTING_MODE_ENABLED_FLAG,
+        hint: PHASE2_PUTTING_MODE_ENABLED_FLAG ? '建议正面拍摄' : '即将开放',
+      },
+      {
+        value: 'chipping' as const,
+        label: '切杆',
+        icon: '🏌️',
+        disabled: !PHASE2_CHIPPING_MODE_ENABLED_FLAG,
+        hint: PHASE2_CHIPPING_MODE_ENABLED_FLAG ? '建议选挖起杆' : '即将开放',
+      },
+    ],
+    [],
+  )
+
+  const showModeSelector =
+    PHASE2_PUTTING_MODE_ENABLED_FLAG || PHASE2_CHIPPING_MODE_ENABLED_FLAG
+
+  useEffect(() => {
+    if (analysisMode === 'putting' && clubType !== 'putter') {
+      Taro.showModal({
+        title: '提示',
+        content: '推杆模式建议选择推杆（putter）',
+        showCancel: false,
+        confirmText: '我知道了',
+      })
+    }
+  }, [analysisMode, clubType])
+
+  useEffect(() => {
+    if (analysisMode === 'putting') {
+      setClubType('putter')
+      setCameraAngle('face_on')
+    } else if (analysisMode === 'chipping' && clubType === 'putter') {
+      setClubType('wedge')
+    }
+  }, [analysisMode])
 
   // 必要参数缺失 → 直接回退到 capture
   useEffect(() => {
@@ -236,6 +285,7 @@ const AnalysisParamsPage: FC = () => {
         upload_id: token.upload_id,
         camera_angle: cameraAngle,
         club_type: clubType,
+        mode: analysisMode,
       })
 
       Taro.hideLoading()
@@ -246,6 +296,7 @@ const AnalysisParamsPage: FC = () => {
         analysis_id: created.analysis_id,
         club_type: clubType,
         camera_angle: cameraAngle,
+        analysis_mode: analysisMode,
         duration,
         size,
       })
@@ -329,6 +380,20 @@ const AnalysisParamsPage: FC = () => {
           </View>
         )}
       </View>
+
+      {showModeSelector && (
+        <View className='params__section'>
+          <Text className='params__section-title'>分析模式</Text>
+          <Text className='params__section-hint'>
+            推杆请选推杆球杆并尽量正面拍摄
+          </Text>
+          <ModeSelector
+            value={analysisMode}
+            options={modeOptions}
+            onChange={setAnalysisMode}
+          />
+        </View>
+      )}
 
       <View className='params__section'>
         <Text className='params__section-title'>拍摄角度</Text>

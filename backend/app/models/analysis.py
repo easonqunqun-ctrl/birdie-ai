@@ -6,6 +6,7 @@ from decimal import Decimal
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     DateTime,
     Float,
     ForeignKey,
@@ -61,8 +62,11 @@ class SwingAnalysis(Base, TimestampMixin):
     video_file_size: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     camera_angle: Mapped[str] = mapped_column(String(20), nullable=False)  # face_on / down_the_line
     club_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    analysis_mode: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="full_swing", server_default="'full_swing'"
+    )
 
-    # M7-14：评分管线版本标记。V1 报告永久按 'v1' 渲染，V2 报告按 'v2' 渲染；
+    # M7-14：评分管线版本标记。
     # 不做"二次评分"。
     engine_version: Mapped[str] = mapped_column(
         String(20), default="v1", server_default="'v1'", nullable=False
@@ -81,6 +85,8 @@ class SwingAnalysis(Base, TimestampMixin):
     overall_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
     score_change: Mapped[int | None] = mapped_column(Integer, nullable=True)
     phase_scores: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    # M10-01/02：推杆/切杆 mode 专属特征分（pendulum_stability 等）；full_swing 为 NULL
+    mode_feature_scores: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     phase_timestamps: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     skeleton_video_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     skeleton_data_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
@@ -123,6 +129,10 @@ class SwingAnalysis(Base, TimestampMixin):
     )
 
     __table_args__ = (
+        CheckConstraint(
+            "analysis_mode IN ('full_swing', 'putting', 'chipping')",
+            name="chk_swing_analysis_mode",
+        ),
         Index("idx_swing_analyses_user", "user_id", "created_at"),
         Index("idx_swing_analyses_status", "status"),
         Index("idx_swing_analyses_confidence", "analysis_confidence"),
