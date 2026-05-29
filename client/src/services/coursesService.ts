@@ -54,6 +54,26 @@ export interface CourseLessonsResponse {
 }
 
 /** P2-M11-04 · POST /lessons/{id}/attempt 响应。 */
+export interface CertificateDetail {
+  id: string
+  user_id: string
+  course_id: string
+  stage: number
+  cert_url: string | null
+  issued_at: string
+  revoked_at: string | null
+  course_title: string
+  badge_label: string
+  holder_name: string
+  stage_title: string
+}
+
+export interface UserCourseStageSummary {
+  current_stage: number
+  earned_stages: number[]
+  certificates: CertificateDetail[]
+}
+
 export interface LessonAttemptResponse {
   passed: boolean
   score: number
@@ -64,6 +84,7 @@ export interface LessonAttemptResponse {
   feedback: string
   stage_upgraded: boolean
   upgraded_to_stage: number | null
+  certificate: CertificateDetail | null
 }
 
 export const coursesService = {
@@ -81,6 +102,17 @@ export const coursesService = {
     return http.post<LessonAttemptResponse>(
       `/lessons/${encodeURIComponent(lessonId)}/attempt`,
       { swing_analysis_id: swingAnalysisId },
+    )
+  },
+  myCourseStage() {
+    return http.get<UserCourseStageSummary>('/users/me/course-stage')
+  },
+  myCertificates() {
+    return http.get<CertificateDetail[]>('/users/me/certificates')
+  },
+  certificateDetail(certId: string) {
+    return http.get<CertificateDetail>(
+      `/users/me/certificates/${encodeURIComponent(certId)}`,
     )
   },
 }

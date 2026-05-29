@@ -50,6 +50,48 @@
     padding: 12rpx 4rpx 20rpx;
   }
 
+  &__stage-right {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 12rpx;
+  }
+
+  &__stage-medal {
+    font-size: var(--font-size-xs);
+    color: var(--color-gold);
+    background: var(--color-gold-soft, rgba(201, 162, 39, 0.12));
+    padding: 4rpx 12rpx;
+    border-radius: 999rpx;
+  }
+
+  &__progress {
+    display: flex;
+    flex-direction: column;
+    background: var(--gradient-hero, linear-gradient(135deg, var(--color-primary), #3949ab));
+    border-radius: 20rpx;
+    padding: 24rpx 28rpx;
+    margin-bottom: 28rpx;
+    color: #fff;
+  }
+
+  &__progress-label {
+    font-size: var(--font-size-xs);
+    opacity: 0.85;
+  }
+
+  &__progress-value {
+    margin-top: 8rpx;
+    font-size: var(--font-size-lg);
+    font-weight: 700;
+  }
+
+  &__progress-meta {
+    margin-top: 8rpx;
+    font-size: var(--font-size-xs);
+    color: var(--color-accent-mint, #00d084);
+  }
+
   &__stage-title {
     font-size: 32rpx;
     font-weight: 600;

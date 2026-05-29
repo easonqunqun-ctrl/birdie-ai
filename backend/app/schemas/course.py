@@ -145,7 +145,25 @@ class CertificateRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CertificateDetailRead(CertificateRead):
+    """M11-05 · 含渲染字段，供客户端 Canvas 合成证书 / 勋章."""
+
+    course_title: str
+    badge_label: str
+    holder_name: str
+    stage_title: str
+
+
+class UserCourseStageRead(BaseModel):
+    """用户当前学习阶段 + 已获证书摘要."""
+
+    current_stage: int = Field(..., ge=1, le=7)
+    earned_stages: list[int] = Field(default_factory=list)
+    certificates: list[CertificateDetailRead] = Field(default_factory=list)
+
+
 __all__ = [
+    "CertificateDetailRead",
     "CertificateRead",
     "CourseCreate",
     "CourseLessonsResponse",
@@ -156,4 +174,5 @@ __all__ = [
     "LessonRead",
     "UserCourseProgressRead",
     "UserCourseProgressUpdate",
+    "UserCourseStageRead",
 ]

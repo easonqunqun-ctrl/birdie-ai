@@ -18,7 +18,7 @@ import { FC, useCallback, useState } from 'react'
 import { View, Text, ScrollView } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { PHASE2_COURSES_ENABLED_FLAG } from '@/constants/flags'
-import { coursesService, type CourseRead } from '@/services/coursesService'
+import { coursesService, type CourseRead, type UserCourseStageSummary } from '@/services/coursesService'
 import './index.scss'
 
 const STAGE_TITLES: Record<number, string> = {
@@ -35,13 +35,18 @@ const CoursesIndexPage: FC = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [courses, setCourses] = useState<CourseRead[]>([])
+  const [stageSummary, setStageSummary] = useState<UserCourseStageSummary | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const data = await coursesService.list()
+      const [data, summary] = await Promise.all([
+        coursesService.list(),
+        coursesService.myCourseStage().catch(() => null),
+      ])
       setCourses(data)
+      setStageSummary(summary)
     } catch (e) {
       const msg = e instanceof Error ? e.message : '加载失败'
       setError(msg)
@@ -111,17 +116,37 @@ const CoursesIndexPage: FC = () => {
     })
   }
 
+  const earnedSet = new Set(stageSummary?.earned_stages ?? [])
+
   return (
     <ScrollView scrollY className='courses-list'>
+      {stageSummary && (
+        <View className='courses-list__progress'>
+          <Text className='courses-list__progress-label'>当前阶段</Text>
+          <Text className='courses-list__progress-value'>
+            第 {stageSummary.current_stage} 阶
+          </Text>
+          {stageSummary.certificates.length > 0 && (
+            <Text className='courses-list__progress-meta'>
+              已获 {stageSummary.certificates.length} 枚勋章
+            </Text>
+          )}
+        </View>
+      )}
       {stages.map((stage) => (
         <View key={stage} className='courses-list__stage'>
           <View className='courses-list__stage-header'>
             <Text className='courses-list__stage-title'>
               {STAGE_TITLES[stage] ?? `第 ${stage} 阶`}
             </Text>
-            <Text className='courses-list__stage-count'>
-              {groups.get(stage)?.length ?? 0} 门
-            </Text>
+            <View className='courses-list__stage-right'>
+              {earnedSet.has(stage) && (
+                <Text className='courses-list__stage-medal'>已通关</Text>
+              )}
+              <Text className='courses-list__stage-count'>
+                {groups.get(stage)?.length ?? 0} 门
+              </Text>
+            </View>
           </View>
           {(groups.get(stage) ?? []).map((course) => (
             <View

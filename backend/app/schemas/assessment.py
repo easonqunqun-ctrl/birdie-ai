@@ -9,6 +9,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.course import CertificateDetailRead
+
 
 class LessonAttemptRequest(BaseModel):
     """POST /v1/lessons/{lesson_id}/attempt 请求体。"""
@@ -37,6 +39,7 @@ class LessonAttemptResponse(BaseModel):
     # 升阶联动（kickoff §3.4）：本次通关是否触发本 course 升阶
     stage_upgraded: bool = False
     upgraded_to_stage: int | None = Field(default=None, ge=1, le=7)
+    certificate: CertificateDetailRead | None = None
 
 
 class PassCriteriaSchema(BaseModel):
