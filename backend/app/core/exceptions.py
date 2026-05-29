@@ -150,6 +150,20 @@ class CoachSpectatorNotAllowedError(ForbiddenError):
     message = "学员未授权教练旁观约球记录"
 
 
+class CoachNotVerifiedError(ForbiddenError):
+    """M8-01 · 当前账号不是已审核教练."""
+
+    code = 40310
+    message = "当前账号不是已审核教练"
+
+
+class CoachVerificationRejectedError(ForbiddenError):
+    """M8-01 · 资质审核被驳回."""
+
+    code = 40311
+    message = "资质审核被驳回，请重新提交"
+
+
 class ConflictError(AppException):
     """资源状态冲突（如分析尚未完成就去取报告）."""
 

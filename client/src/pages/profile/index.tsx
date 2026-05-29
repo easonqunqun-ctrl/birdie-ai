@@ -7,6 +7,7 @@ import { switchToCoach, toastTabNavigationFailure } from '@/utils/tabNav'
 import { FREQ_LABEL, GOAL_LABEL, LEVEL_LABEL } from '@/constants/golf'
 import {
   PAYMENT_ENABLED_FLAG,
+  PHASE2_COACH_ENABLED_FLAG,
   PHASE2_COURSES_ENABLED_FLAG,
   PHASE2_MEETUP_ENABLED_FLAG,
   PHASE2_PROFILE_V2_ENABLED_FLAG,
@@ -246,6 +247,17 @@ const ProfilePage: FC = () => {
             >
               <Text className='profile__menu-icon'>🤝</Text>
               <Text className='profile__menu-label'>约球邀请</Text>
+              <Text className='profile__menu-arrow'>›</Text>
+            </View>
+          )}
+
+          {PHASE2_COACH_ENABLED_FLAG && !user?.is_active_coach && (
+            <View
+              className='profile__menu-item'
+              onClick={() => Taro.navigateTo({ url: '/pages/coach/apply' })}
+            >
+              <Text className='profile__menu-icon'>🎓</Text>
+              <Text className='profile__menu-label'>申请成为教练</Text>
               <Text className='profile__menu-arrow'>›</Text>
             </View>
           )}

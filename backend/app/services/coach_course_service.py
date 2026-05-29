@@ -31,8 +31,24 @@ def coach_course_user_ids() -> frozenset[str]:
 
 
 def assert_coach_course_author(user: User) -> None:
-    if user.id not in coach_course_user_ids():
-        raise ForbiddenError(code=40301, message="无权创建教练定制课程")
+    """同步守门：仅 seed 白名单（M8-01 就位后写端点改 ``assert_coach_author``）."""
+
+    if user.id in coach_course_user_ids():
+        return
+    raise ForbiddenError(code=40301, message="无权创建教练定制课程")
+
+
+async def assert_coach_author(db: AsyncSession, user: User) -> None:
+    """M8-01：seed 白名单或 ``coach_profiles.status=active``."""
+
+    if user.id in coach_course_user_ids():
+        return
+    if settings.PHASE2_COACH_ENABLED:
+        from app.services.coach_profile_service import assert_active_coach
+
+        await assert_active_coach(db, user=user)
+        return
+    raise ForbiddenError(code=40301, message="无权操作教练端点")
 
 
 async def _get_owned_course(
@@ -64,7 +80,7 @@ async def list_coach_courses(db: AsyncSession, user_id: str) -> list[Course]:
 async def create_coach_course(
     db: AsyncSession, *, user: User, payload: CoachCourseCreate
 ) -> Course:
-    assert_coach_course_author(user)
+    await assert_coach_author(db, user)
     code = _unique_course_code(user.id, payload.code)
     course = await course_service.create_course(
         db,
@@ -155,6 +171,7 @@ async def unpublish_coach_course(
 
 __all__ = [
     "add_coach_lesson",
+    "assert_coach_author",
     "assert_coach_course_author",
     "coach_course_user_ids",
     "create_coach_course",

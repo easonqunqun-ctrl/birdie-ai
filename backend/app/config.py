@@ -184,6 +184,11 @@ class Settings(BaseSettings):
     # 空字符串 = 无人可写（端点仍 404/403，不暴露存在性给非白名单）。
     COACH_COURSE_USER_IDS: str = ""
 
+    # M8-01 教练档案 / 资质审核；默认 false。
+    PHASE2_COACH_ENABLED: bool = False
+    # M8-01 Admin 审核端点白名单（逗号分隔 usr_xxx）；CI / 本地联调可配置。
+    ADMIN_USER_IDS: str = ""
+
     # M12 球手对比库（pro_players + pro_swing_clips 等 6 张表）；默认 false，
     # M12-03 资源库 tab UI 上线时切 true。
     PHASE2_PROS_ENABLED: bool = False

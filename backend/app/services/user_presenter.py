@@ -1,6 +1,7 @@
 """用户 ORM → `UserResponse`：清洗 JSONB / 历史脏数据，避免 ValidationError → HTTP 500."""
 
 from app.models.user import User
+from app.schemas.coach_profile import CoachProfileBrief
 from app.schemas.user import (
     UserResponse,
     UserStats,
@@ -13,7 +14,13 @@ from app.services import payment_service
 from app.services.coach_annotation_service import can_user_coach_annotate
 
 
-def build_user_response(user: User, *, include_stats: bool = True) -> UserResponse:
+def build_user_response(
+    user: User,
+    *,
+    include_stats: bool = True,
+    coach_profile: CoachProfileBrief | None = None,
+    is_active_coach: bool = False,
+) -> UserResponse:
     return UserResponse(
         id=user.id,
         nickname=user.nickname,
@@ -39,5 +46,7 @@ def build_user_response(user: User, *, include_stats: bool = True) -> UserRespon
         quota=None,
         created_at=user.created_at,
         account_deletion_scheduled_at=user.account_deletion_scheduled_at,
-        can_coach_annotate=can_user_coach_annotate(user),
+        can_coach_annotate=can_user_coach_annotate(user) or is_active_coach,
+        coach_profile=coach_profile,
+        is_active_coach=is_active_coach,
     )

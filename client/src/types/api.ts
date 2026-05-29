@@ -75,6 +75,16 @@ export interface User {
   account_deletion_scheduled_at?: string | null
   /** M12-09：COACH_COURSE_USER_IDS 白名单 + 批注灰度 */
   can_coach_annotate?: boolean
+  /** M8-01：教练档案摘要 */
+  coach_profile?: {
+    status: 'pending' | 'active' | 'rejected' | 'paused'
+    display_name: string
+    level: string
+    applied_at: string
+    approved_at?: string | null
+    rejected_at?: string | null
+  } | null
+  is_active_coach?: boolean
 }
 
 export interface WechatLoginRequest {
