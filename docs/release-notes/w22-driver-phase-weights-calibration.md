@@ -55,7 +55,10 @@ iron 基线（= V1 单套 `PHASE_WEIGHTS`）：`setup .15 / backswing .20 / top 
 ## 5. 验收
 
 - `test_driver_vs_iron_differs_in_at_least_3_phases` 撤销 xfail 后转绿。
-- `make ai-engine-test` 全套绿。
+- `make ai-engine-test` 全套绿（580 passed / 16 skipped）。
+- **CI 护栏**：此前 ai_engine 在 CI 只跑 3 个 ECS 文件，scoring/profile 等全量测试仅本地跑；
+  新增 `.github/workflows/ai-engine-pytest.yml`（装 ffmpeg → uv sync → 合成视频 → 全量 pytest），
+  让 W22 这批守门测试在 CI 真跑、防回归。
 
 ## 6. 接入评分进度
 
