@@ -1704,6 +1704,26 @@ GET  /v1/users/me/meetup-feedbacks
 
 **客户端**：`meetupFeedbackService`；`pages/meetup/feedback`；详情页「去评价 / 查看互评」入口。
 
+### 5C.3 自助挑战赛（M13-08）
+
+```
+GET  /v1/meetups/events/templates
+POST /v1/meetups/events
+GET  /v1/meetups/events?page=&page_size=&status=
+GET  /v1/meetups/events/{id}
+POST /v1/meetups/events/{id}/join
+POST /v1/meetups/events/{id}/submit-score
+```
+
+**模板**（≥3）：`putting_contest`（推杆 10 球）· `distance_contest`（距离 5 球）· `overall_score`（18 洞总杆）。
+
+**规则**：
+- 默认 `capacity=8`；报满 **42910**；重复报名 **40905**。
+- `submit-score` Body：`{ self_reported_score, score_image_url? }`；无图则自动 `review_status=approved` 并颁发**荣誉徽章**（写入 `moderation_payload.completion_badges`，**无** cash/item 字段，红线 R6）。
+- 有 `score_image_url` 时 `review_status=pending`（M8-08 审核队列后续接力）。
+
+**客户端**：`meetupEventService`；`pages/meetup/events/*`；约球列表「挑战赛」入口。
+
 ---
 
 ## 六、支付模块（/payments）

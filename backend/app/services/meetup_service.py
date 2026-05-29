@@ -433,58 +433,19 @@ async def submit_feedback(
 async def create_event(
     db: AsyncSession, *, organizer_user_id: str, payload: EventCreate
 ) -> SelfOrganizedEvent:
-    e = SelfOrganizedEvent(
-        id=new_id("soe"),
-        organizer_user_id=organizer_user_id,
-        venue_id=payload.venue_id,
-        title=payload.title,
-        description=payload.description,
-        template_code=payload.template_code,
-        scheduled_at=payload.scheduled_at,
-        capacity=payload.capacity,
-        badge_template_code=payload.badge_template_code,
-        rules_payload=dict(payload.rules_payload or {}),
+    from app.services import meetup_event_service as event_svc
+
+    return await event_svc.create_event(
+        db, organizer_user_id=organizer_user_id, payload=payload
     )
-    db.add(e)
-    await db.flush()
-    logger.info(
-        "event_created",
-        event_id=e.id,
-        organizer=organizer_user_id,
-        template=payload.template_code,
-    )
-    return e
 
 
 async def sign_up_event(
     db: AsyncSession, *, event_id: str, user_id: str
 ) -> EventParticipation:
-    e = await db.get(SelfOrganizedEvent, event_id)
-    if e is None:
-        raise NotFoundError(code=40406, message="活动不存在")
-    if e.status not in {"open"}:
-        raise BadRequestError(code=40903, message="活动未开放报名", detail=e.status)
+    from app.services import meetup_event_service as event_svc
 
-    # 容量校验（粗略）
-    if e.capacity is not None:
-        cnt_q = await db.execute(
-            select(EventParticipation).where(
-                EventParticipation.event_id == event_id,
-                EventParticipation.status.in_(["signed_up", "checked_in", "completed"]),
-            )
-        )
-        if len(list(cnt_q.scalars().all())) >= e.capacity:
-            raise BadRequestError(code=40903, message="活动已报满")
-
-    p = EventParticipation(
-        id=new_id("evp"),
-        event_id=event_id,
-        user_id=user_id,
-        status="signed_up",
-    )
-    db.add(p)
-    await db.flush()
-    return p
+    return await event_svc.join_event(db, event_id=event_id, user_id=user_id)
 
 
 __all__ = [

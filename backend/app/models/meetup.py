@@ -305,12 +305,16 @@ class EventParticipation(Base, TimestampMixin):
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    score_payload: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default="{}"
+    )
 
     __table_args__ = (
         CheckConstraint(
             "status IN ('signed_up', 'checked_in', 'completed', 'no_show', 'cancelled')",
             name="chk_evp_status",
         ),
+        UniqueConstraint("event_id", "user_id", name="uq_evp_event_user"),
         Index("idx_evp_event_status", "event_id", "status"),
         Index("idx_evp_user", "user_id", "created_at"),
     )

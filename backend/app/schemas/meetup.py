@@ -175,7 +175,7 @@ class EventCreate(BaseModel):
     venue_id: str | None = Field(None, max_length=32)
     title: str = Field(..., min_length=1, max_length=100)
     description: str | None = None
-    template_code: str | None = Field(None, max_length=40)
+    template_code: str = Field(..., max_length=40)
     scheduled_at: datetime | None = None
     capacity: int | None = Field(None, ge=1, le=200)
     badge_template_code: str | None = Field(None, max_length=40)
@@ -184,24 +184,66 @@ class EventCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class EventScoreSubmit(BaseModel):
+    self_reported_score: float = Field(..., ge=0)
+    score_image_url: str | None = Field(None, max_length=512)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class EventLeaderboardItem(BaseModel):
+    rank: int
+    user_id: str
+    participation_id: str
+    self_reported_score: float
+    submitted_at: str | None = None
+
+
 class EventRead(BaseModel):
     id: str
     organizer_user_id: str
     venue_id: str | None = None
     title: str
+    description: str | None = None
     template_code: str | None = None
+    template_label: str | None = None
     scheduled_at: datetime | None = None
     capacity: int | None = None
+    participant_count: int = 0
     status: EventStatusLiteral
     badge_template_code: str | None = None
+    rules_payload: dict = Field(default_factory=dict)
+    score_label: str | None = None
+    my_completion_badge: dict | None = None
+    my_participation_status: ParticipationStatusLiteral | None = None
+    leaderboard: list[EventLeaderboardItem] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
 
 
+class EventListResponse(BaseModel):
+    items: list[EventRead]
+    total: int
+    page: int
+    page_size: int
+
+
+class EventTemplateRead(BaseModel):
+    code: str
+    label: str
+    description: str
+    default_capacity: int
+    score_label: str
+
+
 __all__ = [
     "EventCreate",
+    "EventLeaderboardItem",
+    "EventListResponse",
     "EventRead",
+    "EventScoreSubmit",
     "EventStatusLiteral",
+    "EventTemplateRead",
     "FeedbackCreate",
     "FeedbackRead",
     "InvitationAcceptPayload",

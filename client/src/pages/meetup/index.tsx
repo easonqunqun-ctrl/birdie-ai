@@ -144,6 +144,12 @@ const MeetupListPage: FC = () => {
       )}
 
       <View className='meetup-list__fab-wrap'>
+        <Button
+          className='meetup-list__fab meetup-list__fab--secondary'
+          onClick={() => Taro.navigateTo({ url: '/pages/meetup/events/index' })}
+        >
+          挑战赛
+        </Button>
         <Button className='meetup-list__fab' onClick={goCreate}>
           发起约球
         </Button>
