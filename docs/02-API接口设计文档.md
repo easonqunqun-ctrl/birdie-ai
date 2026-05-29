@@ -1669,6 +1669,27 @@ POST   /v1/users/me/pros/favorites/{clip_id}/try-it
 
 ---
 
+## 5C、约球风控（M13-06 · 灰度 `PHASE2_MEETUP_ENABLED`）
+
+> 挂接在 ``POST /v1/meetups/invitations`` 创建链路与 ``decline`` / ``accept`` 响应链路。
+
+### 5C.1 四类风控规则
+
+| 规则 | 默认阈值 | 错误码 |
+| --- | --- | --- |
+| 日邀请上限 | 免费 5 / 会员 10 | **42920** |
+| 接受率过低 | ≥10 次发起且接受率 <10% → 24h 冷却 | **42921** |
+| 连续被拒 | 3 次 declined → 24h 冷却 | **42921** |
+| 信用分不足 | `users.meetup_credit_score` < 60 不可发起 | **40339** |
+
+**阈值热更新**：Redis hash `meetup:risk:config` 字段覆盖 env（`MEETUP_RISK_*`）；未配置时用 Settings 默认。
+
+**快照**：成功创建的邀请写入 `meetup_invitations.risk_payload`（`daily_count` / `credit_score` / `config` / `checked_at`）。
+
+**信用分**：初始 100；M13-07 互评经 `user_credit_service` 增减（`+5×(rating-3)`，`no_show -10`，`on_time +2`，clamp 0–100）。
+
+---
+
 ## 六、支付模块（/payments）
 
 ### 6.1 创建订阅订单

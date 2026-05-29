@@ -44,6 +44,7 @@ from app.schemas.meetup import (
     InvitationRead,
     VenueCreate,
 )
+from app.services import user_credit_service as credit_svc
 
 # Nearby 搜索硬上限：避免恶意客户端用极大 radius 把全国 venue 都拉下来。
 MAX_NEARBY_RADIUS_KM: float = 100.0
@@ -457,6 +458,12 @@ async def submit_feedback(
         comment=payload.comment,
     )
     db.add(fb)
+    await credit_svc.apply_feedback_to_user_credit(
+        db,
+        user_id=payload.reviewee_user_id,
+        rating=payload.rating,
+        tags=list(payload.tags),
+    )
     await db.flush()
     logger.info(
         "meetup_feedback_submitted",

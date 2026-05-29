@@ -24,15 +24,18 @@ service.``filter_invitation_contact_for_user`` 是合规过滤器；任何返回
 from __future__ import annotations
 
 from fastapi import APIRouter, Body, Depends
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.config import settings
 from app.core.database import get_db
 from app.core.exceptions import NotFoundError
+from app.core.redis import get_redis
 from app.models.user import User
 from app.schemas.base import APIResponse, ok
 from app.schemas.meetup import InvitationAcceptPayload, InvitationRead
+from app.services import meetup_risk_service as risk_svc
 from app.services import meetup_service
 
 router = APIRouter()
@@ -60,6 +63,7 @@ async def accept_meetup_invitation(
     ),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
 ):
     """守门链：非 invitee → 40330；非 pending → 40903；contact 含禁字段 → 40335.
 
@@ -74,6 +78,7 @@ async def accept_meetup_invitation(
         user_id=user.id,
         contact_payload=contact_payload,
     )
+    await risk_svc.on_invitation_accepted(redis, inviter_user_id=inv.inviter_user_id)
     await db.commit()
     inv = meetup_service.filter_invitation_contact_for_user(
         inv, viewer_user_id=user.id
@@ -91,6 +96,7 @@ async def decline_meetup_invitation(
     invitation_id: str,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
 ):
     """非 invitee → 40330；非 pending → 幂等返回当前状态."""
 
@@ -98,6 +104,11 @@ async def decline_meetup_invitation(
     inv = await meetup_service.decline_invitation(
         db, invitation_id=invitation_id, user_id=user.id
     )
+    if inv.status == "declined":
+        cfg = await risk_svc.get_risk_config(redis)
+        await risk_svc.on_invitation_declined(
+            redis, inviter_user_id=inv.inviter_user_id, config=cfg
+        )
     await db.commit()
     inv = meetup_service.filter_invitation_contact_for_user(
         inv, viewer_user_id=user.id
