@@ -156,6 +156,8 @@ def test_diagnose_v2_fills_key_frame_timestamp_from_phases() -> None:
             "impact": PhaseInfo(start_frame=60, end_frame=60, key_frame=60),
             "follow_through": PhaseInfo(start_frame=61, end_frame=99, key_frame=80),
         },
+        swing_start=11,
+        swing_end=80,
         top_frame=45,
         impact_frame=60,
         handedness="right",
