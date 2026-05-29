@@ -17,6 +17,7 @@ export interface CertificateCanvasContext {
   textBaseline: CanvasTextBaseline
   lineWidth: number
   fillRect: (x: number, y: number, w: number, h: number) => void
+  strokeRect: (x: number, y: number, w: number, h: number) => void
   beginPath: () => void
   moveTo: (x: number, y: number) => void
   lineTo: (x: number, y: number) => void
