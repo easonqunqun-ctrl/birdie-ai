@@ -776,6 +776,56 @@ GET /v1/analyses/{analysis_id}
 
 ---
 
+### 3.4d 匹配最相似职业球手镜头（M12-04 · 灰度 `PHASE2_PROS_ENABLED`）
+
+```
+GET /v1/analyses/{analysis_id}/pro-matches?limit=5&record=true
+```
+
+**需认证**（仅本人 **`completed`** 且非 `is_sample` 的分析）
+
+**Query**：
+
+| 参数 | 默认 | 说明 |
+|------|------|------|
+| `limit` | `5` | 返回 Top-N，范围 1–10 |
+| `record` | `true` | 是否将 Top-1 写入 `user_pro_match_history` |
+
+**守门**：
+
+- `PHASE2_PROS_ENABLED=false` → **404**（`40406`）
+- `pending` / `processing` / 无 `overall_score` → **400**（`40001`）
+- `is_sample=true` → **400**（`40093`，与软删除守门一致）
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "analysis_id": "ana_xxx",
+    "matches": [
+      {
+        "match_score": 87.5,
+        "match_details": {
+          "camera_angle_match": true,
+          "base_score": 72.5,
+          "components": { "overall": 85.0, "phase_proxy": 78.0 }
+        },
+        "clip": { "id": "psc_xxx", "club_type": "iron_7", "camera_angle": "face_on", "...": "..." },
+        "player": { "id": "pp_xxx", "name": "Demo Pro · 内置示例", "...": "..." }
+      }
+    ],
+    "recorded_match_id": "upmh_xxx"
+  }
+}
+```
+
+**匹配逻辑（v0.1 启发式）**：同 `club_type` 硬过滤 → `overall_score` / `phase_scores` 相似度加权 → 机位一致 +15 分。客户端 service：`prosService.matchForAnalysis()`；并排对比 UI 见 M12-05。
+
+---
+
 ### 3.4a 软删除分析报告
 
 ```
@@ -2155,6 +2205,7 @@ POST /v1/events
 | 10 | POST | /v1/analyses | 是 | 创建分析任务 |
 | 11 | GET | /v1/analyses/{id}/status | 是 | 查询分析状态 |
 | 12 | GET | /v1/analyses/{id} | 是 | 获取分析报告 |
+| 12b | GET | /v1/analyses/{id}/pro-matches | 是 | 匹配最相似职业镜头（M12-04，`PHASE2_PROS_ENABLED`） |
 | 12a | DELETE | /v1/analyses/{id} | 是 | 软删除分析报告（进行中/示例不可删） |
 | 13 | GET | /v1/analyses | 是 | 分析历史列表 |
 | 14 | GET | /v1/analyses/sample | 否 | 获取示例分析报告（免登体验，固定数据） |

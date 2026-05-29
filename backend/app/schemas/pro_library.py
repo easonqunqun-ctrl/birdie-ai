@@ -135,12 +135,29 @@ class UserProMatchRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ProMatchItemRead(BaseModel):
+    """M12-04 · 单条职业镜头匹配结果."""
+
+    match_score: Decimal
+    match_details: dict = Field(default_factory=dict)
+    clip: ProSwingClipRead
+    player: ProPlayerRead
+
+
+class ProMatchResultRead(BaseModel):
+    analysis_id: str
+    matches: list[ProMatchItemRead] = Field(default_factory=list)
+    recorded_match_id: str | None = None
+
+
 __all__ = [
     "AnnotationTypeLiteral",
     "CameraAngleLiteral",
     "HandednessLiteral",
     "LicenseStatusLiteral",
     "ProClipAnnotationCreate",
+    "ProMatchItemRead",
+    "ProMatchResultRead",
     "ProPlayerCreate",
     "ProPlayerRead",
     "ProSwingClipCreate",
