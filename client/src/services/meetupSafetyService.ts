@@ -9,6 +9,7 @@ export type MeetupGenderPreference = 'any' | 'same' | 'coach_only'
 export interface MeetupSafetyStatus {
   meetup_tos_accepted_at: string | null
   gender_preference: MeetupGenderPreference
+  coach_spectator_optin: boolean
   identity_eligible: boolean
   phone_verified: boolean
   age_years: number | null
@@ -49,5 +50,11 @@ export const meetupSafetyService = {
 
   updatePreference(gender_preference: MeetupGenderPreference): Promise<MeetupSafetyStatus> {
     return http.patch<MeetupSafetyStatus>('/meetups/safety/preferences', { gender_preference })
+  },
+
+  updateSpectatorOptin(coach_spectator_optin: boolean): Promise<MeetupSafetyStatus> {
+    return http.patch<MeetupSafetyStatus>('/meetups/safety/spectator-optin', {
+      coach_spectator_optin,
+    })
   },
 }

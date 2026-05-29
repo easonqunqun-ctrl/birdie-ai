@@ -14,6 +14,7 @@ from app.schemas.base import APIResponse, ok
 from app.schemas.meetup_safety import (
     MeetupGenderPreferenceUpdate,
     MeetupSafetyStatus,
+    MeetupSpectatorOptinUpdate,
     MeetupTosAccept,
     MeetupTosContent,
 )
@@ -104,6 +105,24 @@ async def update_meetup_preferences(
     await safety_svc.ensure_meetup_access(db, user=user)
     data = await safety_svc.update_gender_preference(
         db, user=user, preference=payload.gender_preference
+    )
+    await db.commit()
+    return ok(MeetupSafetyStatus.model_validate(data))
+
+
+@router.patch(
+    "/safety/spectator-optin",
+    summary="学员授权教练旁观约球（M13-10）",
+    response_model=APIResponse[MeetupSafetyStatus],
+)
+async def update_meetup_spectator_optin(
+    payload: MeetupSpectatorOptinUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    _ensure_meetup_enabled()
+    data = await safety_svc.update_coach_spectator_optin(
+        db, user=user, optin=payload.coach_spectator_optin
     )
     await db.commit()
     return ok(MeetupSafetyStatus.model_validate(data))

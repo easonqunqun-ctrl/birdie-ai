@@ -86,6 +86,21 @@ async def test_accept_tos_and_ensure_access() -> None:
 
 
 @pytest.mark.asyncio
+async def test_coach_spectator_optin_toggle() -> None:
+    async with AsyncSessionLocal() as db:
+        user = await _make_user(
+            db,
+            birth_date=date(1995, 1, 1),
+            phone_verified=True,
+        )
+        await safety_svc.accept_meetup_tos(db, user=user)
+        data = await safety_svc.update_coach_spectator_optin(db, user=user, optin=True)
+        assert data["coach_spectator_optin"] is True
+        data = await safety_svc.update_coach_spectator_optin(db, user=user, optin=False)
+        assert data["coach_spectator_optin"] is False
+
+
+@pytest.mark.asyncio
 async def test_ensure_access_requires_tos() -> None:
     async with AsyncSessionLocal() as db:
         user = await _make_user(

@@ -143,6 +143,13 @@ class MeetupTosRequiredError(ForbiddenError):
     message = "请先阅读并同意约球服务协议"
 
 
+class CoachSpectatorNotAllowedError(ForbiddenError):
+    """M13-10 · 学员未授权教练旁观约球."""
+
+    code = 40336
+    message = "学员未授权教练旁观约球记录"
+
+
 class ConflictError(AppException):
     """资源状态冲突（如分析尚未完成就去取报告）."""
 

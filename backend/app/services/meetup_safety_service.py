@@ -22,6 +22,7 @@ GenderPreference = Literal["any", "same", "coach_only"]
 
 MEETUP_TOS_KEY = "meetup_tos_accepted_at"
 GENDER_PREFERENCE_KEY = "gender_preference"
+COACH_SPECTATOR_OPTIN_KEY = "coach_spectator_optin"
 VALID_GENDER_PREFERENCES: frozenset[str] = frozenset({"any", "same", "coach_only"})
 
 logger = get_logger("meetup_safety")
@@ -84,6 +85,7 @@ async def get_safety_status(db: AsyncSession, *, user: User) -> dict:
     return {
         "meetup_tos_accepted_at": payload.get(MEETUP_TOS_KEY),
         "gender_preference": pref,
+        "coach_spectator_optin": bool(payload.get(COACH_SPECTATOR_OPTIN_KEY)),
         "identity_eligible": _identity_eligible_soft(user),
         "phone_verified": is_phone_verified(user),
         "age_years": age,
@@ -169,7 +171,23 @@ async def stamp_mock_identity(db: AsyncSession, *, user: User) -> User:
     return user
 
 
+async def update_coach_spectator_optin(
+    db: AsyncSession, *, user: User, optin: bool
+) -> dict:
+    """M13-10 · 学员授权教练旁观约球记录."""
+
+    await ensure_meetup_access(db, user=user)
+    profile = await _get_or_create_profile(db, user.id)
+    payload = _read_privacy(profile)
+    payload[COACH_SPECTATOR_OPTIN_KEY] = optin
+    profile.privacy_payload = payload
+    await db.flush()
+    logger.info("coach_spectator_optin_updated", user_id=user.id, optin=optin)
+    return await get_safety_status(db, user=user)
+
+
 __all__ = [
+    "COACH_SPECTATOR_OPTIN_KEY",
     "GENDER_PREFERENCE_KEY",
     "MEETUP_TOS_KEY",
     "VALID_GENDER_PREFERENCES",
@@ -180,6 +198,7 @@ __all__ = [
     "ensure_meetup_access",
     "get_safety_status",
     "stamp_mock_identity",
+    "update_coach_spectator_optin",
     "update_gender_preference",
     "user_age_years",
 ]

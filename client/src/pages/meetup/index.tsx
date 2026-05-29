@@ -3,7 +3,7 @@
  */
 
 import { FC, useCallback, useEffect, useState } from 'react'
-import { View, Text, ScrollView, Button } from '@tarojs/components'
+import { View, Text, ScrollView, Button, Switch } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import MeetupTosModal from '@/components/MeetupTosModal'
 import { PHASE2_MEETUP_ENABLED_FLAG } from '@/constants/flags'
@@ -33,6 +33,8 @@ const MeetupListPage: FC = () => {
   const [items, setItems] = useState<MeetupInvitationRead[]>([])
   const [showTos, setShowTos] = useState(false)
   const [meetupReady, setMeetupReady] = useState(false)
+  const [spectatorOptin, setSpectatorOptin] = useState(false)
+  const [optinSaving, setOptinSaving] = useState(false)
 
   const load = useCallback(async () => {
     if (!meetupReady) return
@@ -56,6 +58,7 @@ const MeetupListPage: FC = () => {
         setMeetupReady(false)
         return
       }
+      setSpectatorOptin(Boolean(status.coach_spectator_optin))
       setMeetupReady(true)
       setShowTos(false)
     } catch (e) {
@@ -96,6 +99,26 @@ const MeetupListPage: FC = () => {
     Taro.navigateTo({ url: '/pages/meetup/create' })
   }
 
+  const onSpectatorOptinChange = async (checked: boolean) => {
+    if (optinSaving) return
+    setOptinSaving(true)
+    try {
+      const status = await meetupSafetyService.updateSpectatorOptin(checked)
+      setSpectatorOptin(Boolean(status.coach_spectator_optin))
+      Taro.showToast({
+        title: checked ? '已允许教练旁观' : '已关闭教练旁观',
+        icon: 'none',
+      })
+    } catch (e) {
+      Taro.showToast({
+        title: e instanceof Error ? e.message : '更新失败',
+        icon: 'none',
+      })
+    } finally {
+      setOptinSaving(false)
+    }
+  }
+
   if (!PHASE2_MEETUP_ENABLED_FLAG) {
     return (
       <View className='meetup-list meetup-list--blocked'>
@@ -122,6 +145,23 @@ const MeetupListPage: FC = () => {
           </View>
         ))}
       </View>
+
+      {meetupReady && (
+        <View className='meetup-list__privacy'>
+          <View className='meetup-list__privacy-text'>
+            <Text className='meetup-list__privacy-title'>教练旁观</Text>
+            <Text className='meetup-list__privacy-desc'>
+              开启后，你的教练可查看约球记录（不含对方联系方式）
+            </Text>
+          </View>
+          <Switch
+            checked={spectatorOptin}
+            disabled={optinSaving}
+            color='var(--color-primary)'
+            onChange={(e) => void onSpectatorOptinChange(Boolean(e.detail.value))}
+          />
+        </View>
+      )}
 
       {loading && (
         <View className='meetup-list__empty'>

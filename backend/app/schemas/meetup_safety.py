@@ -12,6 +12,7 @@ GenderPreferenceLiteral = Literal["any", "same", "coach_only"]
 class MeetupSafetyStatus(BaseModel):
     meetup_tos_accepted_at: str | None = None
     gender_preference: GenderPreferenceLiteral
+    coach_spectator_optin: bool = False
     identity_eligible: bool
     phone_verified: bool
     age_years: int | None = None
@@ -21,6 +22,12 @@ class MeetupSafetyStatus(BaseModel):
 
 class MeetupGenderPreferenceUpdate(BaseModel):
     gender_preference: GenderPreferenceLiteral
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class MeetupSpectatorOptinUpdate(BaseModel):
+    coach_spectator_optin: bool
 
     model_config = ConfigDict(extra="forbid")
 
