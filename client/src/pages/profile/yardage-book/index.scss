@@ -1,0 +1,84 @@
+.yardage-book {
+  padding: 24rpx;
+  min-height: 100vh;
+  background: var(--color-bg-page);
+
+  &__intro {
+    margin-bottom: 24rpx;
+    padding: 20rpx;
+    border-radius: var(--radius-md);
+    background: var(--color-bg-card);
+  }
+
+  &__intro-text {
+    font-size: 28rpx;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+  }
+
+  &__hint {
+    display: block;
+    font-size: 28rpx;
+    color: var(--color-text-tertiary);
+    padding: 24rpx 0;
+  }
+
+  &__error {
+    display: block;
+    color: var(--color-error);
+    font-size: 28rpx;
+    padding: 16rpx 0;
+  }
+
+  &__list {
+    max-height: calc(100vh - 200rpx);
+  }
+
+  &__row {
+    margin-bottom: 16rpx;
+    padding: 20rpx;
+    border-radius: var(--radius-md);
+    background: var(--color-bg-card);
+    border: 1rpx solid var(--color-border);
+  }
+
+  &__row-main {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8rpx;
+  }
+
+  &__club {
+    font-size: 30rpx;
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
+
+  &__yards {
+    font-size: 32rpx;
+    font-weight: 700;
+    color: var(--color-primary);
+  }
+
+  &__row-meta {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  &__meta {
+    font-size: 24rpx;
+    color: var(--color-text-tertiary);
+  }
+
+  &__edit-btn {
+    margin: 0;
+    background: transparent;
+    color: var(--color-primary);
+    border: 1rpx solid var(--color-primary);
+    font-size: 24rpx;
+  }
+}

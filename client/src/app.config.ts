@@ -40,6 +40,7 @@ export default defineAppConfig({
     'pages/profile/settings',
     'pages/profile/about',
     'pages/profile/clubs',
+    'pages/profile/yardage-book/index',
     'pages/profile/profile-v2',
     'pages/profile/favorite-venues',
     'pages/profile/coach-visibility',

@@ -222,6 +222,8 @@ class Settings(BaseSettings):
     PHASE2_PUTTING_MODE_ENABLED: bool = False
     # M10-02 切杆 mode UI；与 ai_engine mode=chipping 双端联动。
     PHASE2_CHIPPING_MODE_ENABLED: bool = False
+    # M10-03 个人 yardage book（依赖 M9-02 user_clubs + target_yardage 反推）。
+    PHASE2_YARDAGE_BOOK_ENABLED: bool = False
 
     # M13 球友约球
     # 上线前需 DEP-05 法律意见书到位（M13-09 服务协议 / 未成年保护）。
