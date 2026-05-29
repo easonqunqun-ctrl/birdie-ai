@@ -149,6 +149,11 @@ async def create_annotation(
             clip_id=clip.id,
             coach_id=coach.id,
         )
+        from app.services.coach_dashboard_service import invalidate_dashboard_for_coach
+
+        await invalidate_dashboard_for_coach(
+            coach_user_id=coach.id, student_user_id=analysis.user_id
+        )
         return _to_clip_ref_read(ann, clip, player, clip_unavailable=False)
 
     if payload.annotation_type == "text":
@@ -174,6 +179,11 @@ async def create_annotation(
             analysis_id=analysis.id,
             annotation_type="text",
             coach_id=coach.id,
+        )
+        from app.services.coach_dashboard_service import invalidate_dashboard_for_coach
+
+        await invalidate_dashboard_for_coach(
+            coach_user_id=coach.id, student_user_id=analysis.user_id
         )
         return _to_clip_ref_read(ann, None, None, clip_unavailable=False)
 

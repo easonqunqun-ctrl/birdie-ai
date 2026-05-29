@@ -25,6 +25,7 @@ export default defineAppConfig({
     'pages/coach/student-meetups',
     'pages/coach/students-invite',
     'pages/coach/students/index',
+    'pages/coach/students/detail',
     'pages/coach/task-assign/index',
     'pages/coach/apply',
     'pages/training/index',

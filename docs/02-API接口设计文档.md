@@ -1722,6 +1722,24 @@ GET  /v1/coach/tasks?student_id=&status=
 
 **客户端**：`coachTaskService`；`pages/coach/task-assign`；「我的学员」active 卡片「布置作业」；训练 Tab「教练布置的任务」分组。
 
+### 5A.8 教练学员看板（M8-06）
+
+```
+GET /v1/coach/students/dashboard
+GET /v1/coach/students/{student_id}/dashboard
+```
+
+**灰度**：`PHASE2_COACH_DASHBOARD_ENABLED` + `PHASE2_COACH_ENABLED`；教练读端点须 JWT **`role=coach`** + 已审核教练；单学员详情须 **active 师生关系**（M8-03），否则 **40312**。
+
+**语义**：
+- 列表聚合 active 学员（最多 100），返回 `analyses_7d`、`last_analysis_at`、`last_annotation_at`、`pending_tasks`、`needs_response`。
+- `needs_response`：学员近 24h 有新分析报告，且教练近 24h 内未对该学员新增批注。
+- 排序：`needs_response` desc → `analyses_7d` desc → `last_analysis_at` desc。
+- Redis 缓存 TTL 30s（key：`coach_dashboard:{coach_id}` / `coach_dashboard:{coach_id}:{student_id}`）；教练新增批注 / 派发作业时主动失效；新分析报告依赖 TTL 刷新（≤30s）。
+- 详情附加：最近 5 份分析报告、最近 5 条批注、待完成教练作业列表。
+
+**客户端**：`coachStudentsService.dashboardList()` / `dashboardDetail()`；`pages/coach/students/index` 看板指标 + `pages/coach/students/detail` 详情；看板 API 未开放时列表页回退 `GET /coach/students?status=active`。
+
 ---
 
 ## 5B、球手对比库（/pros · M12，灰度 `PHASE2_PROS_ENABLED`）

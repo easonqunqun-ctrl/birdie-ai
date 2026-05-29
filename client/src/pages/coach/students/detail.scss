@@ -1,0 +1,164 @@
+.coach-student-detail {
+  min-height: 100%;
+  padding: 24rpx;
+  background: var(--color-bg-page);
+  box-sizing: border-box;
+
+  &--blocked {
+    padding-top: 160rpx;
+    text-align: center;
+    color: var(--color-text-secondary);
+    font-size: 32rpx;
+  }
+
+  &__head {
+    background: var(--color-bg-card);
+    border: 1rpx solid var(--color-border);
+    border-radius: 18rpx;
+    padding: 24rpx;
+    margin-bottom: 16rpx;
+    box-shadow: var(--shadow-xs);
+  }
+
+  &__name-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12rpx;
+  }
+
+  &__name {
+    font-size: 36rpx;
+    font-weight: 700;
+    color: var(--color-text-primary);
+  }
+
+  &__badge {
+    padding: 4rpx 16rpx;
+    border-radius: 999rpx;
+    font-size: 22rpx;
+    font-weight: 600;
+    color: var(--color-on-primary);
+    background: var(--color-warning);
+  }
+
+  &__metrics {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 12rpx;
+    margin-top: 16rpx;
+  }
+
+  &__metric {
+    flex: 1;
+    min-width: 180rpx;
+    background: var(--color-bg-page);
+    border-radius: 12rpx;
+    padding: 12rpx 16rpx;
+  }
+
+  &__metric-label {
+    display: block;
+    font-size: 22rpx;
+    color: var(--color-text-tertiary);
+  }
+
+  &__metric-value {
+    display: block;
+    margin-top: 4rpx;
+    font-size: 30rpx;
+    font-weight: 600;
+    color: var(--color-primary);
+  }
+
+  &__actions {
+    display: flex;
+    flex-direction: row;
+    gap: 12rpx;
+    margin-top: 16rpx;
+  }
+
+  &__action-btn {
+    flex: 1;
+    margin: 0 !important;
+    padding: 0 16rpx !important;
+    height: 68rpx !important;
+    line-height: 68rpx !important;
+    font-size: 26rpx !important;
+    background: var(--color-primary) !important;
+    color: var(--color-on-primary) !important;
+    border-radius: 999rpx !important;
+
+    &::after {
+      border: none !important;
+    }
+  }
+
+  &__section {
+    background: var(--color-bg-card);
+    border: 1rpx solid var(--color-border);
+    border-radius: 18rpx;
+    padding: 20rpx 22rpx;
+    margin-bottom: 12rpx;
+    box-shadow: var(--shadow-xs);
+  }
+
+  &__section-title {
+    display: block;
+    font-size: 30rpx;
+    font-weight: 700;
+    color: var(--color-primary);
+    margin-bottom: 12rpx;
+  }
+
+  &__empty {
+    font-size: 26rpx;
+    color: var(--color-text-tertiary);
+    line-height: 1.5;
+  }
+
+  &__row {
+    padding: 12rpx 0;
+    border-bottom: 1rpx solid var(--color-border);
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  &__row-top {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12rpx;
+  }
+
+  &__row-title {
+    font-size: 28rpx;
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
+
+  &__row-meta {
+    font-size: 24rpx;
+    color: var(--color-text-tertiary);
+  }
+
+  &__row-sub {
+    display: block;
+    margin-top: 6rpx;
+    font-size: 26rpx;
+    color: var(--color-text-secondary);
+    line-height: 1.45;
+  }
+
+  &__link {
+    margin-top: 8rpx;
+    font-size: 24rpx;
+    color: var(--color-primary);
+    font-weight: 600;
+  }
+}

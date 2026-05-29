@@ -200,6 +200,9 @@ class Settings(BaseSettings):
     PHASE2_COACH_TASKS_ENABLED: bool = False
     COACH_TASK_MAX_PER_DAY: int = 50
 
+    # M8-06 教练学员看板；默认 false。
+    PHASE2_COACH_DASHBOARD_ENABLED: bool = False
+
     # M13 球友约球
     # 上线前需 DEP-05 法律意见书到位（M13-09 服务协议 / 未成年保护）。
     PHASE2_MEETUP_ENABLED: bool = False

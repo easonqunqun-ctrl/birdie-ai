@@ -49,4 +49,22 @@ describe('coachStudentsService.invite / myCoachOverview', () => {
     expect(sent.url).toContain('/users/me/coach/csr_1/visibility')
     expect(sent.data).toEqual({ handicap: true })
   })
+
+  test('dashboardList → GET /coach/students/dashboard', async () => {
+    T.request.mockResolvedValueOnce(ok({ students: [], total: 0, cached_at: null }))
+    await coachStudentsService.dashboardList()
+    const sent = T.request.mock.calls[0][0]
+    expect(sent.method).toBe('GET')
+    expect(sent.url).toMatch(/\/coach\/students\/dashboard$/)
+  })
+
+  test('dashboardDetail → GET /coach/students/{id}/dashboard', async () => {
+    T.request.mockResolvedValueOnce(
+      ok({ student_user_id: 'usr_s', recent_analyses: [], recent_annotations: [], pending_coach_tasks: [] }),
+    )
+    await coachStudentsService.dashboardDetail('usr_s')
+    const sent = T.request.mock.calls[0][0]
+    expect(sent.method).toBe('GET')
+    expect(sent.url).toMatch(/\/coach\/students\/usr_s\/dashboard$/)
+  })
 })
