@@ -51,8 +51,14 @@ import { groupIssuesByConfidence, ISSUE_SEVERITY_ORDER } from '@/utils/issueConf
 import { resolveTrustTier } from '@/utils/trustLabel'
 import { PHASE2_PROS_ENABLED_FLAG } from '@/constants/flags'
 import { prosService, type ProMatchItemRead } from '@/services/prosService'
+import {
+  coachAnnotationService,
+  type CoachAnnotationClipRef,
+} from '@/services/coachAnnotationService'
 import RadarChart, { RadarAxis } from '@/components/RadarChart'
 import '@/components/RadarChart.scss'
+import ProClipReferenceCard from '@/components/ProClipReferenceCard'
+import '@/components/ProClipReferenceCard.scss'
 import TrustBadge from '@/components/TrustBadge'
 import '@/components/TrustBadge.scss'
 import CameraAngleAlert from '@/components/CameraAngleAlert'
@@ -93,6 +99,7 @@ const ReportPage: FC = () => {
   // W7-T5：`from_share=1` 的 path 由朋友分享出来，被分享者点进来走"脱敏公开报告"分支
   const fromShare = params.from_share === '1'
   const currentUserToken = useUserStore((s) => s.token)
+  const user = useUserStore((s) => s.user)
 
   const [report, setReport] = useState<AnalysisReportResponse | null>(null)
   const [publicReport, setPublicReport] = useState<PublicReport | null>(null)
@@ -110,6 +117,7 @@ const ReportPage: FC = () => {
   const [showHiddenIssues, setShowHiddenIssues] = useState(false)
   const [showEngineWarnings, setShowEngineWarnings] = useState(false)
   const [proMatchTop, setProMatchTop] = useState<ProMatchItemRead | null>(null)
+  const [coachAnnotations, setCoachAnnotations] = useState<CoachAnnotationClipRef[]>([])
   const videoCtxRef = useRef<Taro.VideoContext | null>(null)
   const scrollResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -203,6 +211,32 @@ const ReportPage: FC = () => {
       cancelled = true
     }
   }, [analysisId, fromShare, report])
+
+  useEffect(() => {
+    if (
+      !analysisId ||
+      analysisId === 'sample' ||
+      fromShare ||
+      !currentUserToken ||
+      !report ||
+      report.status !== 'completed'
+    ) {
+      setCoachAnnotations([])
+      return
+    }
+    let cancelled = false
+    coachAnnotationService
+      .listForAnalysis(analysisId)
+      .then((list) => {
+        if (!cancelled) setCoachAnnotations(list)
+      })
+      .catch(() => {
+        if (!cancelled) setCoachAnnotations([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [analysisId, currentUserToken, fromShare, report])
 
   // 默认给 Taro.setNavigationBarTitle 一个更友好的标题
   useEffect(() => {
@@ -362,6 +396,15 @@ const ReportPage: FC = () => {
       url: `/pages/analysis/pro-compare?id=${encodeURIComponent(analysisId)}&clipId=${encodeURIComponent(proMatchTop.clip.id)}`,
     }).catch(toastTabNavigationFailure)
   }
+
+  const handleGoCoachAnnotate = () => {
+    if (!analysisId || analysisId === 'sample') return
+    Taro.navigateTo({
+      url: `/pages/coach/analysis-annotate?analysisId=${encodeURIComponent(analysisId)}`,
+    }).catch(toastTabNavigationFailure)
+  }
+
+  const canCoachAnnotate = Boolean(user?.can_coach_annotate)
 
   const goScoreGuide = () => {
     Taro.navigateTo({ url: '/pages/help/score-guide?from=report' }).catch(toastTabNavigationFailure)
@@ -842,6 +885,21 @@ const ReportPage: FC = () => {
         </View>
       )}
 
+      {coachAnnotations.length > 0 && !isSample && (
+        <View className='report__section'>
+          <View className='report__section-header'>
+            <Text className='report__section-title'>教练参考素材</Text>
+          </View>
+          {coachAnnotations.map((ann) => (
+            <ProClipReferenceCard
+              key={ann.id}
+              annotation={ann}
+              analysisId={analysisId}
+            />
+          ))}
+        </View>
+      )}
+
       {/* ==================== 4. 问题诊断 ==================== */}
       <View className='report__section'>
         <View className='report__section-header'>
@@ -1004,6 +1062,11 @@ const ReportPage: FC = () => {
         {proMatchTop && !isSample && (
           <Button className='report__footer-btn' onClick={handleGoProCompare}>
             🏌️ 职业对比
+          </Button>
+        )}
+        {canCoachAnnotate && !isSample && (
+          <Button className='report__footer-btn' onClick={handleGoCoachAnnotate}>
+            📎 引用职业镜头
           </Button>
         )}
         <Button className='report__footer-btn' onClick={handleAskCoach}>

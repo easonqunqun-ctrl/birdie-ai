@@ -73,6 +73,8 @@ export interface User {
   created_at: string
   /** 非空：账号将于该时间（ISO）后永久删除，可调用取消接口 */
   account_deletion_scheduled_at?: string | null
+  /** M12-09：COACH_COURSE_USER_IDS 白名单 + 批注灰度 */
+  can_coach_annotate?: boolean
 }
 
 export interface WechatLoginRequest {

@@ -10,6 +10,7 @@ from app.schemas.user import (
     sanitize_primary_goals_for_response,
 )
 from app.services import payment_service
+from app.services.coach_annotation_service import can_user_coach_annotate
 
 
 def build_user_response(user: User, *, include_stats: bool = True) -> UserResponse:
@@ -38,4 +39,5 @@ def build_user_response(user: User, *, include_stats: bool = True) -> UserRespon
         quota=None,
         created_at=user.created_at,
         account_deletion_scheduled_at=user.account_deletion_scheduled_at,
+        can_coach_annotate=can_user_coach_annotate(user),
     )

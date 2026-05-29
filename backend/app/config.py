@@ -188,7 +188,10 @@ class Settings(BaseSettings):
     # M12-03 资源库 tab UI 上线时切 true。
     PHASE2_PROS_ENABLED: bool = False
 
-    # M13 球友约球（venues/meetup_invitations 等 5 张表）；默认 false，
+    # M8-04 / M12-09 教练报告批注（video_ref 等）；默认 false。
+    PHASE2_COACH_ANNOTATIONS_ENABLED: bool = False
+
+    # M13 球友约球
     # 上线前需 DEP-05 法律意见书到位（M13-09 服务协议 / 未成年保护）。
     PHASE2_MEETUP_ENABLED: bool = False
 

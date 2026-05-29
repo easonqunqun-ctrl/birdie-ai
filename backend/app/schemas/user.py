@@ -106,6 +106,8 @@ class UserResponse(BaseModel):
     created_at: datetime
     # MVP §3.4 注销冷静期：非空表示将于该 UTC 时间后硬删
     account_deletion_scheduled_at: datetime | None = None
+    # M12-09：教练批注入口（COACH_COURSE_USER_IDS 白名单 + 灰度开启）
+    can_coach_annotate: bool = False
 
 
 class AccountDeletionRequest(BaseModel):
