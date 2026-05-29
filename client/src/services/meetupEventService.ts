@@ -76,7 +76,12 @@ export const meetupEventService = {
   },
 
   list(params?: { page?: number; page_size?: number; status?: string }): Promise<MeetupEventListResponse> {
-    return http.get<MeetupEventListResponse>('/meetups/events', params)
+    const qs: string[] = []
+    if (params?.page != null) qs.push(`page=${params.page}`)
+    if (params?.page_size != null) qs.push(`page_size=${params.page_size}`)
+    if (params?.status) qs.push(`status=${encodeURIComponent(params.status)}`)
+    const tail = qs.length ? `?${qs.join('&')}` : ''
+    return http.get<MeetupEventListResponse>(`/meetups/events${tail}`)
   },
 
   get(eventId: string): Promise<MeetupEventRead> {
