@@ -33,6 +33,14 @@ describe('coachStudentsService.invite / myCoachOverview', () => {
     expect(sent.url).toContain('/users/me/coach')
   })
 
+  test('list → GET /coach/students', async () => {
+    T.request.mockResolvedValueOnce(ok({ items: [], total: 0 }))
+    await coachStudentsService.list('active')
+    const sent = T.request.mock.calls[0][0]
+    expect(sent.method).toBe('GET')
+    expect(sent.url).toContain('/coach/students?status=active')
+  })
+
   test('updateVisibility → PUT /users/me/coach/{id}/visibility', async () => {
     T.request.mockResolvedValueOnce(ok({ id: 'csr_1', status: 'active' }))
     await coachStudentsService.updateVisibility('csr_1', { handicap: true })

@@ -44,14 +44,12 @@ export interface CoachStudentVisibilityUpdate {
 export const COACH_VISIBILITY_FIELDS: {
   key: keyof CoachStudentVisibilityUpdate
   label: string
-  sensitive?: boolean
 }[] = [
   { key: 'handicap', label: '差点 / 水平' },
   { key: 'goals', label: '练习目标' },
   { key: 'training_preference', label: '训练偏好' },
   { key: 'frequent_venues', label: '常去球馆' },
-  { key: 'body', label: '身高体重' },
-  { key: 'injuries', label: '伤病信息', sensitive: true },
+  { key: 'body', label: '身高体重 / 利手' },
 ]
 
 export const coachStudentsService = {
