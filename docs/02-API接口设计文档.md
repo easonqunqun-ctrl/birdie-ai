@@ -1536,6 +1536,19 @@ GET /v1/users/me/certificates/{cert_id}
 
 `POST /v1/lessons/{lesson_id}/attempt` 成功且触发升阶时，响应新增可选字段 `certificate`（结构同 `CertificateDetailRead`）。
 
+### 5A.3 教练定制课程（M11-06）
+
+```
+GET    /v1/users/me/coach/courses
+POST   /v1/users/me/coach/courses
+PATCH  /v1/users/me/coach/courses/{course_id}
+POST   /v1/users/me/coach/courses/{course_id}/lessons
+POST   /v1/users/me/coach/courses/{course_id}/publish
+POST   /v1/users/me/coach/courses/{course_id}/unpublish
+```
+
+**需认证** + 课程灰度开启；写端点额外要求用户 ID 在服务端 `COACH_COURSE_USER_IDS` 白名单（M8 教练认证就位前）。创建的课程 `created_by_user_id` 指向教练；发布后出现在公开 `GET /v1/courses` 列表。
+
 ---
 
 ## 六、支付模块（/payments）

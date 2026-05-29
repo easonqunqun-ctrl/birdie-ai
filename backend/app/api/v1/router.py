@@ -7,6 +7,7 @@ from app.api.v1 import (
     assets,
     auth,
     chat,
+    coach_courses,
     common,
     course_certificates,
     courses,
@@ -43,6 +44,9 @@ api_router.include_router(payments.me_router, prefix="/users/me", tags=["支付"
 api_router.include_router(courses.router, prefix="/courses", tags=["课程"])
 api_router.include_router(
     course_certificates.router, prefix="/users/me", tags=["课程"]
+)
+api_router.include_router(
+    coach_courses.router, prefix="/users/me/coach/courses", tags=["课程"]
 )
 api_router.include_router(lessons.router, prefix="/lessons", tags=["课程"])
 # M12-02 球手对比库（公开读端点）；写入仍在 service 层 / 后续 admin 工具

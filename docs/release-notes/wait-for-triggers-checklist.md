@@ -35,6 +35,7 @@
 | **M7-11-dx** | 推杆诊断 5 条已上 | M7-09 杆/球追踪 or 手腕角序列特征就位 | 补 putter-lift / 手腕翻折 / 回摆过短 / 减速/瞄准偏移 等诊断 | AI 工程 |
 | **M7-12-cal** | 切杆 pipeline 链路就位 | ECS 切杆 ≥10 段人工标注就位 | 回填 `chipping/constants.py` ideal + 验 AC-2（r≥0.65） | AI 工程 |
 | **M7-13-ui** | 多挥识别引擎链路就位（W28-W29） | 产品确认 select-swing UX + M10 训练页入口排期 | 客户端 `select-swing.tsx` + ffmpeg 缩略图 + `selected_swing_index` 回传 | 客户端 + AI 工程 |
+| **M11-06-auth** | 教练定制课程写 API 就位（白名单） | M8-01 教练认证 + 角色切换就位 | 白名单切 `is_coach` 校验；教练端课程编辑 UI（M8） | 后端 + 客户端 |
 
 ---
 
@@ -235,6 +236,19 @@
 3. 分析请求回传 `selected_swing_index`；已有引擎字段 `swing_candidates` / `50122` 无需再改
 
 > 引擎侧 W28-W29（`multi_swing.py` + full_swing 路由 + 50122 + 单测）已合；UI 与 ECS 准确率验收（AC-1/AC-3）等真实样本。
+
+### 2.16 M11-06-auth · 教练定制课程 UI + 认证切流
+
+**触发条件**（任一）：
+- [ ] M8-01 教练认证 API + 角色字段就位
+- [ ] 教练端课程编辑页排期（M8-05/06 作业与看板同批）
+
+**触发后动作**：
+1. `COACH_COURSE_USER_IDS` 白名单切 `User.is_coach` / JWT claim 校验
+2. 客户端教练端：创建 / 编辑 / 发布定制课程 UI（对接已有写端点）
+3. 学员侧课程详情标注「教练定制」来源（`created_by_user_id` 非空）
+
+> 写 API（M11-06）已合；当前仅 seed 教练 user_id 白名单可写。
 
 ---
 
