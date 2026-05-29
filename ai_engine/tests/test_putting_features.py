@@ -26,7 +26,6 @@ from app.pipeline.putting.features import extract_putting_features
 from app.pipeline.putting.phases import (
     PuttingPhaseInfo,
     PuttingPhaseResult,
-    segment_putting_phases,
 )
 
 _N = 40
@@ -157,11 +156,6 @@ def test_phase_result_rejects_missing_phase() -> None:
             handedness="right",
             fps=30.0,
         )
-
-
-def test_segment_putting_phases_is_w23_stub() -> None:
-    with pytest.raises(NotImplementedError, match="W23"):
-        segment_putting_phases()
 
 
 def test_weights_sum_to_one() -> None:
