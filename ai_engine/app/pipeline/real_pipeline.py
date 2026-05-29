@@ -36,7 +36,7 @@ from app.config import settings
 from app.pipeline.constants import PHASE_LABELS
 from app.pipeline.diagnose import DiagnosedIssue, diagnose
 from app.pipeline.features import extract_features
-from app.pipeline.phases import PhaseSegmentResult, segment_phases
+from app.pipeline.phases import PhaseSegmentResult
 from app.pipeline.pose import PoseResult, estimate_poses, quality_warnings_from_pose
 from app.pipeline.club_profiles import to_club_category
 from app.pipeline.preprocess import preprocess_video, quality_warnings_from_preprocess
@@ -54,6 +54,7 @@ from app.schemas import (
     IssueItem,
     PhaseScore,
     PhaseTimestamps,
+    SwingCandidateItem,
 )
 from app.storage import get_storage
 
@@ -142,8 +143,23 @@ async def run_real_analysis(
         },
     )
 
-    # 3. 阶段分割
-    phases = segment_phases(pose_result)
+    # 3. 阶段分割（P2-M7-13：full_swing 多挥识别 + 试挥过滤）
+    swing_candidates_out: list[SwingCandidateItem] = []
+    selected_idx: int | None = None
+    ms_warning: dict | None = None
+    from app.pipeline.multi_swing import (
+        multi_swing_engine_warning,
+        segment_phases_with_multi_swing,
+    )
+
+    phases, raw_candidates, selected_idx = segment_phases_with_multi_swing(
+        pose_result,
+        selected_swing_index=getattr(req, "selected_swing_index", None),
+    )
+    swing_candidates_out = [
+        SwingCandidateItem(**c.to_dict(fps)) for c in raw_candidates
+    ]
+    ms_warning = multi_swing_engine_warning(raw_candidates, selected_idx, fps)
 
     # 4. 特征抽取
     features = extract_features(pose_result.keypoints, phases)
@@ -261,7 +277,11 @@ async def run_real_analysis(
         thumbnail_url=thumb_url,
         duration_ms=duration_ms,
         quality_warnings=quality_warnings,
+        swing_candidates=swing_candidates_out,
+        selected_swing_index=selected_idx if raw_candidates else 0,
     )
+    if ms_warning is not None:
+        result.engine_warnings = [ms_warning]
 
     # P2-W7 ENG-B：V2 通过 enrichment_fn 把三层 confidence + engine_warnings 注入 result；
     # V1 默认 enrichment_fn=None → 不调用 → analysis_confidence=1.0 / issues 无 confidence 字段（向后兼容）

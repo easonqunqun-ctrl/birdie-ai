@@ -189,11 +189,16 @@ def _find_active_window(speeds: np.ndarray) -> tuple[int, int]:
 # ==================== 主入口 ====================
 
 
-def segment_phases(pose: PoseResult) -> PhaseSegmentResult:
+def segment_phases(
+    pose: PoseResult,
+    *,
+    swing_window: tuple[int, int] | None = None,
+) -> PhaseSegmentResult:
     """对姿态时序做六阶段分割。
 
     Args:
-        pose: 来自 `estimate_poses` 的 PoseResult
+        pose: 来自 ``estimate_poses`` 的 PoseResult
+        swing_window: P2-M7-13 多挥识别后注入 ``(swing_start, swing_end)``；``None`` 则自动检测。
 
     Returns:
         PhaseSegmentResult
@@ -221,7 +226,15 @@ def segment_phases(pose: PoseResult) -> PhaseSegmentResult:
 
     # 2. 手腕速度 + 活跃区间
     speeds = _wrist_speed(keypoints, valid_mask, lead_wrist_idx)
-    swing_start, swing_end = _find_active_window(speeds)
+    if swing_window is not None:
+        swing_start, swing_end = swing_window
+        if swing_end - swing_start < MIN_SWING_FRAMES:
+            raise NoSwingError(
+                f"指定挥杆窗口过短 {swing_end - swing_start} < {MIN_SWING_FRAMES}",
+                user_message="未检测到完整挥杆动作",
+            )
+    else:
+        swing_start, swing_end = _find_active_window(speeds)
     if swing_start < 0:
         raise NoSwingError(
             "未检测到明显挥杆动作（手腕速度全程低于阈值）",
