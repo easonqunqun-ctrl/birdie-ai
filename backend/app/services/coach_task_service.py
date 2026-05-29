@@ -190,6 +190,13 @@ async def assign_task(
     db.add(assigned)
     await db.flush()
 
+    if coach_note:
+        from app.services.content_moderation_service import moderate_coach_task_note
+
+        await moderate_coach_task_note(
+            db, assigned_id=assigned.id, coach_note=coach_note
+        )
+
     logger.info(
         "coach_task_assigned",
         assigned_id=assigned.id,
@@ -265,14 +272,21 @@ async def load_coach_refs_for_tasks(
         )
     )
     out: dict[str, tuple[str, str, int, str | None]] = {}
+    from app.services.content_moderation_service import is_coach_note_visible_to_student
+
     for assigned, display_name in rows.all():
         if not assigned.training_task_id:
             continue
+        note = assigned.coach_note
+        if note and not await is_coach_note_visible_to_student(
+            db, assigned_id=assigned.id, coach_note=note
+        ):
+            note = None
         out[assigned.training_task_id] = (
             assigned.coach_user_id,
             display_name or "教练",
             assigned.target_count,
-            assigned.coach_note,
+            note,
         )
     return out
 

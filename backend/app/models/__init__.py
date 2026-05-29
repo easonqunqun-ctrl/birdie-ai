@@ -27,6 +27,7 @@ from app.models.meetup import (
     SelfOrganizedEvent,
     Venue,
 )
+from app.models.moderation import ModerationQueue
 from app.models.payment import Order, PaymentTransaction
 from app.models.pro_library import (
     ProClipAnnotation,
@@ -65,6 +66,7 @@ __all__ = [
     "Lesson",
     "MeetupFeedback",
     "MeetupInvitation",
+    "ModerationQueue",
     "Order",
     "PaymentTransaction",
     "PracticeLog",

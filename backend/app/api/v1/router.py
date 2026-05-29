@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     admin_coach,
+    admin_moderation,
     analyses,
     assets,
     auth,
@@ -66,6 +67,7 @@ api_router.include_router(coach_students.router, prefix="/coach", tags=["教练"
 api_router.include_router(coach_tasks.router, prefix="/coach", tags=["教练"])
 api_router.include_router(coach_recap.router, prefix="/coach", tags=["教练"])
 api_router.include_router(admin_coach.router, prefix="/admin", tags=["管理"])
+api_router.include_router(admin_moderation.router, prefix="/admin", tags=["管理"])
 api_router.include_router(lessons.router, prefix="/lessons", tags=["课程"])
 # M12-02 球手对比库（公开读端点）；写入仍在 service 层 / 后续 admin 工具
 api_router.include_router(pros.router, prefix="/pros", tags=["球手对比库"])
