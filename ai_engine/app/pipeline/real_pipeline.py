@@ -38,6 +38,7 @@ from app.pipeline.diagnose import DiagnosedIssue, diagnose
 from app.pipeline.features import extract_features
 from app.pipeline.phases import PhaseSegmentResult, segment_phases
 from app.pipeline.pose import PoseResult, estimate_poses, quality_warnings_from_pose
+from app.pipeline.club_profiles import to_club_category
 from app.pipeline.preprocess import preprocess_video, quality_warnings_from_preprocess
 from app.pipeline.recommend import recommend
 from app.pipeline.scoring import score_all_phases, score_overall, weakest_phase
@@ -146,9 +147,11 @@ async def run_real_analysis(
     # 4. 特征抽取
     features = extract_features(pose_result.keypoints, phases)
 
-    # 5. 评分
+    # 5. 评分（W22：综合分按球杆类别选相位权重；iron / 未知 / putter → V1 单套兜底，
+    #    iron 套 == V1 → 7 铁报告分数接入前后不跳变。仅 driver/wood/hybrid/wedge 综合分变化。）
+    club_category = to_club_category(getattr(req, "club_type", None))
     phase_scores_int = score_all_phases(features)
-    overall = score_overall(phase_scores_int)
+    overall = score_overall(phase_scores_int, club_category=club_category)
     weakest = weakest_phase(phase_scores_int)
 
     # 6. 诊断（V1 默认 ``diagnose``；V2 灰度桶可注入 ``diagnose_v2``）

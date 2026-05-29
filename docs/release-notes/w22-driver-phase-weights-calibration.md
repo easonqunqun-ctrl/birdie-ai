@@ -55,8 +55,18 @@ iron 基线（= V1 单套 `PHASE_WEIGHTS`）：`setup .15 / backswing .20 / top 
 - `test_driver_vs_iron_differs_in_at_least_3_phases` 撤销 xfail 后转绿。
 - `make ai-engine-test` 全套绿。
 
-## 6. 待办（接入评分时）
+## 6. 接入评分进度
 
-- [ ] W22 把 `phase_weights_for_category` 接进 scoring.py（(angle, category) 二维组合）。
+- [x] **W22 把 `phase_weights_for_category` 接进 `scoring.py`**（本次）：
+  `score_overall(phase_scores, *, club_category=None)` 按球杆类别选相位权重；
+  `run_real_analysis`（V1/V2 共用入口）用 `to_club_category(req.club_type)` 派生类别传入。
+  - 行为变化范围：**仅 driver / wood / hybrid / wedge** 综合分按各自相位权重重算；
+    **iron / putter / 未知 → V1 单套兜底，分数不变**。
+  - 因评分在 V1/V2 共用主体里，**V1 路径同样生效**（即对所有 driver 用户即时生效，
+    非仅 V2 灰度桶）。如需仅灰度生效，应在 V2 注入层再加开关——当前未做，列为决策点。
+- [ ] `ideal_for_category`（M7-05 §4.2 单特征 ideal 标尺）接进 `score_phase`——
+  本次只接了相位权重维度，per-feature ideal 区间仍走 V1。
+- [ ] angle 维度（`angle_profiles.phase_weights_for` / `ideal_for_angle`）同样尚未接入 scoring；
+  kickoff 的「(angle, category) 二维笛卡尔积」需定**两维 override 的优先级**后再合并。
 - [ ] driver 报告分数纳入 V1↔V2 灰度对比，确认无异常跳变。
 - [ ] 真实 ECS 争议样本 ≥20 后，用 `scripts/calibration_regression.py` 同源思路二次校准本表。

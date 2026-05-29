@@ -10,7 +10,12 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from app.pipeline.constants import FEATURES_BY_PHASE, PHASE_ORDER, PHASE_WEIGHTS
+
+if TYPE_CHECKING:
+    from app.pipeline.club_profiles import ClubCategory
 
 
 def score_feature(
@@ -87,10 +92,29 @@ def score_phase(features: dict[str, float], phase: str) -> int:
     return int(round(total))
 
 
-def score_overall(phase_scores: dict[str, int]) -> int:
-    """综合分 = 各阶段分按 PHASE_WEIGHTS 加权。"""
+def score_overall(
+    phase_scores: dict[str, int],
+    *,
+    club_category: ClubCategory | None = None,
+) -> int:
+    """综合分 = 各阶段分按相位权重加权。
+
+    W22（``docs/release-notes/w22-driver-phase-weights-calibration.md`` 待办 #1）：
+    ``club_category`` 提供时按球杆类别选 PHASE_WEIGHTS（driver/wood/hybrid/iron/wedge），
+    让开球木等更偏重 backswing/downswing；``None`` / putter / 未知 → V1 单套
+    ``PHASE_WEIGHTS`` 兜底。**iron 套 == V1 单套**，故 7 铁报告分数 V1↔V2、接入前后均不跳变
+    （灰度安全，kickoff R-02）。
+    """
+    if club_category is None:
+        weights = PHASE_WEIGHTS
+    else:
+        # 延迟 import：club_profiles 依赖 constants，scoring 也依赖 constants，
+        # 顶层 import 会有先后耦合；函数级 import 规避且仅在传 category 时才触发。
+        from app.pipeline.club_profiles import phase_weights_for_category
+
+        weights = phase_weights_for_category(club_category)
     total = 0.0
-    for p, w in PHASE_WEIGHTS.items():
+    for p, w in weights.items():
         total += phase_scores.get(p, 0) * w
     return int(round(total))
 
