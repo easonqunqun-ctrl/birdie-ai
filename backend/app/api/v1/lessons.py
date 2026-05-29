@@ -15,6 +15,8 @@ from app.core.exceptions import NotFoundError
 from app.models.user import User
 from app.schemas.assessment import LessonAttemptRequest, LessonAttemptResponse
 from app.schemas.base import APIResponse, ok
+from app.schemas.course import CertificateDetailRead
+from app.services import course_certificate_service as cert_svc
 from app.services import course_service
 
 router = APIRouter()
@@ -39,12 +41,30 @@ async def submit_lesson_attempt(
     """用已完成 swing_analysis 参与 engine_score 考核，更新 user_course_progress."""
 
     _ensure_courses_enabled()
-    outcome, stage_upgraded, upgraded_to_stage = await course_service.submit_lesson_attempt(
-        db,
-        user_id=user.id,
-        lesson_id=lesson_id,
-        swing_analysis_id=payload.swing_analysis_id,
+    outcome, stage_upgraded, upgraded_to_stage, issued_cert = (
+        await course_service.submit_lesson_attempt(
+            db,
+            user_id=user.id,
+            lesson_id=lesson_id,
+            swing_analysis_id=payload.swing_analysis_id,
+        )
     )
+    certificate: CertificateDetailRead | None = None
+    if issued_cert is not None:
+        item = cert_svc.certificate_to_read_dict(
+            issued_cert,
+            course_title=(issued_cert.extra_metadata or {}).get("course_title", ""),
+            holder_name=(issued_cert.extra_metadata or {}).get("holder_name"),
+        )
+        if not item["course_title"]:
+            course = await course_service.get_course(db, issued_cert.course_id)
+            if course is not None:
+                item = cert_svc.certificate_to_read_dict(
+                    issued_cert,
+                    course_title=course.title,
+                    holder_name=item["holder_name"],
+                )
+        certificate = CertificateDetailRead(**item)
     await db.commit()
     return ok(
         LessonAttemptResponse(
@@ -57,5 +77,6 @@ async def submit_lesson_attempt(
             feedback=outcome.feedback,
             stage_upgraded=stage_upgraded,
             upgraded_to_stage=upgraded_to_stage,
+            certificate=certificate,
         )
     )

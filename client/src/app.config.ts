@@ -35,6 +35,7 @@ export default defineAppConfig({
     'pages/profile/favorite-venues',
     'pages/courses/index',
     'pages/courses/detail',
+    'pages/courses/certificate',
     'pages/pros/index',
     'pages/pros/detail',
     'pages/meetup/index',

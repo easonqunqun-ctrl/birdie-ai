@@ -35,6 +35,7 @@ from app.models.course import (
     UserCourseProgress,
 )
 from app.models.training import Drill
+from app.models.user import User
 from app.schemas.course import (
     CourseCreate,
     LessonCreate,
@@ -50,6 +51,10 @@ from app.services.course_assessment_service import (
     maybe_upgrade_stage,
     parse_pass_criteria,
     score_from_analysis,
+)
+from app.services.course_certificate_service import (
+    holder_display_name,
+    populate_certificate_metadata,
 )
 
 logger = get_logger("course")
@@ -315,7 +320,7 @@ async def is_course_passed(
 async def maybe_issue_certificate(
     db: AsyncSession, *, user_id: str, course_id: str
 ) -> CourseCertificate | None:
-    """通关时落证书占位行（M11-05 异步合成 cert_url）。已发过则幂等。"""
+    """通关时落证书行并写入渲染元数据（M11-05；图像由客户端 Canvas 合成）."""
 
     course = await get_course(db, course_id)
     if course is None:
@@ -334,14 +339,23 @@ async def maybe_issue_certificate(
     if cert is not None:
         return cert
 
+    user_row = await db.execute(select(User).where(User.id == user_id))
+    user = user_row.scalar_one_or_none()
+
     cert = CourseCertificate(
         id=new_id("crt"),
         user_id=user_id,
         course_id=course_id,
         stage=course.stage,
-        cert_url=None,  # 由 M11-05 异步合成回填
+        cert_url=None,
     )
     db.add(cert)
+    await db.flush()
+    populate_certificate_metadata(
+        cert,
+        course=course,
+        holder_name=holder_display_name(user),
+    )
     await db.flush()
     logger.info(
         "certificate_issued", cert_id=cert.id, user_id=user_id, course_id=course_id
@@ -478,7 +492,7 @@ async def submit_lesson_attempt(
     user_id: str,
     lesson_id: str,
     swing_analysis_id: str,
-) -> tuple[AssessmentOutcome, bool, int | None]:
+) -> tuple[AssessmentOutcome, bool, int | None, CourseCertificate | None]:
     """提交阶段考核：校验 lesson / analysis → evaluate → upsert progress → 升阶判定."""
 
     lesson = await get_lesson(db, lesson_id)
@@ -553,6 +567,7 @@ async def submit_lesson_attempt(
 
     stage_upgraded = False
     upgraded_to_stage: int | None = None
+    issued_certificate: CourseCertificate | None = None
     if outcome.passed:
         lessons = await list_lessons_by_course(db, lesson.course_id)
         lesson_ids = [item.id for item in lessons]
@@ -570,13 +585,13 @@ async def submit_lesson_attempt(
             user_progress_statuses=statuses,
         )
         if stage_upgraded:
-            await maybe_issue_certificate(
+            issued_certificate = await maybe_issue_certificate(
                 db, user_id=user_id, course_id=lesson.course_id
             )
             if course.stage < MAX_STAGE:
                 upgraded_to_stage = course.stage + 1
 
-    return outcome, stage_upgraded, upgraded_to_stage
+    return outcome, stage_upgraded, upgraded_to_stage, issued_certificate
 
 
 __all__ = [

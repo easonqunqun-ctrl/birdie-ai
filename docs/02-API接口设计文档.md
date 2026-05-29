@@ -1516,6 +1516,28 @@ GET /v1/training/calendar?month=2026-04
 
 ---
 
+## 5A、课程模块（/courses · M11，灰度 `PHASE2_COURSES_ENABLED`）
+
+> 读端点见 M11-02；考核见 M11-04。以下 M11-05 证书/勋章。
+
+### 5A.1 当前学习阶段与证书列表
+
+```
+GET /v1/users/me/course-stage
+GET /v1/users/me/certificates
+GET /v1/users/me/certificates/{cert_id}
+```
+
+**需认证**；未启用课程灰度时返回 `40406`。
+
+**course-stage 响应字段**：`current_stage`（1–7）、`earned_stages[]`、`certificates[]`（含 `course_title` / `badge_label` / `holder_name` / `stage_title`，供客户端 Canvas 合成证书图）。
+
+### 5A.2 考核升阶返回证书
+
+`POST /v1/lessons/{lesson_id}/attempt` 成功且触发升阶时，响应新增可选字段 `certificate`（结构同 `CertificateDetailRead`）。
+
+---
+
 ## 六、支付模块（/payments）
 
 ### 6.1 创建订阅订单

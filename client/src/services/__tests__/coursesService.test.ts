@@ -90,6 +90,7 @@ describe('coursesService', () => {
         feedback: '表现不错',
         stage_upgraded: false,
         upgraded_to_stage: null,
+        certificate: null,
       }),
     )
     const res = await coursesService.submitLessonAttempt('les_abc', 'sa_xyz')
@@ -99,5 +100,35 @@ describe('coursesService', () => {
     expect(sent.data).toEqual({ swing_analysis_id: 'sa_xyz' })
     expect(res.passed).toBe(true)
     expect(res.score).toBe(85)
+  })
+
+  test('myCourseStage → GET /users/me/course-stage', async () => {
+    T.request.mockResolvedValueOnce(
+      ok({ current_stage: 2, earned_stages: [1], certificates: [] }),
+    )
+    const res = await coursesService.myCourseStage()
+    expect(T.request.mock.calls[0][0].url).toMatch(/\/users\/me\/course-stage$/)
+    expect(res.current_stage).toBe(2)
+  })
+
+  test('certificateDetail → GET /users/me/certificates/{id}', async () => {
+    T.request.mockResolvedValueOnce(
+      ok({
+        id: 'crt_abc',
+        user_id: 'usr_x',
+        course_id: 'crs_x',
+        stage: 1,
+        cert_url: null,
+        issued_at: '2026-05-29T00:00:00Z',
+        revoked_at: null,
+        course_title: '入门',
+        badge_label: '入门过关',
+        holder_name: '球友',
+        stage_title: '第 1 阶 · 入门',
+      }),
+    )
+    const res = await coursesService.certificateDetail('crt_abc')
+    expect(T.request.mock.calls[0][0].url).toMatch(/\/users\/me\/certificates\/crt_abc$/)
+    expect(res.badge_label).toBe('入门过关')
   })
 })

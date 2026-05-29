@@ -127,7 +127,19 @@ const CourseDetailPage: FC = () => {
     if (result.stage_upgraded && result.upgraded_to_stage != null) {
       content += `\n恭喜升阶至第 ${result.upgraded_to_stage} 阶！`
     }
-    void Taro.showModal({ title, content, showCancel: false })
+    void Taro.showModal({
+      title,
+      content,
+      showCancel: Boolean(result.certificate),
+      cancelText: result.certificate ? '稍后查看' : undefined,
+      confirmText: result.certificate ? '查看证书' : '知道了',
+    }).then((res) => {
+      if (result.certificate && res.confirm) {
+        Taro.navigateTo({
+          url: `/pages/courses/certificate?id=${encodeURIComponent(result.certificate.id)}`,
+        })
+      }
+    })
   }
 
   const handleSubmitAssessment = async (lesson: LessonRead) => {
