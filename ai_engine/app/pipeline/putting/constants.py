@@ -21,6 +21,14 @@ from typing import TypedDict
 # 4 阶段（kickoff §3.3）：setup → backstroke → impact → follow
 PUTTING_PHASE_ORDER: list[str] = ["setup", "backstroke", "impact", "follow"]
 
+# 阶段中文展示名（报告/客户端用）
+PUTTING_PHASE_LABELS: dict[str, str] = {
+    "setup": "瞄准准备",
+    "backstroke": "回摆",
+    "impact": "击球",
+    "follow": "送杆",
+}
+
 
 class PuttingFeatureMeta(TypedDict):
     name: str

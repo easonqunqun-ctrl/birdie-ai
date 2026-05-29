@@ -31,6 +31,8 @@
 | **W18+** | 监控栈就位 | webhook-echo → 企业微信群机器人 | 改 alertmanager.yml receivers | DevOps |
 | **W18+** | probe rewrite + 自检脚本就位 | 切 COS / OSS / 第三方对象存储 | 改 env → 跑 `cos_switch_selfcheck.py` 校验 → 重启 | DevOps |
 | **W19+** | 朋友圈封面 layout 就位 | 产品决定接入 timeline 海报 | 实现 drawPosterTimeline + 接 poster.tsx | 客户端工程 |
+| **M7-11-cal** | 推杆 pipeline 链路就位（W22-W25） | ECS 推杆 ≥10 段人工标注就位 | 回填 `putting/constants.py` ideal 区间 + 验 AC-3（与教练人评 r≥0.7） | AI 工程 |
+| **M7-11-dx** | 推杆诊断 5 条已上 | M7-09 杆/球追踪 or 手腕角序列特征就位 | 补 putter-lift / 手腕翻折 / 回摆过短 / 减速击球 / 瞄准偏移 等诊断 | AI 工程 |
 
 ---
 
@@ -184,6 +186,30 @@
 1. 实现 `client/src/utils/posterCanvasTimeline.ts`（drawPosterTimeline）
 2. `pages/analysis/poster.tsx` 加「分享变体」切换器（wxa / timeline）
 3. layout 工具 + 22/22 单测已就位
+
+### 2.12 M7-11-cal · 推杆特征 ideal 区间 ECS 标定
+
+**触发条件**：
+- [ ] ECS 采集到推杆视频 ≥10 段，且每段有教练人评分（0-100）
+
+**触发后动作**：
+1. 跑现有 pipeline 抽取 4 特征（pendulum/head/face/tempo）落 CSV
+2. 用人评分回归校准 `ai_engine/app/pipeline/putting/constants.py` 里 4 特征的 `ideal_min/ideal_max/tolerance`（当前为归一化 v0.1 占位）
+3. 验 **AC-3**：putting overall 与教练人评 **r≥0.7**；不达标继续调
+
+> **注**：当前 ideal 阈值是 kickoff §3.2 px 草案改写的归一化占位，**未用任何假数据污染**（沿用 W14-C 原则）。
+
+### 2.13 M7-11-dx · 推杆诊断剩余规则
+
+**触发条件**（任一）：
+- [ ] M7-09 杆头/球追踪就位（提供杆头轨迹、putter-lift 信号）
+- [ ] 新增手腕角时序特征（wrist hinge series）
+
+**触发后动作**：
+1. 在 `ai_engine/app/pipeline/putting/diagnose.py` 补 kickoff §3.5 草案剩余项：杆头抬起 / 手腕翻折 / 回摆过短 / 减速击球 / 瞄准偏移
+2. 每条配阈值 + 单测；现有 5 条（钟摆/头部/杆面/急/慢）已上线
+
+> 当前 5 条诊断全部基于已落地的 4 特征，可上线可测；剩余项**缺信号**，不硬凑。
 
 ---
 
