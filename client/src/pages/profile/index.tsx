@@ -14,12 +14,14 @@ import {
   PHASE2_PROS_ENABLED_FLAG,
 } from '@/constants/flags'
 import type { GolfLevel, PrimaryGoal, WeeklyFreq } from '@/types/api'
+import { coachStudentsService } from '@/services/coachStudentsService'
 import './index.scss'
 
 const ProfilePage: FC = () => {
   const { user, token, initialized, logout, fetchMe, bootstrap, currentRole, setRole } =
     useUserStore()
   const [roleSwitchSaving, setRoleSwitchSaving] = useState(false)
+  const [pendingCoachInvites, setPendingCoachInvites] = useState(0)
 
   useEffect(() => {
     if (!initialized) {
@@ -30,6 +32,12 @@ const ProfilePage: FC = () => {
   // 从"编辑档案"返回时自动刷新，保证卡片展示是最新的。
   useDidShow(() => {
     if (token) fetchMe().catch(() => undefined)
+    if (token && PHASE2_COACH_ENABLED_FLAG) {
+      coachStudentsService
+        .myCoachOverview()
+        .then((data) => setPendingCoachInvites(data.pending.length))
+        .catch(() => setPendingCoachInvites(0))
+    }
   })
 
   if (!initialized) {
@@ -167,6 +175,18 @@ const ProfilePage: FC = () => {
         </View>
       )}
 
+      {PHASE2_COACH_ENABLED_FLAG && pendingCoachInvites > 0 && (
+        <View
+          className='profile__coach-banner'
+          onClick={() => Taro.navigateTo({ url: '/pages/coach-invite/index' })}
+        >
+          <Text className='profile__coach-banner-text'>
+            你有 {pendingCoachInvites} 条教练邀请待处理
+          </Text>
+          <Text className='profile__coach-banner-action'>去处理 ›</Text>
+        </View>
+      )}
+
       {user.stats && (
         <View className='profile__stats'>
           <View className='profile__stat'>
@@ -300,6 +320,36 @@ const ProfilePage: FC = () => {
             >
               <Text className='profile__menu-icon'>🎓</Text>
               <Text className='profile__menu-label'>申请成为教练</Text>
+              <Text className='profile__menu-arrow'>›</Text>
+            </View>
+          )}
+          {PHASE2_COACH_ENABLED_FLAG && user?.is_active_coach && currentRole === 'coach' && (
+            <View
+              className='profile__menu-item'
+              onClick={() => Taro.navigateTo({ url: '/pages/coach/students-invite' })}
+            >
+              <Text className='profile__menu-icon'>🧑‍🎓</Text>
+              <Text className='profile__menu-label'>邀请学员</Text>
+              <Text className='profile__menu-arrow'>›</Text>
+            </View>
+          )}
+          {PHASE2_COACH_ENABLED_FLAG && (
+            <View
+              className='profile__menu-item'
+              onClick={() => Taro.navigateTo({ url: '/pages/coach-invite/index' })}
+            >
+              <Text className='profile__menu-icon'>📩</Text>
+              <Text className='profile__menu-label'>教练邀请</Text>
+              <Text className='profile__menu-arrow'>›</Text>
+            </View>
+          )}
+          {PHASE2_COACH_ENABLED_FLAG && (
+            <View
+              className='profile__menu-item'
+              onClick={() => Taro.navigateTo({ url: '/pages/profile/coach-visibility' })}
+            >
+              <Text className='profile__menu-icon'>🔒</Text>
+              <Text className='profile__menu-label'>教练可见字段</Text>
               <Text className='profile__menu-arrow'>›</Text>
             </View>
           )}

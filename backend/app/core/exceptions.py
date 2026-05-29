@@ -164,6 +164,20 @@ class CoachVerificationRejectedError(ForbiddenError):
     message = "资质审核被驳回，请重新提交"
 
 
+class CoachStudentRelationError(ForbiddenError):
+    """M8-03 · 师生关系不存在或已结束."""
+
+    code = 40312
+    message = "师生关系不存在或已结束"
+
+
+class CoachStudentFieldNotVisibleError(ForbiddenError):
+    """M8-03 · 学员未授权教练查看此字段."""
+
+    code = 40313
+    message = "学员未授权教练查看此字段"
+
+
 class CoachRoleSwitchError(ForbiddenError):
     """M8-02 · 无法切换为教练身份."""
 

@@ -1,0 +1,60 @@
+.coach-students-invite {
+  min-height: 100%;
+  padding: 32rpx 24rpx;
+  background: var(--color-bg-page);
+  box-sizing: border-box;
+
+  &--blocked {
+    padding-top: 160rpx;
+    text-align: center;
+    color: var(--color-text-secondary);
+    font-size: 32rpx;
+  }
+
+  &__title {
+    display: block;
+    font-size: 40rpx;
+    font-weight: 700;
+    color: var(--color-primary);
+    margin-bottom: 12rpx;
+  }
+
+  &__hint {
+    display: block;
+    font-size: 28rpx;
+    color: var(--color-text-tertiary);
+    line-height: 1.5;
+    margin-bottom: 28rpx;
+  }
+
+  &__field {
+    margin-bottom: 20rpx;
+  }
+
+  &__label {
+    display: block;
+    font-size: 28rpx;
+    color: var(--color-text-secondary);
+    margin-bottom: 8rpx;
+  }
+
+  &__input {
+    background: var(--color-bg-card);
+    border: 1rpx solid var(--color-border);
+    border-radius: 16rpx;
+    padding: 18rpx 20rpx;
+    font-size: 30rpx;
+  }
+
+  &__btn {
+    margin-top: 24rpx !important;
+    background: var(--color-primary) !important;
+    color: var(--color-on-primary) !important;
+    border-radius: 20rpx !important;
+    font-weight: 700 !important;
+
+    &::after {
+      border: none !important;
+    }
+  }
+}

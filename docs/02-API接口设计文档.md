@@ -1675,6 +1675,31 @@ POST /v1/auth/role-switch    Body: { role: "user" | "coach" }
 
 **客户端**：`userService.roleSwitch()`；`userStore.setRole()` + `storage.auth_role`；`applyTabBarRole()`；「我的」页教练模式 Switch（仅 `is_active_coach` 可见）。
 
+### 5A.6 学员双向 opt-in 绑定（M8-03）
+
+```
+POST /v1/coach/students/invite              Body: { student_user_id?, invite_code?, message? }
+GET  /v1/coach/students?status=
+POST /v1/coach/students/{relation_id}/end
+GET  /v1/coach/students/{student_id}/shared-profile?field=
+
+GET  /v1/users/me/coach
+POST /v1/users/me/coach/{relation_id}/accept
+POST /v1/users/me/coach/{relation_id}/reject
+POST /v1/users/me/coach/{relation_id}/end
+PUT  /v1/users/me/coach/{relation_id}/visibility   Body: { handicap?, body?, ... }
+```
+
+**灰度**：`PHASE2_COACH_ENABLED`；教练写端点须 JWT **`role=coach`** + 已审核教练（M8-01 / seed 白名单）。
+
+**状态机**：`pending` →（学员 accept）→ `active`；`pending` →（reject）→ `ended`；`active|paused|pending` →（任一方 end）→ `ended`。
+
+**约束**：一学员同时最多 1 条 `pending|active` 关系（跨教练）；违反 → **40915**。`visibility_payload` 默认全 false；`injuries` 不可设为 true（**40010**）。
+
+**错误码**：**40312** 师生关系不存在或已结束；**40313** 学员未授权该字段；**40915** 学员已有活跃教练。
+
+**客户端**：`coachStudentsService`；`pages/coach/students-invite`；`pages/coach-invite/index`；`pages/profile/coach-visibility`；「我的」待处理邀请 banner。
+
 ---
 
 ## 5B、球手对比库（/pros · M12，灰度 `PHASE2_PROS_ENABLED`）

@@ -11,6 +11,11 @@ from app.models.user import User
 from app.models.user_profile_v2 import MAX_CLUBS_PER_USER
 from app.schemas.analysis import AnalysisProgressResponse, ScorePercentileResponse
 from app.schemas.base import APIResponse, ok
+from app.schemas.coach_student import (
+    CoachStudentRelationRead,
+    CoachStudentVisibilityUpdate,
+    StudentCoachOverviewResponse,
+)
 from app.schemas.user import (
     AccountDeletionRequest,
     OnboardingRequest,
@@ -40,6 +45,7 @@ from app.services import (
     user_profile_v2_service,
 )
 from app.services import coach_profile_service as coach_prof_svc
+from app.services import coach_student_service as csr_svc
 from app.services.profile_v2_consent import merged_update_payload
 from app.services.user_presenter import build_user_response
 
@@ -427,3 +433,80 @@ async def update_my_coach_consent(
     await db.refresh(profile)
     view = user_profile_v2_service.coach_consent_view(profile)
     return ok(CoachConsentRead.model_validate(view))
+
+
+@router.get(
+    "/me/coach",
+    summary="学员查看教练绑定概览（M8-03）",
+    response_model=APIResponse[StudentCoachOverviewResponse],
+)
+async def get_my_coach_overview(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    csr_svc.ensure_coach_module_enabled()
+    data = await csr_svc.get_student_coach_overview(db, student=user)
+    return ok(data)
+
+
+@router.post(
+    "/me/coach/{relation_id}/accept",
+    summary="学员接受教练邀请（M8-03）",
+    response_model=APIResponse[CoachStudentRelationRead],
+)
+async def accept_coach_invite(
+    relation_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    data = await csr_svc.accept_relation(db, student=user, relation_id=relation_id)
+    await db.commit()
+    return ok(data)
+
+
+@router.post(
+    "/me/coach/{relation_id}/reject",
+    summary="学员拒绝教练邀请（M8-03）",
+    response_model=APIResponse[CoachStudentRelationRead],
+)
+async def reject_coach_invite(
+    relation_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    data = await csr_svc.reject_relation(db, student=user, relation_id=relation_id)
+    await db.commit()
+    return ok(data)
+
+
+@router.post(
+    "/me/coach/{relation_id}/end",
+    summary="学员解除师生关系（M8-03）",
+    response_model=APIResponse[CoachStudentRelationRead],
+)
+async def student_end_coach_relation(
+    relation_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    data = await csr_svc.end_relation(db, user=user, relation_id=relation_id)
+    await db.commit()
+    return ok(data)
+
+
+@router.put(
+    "/me/coach/{relation_id}/visibility",
+    summary="学员更新对教练的字段可见性（M8-03）",
+    response_model=APIResponse[CoachStudentRelationRead],
+)
+async def update_coach_visibility(
+    relation_id: str,
+    payload: CoachStudentVisibilityUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    data = await csr_svc.update_visibility(
+        db, student=user, relation_id=relation_id, payload=payload
+    )
+    await db.commit()
+    return ok(data)
