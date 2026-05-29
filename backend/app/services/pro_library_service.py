@@ -45,6 +45,73 @@ from app.schemas.pro_library import (
 logger = get_logger("pro_library")
 
 
+def _stick_pose(
+    *,
+    hip_x: float = 0.5,
+    l_shoulder_y: float = 0.25,
+    r_shoulder_y: float = 0.25,
+    l_elbow_x: float = 0.38,
+    l_wrist_x: float = 0.35,
+) -> list[dict[str, float]]:
+    """M12-08 简化 9 点 stick figure（归一化坐标）."""
+
+    return [
+        {"x": 0.5, "y": 0.15},
+        {"x": 0.5, "y": 0.22},
+        {"x": 0.42, "y": l_shoulder_y},
+        {"x": 0.58, "y": r_shoulder_y},
+        {"x": l_elbow_x, "y": 0.38},
+        {"x": 0.62, "y": 0.38},
+        {"x": l_wrist_x, "y": 0.52},
+        {"x": 0.65, "y": 0.52},
+        {"x": hip_x, "y": 0.42},
+    ]
+
+
+DEMO_EVOLUTION_POSES: dict[str, dict] = {
+    "early_extension": {
+        "label": "早伸修复示意",
+        "user": _stick_pose(hip_x=0.56),
+        "pro": _stick_pose(hip_x=0.48),
+    },
+    "chicken_wing": {
+        "label": "鸡翼肘改善示意",
+        "user": _stick_pose(l_elbow_x=0.46, l_wrist_x=0.44),
+        "pro": _stick_pose(l_elbow_x=0.36, l_wrist_x=0.34),
+    },
+    "reverse_spine": {
+        "label": "脊柱回正示意",
+        "user": _stick_pose(l_shoulder_y=0.28, r_shoulder_y=0.22),
+        "pro": _stick_pose(l_shoulder_y=0.25, r_shoulder_y=0.25),
+    },
+}
+
+
+async def _ensure_demo_clip_evolution_poses(
+    db: AsyncSession, player: ProPlayer
+) -> None:
+    """幂等：demo clip 写入 M12-08 evolution_poses stub."""
+
+    row = await db.execute(
+        select(ProSwingClip)
+        .where(
+            ProSwingClip.pro_player_id == player.id,
+            ProSwingClip.is_published.is_(True),
+        )
+        .limit(1)
+    )
+    clip = row.scalar_one_or_none()
+    if clip is None:
+        return
+    snap = dict(clip.features_snapshot or {})
+    if snap.get("evolution_poses"):
+        return
+    snap["evolution_poses"] = DEMO_EVOLUTION_POSES
+    clip.features_snapshot = snap
+    await db.flush()
+    logger.info("seed_pro_evolution_poses_done", clip_id=clip.id)
+
+
 # 球手镜头 video_url 允许的域名白名单（合规 + 安全）。
 # 设计考量
 # --------
@@ -442,6 +509,7 @@ async def seed_initial_pros(db: AsyncSession) -> list[ProPlayer]:
     existing = await db.execute(select(ProPlayer).where(ProPlayer.name == name))
     player = existing.scalar_one_or_none()
     if player is not None:
+        await _ensure_demo_clip_evolution_poses(db, player)
         return [player]
 
     player = ProPlayer(
@@ -471,7 +539,11 @@ async def seed_initial_pros(db: AsyncSession) -> list[ProPlayer]:
         fps=60,
         overall_score=92,
         engine_version="v1",
-        features_snapshot={"shoulder_turn_deg": 92, "tempo_ratio": 3.1},
+        features_snapshot={
+            "shoulder_turn_deg": 92,
+            "tempo_ratio": 3.1,
+            "evolution_poses": DEMO_EVOLUTION_POSES,
+        },
         phase_timestamps={"address": 0, "top": 1200, "impact": 2200},
         license_status="public_clip",
         source_credit="Birdie Golf · internal demo (M12-02 seed)",

@@ -2,7 +2,7 @@
  * 双序列六维雷达（M12-05）：用户实线 + 职业参考虚线叠加同一网格。
  */
 
-import { FC, useEffect, useState } from 'react'
+import { FC, useEffect, useMemo, useState } from 'react'
 import { Canvas, View, Text } from '@tarojs/components'
 import Taro, { useReady } from '@tarojs/taro'
 
@@ -20,8 +20,21 @@ const DualRadarChart: FC<DualRadarChartProps> = ({
   secondaryAxes,
   primaryLabel = '你',
   secondaryLabel = '职业参考',
+  morphProgress,
 }) => {
   const [ready, setReady] = useState(false)
+  const displayPrimary = useMemo(() => {
+    if (morphProgress == null || secondaryAxes.length === 0) return primaryAxes
+    const t = Math.max(0, Math.min(1, morphProgress))
+    return primaryAxes.map((ax, i) => {
+      const target = secondaryAxes[i]?.score ?? ax.score
+      return {
+        ...ax,
+        score: Math.round(ax.score + (target - ax.score) * t),
+      }
+    })
+  }, [primaryAxes, secondaryAxes, morphProgress])
+  const showSecondary = morphProgress == null && secondaryAxes.length > 0
   useReady(() => setReady(true))
   useEffect(() => {
     if (ready) return
@@ -30,12 +43,12 @@ const DualRadarChart: FC<DualRadarChartProps> = ({
   }, [ready])
 
   useEffect(() => {
-    if (!ready || primaryAxes.length === 0) return
+    if (!ready || displayPrimary.length === 0) return
     let cancelled = false
     let attempt = 0
     const tryDraw = () => {
       if (cancelled) return
-      drawDualRadar(primaryAxes, secondaryAxes, (ok) => {
+      drawDualRadar(displayPrimary, showSecondary ? secondaryAxes : [], (ok) => {
         if (cancelled) return
         if (ok) return
         attempt += 1
@@ -47,14 +60,14 @@ const DualRadarChart: FC<DualRadarChartProps> = ({
     return () => {
       cancelled = true
     }
-  }, [primaryAxes, secondaryAxes, ready])
+  }, [displayPrimary, secondaryAxes, showSecondary, ready])
 
-  const labelPositions = computeLabelPositions(primaryAxes.length)
+  const labelPositions = computeLabelPositions(displayPrimary.length)
 
   return (
     <View className='dual-radar'>
       <Canvas type='2d' id={CANVAS_ID} canvasId={CANVAS_ID} className='dual-radar__canvas' />
-      {primaryAxes.map((ax, i) => {
+      {displayPrimary.map((ax, i) => {
         const pos = labelPositions[i]
         return (
           <View
