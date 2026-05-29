@@ -2,6 +2,7 @@ import Taro from '@tarojs/taro'
 
 const TOKEN_KEY = 'auth_token'
 const USER_KEY = 'auth_user'
+const ROLE_KEY = 'auth_role'
 const ANALYSIS_GUIDE_SEEN_KEY = 'analysis_guide_seen'
 const AGREED_TERMS_KEY = 'agreed_terms'
 
@@ -29,6 +30,16 @@ export const storage = {
   },
   clearToken(): void {
     Taro.removeStorageSync(TOKEN_KEY)
+  },
+  setRole(role: 'user' | 'coach'): void {
+    Taro.setStorageSync(ROLE_KEY, role)
+  },
+  getRole(): 'user' | 'coach' {
+    const role = Taro.getStorageSync(ROLE_KEY)
+    return role === 'coach' ? 'coach' : 'user'
+  },
+  clearRole(): void {
+    Taro.removeStorageSync(ROLE_KEY)
   },
   setUser<T>(user: T): void {
     Taro.setStorageSync(USER_KEY, user)
@@ -101,5 +112,6 @@ export const storage = {
   clearAuthSession(): void {
     Taro.removeStorageSync(TOKEN_KEY)
     Taro.removeStorageSync(USER_KEY)
+    Taro.removeStorageSync(ROLE_KEY)
   }
 }

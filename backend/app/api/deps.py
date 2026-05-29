@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.exceptions import UnauthorizedError
-from app.core.security import decode_access_token
+from app.core.security import decode_access_token, token_role
 from app.models.user import User
 from app.services.user_service import get_user_by_id
 
@@ -31,6 +31,22 @@ async def get_current_user(
     if not user_id:
         raise UnauthorizedError(code=40102, message="Token 无效")
     return await get_user_by_id(db, user_id)
+
+
+async def get_coach_role_user(
+    payload: dict = Depends(get_token_payload),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """M8-02 · ``/v1/coach/*`` 业务端点：JWT role=coach + 档案仍 active."""
+
+    from app.core.exceptions import CoachNotVerifiedError
+    from app.services.coach_profile_service import assert_active_coach
+
+    if token_role(payload) != "coach":
+        raise CoachNotVerifiedError()
+    await assert_active_coach(db, user=user)
+    return user
 
 
 async def get_current_user_optional(

@@ -164,6 +164,13 @@ class CoachVerificationRejectedError(ForbiddenError):
     message = "资质审核被驳回，请重新提交"
 
 
+class CoachRoleSwitchError(ForbiddenError):
+    """M8-02 · 无法切换为教练身份."""
+
+    code = 40320
+    message = "无法切换为教练身份"
+
+
 class ConflictError(AppException):
     """资源状态冲突（如分析尚未完成就去取报告）."""
 

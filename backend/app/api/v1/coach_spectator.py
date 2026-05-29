@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
+from app.api.deps import get_coach_role_user
 from app.core.database import get_db
 from app.models.user import User
 from app.schemas.base import APIResponse, ok
@@ -24,7 +24,7 @@ async def list_coach_student_meetups(
     student_id: str,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=50),
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_coach_role_user),
     db: AsyncSession = Depends(get_db),
 ):
     data = await spectator_svc.list_student_meetups_for_coach(

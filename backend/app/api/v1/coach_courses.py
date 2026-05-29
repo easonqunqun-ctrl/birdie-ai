@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
+from app.api.deps import get_coach_role_user
 from app.api.v1.courses import _ensure_courses_enabled
 from app.core.database import get_db
 from app.models.user import User
@@ -28,7 +28,7 @@ router = APIRouter()
     response_model=APIResponse[list[CourseRead]],
 )
 async def list_my_coach_courses(
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_coach_role_user),
     db: AsyncSession = Depends(get_db),
 ):
     _ensure_courses_enabled()
@@ -44,7 +44,7 @@ async def list_my_coach_courses(
 )
 async def create_coach_course(
     payload: CoachCourseCreate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_coach_role_user),
     db: AsyncSession = Depends(get_db),
 ):
     _ensure_courses_enabled()
@@ -61,7 +61,7 @@ async def create_coach_course(
 async def update_coach_course(
     course_id: str,
     payload: CoachCourseUpdate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_coach_role_user),
     db: AsyncSession = Depends(get_db),
 ):
     _ensure_courses_enabled()
@@ -81,7 +81,7 @@ async def update_coach_course(
 async def add_coach_course_lesson(
     course_id: str,
     payload: CoachLessonCreate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_coach_role_user),
     db: AsyncSession = Depends(get_db),
 ):
     _ensure_courses_enabled()
@@ -100,7 +100,7 @@ async def add_coach_course_lesson(
 )
 async def publish_coach_course(
     course_id: str,
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_coach_role_user),
     db: AsyncSession = Depends(get_db),
 ):
     _ensure_courses_enabled()
@@ -119,7 +119,7 @@ async def publish_coach_course(
 )
 async def unpublish_coach_course(
     course_id: str,
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_coach_role_user),
     db: AsyncSession = Depends(get_db),
 ):
     _ensure_courses_enabled()

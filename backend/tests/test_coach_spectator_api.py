@@ -19,6 +19,7 @@ from tests.meetup_test_helpers import prepare_meetup_access
 @pytest.fixture
 def meetup_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "PHASE2_MEETUP_ENABLED", True)
+    monkeypatch.setattr(settings, "PHASE2_COACH_ENABLED", True)
 
 
 @pytest.fixture
@@ -51,6 +52,18 @@ async def _login(client: AsyncClient, *, code_suffix: str) -> tuple[str, dict[st
     user_id = login.json()["data"]["user"]["id"]
     headers = {"Authorization": f"Bearer {login.json()['data']['token']}"}
     return user_id, headers
+
+
+async def _switch_coach_role(
+    client: AsyncClient, headers: dict[str, str]
+) -> dict[str, str]:
+    resp = await client.post(
+        "/v1/auth/role-switch",
+        json={"role": "coach"},
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    return {"Authorization": f"Bearer {resp.json()['data']['token']}"}
 
 
 @pytest.mark.asyncio
@@ -100,6 +113,8 @@ async def test_coach_spectator_happy_path(
     assert create.status_code == 200, create.text
     inv_id = create.json()["data"]["id"]
 
+    coach_headers = await _switch_coach_role(client, coach_headers)
+
     list_resp = await client.get(
         f"/v1/coach/students/{student_id}/meetups",
         headers=coach_headers,
@@ -134,6 +149,8 @@ async def test_coach_spectator_rejects_without_optin(
 
     await prepare_meetup_access(client, student_headers)
 
+    coach_headers = await _switch_coach_role(client, coach_headers)
+
     resp = await client.get(
         f"/v1/coach/students/{student_id}/meetups",
         headers=coach_headers,
@@ -165,6 +182,8 @@ async def test_coach_spectator_optin_revoke(
         json={"coach_spectator_optin": True},
         headers=student_headers,
     )
+
+    coach_headers = await _switch_coach_role(client, coach_headers)
 
     revoke = await client.patch(
         "/v1/meetups/safety/spectator-optin",

@@ -17,6 +17,7 @@ from app.services import coach_course_service as coach_svc
 @pytest.fixture
 def courses_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "PHASE2_COURSES_ENABLED", True)
+    monkeypatch.setattr(settings, "PHASE2_COACH_ENABLED", True)
 
 
 async def _make_user(db) -> User:
@@ -85,6 +86,14 @@ async def test_coach_course_publish_flow_api(
     user_id = login.json()["data"]["user"]["id"]
     headers = {"Authorization": f"Bearer {login.json()['data']['token']}"}
     monkeypatch.setattr(settings, "COACH_COURSE_USER_IDS", user_id)
+
+    switch = await client.post(
+        "/v1/auth/role-switch",
+        json={"role": "coach"},
+        headers=headers,
+    )
+    assert switch.status_code == 200, switch.text
+    headers = {"Authorization": f"Bearer {switch.json()['data']['token']}"}
 
     async with AsyncSessionLocal() as db:
         drill = await _make_drill(db)

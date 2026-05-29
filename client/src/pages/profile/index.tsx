@@ -1,5 +1,5 @@
-import { FC, useEffect } from 'react'
-import { View, Text, Button } from '@tarojs/components'
+import { FC, useEffect, useState } from 'react'
+import { View, Text, Button, Switch } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import EnvBadge from '@/components/EnvBadge'
 import { useUserStore } from '@/store/userStore'
@@ -17,7 +17,9 @@ import type { GolfLevel, PrimaryGoal, WeeklyFreq } from '@/types/api'
 import './index.scss'
 
 const ProfilePage: FC = () => {
-  const { user, token, initialized, logout, fetchMe, bootstrap } = useUserStore()
+  const { user, token, initialized, logout, fetchMe, bootstrap, currentRole, setRole } =
+    useUserStore()
+  const [roleSwitchSaving, setRoleSwitchSaving] = useState(false)
 
   useEffect(() => {
     if (!initialized) {
@@ -78,6 +80,27 @@ const ProfilePage: FC = () => {
     Taro.navigateTo({ url: '/pages/profile/edit' })
   }
 
+  const onCoachModeChange = async (checked: boolean) => {
+    if (roleSwitchSaving) return
+    const targetRole = checked ? 'coach' : 'user'
+    if (targetRole === currentRole) return
+    setRoleSwitchSaving(true)
+    try {
+      await setRole(targetRole)
+      Taro.showToast({
+        title: checked ? '已切换教练模式' : '已切换球友模式',
+        icon: 'none',
+      })
+    } catch (e) {
+      Taro.showToast({
+        title: e instanceof Error ? e.message : '切换失败',
+        icon: 'none',
+      })
+    } finally {
+      setRoleSwitchSaving(false)
+    }
+  }
+
   const isMember = user.is_member
   const membershipLabel = isMember
     ? `${user.membership_type === 'yearly' ? '年度' : '月度'}会员 · ${user.membership_days_remaining}天`
@@ -124,6 +147,25 @@ const ProfilePage: FC = () => {
           编辑
         </Text>
       </View>
+
+      {PHASE2_COACH_ENABLED_FLAG && user.is_active_coach && (
+        <View className='profile__section profile__role-switch'>
+          <View className='profile__role-switch-row'>
+            <View className='profile__role-switch-text'>
+              <Text className='profile__role-switch-title'>教练模式</Text>
+              <Text className='profile__role-switch-desc'>
+                开启后 TabBar 切换为教练工作台，可访问学员与教练工具
+              </Text>
+            </View>
+            <Switch
+              checked={currentRole === 'coach'}
+              disabled={roleSwitchSaving}
+              color='var(--color-primary)'
+              onChange={(e) => void onCoachModeChange(Boolean(e.detail.value))}
+            />
+          </View>
+        </View>
+      )}
 
       {user.stats && (
         <View className='profile__stats'>

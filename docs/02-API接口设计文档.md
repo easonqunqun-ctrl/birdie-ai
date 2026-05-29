@@ -279,6 +279,46 @@ POST /v1/auth/refresh-token
 }
 ```
 
+**JWT `role` claim（M8-02）**：刷新时保留原 Token 的 `role`（`user` / `coach`）；旧 Token 无 `role` 字段时视为 `user`。
+
+---
+
+### 2.2.1 切换 user/coach 身份（M8-02）
+
+```
+POST /v1/auth/role-switch
+```
+
+**需认证** + 灰度 `PHASE2_COACH_ENABLED`（未开启 → **404**，`40406`）。
+
+**请求体**：
+
+```json
+{ "role": "user | coach" }
+```
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiIs...",
+    "expires_in": 604800,
+    "role": "coach"
+  }
+}
+```
+
+**语义**：
+
+- 登录默认签发 `role=user`。
+- `role=coach` 时服务端校验 `is_active_coach`（含 seed 白名单）；失败 → **40320**。
+- 重签 JWT 后客户端须替换本地 Token，并同步 TabBar 文案（球友 `[首页, AI教练, 训练, 我的]` ↔ 教练 `[工作台, AI教练, 学员, 我的]`）。
+
+**错误码**：**40320** 无法切换为教练身份。
+
 ---
 
 ### 2.3 完成新用户引导
@@ -1621,6 +1661,20 @@ POST /v1/admin/coach/verifications/{id}/review   Body: { decision, notes? }
 
 **客户端**：`coachProfileService`；`pages/coach/apply`；加密材料上传 / 订阅通知挂 wait-for-triggers §2.16 后续项。
 
+### 5A.5 教练身份切换（M8-02）
+
+```
+POST /v1/auth/role-switch    Body: { role: "user" | "coach" }
+```
+
+**灰度**：`PHASE2_COACH_ENABLED`。
+
+**JWT**：登录 / 刷新默认 `role=user`；切换成功后重签 Token。旧 Token 无 `role` 视为 `user`。
+
+**教练业务端点门禁**：`/v1/coach/*` 写读业务（旁观、批注、定制课程等，不含 `profile/apply|me`）除 M8-01 的 `assert_active_coach` 外，JWT 须 **`role=coach`**；否则 **40310**。切换 coach 失败 → **40320**。
+
+**客户端**：`userService.roleSwitch()`；`userStore.setRole()` + `storage.auth_role`；`applyTabBarRole()`；「我的」页教练模式 Switch（仅 `is_active_coach` 可见）。
+
 ---
 
 ## 5B、球手对比库（/pros · M12，灰度 `PHASE2_PROS_ENABLED`）
@@ -2371,6 +2425,7 @@ POST /v1/events
 |---|------|------|------|------|
 | 1 | POST | /v1/auth/wechat-login | 否 | 微信登录 |
 | 2 | POST | /v1/auth/refresh-token | 是 | 刷新 Token |
+| 2a | POST | /v1/auth/role-switch | 是 | 切换 user/coach 身份（M8-02，`PHASE2_COACH_ENABLED`） |
 | 3 | POST | /v1/users/me/onboarding | 是 | 完成引导 |
 | 4 | GET | /v1/users/me | 是 | 获取用户信息 |
 | 5 | PATCH | /v1/users/me | 是 | 更新用户信息 |

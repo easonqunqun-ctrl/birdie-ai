@@ -48,13 +48,24 @@ describe('userService.wechatLogin · 端分叉', () => {
   })
 })
 
-describe('userService.refreshToken / getMe', () => {
+describe('userService.refreshToken / getMe / roleSwitch', () => {
   test('refreshToken → POST /auth/refresh-token', async () => {
     T.request.mockResolvedValueOnce(ok({ token: 't', expires_in: 7200 }))
     await userService.refreshToken()
     const sent = T.request.mock.calls[0][0]
     expect(sent.method).toBe('POST')
     expect(sent.url).toContain('/auth/refresh-token')
+  })
+
+  test('roleSwitch → POST /auth/role-switch', async () => {
+    T.request.mockResolvedValueOnce(
+      ok({ token: 'coach_jwt', expires_in: 7200, role: 'coach' }),
+    )
+    await userService.roleSwitch('coach')
+    const sent = T.request.mock.calls[0][0]
+    expect(sent.method).toBe('POST')
+    expect(sent.url).toContain('/auth/role-switch')
+    expect(sent.data).toEqual({ role: 'coach' })
   })
 
   test('getMe → GET /users/me', async () => {
