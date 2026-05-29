@@ -118,24 +118,13 @@ const AnalysisParamsPage: FC = () => {
     PHASE2_PUTTING_MODE_ENABLED_FLAG || PHASE2_CHIPPING_MODE_ENABLED_FLAG
 
   useEffect(() => {
-    if (analysisMode === 'putting' && clubType !== 'putter') {
-      Taro.showModal({
-        title: '提示',
-        content: '推杆模式建议选择推杆（putter）',
-        showCancel: false,
-        confirmText: '我知道了',
-      })
-    }
-  }, [analysisMode, clubType])
-
-  useEffect(() => {
     if (analysisMode === 'putting') {
       setClubType('putter')
       setCameraAngle('face_on')
     } else if (analysisMode === 'chipping' && clubType === 'putter') {
       setClubType('wedge')
     }
-  }, [analysisMode])
+  }, [analysisMode, clubType])
 
   // 必要参数缺失 → 直接回退到 capture
   useEffect(() => {
