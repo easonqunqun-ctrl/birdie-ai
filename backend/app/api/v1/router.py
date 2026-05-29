@@ -17,6 +17,7 @@ from app.api.v1 import (
     invitations,
     lessons,
     meetup_responses,
+    meetup_feedbacks,
     meetups,
     payments,
     pro_favorites,
@@ -59,6 +60,8 @@ api_router.include_router(pro_favorites.router, prefix="/users/me", tags=["球�
 api_router.include_router(venues.router, prefix="/venues", tags=["约球"])
 # M13-03 约球邀请创建 / 撤回 / 列表
 api_router.include_router(meetups.router, prefix="/meetups", tags=["约球"])
+api_router.include_router(meetup_feedbacks.router, prefix="/meetups", tags=["约球"])
+api_router.include_router(meetup_feedbacks.me_router, prefix="/users/me", tags=["约球"])
 api_router.include_router(meetups.me_router, prefix="/users/me", tags=["约球"])
 # M13-04 约球邀请 accept / decline
 api_router.include_router(meetup_responses.router, prefix="/meetups", tags=["约球"])

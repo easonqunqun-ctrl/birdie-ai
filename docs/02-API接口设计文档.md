@@ -1686,7 +1686,23 @@ POST   /v1/users/me/pros/favorites/{clip_id}/try-it
 
 **快照**：成功创建的邀请写入 `meetup_invitations.risk_payload`（`daily_count` / `credit_score` / `config` / `checked_at`）。
 
-**信用分**：初始 100；M13-07 互评经 `user_credit_service` 增减（`+5×(rating-3)`，`no_show -10`，`on_time +2`，clamp 0–100）。
+**信用分**：初始 100；M13-07 互评经 `user_credit_service` 增减（`+5×(rating-3)` + 标签加成，clamp 0–100）。
+
+### 5C.2 约球互评（M13-07）
+
+```
+POST /v1/meetups/feedbacks                         Body: { invitation_id, rating, tags?, comment? }
+GET  /v1/meetups/feedbacks?invitation_id={id}      24h 隔离后返回双方评分
+GET  /v1/meetups/feedbacks/eligibility?invitation_id={id}
+GET  /v1/users/me/meetup-feedbacks
+```
+
+**规则**：
+- 邀请 `accepted` 且 `accepted_at + 24h` 后可提交；`(invitation_id, reviewer_user_id)` 唯一（40904 重复）。
+- 查看对方评分：己方提交后满 24h 才返回 peer 记录（service 层强制）。
+- 标签：`on_time` +2、`friendly` +1、`patient_teaching` +2、`no_show` -10、`rude` -15（触发风控日志）。
+
+**客户端**：`meetupFeedbackService`；`pages/meetup/feedback`；详情页「去评价 / 查看互评」入口。
 
 ---
 
