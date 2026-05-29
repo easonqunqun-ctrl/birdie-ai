@@ -325,6 +325,7 @@ async def create_upload_token(
     db: AsyncSession,
     redis: Redis,
     storage: MinioStorageClient,
+    request_role: str | None = None,
 ) -> UploadTokenResponse:
     """签发一次性上传凭证。
 
@@ -345,7 +346,9 @@ async def create_upload_token(
         raise BadRequestError(code=40004, message="视频超过 30 秒，请裁剪后重试")
 
     # 2) 配额预检（不扣减）
-    await quota_service.check_analysis_quota(db, user)
+    await quota_service.check_analysis_quota(
+        db, user, request_role=request_role, redis=redis
+    )
 
     # 3) 分配 upload_id 与对象 key
     upload_id = new_id("upl")
@@ -456,6 +459,7 @@ async def create_analysis(
     db: AsyncSession,
     redis: Redis,
     storage: MinioStorageClient,
+    request_role: str | None = None,
 ) -> CreateAnalysisResponse:
     """创建分析任务：落库 + 扣配额；Celery 调度见路由层 `finalize_analysis_dispatch_after_commit`。"""
     # 1) 取凭证上下文 & 归属校验
@@ -505,7 +509,9 @@ async def create_analysis(
         )
 
     # 3) 扣配额（可能抛 QuotaExceededError）
-    await quota_service.consume_analysis_quota(db, user)
+    await quota_service.consume_analysis_quota(
+        db, user, request_role=request_role, redis=redis
+    )
 
     # 4) 创建 SwingAnalysis 记录
     analysis_id = new_id("ana")

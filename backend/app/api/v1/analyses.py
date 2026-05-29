@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, File, Query, UploadFile
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_current_user_optional
+from app.api.deps import get_current_user, get_current_user_optional, resolve_request_role
 from app.api.v1.pros import _ensure_pros_enabled
 from app.core.database import get_db
 from app.core.redis import get_redis
@@ -62,6 +62,7 @@ async def get_sample_analysis(
 async def get_upload_token(
     payload: UploadTokenRequest,
     user: User = Depends(get_current_user),
+    request_role: str = Depends(resolve_request_role),
     db: AsyncSession = Depends(get_db),
     redis: Redis = Depends(get_redis),
     storage: MinioStorageClient = Depends(get_minio_storage),
@@ -72,6 +73,7 @@ async def get_upload_token(
         db=db,
         redis=redis,
         storage=storage,
+        request_role=request_role,
     )
     await db.commit()
     return ok(result)
@@ -111,6 +113,7 @@ async def upload_analysis_video(
 async def create_analysis(
     payload: CreateAnalysisRequest,
     user: User = Depends(get_current_user),
+    request_role: str = Depends(resolve_request_role),
     db: AsyncSession = Depends(get_db),
     redis: Redis = Depends(get_redis),
     storage: MinioStorageClient = Depends(get_minio_storage),
@@ -121,6 +124,7 @@ async def create_analysis(
         db=db,
         redis=redis,
         storage=storage,
+        request_role=request_role,
     )
     await db.commit()
     await analysis_service.finalize_analysis_dispatch_after_commit(

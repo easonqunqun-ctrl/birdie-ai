@@ -49,6 +49,18 @@ async def get_coach_role_user(
     return user
 
 
+def resolve_request_role(
+    payload: dict = Depends(get_token_payload),
+    x_role: str | None = Header(default=None, alias="X-Role"),
+) -> str:
+    """M8-09 · 配额短路用角色：优先 ``X-Role``，否则 JWT ``role`` claim."""
+
+    if x_role:
+        role = x_role.strip().lower()
+        return role if role in {"user", "coach"} else "user"
+    return token_role(payload)
+
+
 async def get_current_user_optional(
     authorization: str | None = Header(default=None),
     db: AsyncSession = Depends(get_db),

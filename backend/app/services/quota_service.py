@@ -2,15 +2,19 @@
 
 from datetime import UTC, datetime, timedelta
 
+from redis.asyncio import Redis
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.core.logging import get_logger
 from app.core.security import new_id
 from app.models.analysis import AnalysisQuota
 from app.models.chat import ChatQuota
 from app.models.user import User
+
+logger = get_logger("quota")
 
 # W8-T3：「无限」对外 sentinel。前端约定 < 0 即无限，避免每个调用方
 #   各自记 9999 等魔法数。会员（quota.total = -1）和 QUOTA_MODE=unlimited
@@ -50,6 +54,37 @@ def _is_member(user: User) -> bool:
 def _is_unlimited_user(user: User) -> bool:
     """该用户是否享有无限配额（会员 / QUOTA_MODE=unlimited）."""
     return _is_unlimited_mode() or _is_member(user)
+
+
+async def _coach_quota_bypass_applies(
+    db: AsyncSession,
+    user: User,
+    *,
+    request_role: str | None,
+    quota_type: str,
+    redis: Redis | None = None,
+) -> bool:
+    if not settings.COACH_QUOTA_BYPASS_ENABLED:
+        return False
+    role = (request_role or "user").strip().lower()
+    if role != "coach":
+        return False
+    from app.services.coach_profile_service import is_active_coach
+
+    if not await is_active_coach(db, user_id=user.id):
+        return False
+    if redis is None:
+        from app.core.redis import get_redis
+
+        redis = await get_redis()
+    from app.services.coach_abuse_service import track_coach_quota_usage
+
+    await track_coach_quota_usage(redis, user_id=user.id, quota_type=quota_type)
+    logger.info(
+        "quota_skipped",
+        extra={"user_id": user.id, "role": "coach", "quota_type": quota_type},
+    )
+    return True
 
 
 # ==================== 分析配额 ====================
@@ -100,7 +135,13 @@ def analysis_remaining(quota: AnalysisQuota) -> int:
     return max(0, quota.total + quota.bonus - quota.used)
 
 
-async def check_analysis_quota(db: AsyncSession, user: User) -> AnalysisQuota:
+async def check_analysis_quota(
+    db: AsyncSession,
+    user: User,
+    *,
+    request_role: str | None = None,
+    redis: Redis | None = None,
+) -> AnalysisQuota:
     """配额预检：返回当月 quota；无剩余次数时抛 QuotaExceededError。
 
     注意：此方法**不扣减**配额，仅校验 + 初始化记录（写入当月空记录以便后续 consume）。
@@ -110,6 +151,10 @@ async def check_analysis_quota(db: AsyncSession, user: User) -> AnalysisQuota:
 
     quota = await get_or_create_analysis_quota(db, user)
     assert quota is not None  # create=True 时不会返回 None
+    if await _coach_quota_bypass_applies(
+        db, user, request_role=request_role, quota_type="analysis", redis=redis
+    ):
+        return quota
     # W8-T3：剩余 = -1（unlimited / 会员）或 > 0 都放行；
     #   "==0" 才算耗尽。原 `<= 0` 会把 -1 误判为耗尽。
     remaining = analysis_remaining(quota)
@@ -121,7 +166,13 @@ async def check_analysis_quota(db: AsyncSession, user: User) -> AnalysisQuota:
     return quota
 
 
-async def consume_analysis_quota(db: AsyncSession, user: User) -> AnalysisQuota:
+async def consume_analysis_quota(
+    db: AsyncSession,
+    user: User,
+    *,
+    request_role: str | None = None,
+    redis: Redis | None = None,
+) -> AnalysisQuota:
     """扣减一次分析配额（创建 SwingAnalysis 记录时调用）。
 
     并发保护（P0-4）：
@@ -141,6 +192,10 @@ async def consume_analysis_quota(db: AsyncSession, user: User) -> AnalysisQuota:
 
     quota = await get_or_create_analysis_quota(db, user)
     assert quota is not None
+    if await _coach_quota_bypass_applies(
+        db, user, request_role=request_role, quota_type="analysis", redis=redis
+    ):
+        return quota
     # 关键：行锁定 + 重新读取，避免并发双扣
     locked_stmt = (
         select(AnalysisQuota)
@@ -232,18 +287,34 @@ def chat_remaining(quota: ChatQuota) -> int:
     return max(0, quota.total - quota.used)
 
 
-async def check_chat_quota(db: AsyncSession, user: User) -> ChatQuota:
+async def check_chat_quota(
+    db: AsyncSession,
+    user: User,
+    *,
+    request_role: str | None = None,
+    redis: Redis | None = None,
+) -> ChatQuota:
     """消息发送前的配额预检。不足抛 ChatQuotaExhaustedError(40007)."""
     from app.core.exceptions import ChatQuotaExhaustedError
 
     quota = await get_or_create_chat_quota(db, user)
     assert quota is not None
+    if await _coach_quota_bypass_applies(
+        db, user, request_role=request_role, quota_type="chat", redis=redis
+    ):
+        return quota
     if chat_remaining(quota) == 0:
         raise ChatQuotaExhaustedError()
     return quota
 
 
-async def consume_chat_quota(db: AsyncSession, user: User) -> ChatQuota:
+async def consume_chat_quota(
+    db: AsyncSession,
+    user: User,
+    *,
+    request_role: str | None = None,
+    redis: Redis | None = None,
+) -> ChatQuota:
     """扣减一次对话配额。
 
     约定：一"轮" = 1 条 user message（无论 AI 回复是否成功）。
@@ -257,6 +328,10 @@ async def consume_chat_quota(db: AsyncSession, user: User) -> ChatQuota:
 
     quota = await get_or_create_chat_quota(db, user)
     assert quota is not None
+    if await _coach_quota_bypass_applies(
+        db, user, request_role=request_role, quota_type="chat", redis=redis
+    ):
+        return quota
     locked_stmt = (
         select(ChatQuota)
         .where(ChatQuota.id == quota.id)
