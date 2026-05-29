@@ -39,6 +39,7 @@ export default defineAppConfig({
     'pages/courses/certificate',
     'pages/pros/index',
     'pages/pros/detail',
+    'pages/pros/topic',
     'pages/meetup/index',
     'pages/meetup/detail',
     'pages/meetup/create'

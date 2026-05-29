@@ -16,10 +16,11 @@
 
 from __future__ import annotations
 
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from urllib.parse import urlparse
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import BadRequestError, NotFoundError
@@ -315,6 +316,46 @@ async def create_topic(db: AsyncSession, payload: ProTopicCreate) -> ProTopic:
     return topic
 
 
+async def get_current_published_topic(db: AsyncSession) -> ProTopic | None:
+    """返回当前生效的每周精选（``is_published`` + ``week_starts_at`` 已到期）."""
+
+    today = date.today()
+    row = await db.execute(
+        select(ProTopic)
+        .where(
+            ProTopic.is_published.is_(True),
+            or_(ProTopic.week_starts_at.is_(None), ProTopic.week_starts_at <= today),
+        )
+        .order_by(
+            ProTopic.week_starts_at.desc().nulls_last(),
+            ProTopic.published_at.desc().nulls_last(),
+            ProTopic.created_at.desc(),
+        )
+        .limit(1)
+    )
+    return row.scalar_one_or_none()
+
+
+async def load_topic_clip_items(
+    db: AsyncSession, topic: ProTopic
+) -> list[tuple[ProSwingClip, ProPlayer]]:
+    """按 ``clip_ids`` 顺序返回已发布镜头 + 在架球手；缺失 id 静默跳过."""
+
+    if not topic.clip_ids:
+        return []
+    rows = await db.execute(
+        select(ProSwingClip, ProPlayer)
+        .join(ProPlayer, ProPlayer.id == ProSwingClip.pro_player_id)
+        .where(
+            ProSwingClip.id.in_(list(topic.clip_ids)),
+            ProSwingClip.is_published.is_(True),
+            ProPlayer.is_active.is_(True),
+        )
+    )
+    by_id = {clip.id: (clip, player) for clip, player in rows.all()}
+    return [by_id[cid] for cid in topic.clip_ids if cid in by_id]
+
+
 # ---------------- 收藏 ----------------
 
 
@@ -447,6 +488,47 @@ async def seed_initial_pros(db: AsyncSession) -> list[ProPlayer]:
     return [player]
 
 
+async def seed_initial_weekly_topic(db: AsyncSession) -> ProTopic | None:
+    """开发 / E2E：幂等写入 1 条 published 每周精选，引用 demo clip."""
+
+    code = "demo_weekly_m12"
+    existing = await db.execute(select(ProTopic).where(ProTopic.code == code))
+    topic = existing.scalar_one_or_none()
+    if topic is not None:
+        return topic
+
+    await seed_initial_pros(db)
+    clip_row = await db.execute(
+        select(ProSwingClip)
+        .join(ProPlayer, ProPlayer.id == ProSwingClip.pro_player_id)
+        .where(
+            ProPlayer.name == "Demo Pro · 内置示例",
+            ProSwingClip.is_published.is_(True),
+        )
+        .limit(1)
+    )
+    clip = clip_row.scalar_one_or_none()
+    if clip is None:
+        return None
+
+    topic = await create_topic(
+        db,
+        ProTopicCreate(
+            code=code,
+            title="本周精选 · 7 号铁正面示范",
+            subtitle="跟 Demo Pro 学标准 timing",
+            summary="内置示例专题，用于 M12-06 每周精选 banner 与镜头列表联调。",
+            clip_ids=[clip.id],
+            week_starts_at=date.today(),
+            is_published=True,
+        ),
+    )
+    topic.published_at = datetime.now(UTC)
+    await db.flush()
+    logger.info("seed_initial_weekly_topic_done", topic_id=topic.id, clip_id=clip.id)
+    return topic
+
+
 __all__ = [
     "DEFAULT_PRO_CLIP_DOMAINS",
     "add_annotation",
@@ -455,11 +537,14 @@ __all__ = [
     "create_topic",
     "favorite_clip",
     "get_clip",
+    "get_current_published_topic",
     "get_player",
     "list_active_players",
     "list_published_clips",
+    "load_topic_clip_items",
     "record_match",
     "seed_initial_pros",
+    "seed_initial_weekly_topic",
     "takedown_clip",
     "unfavorite_clip",
 ]

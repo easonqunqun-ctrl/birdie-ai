@@ -1603,6 +1603,24 @@ POST   /v1/users/me/coach/courses/{course_id}/unpublish
 
 ---
 
+## 5B、球手对比库（/pros · M12，灰度 `PHASE2_PROS_ENABLED`）
+
+> 读端点：`GET /v1/pros`、`GET /v1/pros/{player_id}`、`GET /v1/pros/{player_id}/clips`（M12-02）；匹配见 §3.4d（M12-04）。
+
+### 5B.1 当前每周精选（M12-06）
+
+```
+GET /v1/pros/topics/current
+```
+
+**无需登录**；`PHASE2_PROS_ENABLED=false` → **404**（`40406`）。
+
+**语义**：返回 `is_published=true` 且 `week_starts_at` 为空或 ≤ 今日的专题中，按 `week_starts_at` / `published_at` 最新一条；`clips[]` 展开为 `{ clip, player }`（仅已发布镜头 + 在架球手）。无专题时 **`data=null`**（200，非 404）。
+
+**客户端**：`prosService.currentTopic()`；`pages/pros/index` 顶部 banner → `pages/pros/topic` 详情。
+
+---
+
 ## 六、支付模块（/payments）
 
 ### 6.1 创建订阅订单

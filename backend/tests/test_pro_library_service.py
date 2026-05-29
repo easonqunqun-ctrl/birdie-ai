@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -94,6 +95,57 @@ async def test_takedown_clip_is_idempotent() -> None:
         refreshed = await svc.get_clip(db, clip.id)
         assert refreshed is not None
         assert refreshed.is_published is False
+
+
+@pytest.mark.asyncio
+async def test_get_current_published_topic_prefers_latest_week(
+) -> None:
+    async with AsyncSessionLocal() as db:
+        player = await svc.create_player(
+            db, ProPlayerCreate(name="P", handedness="right")
+        )
+        clip = await svc.add_clip(
+            db,
+            _make_clip_payload(player.id, is_published=True),
+        )
+        older = await svc.create_topic(
+            db,
+            ProTopicCreate(
+                code=f"week_old_{new_id('x')[-6:]}",
+                title="Old",
+                clip_ids=[clip.id],
+                week_starts_at=date(2026, 1, 1),
+                is_published=True,
+            ),
+        )
+        newer = await svc.create_topic(
+            db,
+            ProTopicCreate(
+                code=f"week_new_{new_id('x')[-6:]}",
+                title="New",
+                clip_ids=[clip.id],
+                week_starts_at=date(2026, 5, 1),
+                is_published=True,
+            ),
+        )
+        await db.commit()
+
+        current = await svc.get_current_published_topic(db)
+        assert current is not None
+        assert current.id == newer.id
+        assert current.id != older.id
+
+
+@pytest.mark.asyncio
+async def test_seed_initial_weekly_topic_is_idempotent() -> None:
+    async with AsyncSessionLocal() as db:
+        await svc.seed_initial_pros(db)
+        first = await svc.seed_initial_weekly_topic(db)
+        second = await svc.seed_initial_weekly_topic(db)
+        await db.commit()
+        assert first is not None
+        assert second is not None
+        assert first.id == second.id
 
 
 @pytest.mark.asyncio

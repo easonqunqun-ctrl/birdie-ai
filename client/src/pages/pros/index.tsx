@@ -1,29 +1,34 @@
 /**
- * P2-M12-03 · 球手对比库列表页：可选球手 → 进详情看 clips。
- *
- * 灰度
- * ----
- * `PHASE2_PROS_ENABLED_FLAG=false` 时 onShow 立即退回，避免直跳链接进入。
+ * P2-M12-03 · 球手对比库列表页：每周精选 banner + 可选球手 → 进详情看 clips。
  */
 
 import { FC, useCallback, useState } from 'react'
 import { View, Text, ScrollView, Image } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { PHASE2_PROS_ENABLED_FLAG } from '@/constants/flags'
-import { prosService, type ProPlayerRead } from '@/services/prosService'
+import {
+  prosService,
+  type ProPlayerRead,
+  type ProTopicRead,
+} from '@/services/prosService'
 import './index.scss'
 
 const ProsIndexPage: FC = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [players, setPlayers] = useState<ProPlayerRead[]>([])
+  const [weeklyTopic, setWeeklyTopic] = useState<ProTopicRead | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const data = await prosService.list()
-      setPlayers(data)
+      const [playerList, topic] = await Promise.all([
+        prosService.list(),
+        prosService.currentTopic().catch(() => null),
+      ])
+      setPlayers(playerList)
+      setWeeklyTopic(topic)
     } catch (e) {
       const msg = e instanceof Error ? e.message : '加载失败'
       setError(msg)
@@ -40,6 +45,10 @@ const ProsIndexPage: FC = () => {
     }
     void load()
   })
+
+  const openWeeklyTopic = () => {
+    Taro.navigateTo({ url: '/pages/pros/topic' }).catch(() => undefined)
+  }
 
   if (!PHASE2_PROS_ENABLED_FLAG) {
     return (
@@ -68,14 +77,6 @@ const ProsIndexPage: FC = () => {
     )
   }
 
-  if (players.length === 0) {
-    return (
-      <View className='pros-list pros-list--empty'>
-        <Text>暂无球手，敬请期待</Text>
-      </View>
-    )
-  }
-
   const onTap = (player: ProPlayerRead) => {
     Taro.navigateTo({
       url: `/pages/pros/detail?id=${encodeURIComponent(player.id)}`,
@@ -84,45 +85,70 @@ const ProsIndexPage: FC = () => {
 
   return (
     <ScrollView scrollY className='pros-list'>
-      {players.map((player) => (
+      {weeklyTopic && (
         <View
-          key={player.id}
-          className='pros-list__card'
-          onClick={() => onTap(player)}
+          className='pros-list__banner'
+          onClick={openWeeklyTopic}
+          style={
+            weeklyTopic.banner_url
+              ? { backgroundImage: `url(${weeklyTopic.banner_url})` }
+              : undefined
+          }
         >
-          {player.avatar_url ? (
-            <Image
-              className='pros-list__avatar'
-              src={player.avatar_url}
-              mode='aspectFill'
-            />
-          ) : (
-            <View className='pros-list__avatar pros-list__avatar--placeholder'>
-              <Text>{player.name.slice(0, 1)}</Text>
-            </View>
+          <Text className='pros-list__banner-tag'>每周精选</Text>
+          <Text className='pros-list__banner-title'>{weeklyTopic.title}</Text>
+          {weeklyTopic.subtitle && (
+            <Text className='pros-list__banner-subtitle'>{weeklyTopic.subtitle}</Text>
           )}
-          <View className='pros-list__main'>
-            <Text className='pros-list__name'>{player.name}</Text>
-            {player.name_en && (
-              <Text className='pros-list__name-en'>{player.name_en}</Text>
-            )}
-            <View className='pros-list__meta'>
-              {player.nationality && (
-                <Text className='pros-list__meta-item'>{player.nationality}</Text>
-              )}
-              <Text className='pros-list__meta-item'>
-                {player.handedness === 'right' ? '右手' : '左手'}
-              </Text>
-              {player.height_cm && (
-                <Text className='pros-list__meta-item'>
-                  {player.height_cm}cm
-                </Text>
-              )}
-            </View>
-          </View>
-          <Text className='pros-list__arrow'>›</Text>
+          <Text className='pros-list__banner-cta'>查看专题 ›</Text>
         </View>
-      ))}
+      )}
+
+      {players.length === 0 ? (
+        <View className='pros-list__empty-inline'>
+          <Text>暂无球手，敬请期待</Text>
+        </View>
+      ) : (
+        players.map((player) => (
+          <View
+            key={player.id}
+            className='pros-list__card'
+            onClick={() => onTap(player)}
+          >
+            {player.avatar_url ? (
+              <Image
+                className='pros-list__avatar'
+                src={player.avatar_url}
+                mode='aspectFill'
+              />
+            ) : (
+              <View className='pros-list__avatar pros-list__avatar--placeholder'>
+                <Text>{player.name.slice(0, 1)}</Text>
+              </View>
+            )}
+            <View className='pros-list__main'>
+              <Text className='pros-list__name'>{player.name}</Text>
+              {player.name_en && (
+                <Text className='pros-list__name-en'>{player.name_en}</Text>
+              )}
+              <View className='pros-list__meta'>
+                {player.nationality && (
+                  <Text className='pros-list__meta-item'>{player.nationality}</Text>
+                )}
+                <Text className='pros-list__meta-item'>
+                  {player.handedness === 'right' ? '右手' : '左手'}
+                </Text>
+                {player.height_cm && (
+                  <Text className='pros-list__meta-item'>
+                    {player.height_cm}cm
+                  </Text>
+                )}
+              </View>
+            </View>
+            <Text className='pros-list__arrow'>›</Text>
+          </View>
+        ))
+      )}
     </ScrollView>
   )
 }
