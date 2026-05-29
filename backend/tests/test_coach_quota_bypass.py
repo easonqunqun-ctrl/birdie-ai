@@ -251,3 +251,34 @@ async def test_x_role_header_overrides_jwt_user(
 
     me = await client.get("/v1/users/me", headers=user_headers)
     assert me.json()["data"]["quota"]["analysis_remaining"] == 3
+
+
+@pytest.mark.asyncio
+async def test_check_then_consume_tracks_abuse_once(
+    client: AsyncClient,
+    coach_quota_enabled: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """upload-token 预检不计入日限；create 扣减时才 INCR 一次."""
+    coach_id, coach_headers = await _login(client, suffix=new_id("once")[-8:])
+    admin_id, admin_headers = await _login(client, suffix=new_id("once2")[-8:])
+    monkeypatch.setattr(settings, "ADMIN_USER_IDS", admin_id)
+    await _approve_coach(
+        client, coach_headers=coach_headers, admin_headers=admin_headers
+    )
+    monkeypatch.setattr(settings, "COACH_ANALYSIS_DAILY_LIMIT", 1)
+
+    redis = await get_redis()
+    async with AsyncSessionLocal() as db:
+        user = await get_user_by_id(db, coach_id)
+        await quota_service.check_analysis_quota(
+            db, user, request_role="coach", redis=redis
+        )
+        await quota_service.consume_analysis_quota(
+            db, user, request_role="coach", redis=redis
+        )
+        with pytest.raises(BadRequestError) as exc:
+            await quota_service.consume_analysis_quota(
+                db, user, request_role="coach", redis=redis
+            )
+        assert exc.value.code == 40001

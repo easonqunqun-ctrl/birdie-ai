@@ -56,13 +56,11 @@ def _is_unlimited_user(user: User) -> bool:
     return _is_unlimited_mode() or _is_member(user)
 
 
-async def _coach_quota_bypass_applies(
+async def _coach_quota_bypass_eligible(
     db: AsyncSession,
     user: User,
     *,
     request_role: str | None,
-    quota_type: str,
-    redis: Redis | None = None,
 ) -> bool:
     if not settings.COACH_QUOTA_BYPASS_ENABLED:
         return False
@@ -71,15 +69,28 @@ async def _coach_quota_bypass_applies(
         return False
     from app.services.coach_profile_service import is_active_coach
 
-    if not await is_active_coach(db, user_id=user.id):
+    return await is_active_coach(db, user_id=user.id)
+
+
+async def _coach_quota_bypass_applies(
+    db: AsyncSession,
+    user: User,
+    *,
+    request_role: str | None,
+    quota_type: str,
+    redis: Redis | None = None,
+    track_abuse: bool = True,
+) -> bool:
+    if not await _coach_quota_bypass_eligible(db, user, request_role=request_role):
         return False
-    if redis is None:
-        from app.core.redis import get_redis
+    if track_abuse:
+        if redis is None:
+            from app.core.redis import get_redis
 
-        redis = await get_redis()
-    from app.services.coach_abuse_service import track_coach_quota_usage
+            redis = await get_redis()
+        from app.services.coach_abuse_service import track_coach_quota_usage
 
-    await track_coach_quota_usage(redis, user_id=user.id, quota_type=quota_type)
+        await track_coach_quota_usage(redis, user_id=user.id, quota_type=quota_type)
     logger.info(
         "quota_skipped",
         extra={"user_id": user.id, "role": "coach", "quota_type": quota_type},
@@ -152,7 +163,12 @@ async def check_analysis_quota(
     quota = await get_or_create_analysis_quota(db, user)
     assert quota is not None  # create=True 时不会返回 None
     if await _coach_quota_bypass_applies(
-        db, user, request_role=request_role, quota_type="analysis", redis=redis
+        db,
+        user,
+        request_role=request_role,
+        quota_type="analysis",
+        redis=redis,
+        track_abuse=False,
     ):
         return quota
     # W8-T3：剩余 = -1（unlimited / 会员）或 > 0 都放行；
@@ -300,7 +316,12 @@ async def check_chat_quota(
     quota = await get_or_create_chat_quota(db, user)
     assert quota is not None
     if await _coach_quota_bypass_applies(
-        db, user, request_role=request_role, quota_type="chat", redis=redis
+        db,
+        user,
+        request_role=request_role,
+        quota_type="chat",
+        redis=redis,
+        track_abuse=False,
     ):
         return quota
     if chat_remaining(quota) == 0:
