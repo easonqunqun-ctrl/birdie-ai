@@ -346,7 +346,7 @@ const DRILLS: DrillDetail[] = [
   {
     drill_id: 'drill_mirror_setup',
     name: '镜子站位练习',
-    target_issue: 'setup_posture',
+    target_issue: 'loss_of_posture',
     category: 'full_swing',
     description: '对照镜子校正站姿与脊柱角。',
     duration_minutes: 15,
@@ -357,7 +357,7 @@ const DRILLS: DrillDetail[] = [
   {
     drill_id: 'drill_feet_together',
     name: '并脚平衡挥杆',
-    target_issue: 'sway',
+    target_issue: 'sway_slide',
     category: 'full_swing',
     description: '缩小支撑面，强化挥杆平衡。',
     duration_minutes: 12,
@@ -368,7 +368,7 @@ const DRILLS: DrillDetail[] = [
   {
     drill_id: 'drill_pause_top',
     name: '顶点停顿练习',
-    target_issue: 'overswing',
+    target_issue: 'over_rotation',
     category: 'full_swing',
     description: '上杆顶点多停 1 秒，改善转换顺序。',
     duration_minutes: 15,
