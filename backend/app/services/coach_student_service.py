@@ -5,12 +5,13 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.core.exceptions import NotFoundError
 from app.core.logging import get_logger
 from app.core.security import new_id
 from app.models.coach import CoachStudentRelation
 from app.models.user import User
-from app.services.coach_course_service import assert_coach_course_author
+from app.services.coach_course_service import assert_coach_course_author, coach_course_user_ids
 
 logger = get_logger("coach_student")
 
@@ -20,7 +21,14 @@ async def require_active_relation(
 ) -> CoachStudentRelation:
     """校验 active 师生关系；不存在则 404."""
 
-    assert_coach_course_author(coach)
+    if coach.id in coach_course_user_ids():
+        pass
+    elif settings.PHASE2_COACH_ENABLED:
+        from app.services.coach_profile_service import assert_active_coach
+
+        await assert_active_coach(db, user=coach)
+    else:
+        assert_coach_course_author(coach)
     row = await db.execute(
         select(CoachStudentRelation).where(
             CoachStudentRelation.coach_user_id == coach.id,

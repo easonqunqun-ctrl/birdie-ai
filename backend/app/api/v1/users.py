@@ -39,6 +39,7 @@ from app.services import (
     user_clubs_service,
     user_profile_v2_service,
 )
+from app.services import coach_profile_service as coach_prof_svc
 from app.services.profile_v2_consent import merged_update_payload
 from app.services.user_presenter import build_user_response
 
@@ -64,7 +65,17 @@ async def get_me(
     c_quota = await quota_service.get_or_create_chat_quota(db, user)
     await db.commit()
 
-    resp = build_user_response(user)
+    coach_brief = None
+    is_active = False
+    if settings.PHASE2_COACH_ENABLED:
+        coach_brief = await coach_prof_svc.get_profile_brief(db, user_id=user.id)
+        is_active = await coach_prof_svc.is_active_coach(db, user_id=user.id)
+
+    resp = build_user_response(
+        user,
+        coach_profile=coach_brief,
+        is_active_coach=is_active,
+    )
     # W8-T3：会员 / QUOTA_MODE=unlimited 都走 -1 表示无限。
     #   前端约定：值 < 0 显示"无限"，>= 0 显示具体数字。
     resp.quota = UserQuota(

@@ -6,6 +6,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.coach_profile import CoachProfileBrief
+
 GolfLevel = Literal["beginner", "elementary", "intermediate", "advanced"]
 WeeklyFreq = Literal["occasional", "once", "frequent", "daily"]
 PrimaryGoal = Literal["distance", "accuracy", "short_game", "putting", "consistency"]
@@ -108,6 +110,9 @@ class UserResponse(BaseModel):
     account_deletion_scheduled_at: datetime | None = None
     # M12-09：教练批注入口（COACH_COURSE_USER_IDS 白名单 + 灰度开启）
     can_coach_annotate: bool = False
+    # M8-01：教练档案摘要（PHASE2_COACH_ENABLED 时由 /users/me 填充）
+    coach_profile: CoachProfileBrief | None = None
+    is_active_coach: bool = False
 
 
 class AccountDeletionRequest(BaseModel):

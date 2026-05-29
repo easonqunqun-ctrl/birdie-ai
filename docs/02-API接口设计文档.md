@@ -1601,6 +1601,26 @@ POST   /v1/users/me/coach/courses/{course_id}/unpublish
 
 **需认证** + 课程灰度开启；写端点额外要求用户 ID 在服务端 `COACH_COURSE_USER_IDS` 白名单（M8 教练认证就位前）。创建的课程 `created_by_user_id` 指向教练；发布后出现在公开 `GET /v1/courses` 列表。
 
+### 5A.4 教练档案 / 资质审核（M8-01）
+
+```
+POST /v1/coach/profile/apply          Body: { display_name, level, bio?, specialties?, ... }
+GET  /v1/coach/profile/me
+
+GET  /v1/admin/coach/verifications?status=pending
+POST /v1/admin/coach/verifications/{id}/review   Body: { decision, notes? }
+```
+
+**灰度**：`PHASE2_COACH_ENABLED`；Admin 端点额外要求 `ADMIN_USER_IDS` 白名单。
+
+**状态**：`coach_profiles.status` ∈ `pending` / `active` / `rejected` / `paused`；每次申请新建 `coach_verifications` 行。
+
+**错误码**：**40310** 非已审核教练；**40311** 资质被驳回需重新提交。
+
+**`GET /v1/users/me`** 响应扩展：`coach_profile`（摘要）、`is_active_coach`（含 seed 白名单）。
+
+**客户端**：`coachProfileService`；`pages/coach/apply`；加密材料上传 / 订阅通知挂 wait-for-triggers §2.16 后续项。
+
 ---
 
 ## 5B、球手对比库（/pros · M12，灰度 `PHASE2_PROS_ENABLED`）

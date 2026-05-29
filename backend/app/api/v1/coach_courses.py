@@ -32,7 +32,7 @@ async def list_my_coach_courses(
     db: AsyncSession = Depends(get_db),
 ):
     _ensure_courses_enabled()
-    coach_svc.assert_coach_course_author(user)
+    await coach_svc.assert_coach_author(db, user)
     courses = await coach_svc.list_coach_courses(db, user.id)
     return ok([CourseRead.model_validate(c) for c in courses])
 
@@ -65,7 +65,7 @@ async def update_coach_course(
     db: AsyncSession = Depends(get_db),
 ):
     _ensure_courses_enabled()
-    coach_svc.assert_coach_course_author(user)
+    await coach_svc.assert_coach_author(db, user)
     course = await coach_svc.update_coach_course(
         db, user_id=user.id, course_id=course_id, payload=payload
     )
@@ -85,7 +85,7 @@ async def add_coach_course_lesson(
     db: AsyncSession = Depends(get_db),
 ):
     _ensure_courses_enabled()
-    coach_svc.assert_coach_course_author(user)
+    await coach_svc.assert_coach_author(db, user)
     lesson = await coach_svc.add_coach_lesson(
         db, user_id=user.id, course_id=course_id, payload=payload
     )
@@ -104,7 +104,7 @@ async def publish_coach_course(
     db: AsyncSession = Depends(get_db),
 ):
     _ensure_courses_enabled()
-    coach_svc.assert_coach_course_author(user)
+    await coach_svc.assert_coach_author(db, user)
     course = await coach_svc.publish_coach_course(
         db, user_id=user.id, course_id=course_id
     )
@@ -123,7 +123,7 @@ async def unpublish_coach_course(
     db: AsyncSession = Depends(get_db),
 ):
     _ensure_courses_enabled()
-    coach_svc.assert_coach_course_author(user)
+    await coach_svc.assert_coach_author(db, user)
     course = await coach_svc.unpublish_coach_course(
         db, user_id=user.id, course_id=course_id
     )

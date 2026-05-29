@@ -11,6 +11,7 @@
 
 import {
   PAYMENT_ENABLED_FLAG,
+  PHASE2_COACH_ENABLED_FLAG,
   PHASE2_COURSES_ENABLED_FLAG,
   PHASE2_MEETUP_ENABLED_FLAG,
   PHASE2_PROFILE_V2_ENABLED_FLAG,
@@ -24,6 +25,7 @@ describe('feature flags', () => {
       PHASE2_COURSES_ENABLED_FLAG,
       PHASE2_PROS_ENABLED_FLAG,
       PHASE2_MEETUP_ENABLED_FLAG,
+      PHASE2_COACH_ENABLED_FLAG,
     ]) {
       expect(typeof f).toBe('boolean')
     }
@@ -36,6 +38,7 @@ describe('feature flags', () => {
     expect(PHASE2_COURSES_ENABLED_FLAG).toBe(false)
     expect(PHASE2_PROS_ENABLED_FLAG).toBe(false)
     expect(PHASE2_MEETUP_ENABLED_FLAG).toBe(false)
+    expect(PHASE2_COACH_ENABLED_FLAG).toBe(false)
   })
 
   test('PAYMENT_ENABLED_FLAG is a boolean (编译期常量)', () => {
