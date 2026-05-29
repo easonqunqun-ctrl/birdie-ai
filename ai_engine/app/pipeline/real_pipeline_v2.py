@@ -66,11 +66,6 @@ from app.pipeline.pose import (
     LANDMARK_RIGHT_HIP,
     LANDMARK_RIGHT_KNEE,
     LANDMARK_RIGHT_SHOULDER,
-    LANDMARK_RIGHT_WRIST,
-)
-from app.pipeline.preprocess_v2 import (
-    TARGET_FPS_V2,
-    _ffprobe_extended,
 )
 from app.pipeline.rule_engine import (
     LOCALES_DIR,
