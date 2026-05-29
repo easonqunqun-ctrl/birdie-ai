@@ -198,6 +198,11 @@ async def assign_task(
         drill_id=drill.id,
         task_id=task.id,
     )
+    from app.services.coach_dashboard_service import invalidate_dashboard_for_coach
+
+    await invalidate_dashboard_for_coach(
+        coach_user_id=coach.id, student_user_id=payload.student_user_id
+    )
     return await _serialize_task(db, assigned, include_student=True)
 
 

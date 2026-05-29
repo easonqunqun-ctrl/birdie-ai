@@ -1,5 +1,5 @@
 /**
- * M8-03 · 教练-学员双向 opt-in 绑定 service。
+ * M8-03 / M8-06 · 教练-学员绑定 + 学员看板 service。
  */
 
 import { http } from './request'
@@ -30,6 +30,47 @@ export interface StudentCoachOverview {
   pending: CoachStudentRelationRead[]
   active: CoachStudentRelationRead | null
   paused: CoachStudentRelationRead | null
+}
+
+export interface CoachDashboardStudentItem {
+  student_user_id: string
+  display_name: string
+  avatar_url: string | null
+  relation_id: string
+  analyses_7d: number
+  last_analysis_at: string | null
+  last_annotation_at: string | null
+  pending_tasks: number
+  needs_response: boolean
+}
+
+export interface CoachDashboardListResponse {
+  students: CoachDashboardStudentItem[]
+  total: number
+  cached_at: string | null
+}
+
+export interface CoachDashboardDetailResponse extends CoachDashboardStudentItem {
+  recent_analyses: {
+    id: string
+    created_at: string
+    overall_score: number | null
+    club_type: string | null
+    status: string
+  }[]
+  recent_annotations: {
+    id: string
+    annotation_type: string
+    text_content: string | null
+    created_at: string
+  }[]
+  pending_coach_tasks: {
+    id: string
+    drill_name: string | null
+    target_count: number
+    status: string
+    created_at: string
+  }[]
 }
 
 export interface CoachStudentVisibilityUpdate {
@@ -64,6 +105,16 @@ export const coachStudentsService = {
   list(status?: CoachStudentStatus): Promise<{ items: CoachStudentRelationRead[]; total: number }> {
     const qs = status ? `?status=${encodeURIComponent(status)}` : ''
     return http.get(`/coach/students${qs}`)
+  },
+
+  dashboardList(): Promise<CoachDashboardListResponse> {
+    return http.get<CoachDashboardListResponse>('/coach/students/dashboard')
+  },
+
+  dashboardDetail(studentUserId: string): Promise<CoachDashboardDetailResponse> {
+    return http.get<CoachDashboardDetailResponse>(
+      `/coach/students/${encodeURIComponent(studentUserId)}/dashboard`,
+    )
   },
 
   endAsCoach(relationId: string): Promise<CoachStudentRelationRead> {
