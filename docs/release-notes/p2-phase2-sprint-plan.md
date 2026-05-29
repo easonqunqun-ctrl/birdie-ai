@@ -267,6 +267,7 @@
 | 2026-05-29 | **Phase D · M8-04**（报告批注）：text + video_ref；M8-03 active 师生关系守门；教练/学员 UI |
 | 2026-05-29 | **Phase D · M8-05**（作业派发）：`coach_assigned_tasks` + drill 派发 + 训练 Tab 分组 + 完成同步 |
 | 2026-05-29 | **Phase D · M8-06**（学员看板）：聚合 API + Redis 30s 缓存 + `needs_response` 排序 + 教练列表/详情 UI |
+| 2026-05-29 | **Phase D · M8-07**（教学报告）：`course_session_recaps` + LLM 汇总 + PDF 水印导出 + 教练 UI |
 | 2026-05-29 | **Phase C · M12-05 ✅**（并排叠加+雷达）：`DualRadarChart` + `pages/analysis/pro-compare`；报告页 Top-1 匹配卡片与「职业对比」入口 |
 | 2026-05-29 | **Phase C · M12-04 ✅**（和你最像匹配）：`pro_match_service` 启发式打分 + `GET /v1/analyses/{id}/pro-matches`；客户端 `prosService.matchForAnalysis()`；并排 UI 留 M12-05 |
 | 2026-05-29 | W12-1/2/3 ✅（`8578cf6` + 测试 fix）：3 块按顺序连开。W12-1 progress API 把 `engine_version`+`analysis_confidence` 落到 `AnalysisProgressPoint`，客户端 ProgressLineChart 圆点按 trust tier mint/gold/warning 着色（V1 不上色保兼容），让"我的-成长曲线"也能看出哪几次是高/低可信。W12-2 把 P2-M7-04 早就落地的 `camera_angle.py` 真接入 `_enrich_v2` / `_enrich_v2_fallback`：偏角 >15° → `ANGLE_PENALTY_BAD=0.6` 真惩罚 confidence、`angle_engine_warnings` 追加 result.engine_warnings；`run_real_analysis_v2` 末尾改成"合并"而非"覆盖"避免 angle warning 被 probe/fallback 吞。W12-3 治理 MinIO ffprobe 5XX：5xx/timeout 指数退避 retry 2 次（4xx/binary_missing 立即放弃）、URL log 脱敏去 query string、失败不再静默而是返回 `probe_failed` engine_warning 让客户端 W10 调试浮层能直接看到原因；6 个新 metrics 分桶 (`v2_probe_retries` + `v2_probe_errors_{5xx/timeout}_after_retries` + `v2_probe_errors_{4xx/binary_missing/unknown}`)。CVM 11/11 backend + 93/93 ai_engine（W7+W8+W9 全回归 + W12-2/3 新单测 38 例）+ client 550/550 jest + prod build all green |

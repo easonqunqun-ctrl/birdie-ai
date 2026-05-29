@@ -247,3 +247,37 @@ class CoachAssignedTask(Base, TimestampMixin):
         Index("idx_cat_student_week", "student_user_id", "target_week"),
         Index("idx_cat_coach_created", "coach_user_id", "created_at"),
     )
+
+
+class CourseSessionRecap(Base, TimestampMixin):
+    """教练课程教学报告（M8-07）：多学员 LLM 汇总 + PDF 导出."""
+
+    __tablename__ = "course_session_recaps"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    coach_user_id: Mapped[str] = mapped_column(
+        String(32),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    session_date: Mapped[date] = mapped_column(Date, nullable=False)
+    student_ids: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    analysis_ids: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    ai_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_summary_model: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    coach_manual_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pdf_object_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    pdf_url_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="draft", server_default="'draft'"
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('draft', 'finalized', 'exported')",
+            name="chk_recap_status",
+        ),
+        Index("idx_recap_coach_date", "coach_user_id", "session_date"),
+    )

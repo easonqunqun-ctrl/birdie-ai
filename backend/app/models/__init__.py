@@ -14,6 +14,7 @@ from app.models.coach import (
     CoachProfile,
     CoachStudentRelation,
     CoachVerification,
+    CourseSessionRecap,
 )
 from app.models.course import Course, CourseCertificate, Lesson, UserCourseProgress
 from app.models.event import Event
@@ -55,6 +56,7 @@ __all__ = [
     "CoachVerification",
     "Course",
     "CourseCertificate",
+    "CourseSessionRecap",
     "Drill",
     "Event",
     "EventParticipation",

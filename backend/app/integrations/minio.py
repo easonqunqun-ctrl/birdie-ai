@@ -144,6 +144,18 @@ class MinioStorageClient:
         """构造公网可访问的下载 URL（bucket 已设置为 public download，无需签名）."""
         return f"{self._public_endpoint.rstrip('/')}/{self.bucket}/{key}"
 
+    def presign_get_url(
+        self, key: str, *, expires_in_seconds: int = 3600
+    ) -> tuple[str, datetime]:
+        """签发 GET 预签名 URL（PDF 等私有对象临时下载）."""
+        expires_at = datetime.now(UTC) + timedelta(seconds=expires_in_seconds)
+        url = self._public.presigned_get_object(
+            self.bucket,
+            key,
+            expires=timedelta(seconds=expires_in_seconds),
+        )
+        return url, expires_at
+
 
 # -------------------- FastAPI 依赖注入入口 --------------------
 _default_client: MinioStorageClient | None = None
