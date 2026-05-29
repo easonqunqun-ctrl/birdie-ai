@@ -63,6 +63,9 @@ if (typeof globalThis.PHASE2_PROS_ENABLED === 'undefined') {
 if (typeof globalThis.PHASE2_MEETUP_ENABLED === 'undefined') {
   globalThis.PHASE2_MEETUP_ENABLED = false
 }
+if (typeof globalThis.PHASE2_COACH_ENABLED === 'undefined') {
+  globalThis.PHASE2_COACH_ENABLED = false
+}
 if (typeof globalThis.SUBSCRIBE_TEMPLATES === 'undefined') {
   globalThis.SUBSCRIBE_TEMPLATES = ''
 }
