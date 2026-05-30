@@ -213,14 +213,14 @@
 ### 2.13 M7-11-dx · 推杆诊断剩余规则
 
 **触发条件**（任一）：
-- [ ] M7-09 杆头/球追踪就位（提供杆头轨迹、putter-lift 信号）
-- [ ] 新增手腕角时序特征（wrist hinge series）
+- [x] M7-09 杆头/球追踪就位（提供杆头轨迹、putter-lift 信号）<!-- 部分：lift 仍用腕代理 -->
+- [x] 新增手腕角时序特征（wrist hinge series）<!-- TRIGGERED 2026-05-30 W20-A -->
 
 **触发后动作**：
 1. 在 `ai_engine/app/pipeline/putting/diagnose.py` 补 kickoff §3.5 草案剩余项：杆头抬起 / 手腕翻折 / 回摆过短 / 减速击球 / 瞄准偏移
 2. 每条配阈值 + 单测；现有 5 条（钟摆/头部/杆面/急/慢）已上线
 
-> 当前 5 条诊断全部基于已落地的 4 特征，可上线可测；剩余项**缺信号**，不硬凑。
+> **W20-A Done**：`signals.py` 提取 5 个时序信号 + diagnose 共 10 条 rule；`putter_lift` 仍用主腕 y 代理，M7-09 到位后可替换。
 
 ### 2.14 M7-12-cal · 切杆特征 ideal 区间 ECS 标定
 

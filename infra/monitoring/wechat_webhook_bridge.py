@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
-"""Alertmanager → 企业微信群机器人 webhook 桥接（W19-C）。
+"""Alertmanager → 企微 / PushPlus 告警桥接（W19-C）。
 
-Alertmanager 默认 webhook payload 与企业微信机器人格式不兼容；
-本服务接收 Alertmanager POST，转成 markdown 消息转发到企微。
+Alertmanager webhook payload 与企微机器人格式不兼容；本服务转成可读消息后转发。
+优先企微群机器人；无企微时可配 PushPlus，用个人微信扫码即可收告警。
 
 环境变量
 --------
-WECOM_WEBHOOK_KEY   企微群机器人 key（必填才真发；空则 dry-run 打日志）
-WECOM_WEBHOOK_PORT  监听端口，默认 9095
+WECOM_WEBHOOK_KEY    企微群机器人 key（可选）
+PUSHPLUS_TOKEN       PushPlus 用户 token（可选，https://www.pushplus.plus）
+ALERT_NOTIFY_TITLE   消息标题，默认「领翼golf 监控告警」
+WECOM_WEBHOOK_PORT   监听端口，默认 9095
 """
 
 from __future__ import annotations
@@ -25,6 +27,8 @@ log = logging.getLogger("wechat_webhook_bridge")
 
 PORT = int(os.environ.get("WECOM_WEBHOOK_PORT", "9095"))
 WEBHOOK_KEY = (os.environ.get("WECOM_WEBHOOK_KEY") or "").strip()
+PUSHPLUS_TOKEN = (os.environ.get("PUSHPLUS_TOKEN") or "").strip()
+ALERT_TITLE = (os.environ.get("ALERT_NOTIFY_TITLE") or "领翼golf 监控告警").strip()
 
 
 def _format_alert(payload: dict) -> str:
@@ -50,25 +54,82 @@ def _format_alert(payload: dict) -> str:
     return "\n".join(lines)
 
 
-def _post_to_wecom(content: str) -> tuple[int, str]:
-    if not WEBHOOK_KEY:
-        log.warning("WECOM_WEBHOOK_KEY empty; dry-run only")
-        return 200, "dry-run"
+def _plain_text(content: str) -> str:
+    return content.replace("**", "").replace("_", "")
 
-    url = f"https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key={WEBHOOK_KEY}"
-    body = json.dumps({"msgtype": "markdown", "markdown": {"content": content}}).encode("utf-8")
+
+def _post_json(url: str, payload: dict) -> tuple[int, str]:
+    body = json.dumps(payload).encode("utf-8")
     req = Request(url, data=body, headers={"Content-Type": "application/json"}, method="POST")
     try:
         with urlopen(req, timeout=10) as resp:
             raw = resp.read().decode("utf-8", errors="replace")
-            data = json.loads(raw) if raw else {}
-            if data.get("errcode") == 0:
-                return 200, "ok"
-            return 502, raw[:500]
+            return resp.status, raw[:500]
     except HTTPError as e:
         return e.code, e.read().decode("utf-8", errors="replace")[:500]
     except URLError as e:
         return 502, str(e)
+
+
+def _post_to_wecom(content: str) -> tuple[int, str]:
+    if not WEBHOOK_KEY:
+        return 0, "skip"
+
+    url = f"https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key={WEBHOOK_KEY}"
+    body = {"msgtype": "markdown", "markdown": {"content": content}}
+    code, raw = _post_json(url, body)
+    if code >= 400:
+        return code, raw
+    data = json.loads(raw) if raw else {}
+    if data.get("errcode") == 0:
+        return 200, "ok"
+    return 502, raw
+
+
+def _post_to_pushplus(content: str) -> tuple[int, str]:
+    if not PUSHPLUS_TOKEN:
+        return 0, "skip"
+
+    code, raw = _post_json(
+        "https://www.pushplus.plus/send",
+        {
+            "token": PUSHPLUS_TOKEN,
+            "title": ALERT_TITLE,
+            "content": _plain_text(content),
+            "template": "txt",
+            "channel": "wechat",
+        },
+    )
+    if code >= 400:
+        return code, raw
+    data = json.loads(raw) if raw else {}
+    if data.get("code") == 200:
+        return 200, "ok"
+    return 502, raw
+
+
+def _forward_alert(content: str) -> tuple[int, str]:
+    if not WEBHOOK_KEY and not PUSHPLUS_TOKEN:
+        log.warning("WECOM_WEBHOOK_KEY and PUSHPLUS_TOKEN both empty; dry-run only")
+        log.info("dry-run content:\n%s", content)
+        return 200, "dry-run"
+
+    results: list[tuple[str, int, str]] = []
+    for name, fn in (("wecom", _post_to_wecom), ("pushplus", _post_to_pushplus)):
+        code, detail = fn(content)
+        if code == 0:
+            continue
+        results.append((name, code, detail))
+        if code < 400:
+            log.info("%s forward ok", name)
+        else:
+            log.warning("%s forward failed: %s", name, detail)
+
+    if any(code < 400 for _, code, _ in results):
+        return 200, "ok"
+    if results:
+        return 502, "; ".join(f"{name}:{detail}" for name, _, detail in results)
+    return 200, "dry-run"
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -100,10 +161,13 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         content = _format_alert(payload)
-        code, detail = _post_to_wecom(content)
-        log.info("alert forwarded status=%s alerts=%s wecom=%s", payload.get("status"), len(payload.get("alerts") or []), code)
-        if code >= 400:
-            log.warning("wecom forward failed: %s", detail)
+        code, detail = _forward_alert(content)
+        log.info(
+            "alert forwarded status=%s alerts=%s result=%s",
+            payload.get("status"),
+            len(payload.get("alerts") or []),
+            code,
+        )
 
         self.send_response(200 if code < 400 else 502)
         self.send_header("Content-Type", "application/json")
@@ -113,7 +177,12 @@ class Handler(BaseHTTPRequestHandler):
 
 def main() -> None:
     server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
-    log.info("listening on :%s key_configured=%s", PORT, bool(WEBHOOK_KEY))
+    log.info(
+        "listening on :%s wecom=%s pushplus=%s",
+        PORT,
+        bool(WEBHOOK_KEY),
+        bool(PUSHPLUS_TOKEN),
+    )
     try:
         server.serve_forever()
     except KeyboardInterrupt:

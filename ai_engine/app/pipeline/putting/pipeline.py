@@ -57,7 +57,12 @@ async def run_putting_analysis(req: AnalyzeRequest) -> AnalyzeResult:
     phases = segment_putting_phases(pose_result)
     features = extract_putting_features(pose_result.keypoints, phases)
     scores = score_putting(features)
-    issues_raw = diagnose_putting(features, phases)
+    issues_raw = diagnose_putting(
+        features,
+        phases,
+        keypoints=pose_result.keypoints,
+        valid_mask=pose_result.valid_mask,
+    )
 
     # 7. 组装阶段分（取最弱阶段打徽章）
     phase_scores_int: dict[str, int] = scores["phases"]

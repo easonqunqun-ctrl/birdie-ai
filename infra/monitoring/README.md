@@ -45,28 +45,50 @@ ssh -L 9090:127.0.0.1:9090 -L 9093:127.0.0.1:9093 -L 9094:127.0.0.1:9094 \
 
 默认 `alertmanager.yml` 已指向 **`wechat-webhook-bridge:9095`**（同 compose profile）。
 
-1. 在企业微信群里 **添加群机器人**，复制 webhook key
-2. CVM `.env.local`（或 compose 环境）写入：
+### 方案 A · PushPlus（推荐，个人微信即可）
+
+找不到企微「群机器人」时用此方案：
+
+1. 浏览器打开 https://www.pushplus.plus ，**微信扫码登录**
+2. 首页复制 **用户 Token**
+3. CVM `.env.local` 写入：
+
+   ```bash
+   PUSHPLUS_TOKEN=你的token
+   ```
+
+4. 重启 bridge：
+
+   ```bash
+   docker compose --profile monitoring --env-file .env.local up -d wechat-webhook-bridge
+   ```
+
+5. 测试（CVM 上）：
+
+   ```bash
+   curl -s -X POST http://127.0.0.1:9095/alert \
+     -H 'Content-Type: application/json' \
+     -d '{"status":"firing","alerts":[{"labels":{"alertname":"TestAlert","severity":"warn","service":"ai_engine"},"annotations":{"summary":"PushPlus 通道测试"}}]}'
+   ```
+
+   微信应收到「领翼golf 监控告警」消息。
+
+### 方案 B · 企业微信群机器人
+
+1. **内部群**（仅本公司同事）→ 添加群机器人 → 复制 webhook key
+2. CVM `.env.local`：
 
    ```bash
    WECOM_WEBHOOK_KEY=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
    ```
 
-3. 重启监控栈：
+3. 重启：
 
    ```bash
-   docker compose --profile monitoring up -d alertmanager wechat-webhook-bridge
+   docker compose --profile monitoring --env-file .env.local up -d alertmanager wechat-webhook-bridge
    ```
 
-4. 验证 bridge 健康：
-
-   ```bash
-   curl -s http://127.0.0.1:9095/health   # → ok
-   ```
-
-5. 手工 fire 测试（可选）：Prometheus `/alerts` 里找 firing 规则，或临时调低 threshold
-
-**未配置 key 时**：bridge 仅 dry-run 打日志，不会外发企微（适合本地 profile 调试）。
+**未配置任何 key/token 时**：bridge 仅 dry-run 打日志，不会外发。
 
 本地调试 Alertmanager payload 格式仍可用 **`webhook-echo:9094`** — 把 `alertmanager.yml` receivers url 改回即可。
 

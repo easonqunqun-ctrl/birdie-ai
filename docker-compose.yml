@@ -270,6 +270,8 @@ services:
     environment:
       WECOM_WEBHOOK_PORT: "9095"
       WECOM_WEBHOOK_KEY: ${WECOM_WEBHOOK_KEY:-}
+      PUSHPLUS_TOKEN: ${PUSHPLUS_TOKEN:-}
+      ALERT_NOTIFY_TITLE: ${ALERT_NOTIFY_TITLE:-领翼golf 监控告警}
     command: ["python", "/app/wechat_webhook_bridge.py"]
     ports:
       - "127.0.0.1:9095:9095"

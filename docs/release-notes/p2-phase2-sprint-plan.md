@@ -52,8 +52,20 @@
 | **W19-A** | **朋友圈封面海报 UI** | P2-W19-A · Q-B2 | `drawPosterTimeline` + `poster.tsx` 分享变体；layout 工具已就位（W16-C） | **✅ Done**（repo） |
 | **W19-B** | **xpay 体验版闭环** | Q-B5 · P2-W19-B | mp 消息推送 + 道具 ID + `WECHAT_XPAY_ENABLED` 沙箱/现网小额冒烟；虚拟支付发货到账 | **✅ Done**（runbook + `xpay_smoke_check.py`；真机走单待体验版） |
 | **W19-C** | **Alertmanager → 企微** | P2-W19-C | 申请群机器人 webhook → 改 `alertmanager.yml` receivers（监控 runbook §4） | **✅ Done**（`wechat_webhook_bridge` + compose；CVM 填 `WECOM_WEBHOOK_KEY`） |
-| **W20-A** | **推杆诊断扩展** | P2-M7-11-dx | `putting/diagnose.py` 补 kickoff 剩余规则（依赖 M7-09 信号或手腕角时序，缺信号则跳过） | **📋 Planned** |
-| **W20-B** | **docs/21 + docs/23 入库** | DOC-P2 | 二期 PRD / 可编码规格从 kickoff 引用落地为 `docs/21` · `docs/23` 真源 | **📋 Planned** |
+| **W20-A** | **推杆诊断扩展** | P2-M7-11-dx | `putting/diagnose.py` 补 kickoff 剩余规则（依赖 M7-09 信号或手腕角时序，缺信号则跳过） | **✅ Done**（`signals.py` + 5 条时序 rule；共 10 条） |
+| **W20-B** | **docs/21 + docs/23 入库** | DOC-P2 | 二期 PRD / 可编码规格从 kickoff 引用落地为 `docs/21` · `docs/23` 真源 | **✅ Done**（v0.1 · 2026-05-30） |
+
+**W21 起开发总表**：[`p2-phase2-dev-queue.md`](./p2-phase2-dev-queue.md)（含代码审计 + Batch-A～H 全队列）
+
+| Sprint | 主题 | PLAN-ID | 交付物 | 状态 |
+|--------|------|---------|--------|------|
+| **W21** | **发版收口** | P2-W21-A～E | 体验版上传 + Phase2 smoke + xpay 冒烟 + CVM git + docs 状态回填 | **📋 Next** |
+| **W22** | **短杆闭环抛光** | M10-01/02/03/05 · M7-13-thumb | 推杆/切杆 E2E smoke · 多挥缩略图 · yardage 编辑 · 训练类目 drill | **📋 Planned** |
+| **W23** | **教练 / Pro** | M8-05/06 · M12-09 | 批注 + Pro clip 引用 smoke · 作业/ recap polish | **📋 Planned** |
+| **W24** | **观测与灰度** | V2-ROLLOUT · MON-05 · ENG-06 | V2 pct 上调 · monitoring 发版脚本 · 争议周报首填 | **📋 Planned** |
+| **W25** | **演化动画** | P2-M12-08 | poseInterpolate + SkeletonAnimation best-effort | **📋 Planned** |
+| **W26** | **Drill 内容** | M10-04 | 文案质检 + seed 补全；**视频**等拍摄 Trigger | **📋 Planned** |
+| **W27+** | **ECS / 追踪** | M7-11-cal · M7-12-cal · M7-09 | 等标注样本（[`wait-for-triggers`](./wait-for-triggers-checklist.md)） | **⏳ Trigger** |
 
 **并行泳道（不占 Sprint 主表）**：U-2 COS · Q-B5 papay（商户签约仍等触发）· O-01/O-04 性能抽测 · Q-D1 RN · ECS 标定（M7-01/11-cal/12-cal，等标注样本）
 

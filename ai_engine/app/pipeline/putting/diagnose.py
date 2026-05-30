@@ -1,34 +1,46 @@
-"""P2-M7-11 W25 · 推杆问题诊断（rule-based）。
+"""P2-M7-11 W25+W20-A · 推杆问题诊断（rule-based）。
 
 与 full_swing ``diagnose`` 同款 code-based rule（复用 ``DiagnosedIssue`` 数据结构），
-但只吃推杆 4 特征 + ``PuttingPhaseResult``。每条 rule 触发返回一个 ``DiagnosedIssue``，
-``diagnose_putting`` 统一过滤低置信度 + 按严重度排序返回 TopN。
+但只吃推杆 4 特征 + ``PuttingPhaseResult`` + 可选时序信号（``signals.py``）。
 
-已落地 5 条（全部基于现有 4 特征，可测可上线）：
-| type                       | 触发（主）                              | 依据特征 |
-|----------------------------|----------------------------------------|---------|
-| putting_unstable_pendulum  | pendulum_stability > 2×ideal_max       | 钟摆稳定度 |
-| putting_head_moved         | head_stability > 2×ideal_max           | 头部稳定度 |
-| putting_face_open          | face_alignment > 8°                     | 杆面对准 |
-| putting_rushed_tempo       | tempo_ratio < 1.5（前推过急/戳击）       | 节奏比 |
-| putting_slow_tempo         | tempo_ratio > 3.5（回摆拖沓/减速）       | 节奏比 |
+已落地 10 条：
+| type                       | 触发（主）                              | 依据 |
+|----------------------------|----------------------------------------|------|
+| putting_unstable_pendulum  | pendulum_stability > 2×ideal_max       | 4 特征 |
+| putting_head_moved         | head_stability > 2×ideal_max           | 4 特征 |
+| putting_face_open          | face_alignment > 8°                     | 4 特征 |
+| putting_rushed_tempo       | tempo_ratio < 1.5                       | 4 特征 |
+| putting_slow_tempo         | tempo_ratio > 3.5                       | 4 特征 |
+| putting_wrist_hinge        | wrist_hinge_delta > 8°                  | 时序信号 |
+| putting_short_backstroke   | backstroke_amp_ratio < 0.5              | 时序信号 |
+| putting_decel_stroke       | decel_speed_ratio < 0.8                 | 时序信号 |
+| putting_aim_off            | setup_aim_offset > 5°                   | 时序信号 |
+| putting_lift_putter        | putter_lift_norm > 阈值                 | 时序信号（腕代理杆头） |
 
-**待补（kickoff §3.5 草案剩余项）**：杆头抬起 / 手腕翻折 / 回摆过短 / 减速击球 / 瞄准偏移
-等需要杆头追踪（M7-09）或额外手腕角序列特征，登记 wait-for-triggers，W-later 落地。
+缺信号（``nan``）时对应 rule 跳过；M7-09 杆追踪到位后可替换 lift 信号。
 """
 
 from __future__ import annotations
 
 import logging
+import math
 
 from app.pipeline.diagnose import DiagnosedIssue
 from app.pipeline.putting.constants import putting_feature_meta
 from app.pipeline.putting.phases import PuttingPhaseResult
+from app.pipeline.putting.signals import (
+    DECEL_SPEED_RATIO,
+    PUTTER_LIFT_NORM,
+    SETUP_AIM_OFFSET_DEG,
+    SHORT_BACKSTROKE_RATIO,
+    WRIST_HINGE_TRIGGER_DEG,
+    extract_putting_diagnostic_signals,
+)
 
 log = logging.getLogger("ai_engine.putting.diagnose")
 
 MIN_DISPLAY_CONFIDENCE = 0.6
-MAX_ISSUES = 5
+MAX_ISSUES = 8
 
 # 推杆 issue 中文名
 PUTTING_ISSUE_NAMES: dict[str, str] = {
@@ -37,6 +49,11 @@ PUTTING_ISSUE_NAMES: dict[str, str] = {
     "putting_face_open": "杆面不正",
     "putting_rushed_tempo": "推击过急",
     "putting_slow_tempo": "节奏拖沓",
+    "putting_wrist_hinge": "手腕翻折",
+    "putting_short_backstroke": "回摆过短",
+    "putting_decel_stroke": "减速击球",
+    "putting_aim_off": "瞄准偏移",
+    "putting_lift_putter": "杆头抬起",
 }
 
 
@@ -53,7 +70,7 @@ def _frame_to_time(frame: int, fps: float) -> float | None:
 
 
 def _rule_unstable_pendulum(
-    feat: dict[str, float], phases: PuttingPhaseResult
+    feat: dict[str, float], phases: PuttingPhaseResult, _signals: dict[str, float]
 ) -> DiagnosedIssue | None:
     val = feat["pendulum_stability"]
     ideal_max = putting_feature_meta("pendulum_stability")["ideal_max"]
@@ -76,7 +93,7 @@ def _rule_unstable_pendulum(
 
 
 def _rule_head_moved(
-    feat: dict[str, float], phases: PuttingPhaseResult
+    feat: dict[str, float], phases: PuttingPhaseResult, _signals: dict[str, float]
 ) -> DiagnosedIssue | None:
     val = feat["head_stability"]
     ideal_max = putting_feature_meta("head_stability")["ideal_max"]
@@ -99,7 +116,7 @@ def _rule_head_moved(
 
 
 def _rule_face_open(
-    feat: dict[str, float], phases: PuttingPhaseResult
+    feat: dict[str, float], phases: PuttingPhaseResult, _signals: dict[str, float]
 ) -> DiagnosedIssue | None:
     val = feat["face_alignment"]
     trigger = 8.0  # ideal_max=5°，留 3° 缓冲再判异常
@@ -121,7 +138,7 @@ def _rule_face_open(
 
 
 def _rule_rushed_tempo(
-    feat: dict[str, float], phases: PuttingPhaseResult
+    feat: dict[str, float], phases: PuttingPhaseResult, _signals: dict[str, float]
 ) -> DiagnosedIssue | None:
     val = feat["tempo_ratio"]
     if val >= 1.5:
@@ -142,7 +159,7 @@ def _rule_rushed_tempo(
 
 
 def _rule_slow_tempo(
-    feat: dict[str, float], phases: PuttingPhaseResult
+    feat: dict[str, float], phases: PuttingPhaseResult, _signals: dict[str, float]
 ) -> DiagnosedIssue | None:
     val = feat["tempo_ratio"]
     if val <= 3.5:
@@ -162,12 +179,129 @@ def _rule_slow_tempo(
     )
 
 
+def _sig_val(signals: dict[str, float], key: str) -> float | None:
+    val = signals.get(key, float("nan"))
+    if val is None or not math.isfinite(val):
+        return None
+    return val
+
+
+def _rule_wrist_hinge(
+    _feat: dict[str, float], phases: PuttingPhaseResult, signals: dict[str, float]
+) -> DiagnosedIssue | None:
+    val = _sig_val(signals, "wrist_hinge_delta_deg")
+    if val is None or val <= WRIST_HINGE_TRIGGER_DEG:
+        return None
+    dev = (val - WRIST_HINGE_TRIGGER_DEG) / WRIST_HINGE_TRIGGER_DEG
+    return DiagnosedIssue(
+        type="putting_wrist_hinge",
+        name=PUTTING_ISSUE_NAMES["putting_wrist_hinge"],
+        severity=_severity(dev),
+        description=(
+            f"推杆过程中手腕角度变化约 {val:.0f}°，手腕过度翻折会破坏杆面稳定，"
+            "建议锁腕、用肩部和手臂做钟摆。"
+        ),
+        confidence=min(1.0, 0.55 + dev * 0.3),
+        key_frame_timestamp=_frame_to_time(phases.impact_frame, phases.fps),
+        metrics={"wrist_hinge_delta_deg": val},
+    )
+
+
+def _rule_short_backstroke(
+    _feat: dict[str, float], phases: PuttingPhaseResult, signals: dict[str, float]
+) -> DiagnosedIssue | None:
+    val = _sig_val(signals, "backstroke_amp_ratio")
+    if val is None or val >= SHORT_BACKSTROKE_RATIO:
+        return None
+    dev = (SHORT_BACKSTROKE_RATIO - val) / SHORT_BACKSTROKE_RATIO
+    return DiagnosedIssue(
+        type="putting_short_backstroke",
+        name=PUTTING_ISSUE_NAMES["putting_short_backstroke"],
+        severity=_severity(dev),
+        description=(
+            f"回摆幅度仅为前推的 {val * 100:.0f}%（理想至少约 50%），回摆过短难以形成稳定节奏，"
+            "建议适当加长回摆、再加速通过球。"
+        ),
+        confidence=min(1.0, 0.55 + dev * 0.3),
+        key_frame_timestamp=_frame_to_time(phases.phases["backstroke"].key_frame, phases.fps),
+        metrics={"backstroke_amp_ratio": val},
+    )
+
+
+def _rule_decel_stroke(
+    _feat: dict[str, float], phases: PuttingPhaseResult, signals: dict[str, float]
+) -> DiagnosedIssue | None:
+    val = _sig_val(signals, "decel_speed_ratio")
+    if val is None or val >= DECEL_SPEED_RATIO:
+        return None
+    dev = (DECEL_SPEED_RATIO - val) / DECEL_SPEED_RATIO
+    return DiagnosedIssue(
+        type="putting_decel_stroke",
+        name=PUTTING_ISSUE_NAMES["putting_decel_stroke"],
+        severity=_severity(dev),
+        description=(
+            "送杆阶段速度明显低于回摆（疑似减速推击），球容易推短或方向不稳，"
+            "建议保持杆头加速通过球、送杆自然延伸。"
+        ),
+        confidence=min(1.0, 0.55 + dev * 0.3),
+        key_frame_timestamp=_frame_to_time(phases.phases["follow"].key_frame, phases.fps),
+        metrics={"decel_speed_ratio": val},
+    )
+
+
+def _rule_aim_off(
+    _feat: dict[str, float], phases: PuttingPhaseResult, signals: dict[str, float]
+) -> DiagnosedIssue | None:
+    val = _sig_val(signals, "setup_aim_offset_deg")
+    if val is None or val <= SETUP_AIM_OFFSET_DEG:
+        return None
+    dev = (val - SETUP_AIM_OFFSET_DEG) / SETUP_AIM_OFFSET_DEG
+    return DiagnosedIssue(
+        type="putting_aim_off",
+        name=PUTTING_ISSUE_NAMES["putting_aim_off"],
+        severity=_severity(dev),
+        description=(
+            f"瞄准时杆面与最终推击方向偏差约 {val:.0f}°，瞄准线未对齐会推偏，"
+            "建议站位时先对齐杆面与目标线再启动钟摆。"
+        ),
+        confidence=min(1.0, 0.55 + dev * 0.3),
+        key_frame_timestamp=_frame_to_time(phases.phases["setup"].key_frame, phases.fps),
+        metrics={"setup_aim_offset_deg": val},
+    )
+
+
+def _rule_lift_putter(
+    _feat: dict[str, float], phases: PuttingPhaseResult, signals: dict[str, float]
+) -> DiagnosedIssue | None:
+    val = _sig_val(signals, "putter_lift_norm")
+    if val is None or val <= PUTTER_LIFT_NORM:
+        return None
+    dev = (val - PUTTER_LIFT_NORM) / PUTTER_LIFT_NORM
+    return DiagnosedIssue(
+        type="putting_lift_putter",
+        name=PUTTING_ISSUE_NAMES["putting_lift_putter"],
+        severity=_severity(dev),
+        description=(
+            "送杆过程中杆头（以主腕代理）有明显上抬，容易挑球或节奏中断，"
+            "建议保持杆头低平通过球、沿地面延伸送杆。"
+        ),
+        confidence=min(1.0, 0.55 + dev * 0.25),
+        key_frame_timestamp=_frame_to_time(phases.phases["follow"].key_frame, phases.fps),
+        metrics={"putter_lift_norm": val},
+    )
+
+
 _RULES = [
     _rule_unstable_pendulum,
     _rule_head_moved,
     _rule_face_open,
     _rule_rushed_tempo,
     _rule_slow_tempo,
+    _rule_wrist_hinge,
+    _rule_short_backstroke,
+    _rule_decel_stroke,
+    _rule_aim_off,
+    _rule_lift_putter,
 ]
 
 
@@ -175,14 +309,23 @@ def diagnose_putting(
     features: dict[str, float],
     phases: PuttingPhaseResult,
     *,
+    signals: dict[str, float] | None = None,
+    keypoints=None,
+    valid_mask=None,
     min_confidence: float = MIN_DISPLAY_CONFIDENCE,
     max_issues: int = MAX_ISSUES,
 ) -> list[DiagnosedIssue]:
     """跑所有推杆 rule，过滤低置信度，按严重度→置信度排序返回 TopN。"""
+    sig = signals
+    if sig is None and keypoints is not None:
+        sig = extract_putting_diagnostic_signals(keypoints, phases, valid_mask)
+    if sig is None:
+        sig = {}
+
     issues: list[DiagnosedIssue] = []
     for rule in _RULES:
         try:
-            res = rule(features, phases)
+            res = rule(features, phases, sig)
         except Exception as exc:  # pragma: no cover
             log.warning("putting_rule_error", extra={"rule": rule.__name__, "error": str(exc)})
             continue
