@@ -26,6 +26,8 @@ export interface DrillDetail {
   reps?: number
   /** 步骤（有序） */
   steps: string[]
+  /** 教练提示（W26 · 可选） */
+  tips?: string[]
   /** 难度（前端卡片右上角徽章） */
   difficulty: '入门' | '进阶' | '高级'
   /** M10-04：训练类目 */
@@ -264,6 +266,7 @@ const DRILLS: DrillDetail[] = [
     duration_minutes: 15,
     sets: 3,
     difficulty: '入门',
+    tips: ['握压约 3/10，避免手指单独发力', '推完停留 1 秒再抬头看球线'],
     steps: ['非主导手背后', '主导手推 10 球', '关注肩臂一体'],
   },
   {
@@ -386,6 +389,66 @@ const DRILLS: DrillDetail[] = [
     sets: 3,
     difficulty: '进阶',
     steps: ['正常上杆', '击球后迈步', '10 球一组'],
+  },
+  {
+    drill_id: 'drill_wrist_lock_putt',
+    name: '锁腕推杆',
+    target_issue: 'putting_wrist_hinge',
+    category: 'putting',
+    description: '固定手腕角度，让肩部钟摆主导推击。',
+    duration_minutes: 12,
+    sets: 3,
+    difficulty: '入门',
+    tips: ['可在推杆握把处贴胶带作手腕角度参照', '若球左右乱飞，先缩短距离再恢复'],
+    steps: ['短推 1 米，手腕角度保持不变', '推击时只动肩臂', '每组 10 球记录偏离'],
+  },
+  {
+    drill_id: 'drill_backstroke_pause',
+    name: '回摆停顿推杆',
+    target_issue: 'putting_decel_stroke',
+    category: 'putting',
+    description: '回摆到位后短暂停顿，再加速通过球。',
+    duration_minutes: 15,
+    sets: 3,
+    difficulty: '进阶',
+    tips: ['停顿是为了确认回摆长度，不是刻意减速击球', '送杆长度应与回摆大致对称'],
+    steps: ['上杆到舒适幅度后停 0.5 秒', '下杆加速通过球', '同距离推 10 球'],
+  },
+  {
+    drill_id: 'drill_alignment_chip',
+    name: '对准线切杆',
+    target_issue: 'chipping_alignment_off',
+    category: 'chipping',
+    description: '用地面参照线校正脚线、球位与目标线。',
+    duration_minutes: 12,
+    sets: 3,
+    difficulty: '入门',
+    tips: ['先练方向再练距离', '杆面与目标线垂直时初始方向更稳'],
+    steps: ['地面贴杆作目标线', '脚线与目标线平行', '切 10 球观察方向'],
+  },
+  {
+    drill_id: 'drill_accelerate_through',
+    name: '加速通过切杆',
+    target_issue: 'chipping_decel',
+    category: 'chipping',
+    description: '强调触球后杆头仍向目标加速，避免减速或挑球。',
+    duration_minutes: 15,
+    sets: 3,
+    difficulty: '进阶',
+    tips: ['减速击球常伴随挑球，先练低弹道滚进', '想象杆头要「穿过」球而非「舀」球'],
+    steps: ['上杆至腰高以内', '触球后杆头向目标加速', '送杆时胸朝向目标'],
+  },
+  {
+    drill_id: 'drill_string_line_putt',
+    name: '绳线瞄准推杆',
+    target_issue: 'putting_aim_off',
+    category: 'putting',
+    description: '用地面绳线校准推杆线与目标线，减少瞄准偏差。',
+    duration_minutes: 12,
+    sets: 3,
+    difficulty: '入门',
+    tips: ['先练 1 米直推再加长', '杆头路径比杆面更重要时，先对齐脚线与目标线'],
+    steps: ['洞与球位之间拉绳作目标线', '推杆头沿目标线通过', '同距离推 10 球记录偏离'],
   },
 ]
 

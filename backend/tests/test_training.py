@@ -42,11 +42,12 @@ async def test_drills_endpoint_returns_seeded_rows(
     resp = await client.get("/v1/drills", headers=auth_headers)
     assert resp.status_code == 200, resp.text
     drills = resp.json()["data"]
-    assert len(drills) == 29
+    assert len(drills) == 30
     ids = {d["id"] for d in drills}
     assert "drill_towel_arm" in ids
     assert "drill_grip_checkpoint" in ids
     assert "drill_wrist_lock_putt" in ids
+    assert "drill_string_line_putt" in ids
     # 静态业务字段完整
     towel = next(d for d in drills if d["id"] == "drill_towel_arm")
     assert "casting" in towel["target_issues"]
