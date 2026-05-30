@@ -169,6 +169,7 @@ def diagnose_v2(
     features: dict[str, float],
     phases: PhaseSegmentResult | None = None,
     *,
+    camera_angle: str | None = None,
     min_confidence: float = MIN_DISPLAY_CONFIDENCE,
     max_issues: int = MAX_ISSUES,
     engine: RuleEngine | None = None,
@@ -177,19 +178,29 @@ def diagnose_v2(
 ) -> list[DiagnosedIssue]:
     """V2 诊断主入口：YAML 规则 + i18n locale → DiagnosedIssue。
 
-    与 V1 ``diagnose`` 签名一致；report assembly 不需要分支。
-
-    - ``confidences`` 缺省时所有规则置 1.0；W34 接 P2-M7-06 后由 issue_confidence 填充
-    - ``phases`` 用于按 ``phase_anchor`` 填 ``key_frame_timestamp``；缺省时该字段为 None
+    - ``camera_angle`` 非空时，关联特征在该机位不可测的规则直接跳过（避免 DTL 误报转肩不足等）
+    - ``confidences`` 缺省时所有规则置 1.0
+    - ``phases`` 用于按 ``phase_anchor`` 填 ``key_frame_timestamp``
     """
+    from app.pipeline.feature_measurability import (
+        MIN_MEASURABILITY_TO_DIAGNOSE,
+        issue_measurability,
+    )
+
     rules_engine = engine or RuleEngine(rules=_get_rules())
     loc = locale if locale is not None else _get_locale()
+    rules_by_name = {r.name: r for r in rules_engine.rules}
 
     rule_confs = confidences or {r.name: 1.0 for r in rules_engine.rules}
     results = rules_engine.diagnose(features, confidences=rule_confs)
 
     issues: list[DiagnosedIssue] = []
     for res in results:
+        rule = rules_by_name.get(res.type)
+        if rule is not None and rule.conditions and camera_angle is not None:
+            feat_names = [c.feature for c in rule.conditions]
+            if issue_measurability(feat_names, camera_angle) < MIN_MEASURABILITY_TO_DIAGNOSE:  # type: ignore[arg-type]
+                continue
         try:
             fallback = issue_meta(res.type)["name"]
         except KeyError:
@@ -493,6 +504,12 @@ def _enrich_v2(result: AnalyzeResult, ctx) -> None:
     # Layer 2 — 每 issue confidence + tier（精算 td）
     rules = _get_rules()
     rules_by_name = {r.name: r for r in rules}
+    declared_angle = getattr(ctx, "declared_camera_angle", None)
+    from app.pipeline.feature_measurability import (
+        MIN_MEASURABILITY_TO_SCORE,
+        issue_measurability,
+    )
+
     for issue in result.issues:
         rule = rules_by_name.get(issue.type)
         if rule is None or not rule.conditions:
@@ -506,6 +523,11 @@ def _enrich_v2(result: AnalyzeResult, ctx) -> None:
             conf = issue_confidence(feats_for_issue, threshold_distance=td)
         issue.confidence = round(conf, 3)
         issue.confidence_tier = issue_tier(conf)
+        if rule is not None and rule.conditions:
+            feat_names = [c.feature for c in rule.conditions]
+            if issue_measurability(feat_names, declared_angle) < MIN_MEASURABILITY_TO_SCORE:
+                issue.confidence_tier = "hidden"
+                issue.confidence = min(issue.confidence or 0.0, 0.45)
 
     # P2-W12-2 · 机位独立标尺：M7-04 已落地（camera_angle.py），把 offset_deg 真正
     # 喂给 compute_analysis_confidence；>15° 偏角 angle_penalty=0.6（confidence.py

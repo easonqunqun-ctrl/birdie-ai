@@ -42,6 +42,7 @@ from app.pipeline.club_profiles import to_club_category
 from app.pipeline.preprocess import preprocess_video, quality_warnings_from_preprocess
 from app.pipeline.recommend import recommend
 from app.pipeline.scoring import score_all_phases, score_overall, weakest_phase
+from app.pipeline.scoring_narrative import build_phase_highlights
 from app.pipeline.visualize import (
     dump_pose_parquet,
     extract_issue_keyframes,
@@ -129,8 +130,11 @@ async def run_real_analysis(
         },
     )
 
-    # 2. 姿态估计
+    # 2. 姿态估计 + 关键点时域降噪（减少单帧跳变污染特征）
     pose_result = estimate_poses(pre.normalized_video_path)
+    from app.pipeline.pose_denoise import denoise_pose_result
+
+    pose_result = denoise_pose_result(pose_result)
     quality_warnings = _merge_quality_warnings(
         quality_warnings_from_preprocess(pre),
         quality_warnings_from_pose(pose_result),
@@ -161,28 +165,68 @@ async def run_real_analysis(
     ]
     ms_warning = multi_swing_engine_warning(raw_candidates, selected_idx, fps)
 
-    # 4. 特征抽取
+    # 4. 特征抽取 + 机位可测性预处理（P2 评分护城河）
     features = extract_features(pose_result.keypoints, phases)
-
-    # 5. 评分（W22：``club_aware_scoring`` 仅由 V2 入口打开，搭 version_router 灰度爬坡；
-    #    V1 默认 False → 两 profile 维度都 None → 阶段分用 V1 ideal、综合分用单套 PHASE_WEIGHTS，
-    #    生产路径字节不变。打开时按 (机位, 球杆类别) 二维合成 per-feature ideal（阶段分）+
-    #    相位权重（综合分）：ideal 优先级 category>angle>V1；权重 = V1+两维 delta 叠加。
-    #    iron+无机位==V1；真实分析机位必填，故 V2 桶分数会带机位 delta（仅灰度桶）。)
     club_category = (
         to_club_category(getattr(req, "club_type", None)) if club_aware_scoring else None
     )
     camera_angle = getattr(req, "camera_angle", None) if club_aware_scoring else None
+    from app.pipeline.feature_measurability import sanitize_features, scoring_quality_warnings
+    from app.pipeline.scoring import collect_skipped_features_for_scoring
+
+    features, sanitize_warnings = sanitize_features(
+        features, camera_angle=camera_angle  # type: ignore[arg-type]
+    )
+    quality_warnings = _merge_quality_warnings(quality_warnings, sanitize_warnings)
+    if camera_angle is not None:
+        from app.pipeline.feature_measurability import WARN_ANGLE_LIMITED_SCORING
+
+        skipped = collect_skipped_features_for_scoring(
+            features, camera_angle=camera_angle  # type: ignore[arg-type]
+        )
+        quality_warnings = _merge_quality_warnings(
+            quality_warnings,
+            scoring_quality_warnings(camera_angle, skipped),  # type: ignore[arg-type]
+        )
+        if sanitize_warnings and WARN_ANGLE_LIMITED_SCORING not in quality_warnings:
+            quality_warnings = _merge_quality_warnings(
+                quality_warnings, [WARN_ANGLE_LIMITED_SCORING]
+            )
+
+    # 5. 计分前特征置信度（V2：低置信维度不参与计分）
+    feature_confidences_for_score = None
+    if club_aware_scoring:
+        from app.pipeline.feature_confidence_map import compute_feature_confidences
+
+        feature_confidences_for_score = compute_feature_confidences(pose_result, phases)
+
+    # 6. 评分（W22：``club_aware_scoring`` 仅由 V2 入口打开，搭 version_router 灰度爬坡；
+    #    V1 默认 False → 两 profile 维度都 None → 阶段分用 V1 ideal、综合分用单套 PHASE_WEIGHTS，
+    #    生产路径字节不变。打开时按 (机位, 球杆类别) 二维合成 per-feature ideal（阶段分）+
+    #    相位权重（综合分）：ideal 优先级 category>angle>V1；权重 = V1+两维 delta 叠加。
+    #    iron+无机位==V1；真实分析机位必填，故 V2 桶分数会带机位 delta（仅灰度桶）。)
     phase_scores_int = score_all_phases(
-        features, club_category=club_category, camera_angle=camera_angle
+        features,
+        club_category=club_category,
+        camera_angle=camera_angle,
+        feature_confidences=feature_confidences_for_score,
     )
     overall = score_overall(
-        phase_scores_int, club_category=club_category, camera_angle=camera_angle
+        phase_scores_int,
+        club_category=club_category,
+        camera_angle=camera_angle,
+        features=features,
+        feature_confidences=feature_confidences_for_score,
     )
     weakest = weakest_phase(phase_scores_int)
 
     # 6. 诊断（V1 默认 ``diagnose``；V2 灰度桶可注入 ``diagnose_v2``）
-    issues_raw = diagnose_impl(features, phases)
+    if camera_angle is not None:
+        issues_raw = diagnose_impl(
+            features, phases, camera_angle=camera_angle  # type: ignore[call-arg]
+        )
+    else:
+        issues_raw = diagnose_impl(features, phases)
 
     # 7. 推荐
     recommendations = recommend(issues_raw)
@@ -277,6 +321,11 @@ async def run_real_analysis(
         thumbnail_url=thumb_url,
         duration_ms=duration_ms,
         quality_warnings=quality_warnings,
+        phase_highlights=(
+            build_phase_highlights(phase_scores_int, quality_warnings=quality_warnings)
+            if club_aware_scoring
+            else []
+        ),
         swing_candidates=swing_candidates_out,
         selected_swing_index=selected_idx if raw_candidates else 0,
     )
@@ -304,6 +353,24 @@ async def run_real_analysis(
                 "enrichment_fn_failed",
                 extra={"analysis_id": req.analysis_id, "err": repr(exc)},
             )
+        else:
+            if club_aware_scoring:
+                from app.pipeline.score_trust import calibrate_trusted_overall
+
+                calibrated, trust_warnings = calibrate_trusted_overall(
+                    result.overall_score or 0,
+                    phase_scores_int,
+                    feature_confidences=result.feature_confidences
+                    or feature_confidences_for_score,
+                    analysis_confidence=result.analysis_confidence or 1.0,
+                    quality_warnings=quality_warnings,
+                    camera_angle=camera_angle,
+                )
+                result.overall_score = calibrated
+                if trust_warnings:
+                    result.quality_warnings = _merge_quality_warnings(
+                        result.quality_warnings or [], trust_warnings
+                    )
 
     return result
 

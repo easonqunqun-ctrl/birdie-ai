@@ -2,10 +2,14 @@
 
 三层函数：
 - `score_feature(value, ideal_min, ideal_max, tolerance)` → int[0,100]
-- `score_phase(features, phase)` → int[0,100]（阶段内加权）
+- `score_phase(features, phase)` → int[0,100]（阶段内加权；机位可测性重归一化）
 - `score_overall(phase_scores)` → int[0,100]（阶段间加权，由 PHASE_WEIGHTS 决定）
 
-加上一个 `weakest_phase(phase_scores) → str` 帮 UI 打"最弱项"徽章。
+P2 护城河（feature_measurability.py）
+------------------------------------
+- 机位下不可测的特征不参与该阶段计分（权重重归一化）。
+- 阶段内无可测特征 → 中性 50 分（禁止误伤为 0）。
+- 有可测特征时阶段分不低于 PHASE_SCORE_FLOOR。
 """
 
 from __future__ import annotations
@@ -13,6 +17,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from app.pipeline.constants import FEATURES_BY_PHASE, PHASE_ORDER, PHASE_WEIGHTS
+from app.pipeline.feature_measurability import (
+    MIN_MEASURABILITY_TO_SCORE,
+    PHASE_NEUTRAL_SCORE,
+    PHASE_SCORE_FLOOR,
+    measurability,
+    phase_has_scorable_features,
+)
+from app.pipeline.score_trust import MIN_FEATURE_CONFIDENCE_TO_SCORE
 
 if TYPE_CHECKING:
     from app.pipeline.angle_profiles import CameraAngleEnum
@@ -70,51 +82,70 @@ def score_phase(
     *,
     club_category: ClubCategory | None = None,
     camera_angle: CameraAngleEnum | None = None,
+    feature_confidences: dict[str, float] | None = None,
 ) -> int:
-    """阶段分 = 该阶段内各特征分加权之和。
-
-    Args:
-        features: {name: value}，至少覆盖该阶段的所有特征（缺失记为 0 分）
-        phase: phase key
-        club_category: 球杆类别（W22 待办 #2）。
-        camera_angle: 机位（W22 待办 #3）。
-            ``club_category`` / ``camera_angle`` 任一非空时，per-feature ideal 区间走
-            二维合成 ``score_profiles.resolve_ideal``（优先级 category > angle > V1）；
-            两者均 ``None`` → V1 单套 ideal（``constants.FEATURES``）。
-            **iron / 未 override 的特征都回落 V1**，故灰度安全。tolerance / weight 仍取
-            ``constants.FEATURES``，本期只标定 ideal 区间维度。
-
-    Returns:
-        0-100
-    """
+    """阶段分 = 该阶段内各**可测且高置信**特征分加权之和（权重重归一化）。"""
     phase_feats = FEATURES_BY_PHASE.get(phase, [])
     if not phase_feats:
         return 0
 
     resolve = None
     if club_category is not None or camera_angle is not None:
-        # 延迟 import：避免 score_profiles ↔ constants 顶层耦合，仅传 profile 时触发。
         from app.pipeline.score_profiles import resolve_ideal
 
         resolve = resolve_ideal
 
-    total = 0.0
+    weighted_sum = 0.0
+    weight_total = 0.0
     for meta in phase_feats:
-        if meta["name"] not in features:
-            s = 0
+        name = meta["name"]
+        meas = measurability(name, camera_angle)
+        if meas < MIN_MEASURABILITY_TO_SCORE:
+            continue
+        if feature_confidences is not None:
+            fc = feature_confidences.get(name, 0.0)
+            if fc < MIN_FEATURE_CONFIDENCE_TO_SCORE:
+                continue
+        if name not in features:
+            continue
+        if resolve is not None:
+            ideal_min, ideal_max = resolve(name, camera_angle, club_category)
         else:
-            if resolve is not None:
-                ideal_min, ideal_max = resolve(meta["name"], camera_angle, club_category)
-            else:
-                ideal_min, ideal_max = meta["ideal_min"], meta["ideal_max"]
-            s = score_feature(
-                features[meta["name"]],
-                ideal_min,
-                ideal_max,
-                meta["tolerance"],
-            )
-        total += s * meta["weight"]
-    return int(round(total))
+            ideal_min, ideal_max = meta["ideal_min"], meta["ideal_max"]
+        s = score_feature(
+            features[name],
+            ideal_min,
+            ideal_max,
+            meta["tolerance"],
+        )
+        w = meta["weight"] * meas
+        weighted_sum += s * w
+        weight_total += w
+
+    if weight_total <= 0:
+        return PHASE_NEUTRAL_SCORE
+
+    phase_score = int(round(weighted_sum / weight_total))
+    if phase_score < PHASE_SCORE_FLOOR:
+        phase_score = PHASE_SCORE_FLOOR
+    return phase_score
+
+
+def collect_skipped_features_for_scoring(
+    features: dict[str, float],
+    *,
+    camera_angle: CameraAngleEnum | None,
+) -> set[str]:
+    """计分时会跳过的特征名（供 quality_warnings / issue 过滤）。"""
+    skipped: set[str] = set()
+    for phase in PHASE_ORDER:
+        for meta in FEATURES_BY_PHASE.get(phase, []):
+            name = meta["name"]
+            if name not in features:
+                continue
+            if measurability(name, camera_angle) < MIN_MEASURABILITY_TO_SCORE:
+                skipped.add(name)
+    return skipped
 
 
 def score_overall(
@@ -122,6 +153,8 @@ def score_overall(
     *,
     club_category: ClubCategory | None = None,
     camera_angle: CameraAngleEnum | None = None,
+    features: dict[str, float] | None = None,
+    feature_confidences: dict[str, float] | None = None,
 ) -> int:
     """综合分 = 各阶段分按相位权重加权。
 
@@ -130,15 +163,36 @@ def score_overall(
     （``score_profiles.resolve_phase_weights``，增量叠加 category + angle 两维 delta）；
     两者均 ``None`` → V1 单套 ``PHASE_WEIGHTS`` 兜底。**iron + 无 angle == V1 单套**
     （灰度安全，kickoff R-02）；真实分析 angle 必填，故 V2 桶内即便 iron 也带机位 delta。
+
+    P2 v0.3：机位下整阶段无可测特征时，该阶段权重不参与综合分（重归一化），
+    避免 DTL 上杆中性 50 分拉低职业转播片。
     """
     if club_category is None and camera_angle is None:
-        weights = PHASE_WEIGHTS
+        weights = dict(PHASE_WEIGHTS)
     else:
         # 延迟 import：score_profiles 依赖 constants，scoring 也依赖 constants；
         # 函数级 import 规避顶层耦合，且仅在传 profile 时才触发。
         from app.pipeline.score_profiles import resolve_phase_weights
 
         weights = resolve_phase_weights(camera_angle, club_category)
+
+    if features is not None and camera_angle is not None:
+        excluded = {
+            p
+            for p in PHASE_ORDER
+            if not phase_has_scorable_features(
+                features,
+                p,
+                camera_angle=camera_angle,
+                feature_confidences=feature_confidences,
+            )
+        }
+        if excluded and len(excluded) < len(PHASE_ORDER):
+            active = {p: w for p, w in weights.items() if p not in excluded}
+            weight_total = sum(active.values())
+            if weight_total > 0:
+                weights = {p: active[p] / weight_total for p in active}
+
     total = 0.0
     for p, w in weights.items():
         total += phase_scores.get(p, 0) * w
@@ -161,11 +215,16 @@ def score_all_phases(
     *,
     club_category: ClubCategory | None = None,
     camera_angle: CameraAngleEnum | None = None,
+    feature_confidences: dict[str, float] | None = None,
 ) -> dict[str, int]:
     """一次性算 6 个阶段分。``club_category`` / ``camera_angle`` 透传给 ``score_phase``。"""
     return {
         p: score_phase(
-            features, p, club_category=club_category, camera_angle=camera_angle
+            features,
+            p,
+            club_category=club_category,
+            camera_angle=camera_angle,
+            feature_confidences=feature_confidences,
         )
         for p in PHASE_ORDER
     }

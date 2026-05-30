@@ -90,12 +90,8 @@ IDEAL_OVERRIDES_BY_ANGLE: dict[str, dict[str, tuple[float, float]]] = {
         "head_lateral_shift": (0.0, 0.10),
     },
     "down_the_line": {
-        # dtl 看顶点手腕位置更稳定 → 收紧 ideal
-        "top_wrist_position": (0.15, 0.38),
-        # dtl 是看肩平面的最佳视角，肩旋转角度可看到全幅
-        "shoulder_rotation_top": (60.0, 100.0),
-        # dtl 看左臂伸直度比 face_on 准
-        "left_arm_straightness": (170.0, 180.0),
+        # dtl 看顶点手腕 / 下杆顺序更可靠；左臂 2D 肘角见 feature_measurability（不测）
+        "top_wrist_position": (0.12, 0.42),
     },
 }
 

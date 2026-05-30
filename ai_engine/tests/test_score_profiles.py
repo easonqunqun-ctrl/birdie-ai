@@ -57,7 +57,7 @@ def test_phase_weights_two_dims_compose_and_sum_to_one() -> None:
 
 
 def test_ideal_category_takes_priority_over_angle() -> None:
-    """shoulder_rotation_top 被 driver(35,100) 与 dtl(60,100) 同时 override → 取 category。"""
+    """shoulder_rotation_top 仅 driver category override；DTL 不再抬高肩转 ideal。"""
     assert resolve_ideal("shoulder_rotation_top", "down_the_line", "driver") == (
         35.0,
         100.0,

@@ -5,9 +5,7 @@
 
 设计约束
 --------
-- **绝对不崩溃**：无论关键点多烂，特征函数都得返回一个合理的数（退化值），否则
-  下游 scoring 会挂。退化值选"理想中点"，让评分落到 85-100 这种"还不错"区间，
-  避免给用户假警报
+- **失败则跳过**：单特征算不出时不灌「理想中点」虚高分，交给可测性/置信度过滤
 - 角度单位统一用**度**；比例单位统一为 float，范围由 docs/05 §2.6 决定
 - MediaPipe 坐标系约定：x/y ∈ [0,1]，y **向下**增长（屏幕坐标系）
 - 所有函数都**容忍空 valid 帧**：用 `_safe_mean` / `_safe_angle` 包一层
@@ -374,11 +372,10 @@ def extract_features(
 ) -> dict[str, float]:
     """批量跑 15 个特征函数。
 
-    任意特征函数抛异常时，用该特征的 **ideal 中点** 作退化值，这样下游评分会落在
-    "还不错"区间，避免给用户虚假警报。
+    任意特征函数抛异常或 non-finite 时**跳过该特征**（不再用 ideal 中点虚抬分）。
 
     Returns:
-        {feature_name: value}，15 个键齐全。
+        {feature_name: value}，键为成功算出的特征（可能少于 15 个）。
     """
     out: dict[str, float] = {}
     for name, fn in _FEATURE_FUNCS.items():
@@ -388,11 +385,8 @@ def extract_features(
                 raise ValueError(f"{name} returned non-finite value")
             out[name] = value
         except Exception as exc:
-            meta = feature_meta(name)
-            fallback = (meta["ideal_min"] + meta["ideal_max"]) / 2
             log.warning(
-                "feature_fallback",
-                extra={"feature": name, "error": str(exc), "fallback": fallback},
+                "feature_skip",
+                extra={"feature": name, "error": str(exc)},
             )
-            out[name] = fallback
     return out

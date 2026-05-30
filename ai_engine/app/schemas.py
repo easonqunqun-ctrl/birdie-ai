@@ -156,6 +156,10 @@ class AnalyzeResult(BaseModel):
         default=None,
         description="mode=putting/chipping 时各专属特征 0-100 分",
     )
+    phase_highlights: list[str] = Field(
+        default_factory=list,
+        description="阶段亮点肯定话术（V2；docs/20 §4.3）",
+    )
 
 
 class PrecheckRequest(BaseModel):

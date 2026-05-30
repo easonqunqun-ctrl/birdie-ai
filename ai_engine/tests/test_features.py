@@ -55,7 +55,7 @@ def test_features_roughly_in_range_for_ideal_swing(synthetic_pose_result) -> Non
 
 
 def test_extract_features_is_fault_tolerant() -> None:
-    """哪怕 keypoints 全是 0（奇异输入），特征也必须全部返回（fallback 到 ideal 中点）。"""
+    """奇异输入不崩溃；算不出的特征跳过（不再灌 ideal 中点虚高分）。"""
     import numpy as np
 
     from app.pipeline.phases import PhaseInfo, PhaseSegmentResult
@@ -81,6 +81,6 @@ def test_extract_features_is_fault_tolerant() -> None:
         fps=30.0,
     )
     feats = extract_features(keypoints, fake_phases)
-    assert len(feats) == 15
+    assert isinstance(feats, dict)
     for name, value in feats.items():
         assert math.isfinite(value), f"{name} 非有限"
