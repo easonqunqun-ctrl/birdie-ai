@@ -69,9 +69,14 @@ pnpm build:weapp    # 或体验环境用 pnpm build:weapp + 对应 env
 - [ ] `mock_mode=true`：模拟支付弹窗 → 确认后会员生效  
 - [ ] `mock_mode=false`：拉起真实 `requestPayment`（小额）→ 「我的」会员态与订单
 
-### AI 教练
+### Phase2 短杆 / 多挥（W18–W22，体验版必勾）
 
-- [ ] 进教练页发一条消息（流式/sse 不断开）
+- [ ] 拍摄页 **ModeSelector** 可见推杆/切杆（`PHASE2_*_MODE` 已开）
+- [ ] **推杆**分析 → 报告展示 PuttingReport 四维
+- [ ] **切杆**分析 → 报告展示 ChippingReport
+- [ ] 多段视频 → **select-swing** 页 → 分析成功
+- [ ] **我的 → yardage book** 列表可读；装备页可跳转
+- [ ] 教练 → **定制课程** 列表/编辑（`PHASE2_COACH_ENABLED`）
 
 ---
 

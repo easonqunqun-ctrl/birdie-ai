@@ -59,7 +59,7 @@
 
 | Sprint | 主题 | PLAN-ID | 交付物 | 状态 |
 |--------|------|---------|--------|------|
-| **W21** | **发版收口** | P2-W21-A～E | 体验版上传 + Phase2 smoke + xpay 冒烟 + CVM git + docs 状态回填 | **📋 Next** |
+| **W21** | **发版收口** | P2-W21-A～E | 体验版上传 + Phase2 smoke + xpay 冒烟 + CVM git + docs 状态回填 | **🔧 自动化 Done；真机/DevTools 待验** |
 | **W22** | **短杆闭环抛光** | M10-01/02/03/05 · M7-13-thumb | 推杆/切杆 E2E smoke · 多挥缩略图 · yardage 编辑 · 训练类目 drill | **📋 Planned** |
 | **W23** | **教练 / Pro** | M8-05/06 · M12-09 | 批注 + Pro clip 引用 smoke · 作业/ recap polish | **📋 Planned** |
 | **W24** | **观测与灰度** | V2-ROLLOUT · MON-05 · ENG-06 | V2 pct 上调 · monitoring 发版脚本 · 争议周报首填 | **📋 Planned** |

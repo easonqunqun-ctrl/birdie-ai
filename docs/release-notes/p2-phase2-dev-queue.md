@@ -46,11 +46,11 @@
 
 | Sprint | PLAN-ID | 事项 | 交付物 | 可做 | 状态 |
 |--------|---------|------|--------|------|------|
-| **W21-A** | P2-W21-A | **Git 合流 + 体验版** | commit W20-A/B + 监控；`make client-build-weapp-prod` 上传体验版 | Ops | 📋 |
-| **W21-B** | P2-W21-B | **Phase2 体验版 Smoke** | 推杆/切杆/多挥/yardage/教练课 走 [`experience-version-smoke-runbook.md`](./experience-version-smoke-runbook.md) 子集 | Ops | 📋 |
-| **W21-C** | P2-W21-C | **xpay 真机冒烟** | [`w19-xpay-smoke-runbook.md`](./w19-xpay-smoke-runbook.md) + `scripts/xpay_smoke_check.py` | Ops | 📋 |
-| **W21-D** | P2-W21-D | **CVM git 整理** | 远端 stash/reset → `git pull --ff-only` 恢复；或文档化 rsync-only 流程 | Ops | 📋 |
-| **W21-E** | DOC-P2-01 | **docs/21/23 状态回填** | 本表审计结果同步进 PRD/FR 表 ✅ 列 | Now | 📋 |
+| **W21-A** | P2-W21-A | **Git 合流 + 体验版** | commit `294b63c` + push；`client/dist/` 已 build | Ops | **✅ Done**（上传 DevTools 待人工） |
+| **W21-B** | P2-W21-B | **Phase2 体验版 Smoke** | 本机：putting 单测 16/16 · type-check ✅ · health ✅ | Ops | **🔧 真机勾选待验** |
+| **W21-C** | P2-W21-C | **xpay 真机冒烟** | `xpay_smoke_check.py` 环境自检（见下方输出） | Ops | **🔧 脚本已跑** |
+| **W21-D** | P2-W21-D | **CVM git 整理** | 仍 rsync 发版；`REMOTE_GIT_PULL=no` | Ops | **📋 待整理** |
+| **W21-E** | DOC-P2-01 | **docs/21/23 状态回填** | 已合入 `294b63c` | Now | **✅ Done** |
 
 ---
 
