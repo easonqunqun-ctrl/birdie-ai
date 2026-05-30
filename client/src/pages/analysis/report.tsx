@@ -811,22 +811,35 @@ const ReportPage: FC = () => {
         * 翻译成"下次按你选的机位摆好手机会更准"友好文案；用户看不懂 engine_warnings
         * raw code，但能 act on 这句中文。
         * 与 debug 浮层（W10）共存：这里给 C 端，那里给 PM/教研。 */}
-      <CameraAngleAlert
-        engineWarnings={report.engine_warnings}
-        declaredCameraAngle={report.camera_angle}
-      />
+      <View className='report__notice-stack'>
+        <CameraAngleAlert
+          engineWarnings={report.engine_warnings}
+          declaredCameraAngle={report.camera_angle}
+        />
 
-      {qualityWarningLines.length > 0 && (
-        <View className='report__quality-warnings'>
-          <Text className='report__quality-warnings-title'>拍摄提示</Text>
-          {qualityWarningLines.map((line, i) => (
-            <Text key={i} className='report__quality-warnings-item'>
-              {line}
-            </Text>
-          ))}
-          <Text className='report__quality-warnings-foot'>{QUALITY_WARNING_IMPACT_FOOTNOTE}</Text>
-        </View>
-      )}
+        {(report.phase_highlights?.length ?? 0) > 0 && (
+          <View className='report__phase-highlights'>
+            <Text className='report__phase-highlights-title'>本次亮点</Text>
+            {report.phase_highlights!.map((line, i) => (
+              <Text key={i} className='report__phase-highlights-item'>
+                {line}
+              </Text>
+            ))}
+          </View>
+        )}
+
+        {qualityWarningLines.length > 0 && (
+          <View className='report__quality-warnings'>
+            <Text className='report__quality-warnings-title'>拍摄提示</Text>
+            {qualityWarningLines.map((line, i) => (
+              <Text key={i} className='report__quality-warnings-item'>
+                {line}
+              </Text>
+            ))}
+            <Text className='report__quality-warnings-foot'>{QUALITY_WARNING_IMPACT_FOOTNOTE}</Text>
+          </View>
+        )}
+      </View>
 
       {/* 视频元信息 */}
       <View className='report__meta'>
@@ -862,7 +875,7 @@ const ReportPage: FC = () => {
         </View>
       ) : (
         radarAxes.length > 0 && (
-          <View className='report__section'>
+          <View className='report__section report__section--chart'>
             <View className='report__section-header'>
               <Text className='report__section-title'>六维评分</Text>
               <Text className='report__section-hint'>点击顶点查看阶段</Text>

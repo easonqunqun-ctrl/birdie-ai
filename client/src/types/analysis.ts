@@ -200,6 +200,8 @@ export interface AnalysisReportResponse {
    * V1 引擎或老报告为 [] / null。
    */
   engine_warnings?: EngineWarning[] | null
+  /** V2：阶段亮点肯定话术（≥78 分的维度） */
+  phase_highlights?: string[] | null
   /** 引擎版本：V1 / V2 灰度区分（W5+ 由 ai_engine 返回；老报告兜底 v1） */
   engine_version?: 'v1' | 'v2' | null
   /** 分享卡片（W7 再生成，MVP 期为 null） */

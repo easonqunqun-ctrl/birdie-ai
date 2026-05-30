@@ -7,6 +7,12 @@ export const QUALITY_WARNING_COPY: Record<string, string> = {
   camera_shake: '画面抖动略大，可能影响追踪精度。建议固定机位或使用三脚架后再拍。',
   partial_occlusion: '部分时段身体关键点被遮挡，追踪可能不完整。请确保侧向全身入镜、避免他人或物体遮挡。',
   low_pose_confidence: '姿态关键点置信度偏低，分数可能波动。建议在光线充足、背景简洁处重拍。',
+  angle_limited_scoring:
+    '当前机位下部分维度（如转肩角度）无法从 2D 画面稳定测量，系统已自动调整计分方式；建议同机位多拍几次看趋势。',
+  rotation_reading_unreliable:
+    '旋转类读数波动较大（常见于侧面转播/慢动作），相关诊断已降权，请以可测维度为主。',
+  score_low_trust:
+    '本次视频的可测维度偏少或关键点不够稳，总分已保守处理；建议在规范机位、光线充足处重拍后再对比。',
 }
 
 /** O-10：软警告存在时报告页统一脚注（docs/01 §4.4） */
