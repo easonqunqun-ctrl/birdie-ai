@@ -594,6 +594,17 @@ const TrainingPage: FC = () => {
                 </View>
               ))}
             </View>
+            {drill.tips && drill.tips.length > 0 ? (
+              <View className='training__tips'>
+                <Text className='training__tips-title'>教练提示</Text>
+                {drill.tips.map((tip, idx) => (
+                  <View key={idx} className='training__tip'>
+                    <Text className='training__tip-bullet'>·</Text>
+                    <Text className='training__tip-text'>{tip}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
             {!isDone ? (
               <Button
                 className='training__task-cta'

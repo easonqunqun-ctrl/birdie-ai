@@ -707,6 +707,44 @@
     padding-top: 6rpx;
   }
 
+  &__tips {
+    display: flex;
+    flex-direction: column;
+    gap: 8rpx;
+    margin-bottom: 18rpx;
+    padding: 14rpx 16rpx;
+    border-radius: 14rpx;
+    background: rgba(26, 35, 126, 0.04);
+    border-left: 6rpx solid var(--color-gold);
+  }
+
+  &__tips-title {
+    font-size: 26rpx;
+    font-weight: 700;
+    color: var(--color-primary);
+    margin-bottom: 4rpx;
+  }
+
+  &__tip {
+    display: flex;
+    gap: 8rpx;
+    align-items: flex-start;
+  }
+
+  &__tip-bullet {
+    flex: 0 0 20rpx;
+    font-size: 28rpx;
+    color: var(--color-gold);
+    line-height: 1.5;
+  }
+
+  &__tip-text {
+    flex: 1;
+    font-size: 28rpx;
+    color: var(--color-text-secondary);
+    line-height: 1.55;
+  }
+
   &__task-cta {
     width: 100%;
     background: var(--color-primary) !important;
