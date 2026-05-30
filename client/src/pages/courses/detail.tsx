@@ -27,6 +27,7 @@ import {
   getAssessmentMinScore,
   isAssessmentLesson,
 } from '@/utils/courseAssessment'
+import { isCoachCustomCourse } from '@/utils/coachCourse'
 import './detail.scss'
 
 const CourseDetailPage: FC = () => {
@@ -175,7 +176,12 @@ const CourseDetailPage: FC = () => {
   return (
     <ScrollView scrollY className='course-detail'>
       <View className='course-detail__header'>
-        <Text className='course-detail__stage'>第 {course.stage} 阶</Text>
+        <View className='course-detail__header-tags'>
+          <Text className='course-detail__stage'>第 {course.stage} 阶</Text>
+          {isCoachCustomCourse(course) && (
+            <Text className='course-detail__coach-badge'>教练定制</Text>
+          )}
+        </View>
         <Text className='course-detail__title'>{course.title}</Text>
         {course.subtitle && (
           <Text className='course-detail__subtitle'>{course.subtitle}</Text>

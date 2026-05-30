@@ -23,6 +23,8 @@ view {
   --color-primary-soft: #0d3b8e;
   --color-primary-tint: #e8ebf8;
   --color-on-primary: #ffffff;
+  /* 历史页面误用别名；与 --color-on-primary 同义 */
+  --color-text-on-primary: var(--color-on-primary);
 
   /* 与主色搭配的渐变/点缀（稿中视频区、进度条、高亮趋势） */
   --color-accent-mint: #00d084;

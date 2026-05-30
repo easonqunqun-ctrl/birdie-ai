@@ -11,7 +11,7 @@ import {
   type YardageBookClubItem,
 } from '@/services/yardageBookService'
 import { PHASE2_YARDAGE_BOOK_ENABLED_FLAG } from '@/constants/flags'
-import './yardage-book.scss'
+import './index.scss'
 
 const YardageBookPage: FC = () => {
   const [loading, setLoading] = useState(true)

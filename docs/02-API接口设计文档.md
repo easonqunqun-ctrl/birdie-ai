@@ -664,6 +664,58 @@ POST /v1/analyses/uploads/{upload_id}/video
 
 ---
 
+### 3.1c 多挥候选探测（上传后、创建任务前）
+
+```
+POST /v1/analyses/uploads/{upload_id}/detect-swings
+```
+
+**需认证**
+
+**前置**：视频已通过 §3.1b 写入对象存储；**不扣分析配额**。
+
+**行为概要**：
+
+1. 校验 Redis 上传凭证归属当前用户，且对象已存在；
+2. 调用 ai_engine `POST /detect-swings`（预处理 + pose + 多挥切分，**不跑评分**）；
+3. 返回候选段列表与建议默认索引（第一段非试挥）。
+
+**成功响应**：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "upload_id": "upl_abc123",
+    "swing_candidates": [
+      {
+        "start_frame": 30,
+        "end_frame": 120,
+        "is_practice": true,
+        "confidence": 0.88,
+        "start_time_sec": 1.0,
+        "end_time_sec": 4.0
+      }
+    ],
+    "default_selected_index": 0
+  }
+}
+```
+
+**错误**：
+
+| 场景 | code |
+| --- | --- |
+| 凭证无效 / 过期 | 40011 |
+| 视频未上传 | 40012 |
+| 检测到 >5 段挥杆 | 50122 |
+| 其他引擎预处理失败 | 50101–50121 |
+
+客户端：`full_swing` 上传成功后调用；候选 **>1** 时跳转 `pages/analysis/select-swing`，否则直接 `POST /v1/analyses`（可带 `selected_swing_index`）。`putting` / `chipping` 跳过本接口。
+
+---
+
 ### 3.2 创建挥杆分析任务
 
 ```
@@ -680,7 +732,8 @@ POST /v1/analyses
   "camera_angle": "face_on | down_the_line（必填）",
   "club_type": "driver | fairway_wood | iron_3 | iron_4 | iron_5 | iron_6 | iron_7 | iron_8 | iron_9 | wedge | putter | unknown（必填）",
   "mode": "full_swing | putting | chipping（可选，默认 full_swing；需 `PHASE2_PUTTING_MODE_ENABLED` / `PHASE2_CHIPPING_MODE_ENABLED` 灰度开启）",
-  "target_yardage": "integer 1-400（可选；仅 full_swing 且 `PHASE2_YARDAGE_BOOK_ENABLED` 时写入 `swing_analyses.target_yardage`，供 yardage book 反推）"
+  "target_yardage": "integer 1-400（可选；仅 full_swing 且 `PHASE2_YARDAGE_BOOK_ENABLED` 时写入 `swing_analyses.target_yardage`，供 yardage book 反推）",
+  "selected_swing_index": "integer ≥0（可选；仅 full_swing；多挥视频用户选段索引，透传 ai_engine；省略则引擎自动选第一段非试挥）"
 }
 ```
 
@@ -1681,6 +1734,7 @@ GET /v1/users/me/certificates/{cert_id}
 
 ```
 GET    /v1/users/me/coach/courses
+GET    /v1/users/me/coach/courses/{course_id}
 POST   /v1/users/me/coach/courses
 PATCH  /v1/users/me/coach/courses/{course_id}
 POST   /v1/users/me/coach/courses/{course_id}/lessons
@@ -1688,7 +1742,7 @@ POST   /v1/users/me/coach/courses/{course_id}/publish
 POST   /v1/users/me/coach/courses/{course_id}/unpublish
 ```
 
-**需认证** + 课程灰度开启；写端点额外要求用户 ID 在服务端 `COACH_COURSE_USER_IDS` 白名单（M8 教练认证就位前）。创建的课程 `created_by_user_id` 指向教练；发布后出现在公开 `GET /v1/courses` 列表。
+**需认证** + 课程灰度开启；写端点额外要求用户 ID 在服务端 `COACH_COURSE_USER_IDS` 白名单（M8 教练认证就位前）。创建的课程 `created_by_user_id` 指向教练；发布后出现在公开 `GET /v1/courses` 列表。`GET …/{course_id}` 返回 `{ course, lessons[] }`（含草稿课时，仅教练本人）。
 
 ### 5A.4 教练档案 / 资质审核（M8-01）
 

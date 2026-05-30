@@ -4,7 +4,7 @@
 - pay_sig = hex(hmac_sha256(appKey, uri + "&" + signData))
 - signature = hex(hmac_sha256(session_key, signData))
 其中 wx.requestVirtualPayment 场景 uri 固定为 ``requestVirtualPayment``；
-后端 API（如 query_order）uri 为 ``xpay/query_order``。
+后端 API（如 query_order）uri 为 ``/xpay/query_order``（带前导 ``/``）。
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ logger = structlog.get_logger("wechat_xpay")
 XPAY_QUERY_ORDER_URL = "https://api.weixin.qq.com/xpay/query_order"
 XPAY_NOTIFY_PROVIDE_GOODS_URL = "https://api.weixin.qq.com/xpay/notify_provide_goods"
 VIRTUAL_PAY_URI = "requestVirtualPayment"
-QUERY_ORDER_URI = "xpay/query_order"
+QUERY_ORDER_URI = "/xpay/query_order"
 
 # query_order.order.status：≥2 表示用户已支付（2 待发货，4 已发货）
 XPAY_PAID_STATUSES = frozenset({2, 3, 4})
@@ -189,7 +189,7 @@ async def notify_provide_goods(
     if wx_order_id:
         body_obj["wx_order_id"] = wx_order_id
     body_json = json.dumps(body_obj, ensure_ascii=False, separators=(",", ":"))
-    pay_sig = calc_pay_sig("xpay/notify_provide_goods", body_json)
+    pay_sig = calc_pay_sig("/xpay/notify_provide_goods", body_json)
 
     token = await get_access_token()
     url = f"{XPAY_NOTIFY_PROVIDE_GOODS_URL}?access_token={token}&pay_sig={pay_sig}"

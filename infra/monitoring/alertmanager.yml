@@ -39,15 +39,13 @@ route:
 # ---- 静默：tests / 维护窗口可在 UI http://<host>:9093/#/silences 操作 ----
 
 # ---- 收件人 ----
-# webhook URL 占位：默认指向一个 alertmanager-webhook-echo 容器（compose 里启动）
-# 真接企业微信：把 url 改成 https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=<bot-key>
-# 但企业微信 webhook payload 格式与 alertmanager 默认不一致，需中间一层
-# alertmanager-to-wechat-bot 转换（如 https://github.com/wonderivan/alertmanager-wechat-bot）。
-# 待 W18+ 接生产渠道时统一改。
+# 默认：wechat-webhook-bridge（W19-C）将 Alertmanager payload 转企微 markdown。
+# 未配置 WECOM_WEBHOOK_KEY 时 bridge dry-run，告警仍走日志。
+# 本地调试可改回 webhook-echo：http://webhook-echo:9094/alert
 receivers:
   - name: 'default-webhook'
     webhook_configs:
-      - url: 'http://webhook-echo:9094/alert'
+      - url: 'http://wechat-webhook-bridge:9095/alert'
         send_resolved: true
 
 # ---- 抑制规则（高优先级触发时，低优先级同 alert 静默） ----

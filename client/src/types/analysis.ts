@@ -41,6 +41,24 @@ export interface CreateAnalysisRequest {
   mode?: AnalysisMode
   /** M10-03：全挥杆目标码数（可选），供 yardage book 历史反推 */
   target_yardage?: number
+  /** M7-13：多挥视频段索引（0-based）；仅 full_swing */
+  selected_swing_index?: number
+}
+
+/** M7-13 · 单段挥杆候选 */
+export interface SwingCandidateItem {
+  start_frame: number
+  end_frame: number
+  is_practice: boolean
+  confidence: number
+  start_time_sec: number
+  end_time_sec: number
+}
+
+export interface DetectSwingsResponse {
+  upload_id: string
+  swing_candidates: SwingCandidateItem[]
+  default_selected_index: number
 }
 
 export interface CreateAnalysisResponse {

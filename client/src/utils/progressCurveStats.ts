@@ -7,12 +7,12 @@
 import { PHASE_LABEL, PHASE_ORDER, type SwingPhaseKey } from '@/constants/phaseLabels'
 import { resolveTrustTier, type TrustTier } from '@/utils/trustLabel'
 
-/** 与 backend AnalysisProgressPoint 对齐 */
+/** 与 backend AnalysisProgressPoint 对齐（V1 为数值，V2 为 { score, label, ... }） */
 export interface ProgressPoint {
   analysis_id: string
   analyzed_at: string
   overall_score: number
-  phase_scores?: Record<string, number> | null
+  phase_scores?: Record<string, number | { score?: number | null }> | null
   // P2-W12-1：让进步曲线按 trust tier 着色（V2 高/中/低 = mint/gold/warning，V1 走默认主色）
   engine_version?: 'v1' | 'v2' | null
   analysis_confidence?: number | null
@@ -42,6 +42,15 @@ export interface LineSeriesPoint {
 
 const PHASE_KEYS = PHASE_ORDER as readonly SwingPhaseKey[]
 
+function phaseScoreValue(raw: number | { score?: number | null } | null | undefined): number | null {
+  if (raw == null) return null
+  if (typeof raw === 'number') return Number.isNaN(raw) ? null : raw
+  if (typeof raw === 'object' && typeof raw.score === 'number' && !Number.isNaN(raw.score)) {
+    return raw.score
+  }
+  return null
+}
+
 /** ISO → 短日期 `M/D`（本地时区） */
 export function shortChartDate(iso: string): string {
   const d = new Date(iso)
@@ -60,7 +69,7 @@ export function seriesForDimension(
     if (dimension === 'overall') {
       value = p.overall_score
     } else {
-      value = p.phase_scores?.[dimension] ?? null
+      value = phaseScoreValue(p.phase_scores?.[dimension])
     }
     if (value === null || Number.isNaN(value)) return
     // P2-W12-1：V2 报告才计算 tier；V1 报告（即使 confidence 默认 1.0）也不给 tier，
@@ -87,8 +96,8 @@ export function findBestPhaseImprovement(
   for (const phase of PHASE_KEYS) {
     const vals: number[] = []
     for (const p of points) {
-      const v = p.phase_scores?.[phase]
-      if (typeof v === 'number' && !Number.isNaN(v)) vals.push(v)
+      const v = phaseScoreValue(p.phase_scores?.[phase])
+      if (v !== null) vals.push(v)
     }
     if (vals.length < 2) continue
     const delta = vals[vals.length - 1] - vals[0]

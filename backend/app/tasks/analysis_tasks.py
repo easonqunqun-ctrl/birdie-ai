@@ -155,6 +155,7 @@ async def _run_swing_analysis_async(analysis_id: str) -> None:
                     mode=meta.get("analysis_mode") or "full_swing",
                     # M7-14：传 user_id 让 ai_engine 做灰度分桶
                     user_id_hint=meta.get("user_id"),
+                    selected_swing_index=meta.get("selected_swing_index"),
                 )
                 break
             except (httpx.TimeoutException, httpx.ConnectError, httpx.HTTPStatusError) as e:
@@ -230,6 +231,7 @@ async def _mark_processing(analysis_id: str) -> dict | None:
             "camera_angle": analysis.camera_angle,
             "club_type": analysis.club_type,
             "analysis_mode": getattr(analysis, "analysis_mode", None) or "full_swing",
+            "selected_swing_index": getattr(analysis, "selected_swing_index", None),
             "created_at": analysis.created_at,
         }
 

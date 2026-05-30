@@ -23,6 +23,7 @@ from app.schemas.analysis import (
     CreateAnalysisRequest,
     CreateAnalysisResponse,
     ShareCardResponse,
+    DetectSwingsResponse,
     UploadTokenRequest,
     UploadTokenResponse,
 )
@@ -106,6 +107,27 @@ async def upload_analysis_video(
 
 
 @router.post(
+    "/uploads/{upload_id}/detect-swings",
+    summary="探测多挥候选（上传后、创建任务前）",
+    response_model=APIResponse[DetectSwingsResponse],
+)
+async def detect_swings_for_upload(
+    upload_id: str,
+    user: User = Depends(get_current_user),
+    redis: Redis = Depends(get_redis),
+    storage: MinioStorageClient = Depends(get_minio_storage),
+):
+    """P2-M7-13 · 仅 full_swing 客户端调用；不扣配额。"""
+    result = await analysis_service.detect_swings_for_upload(
+        user=user,
+        upload_id=upload_id,
+        redis=redis,
+        storage=storage,
+    )
+    return ok(result)
+
+
+@router.post(
     "",
     summary="创建挥杆分析任务",
     response_model=APIResponse[CreateAnalysisResponse],
@@ -160,9 +182,17 @@ async def create_share_card(
     db: AsyncSession = Depends(get_db),
     storage: MinioStorageClient = Depends(get_minio_storage),
 ):
-    url = await ensure_share_wxa_code_url(
-        db=db, user=user, analysis_id=analysis_id, storage=storage
-    )
+    from app.core.exceptions import ThirdPartyError
+
+    try:
+        url = await ensure_share_wxa_code_url(
+            db=db, user=user, analysis_id=analysis_id, storage=storage
+        )
+    except RuntimeError as e:
+        raise ThirdPartyError(
+            message="分享码生成失败，请稍后再试",
+            detail=str(e)[:200],
+        ) from e
     await db.commit()
     return ok(ShareCardResponse(wxa_code_url=url))
 

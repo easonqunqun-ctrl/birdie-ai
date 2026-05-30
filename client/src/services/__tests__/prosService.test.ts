@@ -87,6 +87,7 @@ describe('prosService', () => {
     const sent = T.request.mock.calls[0][0]
     expect(sent.method).toBe('GET')
     expect(sent.url).toMatch(/\/analyses\/ana_abc\/pro-matches$/)
+    expect(sent.silent).toBe(true)
   })
 
   test('matchForAnalysis with limit and record=false → query string', async () => {

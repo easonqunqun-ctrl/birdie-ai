@@ -41,22 +41,36 @@ ssh -L 9090:127.0.0.1:9090 -L 9093:127.0.0.1:9093 -L 9094:127.0.0.1:9094 \
 | `prometheus-alerts.yml` | W13-D 落地的 7 条 alerting rules，被 prometheus 容器 mount 进 `/etc/prometheus/rules/ai_engine.yml` |
 | `alertmanager.yml` | 路由 + 抑制规则；webhook 默认指向 `webhook-echo:9094`（占位） |
 
-## 4 · 接生产告警渠道（待 W18+）
+## 4 · 接生产告警渠道（W19-C ✅）
 
-当前 `alertmanager.yml` `receivers.default-webhook.webhook_configs.url` 指向占位 echo
-服务，告警会被 echo 出来但**不通知任何人**。
+默认 `alertmanager.yml` 已指向 **`wechat-webhook-bridge:9095`**（同 compose profile）。
 
-接企业微信群机器人时：
+1. 在企业微信群里 **添加群机器人**，复制 webhook key
+2. CVM `.env.local`（或 compose 环境）写入：
 
-1. 在企业微信里创建群机器人，拿到 webhook key
-2. 由于企业微信 webhook payload 格式与 alertmanager 默认不一致，**不能**直接把
-   alertmanager url 改成 `https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=<KEY>`
-3. 需要中间一层转换。推荐：
-   - 加 `alertmanager-to-wechat-bot` container（如 [wonderivan/alertmanager-wechat-bot](https://github.com/wonderivan/alertmanager-wechat-bot)）
-   - 或写 5 行 FastAPI 自己转
-4. 把 alertmanager.yml 的 webhook url 指向该转换服务
+   ```bash
+   WECOM_WEBHOOK_KEY=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+   ```
 
-接钉钉同理（payload 格式各家不同）。
+3. 重启监控栈：
+
+   ```bash
+   docker compose --profile monitoring up -d alertmanager wechat-webhook-bridge
+   ```
+
+4. 验证 bridge 健康：
+
+   ```bash
+   curl -s http://127.0.0.1:9095/health   # → ok
+   ```
+
+5. 手工 fire 测试（可选）：Prometheus `/alerts` 里找 firing 规则，或临时调低 threshold
+
+**未配置 key 时**：bridge 仅 dry-run 打日志，不会外发企微（适合本地 profile 调试）。
+
+本地调试 Alertmanager payload 格式仍可用 **`webhook-echo:9094`** — 把 `alertmanager.yml` receivers url 改回即可。
+
+接钉钉同理（payload 格式各家不同，需另写 bridge）。
 
 ## 5 · 验证 ai_engine /metrics/prom 被 scrape
 

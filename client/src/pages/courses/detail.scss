@@ -45,10 +45,27 @@
     box-shadow: 0 2rpx 8rpx rgba(26, 35, 126, 0.06);
   }
 
+  &__header-tags {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12rpx;
+    margin-bottom: 8rpx;
+  }
+
+  &__coach-badge {
+    font-size: var(--font-size-xs);
+    color: var(--color-primary);
+    border: 1rpx solid var(--color-primary);
+    border-radius: 6rpx;
+    padding: 0 10rpx;
+    line-height: 32rpx;
+  }
+
   &__stage {
     font-size: var(--font-size-xs);
     color: var(--color-primary);
-    margin-bottom: 8rpx;
   }
 
   &__title {

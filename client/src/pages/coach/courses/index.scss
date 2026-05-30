@@ -1,0 +1,127 @@
+.coach-courses {
+  min-height: 100%;
+  padding: 24rpx;
+  padding-bottom: 160rpx;
+  background: var(--color-bg-page);
+  box-sizing: border-box;
+
+  &--blocked {
+    padding-top: 160rpx;
+    text-align: center;
+    color: var(--color-text-secondary);
+    font-size: 32rpx;
+  }
+
+  &__head {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16rpx;
+    margin-bottom: 20rpx;
+  }
+
+  &__title {
+    font-size: 40rpx;
+    font-weight: 700;
+    color: var(--color-primary);
+  }
+
+  &__create-btn {
+    margin: 0 !important;
+    padding: 0 24rpx !important;
+    height: 64rpx !important;
+    line-height: 64rpx !important;
+    font-size: 26rpx !important;
+    background: var(--color-primary) !important;
+    color: var(--color-on-primary) !important;
+    border-radius: 999rpx !important;
+
+    &::after {
+      border: none !important;
+    }
+  }
+
+  &__hint {
+    display: block;
+    margin-bottom: 20rpx;
+    font-size: 26rpx;
+    color: var(--color-text-tertiary);
+    line-height: 1.5;
+  }
+
+  &__empty {
+    padding: 80rpx 24rpx;
+    text-align: center;
+    color: var(--color-text-tertiary);
+    font-size: 30rpx;
+  }
+
+  &__card {
+    background: var(--color-bg-card);
+    border: 1rpx solid var(--color-border);
+    border-radius: 18rpx;
+    padding: 20rpx 22rpx;
+    margin-bottom: 12rpx;
+    box-shadow: var(--shadow-xs);
+  }
+
+  &__card-top {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12rpx;
+  }
+
+  &__card-main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__card-title {
+    display: block;
+    font-size: 32rpx;
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
+
+  &__card-sub {
+    display: block;
+    margin-top: 6rpx;
+    font-size: 26rpx;
+    color: var(--color-text-secondary);
+  }
+
+  &__card-meta {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10rpx;
+    margin-top: 12rpx;
+  }
+
+  &__badge {
+    font-size: 22rpx;
+    padding: 2rpx 10rpx;
+    border-radius: 6rpx;
+    border: 1rpx solid var(--color-border);
+    color: var(--color-text-secondary);
+  }
+
+  &__badge--published {
+    color: var(--color-accent-mint);
+    border-color: var(--color-accent-mint);
+  }
+
+  &__badge--draft {
+    color: var(--color-warning);
+    border-color: var(--color-warning);
+  }
+
+  &__arrow {
+    font-size: 36rpx;
+    color: var(--color-text-tertiary);
+  }
+}

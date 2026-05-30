@@ -34,4 +34,12 @@ describe('coachCoursesService', () => {
       /\/users\/me\/coach\/courses\/crs_abc\/publish$/,
     )
   })
+
+  test('getDetail → GET .../{course_id}', async () => {
+    T.request.mockResolvedValueOnce(ok({ course: { id: 'crs_x' }, lessons: [] }))
+    await coachCoursesService.getDetail('crs_x')
+    expect(T.request.mock.calls[0][0].url).toMatch(
+      /\/users\/me\/coach\/courses\/crs_x$/,
+    )
+  })
 })

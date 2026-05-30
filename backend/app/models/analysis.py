@@ -67,6 +67,8 @@ class SwingAnalysis(Base, TimestampMixin):
     )
     # M10-03：用户声明的目标码数（yard），供 yardage book 历史反推
     target_yardage: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # M7-13：多挥视频中用户指定的候选段索引（0-based）；None → 引擎自动选第一段非试挥
+    selected_swing_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # M7-14：评分管线版本标记。
     # 不做"二次评分"。

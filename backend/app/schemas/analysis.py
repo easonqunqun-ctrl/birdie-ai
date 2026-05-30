@@ -86,6 +86,11 @@ class CreateAnalysisRequest(BaseModel):
         le=400,
         description="本次击球目标码数（码）；仅 full_swing 且 `PHASE2_YARDAGE_BOOK_ENABLED` 时有效，供 yardage book 反推",
     )
+    selected_swing_index: int | None = Field(
+        default=None,
+        ge=0,
+        description="多挥视频要分析的段索引（0-based）；仅 full_swing；省略则 ai_engine 自动选第一段非试挥",
+    )
 
 
 class CreateAnalysisResponse(BaseModel):
@@ -94,6 +99,29 @@ class CreateAnalysisResponse(BaseModel):
     queue_position: int = Field(..., description="队列位置（0 表示下一个处理）")
     estimated_seconds: int = Field(..., description="预计等待秒数")
     created_at: datetime
+
+
+class SwingCandidateItem(BaseModel):
+    """P2-M7-13 · 单段挥杆候选（与 ai_engine SwingCandidateItem 对齐）."""
+
+    start_frame: int
+    end_frame: int
+    is_practice: bool
+    confidence: float = Field(ge=0.0, le=1.0)
+    start_time_sec: float
+    end_time_sec: float
+
+
+class DetectSwingsResponse(BaseModel):
+    """POST /v1/analyses/uploads/{upload_id}/detect-swings 成功响应."""
+
+    upload_id: str
+    swing_candidates: list[SwingCandidateItem] = Field(default_factory=list)
+    default_selected_index: int = Field(
+        default=0,
+        ge=0,
+        description="建议默认段（第一段非试挥）",
+    )
 
 
 # ==================== 3.3 GET /v1/analyses/{id}/status ====================

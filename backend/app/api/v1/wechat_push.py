@@ -103,7 +103,7 @@ async def wechat_mp_push_event(
         )
 
     event = (payload.get("Event") or payload.get("event") or "").strip()
-    logger.info("wechat_mp_push_received", event=event)
+    logger.info("wechat_mp_push_received", mp_event=event)
 
     if event == "xpay_goods_deliver_notify":
         try:

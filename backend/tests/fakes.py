@@ -77,6 +77,7 @@ class FakeAIEngine:
 
     def __init__(self) -> None:
         self.mode: Literal["ok", "engine_failed", "timeout", "flaky", "precheck_blocked"] = "ok"
+        self.detect_mode: Literal["single", "multi", "overflow", "failed"] = "single"
         self.error_code: int = 50101
         self.error_message: str = "分析失败"
         self.succeed_on_attempt: int = 1
@@ -164,6 +165,73 @@ class FakeAIEngine:
             "quality_warnings": [],
             "elapsed_ms": 50,
             "scan_elapsed_ms": 40,
+        }
+
+    async def detect_swings(
+        self,
+        *,
+        analysis_id: str,
+        video_url: str,
+    ) -> dict:
+        self.calls.append(
+            {
+                "method": "detect_swings",
+                "analysis_id": analysis_id,
+                "video_url": video_url,
+            }
+        )
+        if self.detect_mode == "overflow":
+            return {
+                "analysis_id": analysis_id,
+                "status": "failed",
+                "error_code": 50122,
+                "error_message": "检测到超过 5 段挥杆，请重拍 1-3 段",
+            }
+        if self.detect_mode == "failed":
+            return {
+                "analysis_id": analysis_id,
+                "status": "failed",
+                "error_code": self.error_code,
+                "error_message": self.error_message,
+            }
+        if self.detect_mode == "multi":
+            return {
+                "analysis_id": analysis_id,
+                "status": "ok",
+                "swing_candidates": [
+                    {
+                        "start_frame": 30,
+                        "end_frame": 120,
+                        "is_practice": True,
+                        "confidence": 0.88,
+                        "start_time_sec": 1.0,
+                        "end_time_sec": 4.0,
+                    },
+                    {
+                        "start_frame": 180,
+                        "end_frame": 270,
+                        "is_practice": False,
+                        "confidence": 0.95,
+                        "start_time_sec": 6.0,
+                        "end_time_sec": 9.0,
+                    },
+                ],
+                "default_selected_index": 1,
+            }
+        return {
+            "analysis_id": analysis_id,
+            "status": "ok",
+            "swing_candidates": [
+                {
+                    "start_frame": 30,
+                    "end_frame": 120,
+                    "is_practice": False,
+                    "confidence": 0.95,
+                    "start_time_sec": 1.0,
+                    "end_time_sec": 4.0,
+                }
+            ],
+            "default_selected_index": 0,
         }
 
 

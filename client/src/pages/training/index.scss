@@ -21,6 +21,7 @@
   box-sizing: border-box;
 
   &__scroll-inner {
+    width: 100%;
     padding: 16rpx 24rpx 32rpx;
     box-sizing: border-box;
   }
@@ -83,12 +84,14 @@
   /* ================= 进步趋势（横滑） ================= */
   &__trend {
     width: 100%;
+    max-width: 100%;
     margin-bottom: 16rpx;
-    padding: 24rpx 24rpx 18rpx;
+    padding: 28rpx 28rpx 24rpx;
     background: var(--color-bg-card);
     border: 1rpx solid var(--color-border);
-    border-radius: 20rpx;
+    border-radius: 24rpx;
     box-shadow: var(--shadow-xs);
+    box-sizing: border-box;
   }
 
   &__trend-title {
@@ -120,6 +123,8 @@
   /* ========== 进步曲线（会员）；内含统计大卡 + 折线图 + 打卡柱 ========== */
   &__member-curve {
     width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
     margin-bottom: 16rpx;
   }
 
@@ -128,7 +133,7 @@
     font-weight: 800;
     color: var(--color-primary);
     display: block;
-    margin: 0 4rpx 12rpx;
+    margin-bottom: 12rpx;
     letter-spacing: -0.3rpx;
   }
 
@@ -136,7 +141,7 @@
     display: flex;
     flex-direction: row;
     gap: 16rpx;
-    margin: 0 4rpx 16rpx;
+    margin-bottom: 16rpx;
   }
 
   &__pill {
@@ -148,10 +153,10 @@
     background: var(--color-bg-card);
 
     &.is-active {
-      border-color: var(--color-primary);
-      color: var(--color-primary);
+      border-color: #1a237e;
+      color: #ffffff;
       font-weight: 700;
-      background: rgba(26, 35, 126, 0.06);
+      background: #1a237e;
     }
   }
 
@@ -160,17 +165,25 @@
     line-height: 1.55;
     color: var(--color-text-tertiary);
     display: block;
-    padding: 20rpx 24rpx;
+    width: 100%;
+    max-width: 100%;
+    padding: 28rpx 28rpx 24rpx;
     background: var(--color-bg-card);
     border: 1rpx solid var(--color-border);
-    border-radius: 20rpx;
+    border-radius: 24rpx;
+    box-shadow: var(--shadow-xs);
+    box-sizing: border-box;
   }
 
   &__stat-grid {
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
-    gap: 12rpx;
+    justify-content: space-between;
+    row-gap: 12rpx;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
     margin-bottom: 20rpx;
   }
 
@@ -179,7 +192,7 @@
     box-sizing: border-box;
     background: var(--color-bg-subtle);
     border-radius: 16rpx;
-    padding: 18rpx 16rpx;
+    padding: 18rpx 12rpx;
     text-align: center;
   }
 
@@ -226,10 +239,10 @@
     background: var(--color-bg-subtle);
 
     &.is-active {
-      border-color: var(--color-primary);
-      color: var(--color-primary);
+      border-color: #1a237e;
+      color: #ffffff;
       font-weight: 700;
-      background: rgba(26, 35, 126, 0.06);
+      background: #1a237e;
     }
   }
 
@@ -364,12 +377,15 @@
   }
 
   &__category-chip--active {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-    background: rgba(26, 35, 126, 0.06);
+    border-color: #1a237e;
+    color: #ffffff;
+    background: #1a237e;
   }
 
   &__hero {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
     background: var(--color-bg-card);
     border: 1rpx solid var(--color-border);
     border-radius: 24rpx;

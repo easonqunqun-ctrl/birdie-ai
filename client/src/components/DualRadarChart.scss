@@ -47,7 +47,7 @@
   }
 
   &__legend-text {
-    font-size: 22rpx;
+    font-size: var(--font-size-xs);
     color: var(--color-text-secondary);
   }
 
@@ -62,14 +62,14 @@
   }
 
   &__label-name {
-    font-size: 20rpx;
+    font-size: var(--font-size-xs);
     color: var(--color-text-secondary);
     line-height: 1.2;
     text-align: center;
   }
 
   &__label-score {
-    font-size: 22rpx;
+    font-size: var(--font-size-xs);
     font-weight: 700;
     color: var(--color-primary);
     line-height: 1.2;

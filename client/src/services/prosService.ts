@@ -134,7 +134,9 @@ export const prosService = {
     if (query.limit != null) qs.push(`limit=${query.limit}`)
     if (query.record != null) qs.push(`record=${query.record ? 'true' : 'false'}`)
     const tail = qs.length ? `?${qs.join('&')}` : ''
-    return http.get<ProMatchResultRead>(`/analyses/${analysisId}/pro-matches${tail}`)
+    return http.get<ProMatchResultRead>(`/analyses/${analysisId}/pro-matches${tail}`, {
+      silent: true,
+    })
   },
   currentTopic() {
     return http.get<ProTopicRead | null>('/pros/topics/current')

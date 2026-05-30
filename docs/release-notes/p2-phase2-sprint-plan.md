@@ -44,8 +44,20 @@
 | **W17-C** | **DOC-05 全文档巡检 + 回填** | P2-W17-C · DOC-05 | sprint plan W15-W17 全条目回填 + 真实状态；`wait-for-triggers-checklist.md` 单文件汇总 11 条等触发项（O-01/O-04/P-02/W14-C/Q-B5/Q-D1/ENG-04/ENG-06/W18+ webhook/W18+ COS/W19+ timeline poster）每条触发条件可观测、动作落 owner、证据进 doc | **✅ Done** |
 | **W17-D** | **ENG-06 争议样本周更模板** | P2-W17-D · ENG-06 | `docs/release-notes/eng-06-disputed-sample-weekly-template.md`：数据源 P0-P3（in-app/教练/客服/标定）+ 周报 markdown 模板（数据 + 样本明细表 + 行动项 + 不入档说明 + 下周关注）+ 工程化 4 项最低要求（analysis_id/标注/AI 输出/PLAN-ID）+ 反例 + 落地清单（cp 模板 → 填表 → PR）；首版样例 W17 空跑（v2_count=0 真流量未起，等触发） | **✅ Done** |
 | **W17-E** | **等触发清单收口** | P2-W17-E | 见 W17-C；11 条等触发项集中到 wait-for-triggers-checklist.md 一份；维护契约：每月 1 次扫表 / 触发即更新 / 不要扩散；反模式排雷（不可观测条件 / 没 owner / 工程未就位） | **✅ Done** |
+| **W18-A** | **Phase2 生产 flag 全开** | P2-W18-A | `client/.env.production` + CVM `.env.local` 同步打开 COACH / PUTTING / CHIPPING / YARDAGE / TRAINING_CATEGORIES + 教练子 flag；`infra/deploy/env.prod.deployment.template` 补 PHASE2 块；体验版冒烟清单 | **✅ Done**（repo + CVM env；**待** `make client-build-weapp-prod` 上传体验版） |
+| **W18-B** | **selected_swing_index 全链路** | P2-M7-13 · P2-W18-B | `CreateAnalysisRequest` + DB 列 + Celery → ai_engine `AnalyzeRequest.selected_swing_index`；docs/02 §3.2；pytest | **✅ Done**（repo；CVM 待 `publish-backend-cvm` + Alembic 0042） |
+| **W18-C** | **多挥 detect-swings API** | P2-M7-13 · P2-W18-C | `POST /v1/analyses/uploads/{id}/detect-swings` + ai_engine `/detect-swings`（pose + multi_swing，不跑全量评分）；>5 段 → 50122 | **✅ Done**（repo；CVM 待 `publish-backend-cvm`） |
+| **W18-D** | **select-swing 客户端** | P2-M7-13-ui · P2-W18-D | `pages/analysis/select-swing`：候选列表 + 试挥标签 + 默认非试挥段；params 上传后跳转；`selected_swing_index` 随 create | **✅ Done**（repo；待 `pnpm build:weapp:prod` + 体验版上传） |
+| **W18-E** | **教练定制课 UI** | P2-M11-06 · P2-W18-E | 教练端课程列表/编辑/发布页（对接已有 `coachCoursesService`）；学员侧课程详情「教练定制」标注 | **✅ Done**（repo；待发版） |
+| **W19-A** | **朋友圈封面海报 UI** | P2-W19-A · Q-B2 | `drawPosterTimeline` + `poster.tsx` 分享变体；layout 工具已就位（W16-C） | **✅ Done**（repo） |
+| **W19-B** | **xpay 体验版闭环** | Q-B5 · P2-W19-B | mp 消息推送 + 道具 ID + `WECHAT_XPAY_ENABLED` 沙箱/现网小额冒烟；虚拟支付发货到账 | **✅ Done**（runbook + `xpay_smoke_check.py`；真机走单待体验版） |
+| **W19-C** | **Alertmanager → 企微** | P2-W19-C | 申请群机器人 webhook → 改 `alertmanager.yml` receivers（监控 runbook §4） | **✅ Done**（`wechat_webhook_bridge` + compose；CVM 填 `WECOM_WEBHOOK_KEY`） |
+| **W20-A** | **推杆诊断扩展** | P2-M7-11-dx | `putting/diagnose.py` 补 kickoff 剩余规则（依赖 M7-09 信号或手腕角时序，缺信号则跳过） | **📋 Planned** |
+| **W20-B** | **docs/21 + docs/23 入库** | DOC-P2 | 二期 PRD / 可编码规格从 kickoff 引用落地为 `docs/21` · `docs/23` 真源 | **📋 Planned** |
 
-**并行泳道（不占 Sprint 主表）**：U-2 COS · Q-B5 papay · O-01/O-04 性能抽测 · par-E3/par-T1
+**并行泳道（不占 Sprint 主表）**：U-2 COS · Q-B5 papay（商户签约仍等触发）· O-01/O-04 性能抽测 · Q-D1 RN · ECS 标定（M7-01/11-cal/12-cal，等标注样本）
+
+**W18 目标**：让已合码的二期能力**对用户可见**（flag）+ 多挥选段**API/客户端闭环**；不阻塞在 ECS 样本 / 拍摄团队。
 
 **线上灰度状态**：W5 部署后 V2 pct=5（`.env.local`，CVM 容器内验证 1000 user_id → 49 命中 V2 ≈ 4.9%）。
 
@@ -280,3 +292,4 @@
 | 2026-05-29 | **Phase E · M10-05 ✅**（训练类目）：`issue_to_category.yaml` + category-aware drill pick + 训练页筛选 chip |
 | 2026-05-29 | **Phase E 小结**：M7 短杆引擎线 + M11/M12/M13 内容 + M8 教练端 + M10 训练扩展 **代码链路已通**；Phase D 数据/ML/运营项登记 `wait-for-triggers-checklist.md` §1（M7-01/07/08/09/15/16 · M14） |
 | 2026-05-29 | W12-1/2/3 ✅（`8578cf6` + 测试 fix）：3 块按顺序连开。W12-1 progress API 把 `engine_version`+`analysis_confidence` 落到 `AnalysisProgressPoint`，客户端 ProgressLineChart 圆点按 trust tier mint/gold/warning 着色（V1 不上色保兼容），让"我的-成长曲线"也能看出哪几次是高/低可信。W12-2 把 P2-M7-04 早就落地的 `camera_angle.py` 真接入 `_enrich_v2` / `_enrich_v2_fallback`：偏角 >15° → `ANGLE_PENALTY_BAD=0.6` 真惩罚 confidence、`angle_engine_warnings` 追加 result.engine_warnings；`run_real_analysis_v2` 末尾改成"合并"而非"覆盖"避免 angle warning 被 probe/fallback 吞。W12-3 治理 MinIO ffprobe 5XX：5xx/timeout 指数退避 retry 2 次（4xx/binary_missing 立即放弃）、URL log 脱敏去 query string、失败不再静默而是返回 `probe_failed` engine_warning 让客户端 W10 调试浮层能直接看到原因；6 个新 metrics 分桶 (`v2_probe_retries` + `v2_probe_errors_{5xx/timeout}_after_retries` + `v2_probe_errors_{4xx/binary_missing/unknown}`)。CVM 11/11 backend + 93/93 ai_engine（W7+W8+W9 全回归 + W12-2/3 新单测 38 例）+ client 550/550 jest + prod build all green |
+| 2026-05-29 | **W18 开发计划立项**：可开发项从 wait-for-triggers 迁入 W18-A～W19-C 主表；W18-A 正式包 Phase2 flag 全开；W18-B `selected_swing_index` 全链路（Alembic 0042 + docs/02）；W18-C/D/E、W19-A/B/C 排入 Planned |

@@ -13,6 +13,7 @@ import type {
   AnalysisStatusResponse,
   CreateAnalysisRequest,
   CreateAnalysisResponse,
+  DetectSwingsResponse,
   UploadTokenRequest,
   UploadTokenResponse,
 } from '@/types/analysis'
@@ -137,6 +138,18 @@ export const analysisService = {
     })
   },
 
+  /** M7-13：上传后探测多挥候选（仅 full_swing；不扣配额） */
+  detectSwings(uploadId: string) {
+    return http.post<DetectSwingsResponse>(
+      `/analyses/uploads/${encodeURIComponent(uploadId)}/detect-swings`,
+      {},
+      {
+        timeout: ANALYSIS_API_TIMEOUT_MS,
+        silent: true,
+      },
+    )
+  },
+
   getStatus(analysisId: string) {
     return http.get<AnalysisStatusResponse>(`/analyses/${analysisId}/status`, {
       // 轮询时不弹 toast；失败由调用方决定降级策略
@@ -180,7 +193,11 @@ export const analysisService = {
 
   /** 分享物料：小程序码 PNG（服务端落 COS/MinIO） */
   createShareCard(analysisId: string) {
-    return http.post<{ wxa_code_url: string }>(`/analyses/${analysisId}/share-card`, {})
+    return http.post<{ wxa_code_url: string }>(
+      `/analyses/${analysisId}/share-card`,
+      {},
+      { silent: true },
+    )
   },
 }
 

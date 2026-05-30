@@ -77,6 +77,14 @@ async def list_coach_courses(db: AsyncSession, user_id: str) -> list[Course]:
     return list(rows.scalars().all())
 
 
+async def get_coach_course_detail(
+    db: AsyncSession, *, user_id: str, course_id: str
+) -> tuple[Course, list[Lesson]]:
+    course = await _get_owned_course(db, user_id=user_id, course_id=course_id)
+    lessons = await course_service.list_lessons_by_course(db, course_id)
+    return course, lessons
+
+
 async def create_coach_course(
     db: AsyncSession, *, user: User, payload: CoachCourseCreate
 ) -> Course:
@@ -175,6 +183,7 @@ __all__ = [
     "assert_coach_course_author",
     "coach_course_user_ids",
     "create_coach_course",
+    "get_coach_course_detail",
     "list_coach_courses",
     "publish_coach_course",
     "unpublish_coach_course",

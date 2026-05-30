@@ -209,10 +209,18 @@ class UserCourseStageRead(BaseModel):
     certificates: list[CertificateDetailRead] = Field(default_factory=list)
 
 
+class CoachCourseDetailRead(BaseModel):
+    """M11-06 · 教练查看自有课程详情（含草稿课时）."""
+
+    course: CourseRead
+    lessons: list[LessonRead] = Field(default_factory=list)
+
+
 __all__ = [
     "CertificateDetailRead",
     "CertificateRead",
     "CoachCourseCreate",
+    "CoachCourseDetailRead",
     "CoachCourseUpdate",
     "CoachLessonCreate",
     "CourseCreate",

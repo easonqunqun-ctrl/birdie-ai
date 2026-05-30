@@ -157,6 +157,11 @@
     border-radius: 6rpx;
     padding: 0 8rpx;
     line-height: 28rpx;
+
+    &--coach {
+      color: var(--color-primary);
+      border-color: var(--color-primary);
+    }
   }
 
   &__card-arrow {

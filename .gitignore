@@ -181,6 +181,8 @@ infra/test/certs/server.key
 # `credentialsService.ts` / `passwordSecretsHelper.ts` 这类源码命名。
 帐号*
 账号*
+密管理.docx
+*密管理*
 *credentials*
 !*credentials*.ts
 !*credentials*.tsx

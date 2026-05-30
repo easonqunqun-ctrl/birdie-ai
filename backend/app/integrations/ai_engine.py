@@ -34,6 +34,7 @@ class AIEngineClient:
         mode: str = "full_swing",
         user_id_hint: str | None = None,
         force_engine_version: str | None = None,
+        selected_swing_index: int | None = None,
     ) -> dict:
         payload: dict = {
             "analysis_id": analysis_id,
@@ -47,6 +48,8 @@ class AIEngineClient:
             payload["user_id_hint"] = user_id_hint
         if force_engine_version:
             payload["force_engine_version"] = force_engine_version
+        if selected_swing_index is not None:
+            payload["selected_swing_index"] = selected_swing_index
         log.info("ai_engine_call_start", analysis_id=analysis_id, base_url=self.base_url)
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             resp = await client.post(f"{self.base_url}/analyze", json=payload)
@@ -83,6 +86,37 @@ class AIEngineClient:
                 analysis_id=analysis_id,
                 status=data.get("status"),
                 scan_elapsed_ms=data.get("scan_elapsed_ms"),
+            )
+            return data
+
+    async def detect_swings(
+        self,
+        *,
+        analysis_id: str,
+        video_url: str,
+    ) -> dict:
+        payload = {
+            "analysis_id": analysis_id,
+            "video_url": video_url,
+            "mode": "full_swing",
+        }
+        log.info(
+            "ai_engine_detect_swings_start",
+            analysis_id=analysis_id,
+            base_url=self.base_url,
+        )
+        timeout = float(
+            getattr(settings, "AI_ENGINE_DETECT_SWINGS_TIMEOUT", 120) or 120
+        )
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(f"{self.base_url}/detect-swings", json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+            log.info(
+                "ai_engine_detect_swings_done",
+                analysis_id=analysis_id,
+                status=data.get("status"),
+                count=len(data.get("swing_candidates") or []),
             )
             return data
 

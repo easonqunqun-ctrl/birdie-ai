@@ -167,3 +167,27 @@ class PrecheckResult(BaseModel):
     error_message: str | None = None
     elapsed_ms: int = 0
     scan_elapsed_ms: int = 0
+
+
+class DetectSwingsRequest(BaseModel):
+    """P2-M7-13 · 上传后多挥候选探测（不跑评分）。"""
+
+    analysis_id: str = Field(..., description="探测任务 ID（可用 upload_id）")
+    video_url: str = Field(..., description="已上传视频 URL")
+    mode: Literal["full_swing"] = Field(
+        default="full_swing",
+        description="当前仅 full_swing 支持多挥探测",
+    )
+
+
+class DetectSwingsResult(BaseModel):
+    analysis_id: str
+    status: Literal["ok", "failed"]
+    swing_candidates: list[SwingCandidateItem] = Field(default_factory=list)
+    default_selected_index: int = Field(
+        default=0,
+        ge=0,
+        description="建议默认段（第一段非试挥）",
+    )
+    error_code: int | None = None
+    error_message: str | None = None

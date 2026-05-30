@@ -55,13 +55,26 @@ def _quantize_score(value: float) -> Decimal:
     return Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
+def _phase_score_value(raw: object) -> float | None:
+    """V1 报告 phase_scores 为数值；V2 为 ``{label, score, is_weakest}`` 对象。"""
+    if raw is None:
+        return None
+    if isinstance(raw, (int, float)):
+        return float(raw)
+    if isinstance(raw, dict):
+        score = raw.get("score")
+        if isinstance(score, (int, float)):
+            return float(score)
+    return None
+
+
 def _phase_average(phase_scores: dict | None) -> float | None:
     if not phase_scores:
         return None
     vals = [
-        float(phase_scores[k])
+        v
         for k in STANDARD_PHASES
-        if k in phase_scores and phase_scores[k] is not None
+        if k in phase_scores and (v := _phase_score_value(phase_scores[k])) is not None
     ]
     if not vals:
         return None

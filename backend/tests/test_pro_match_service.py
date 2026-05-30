@@ -59,6 +59,14 @@ def test_score_clip_match_camera_angle_bonus() -> None:
     assert other_score == pytest.approx(50.0, abs=0.01)
 
 
+def test_phase_average_accepts_v2_dict_phase_scores() -> None:
+    phase_scores = {
+        "setup": {"label": "站位", "score": 80, "is_weakest": False},
+        "impact": {"label": "击球", "score": 90, "is_weakest": False},
+    }
+    assert match_svc._phase_average(phase_scores) == pytest.approx(85.0)
+
+
 def test_rank_clip_matches_orders_by_score_desc() -> None:
     analysis = match_svc.AnalysisMatchInput(
         club_type="iron_7",

@@ -19,6 +19,7 @@ import { View, Text, ScrollView } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { PHASE2_COURSES_ENABLED_FLAG } from '@/constants/flags'
 import { coursesService, type CourseRead, type UserCourseStageSummary } from '@/services/coursesService'
+import { isCoachCustomCourse } from '@/utils/coachCourse'
 import './index.scss'
 
 const STAGE_TITLES: Record<number, string> = {
@@ -167,6 +168,11 @@ const CoursesIndexPage: FC = () => {
                   </Text>
                   {course.is_member_only && (
                     <Text className='courses-list__card-badge'>会员</Text>
+                  )}
+                  {isCoachCustomCourse(course) && (
+                    <Text className='courses-list__card-badge courses-list__card-badge--coach'>
+                      教练定制
+                    </Text>
                   )}
                 </View>
               </View>

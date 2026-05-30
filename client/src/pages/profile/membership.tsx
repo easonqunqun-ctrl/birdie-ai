@@ -221,11 +221,15 @@ const MembershipPage: FC = () => {
           } else {
             const fromWx =
               m.replace(/^request(Virtual)?Payment:fail\s*/i, '').trim() || ''
-            const title =
+            let title =
               fromWx.length > 0 && fromWx.length <= 220
                 ? fromWx
                 : describeIntermittentRequestFailure(payErr).toastTitle
-            Taro.showToast({ title, icon: 'none' })
+            if (/iOS支付|尚未开启iOS/i.test(fromWx)) {
+              title =
+                'iOS 支付需在 mp 后台「虚拟支付 → iOS资金概况」完成签约；签约后使用现网 env=0 重试'
+            }
+            Taro.showToast({ title, icon: 'none', duration: 3200 })
           }
           return
         }

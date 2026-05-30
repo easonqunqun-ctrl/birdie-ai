@@ -4,6 +4,13 @@
   padding: 24rpx 20rpx 20rpx;
   box-shadow: 0 4rpx 16rpx rgba(26, 35, 126, 0.06);
 
+  &--embedded {
+    background: transparent;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+
   &__header {
     display: flex;
     flex-direction: row;

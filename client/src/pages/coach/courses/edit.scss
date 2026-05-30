@@ -1,0 +1,159 @@
+.coach-course-edit {
+  min-height: 100%;
+  padding: 24rpx;
+  padding-bottom: 240rpx;
+  background: var(--color-bg-page);
+  box-sizing: border-box;
+
+  &--blocked {
+    padding-top: 160rpx;
+    text-align: center;
+    color: var(--color-text-secondary);
+    font-size: 32rpx;
+  }
+
+  &__section {
+    background: var(--color-bg-card);
+    border-radius: 18rpx;
+    padding: 24rpx;
+    margin-bottom: 20rpx;
+    box-shadow: var(--shadow-xs);
+  }
+
+  &__section-title {
+    display: block;
+    font-size: 30rpx;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin-bottom: 16rpx;
+  }
+
+  &__label {
+    display: block;
+    font-size: 26rpx;
+    color: var(--color-text-secondary);
+    margin-bottom: 8rpx;
+  }
+
+  &__input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 16rpx 20rpx;
+    margin-bottom: 16rpx;
+    border-radius: 12rpx;
+    background: var(--color-bg-muted);
+    font-size: 28rpx;
+    color: var(--color-text-primary);
+  }
+
+  &__textarea {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 160rpx;
+    padding: 16rpx 20rpx;
+    margin-bottom: 16rpx;
+    border-radius: 12rpx;
+    background: var(--color-bg-muted);
+    font-size: 28rpx;
+    color: var(--color-text-primary);
+  }
+
+  &__stage-row {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 12rpx;
+    margin-bottom: 8rpx;
+  }
+
+  &__stage-chip {
+    padding: 10rpx 20rpx;
+    border-radius: 999rpx;
+    border: 1rpx solid var(--color-border);
+    font-size: 26rpx;
+    color: var(--color-text-secondary);
+  }
+
+  &__stage-chip--active {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    background: rgba(26, 35, 126, 0.06);
+  }
+
+  &__lesson {
+    padding: 16rpx 0;
+    border-bottom: 1rpx solid var(--color-border);
+  }
+
+  &__lesson:last-child {
+    border-bottom: none;
+  }
+
+  &__lesson-title {
+    display: block;
+    font-size: 28rpx;
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
+
+  &__lesson-meta {
+    display: block;
+    margin-top: 4rpx;
+    font-size: 24rpx;
+    color: var(--color-text-tertiary);
+  }
+
+  &__empty-lessons {
+    font-size: 26rpx;
+    color: var(--color-text-tertiary);
+    padding: 8rpx 0 16rpx;
+  }
+
+  &__footer {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 20rpx 24rpx calc(20rpx + env(safe-area-inset-bottom));
+    background: var(--color-bg-page);
+    box-shadow: 0 -4rpx 16rpx rgba(26, 35, 126, 0.06);
+    display: flex;
+    flex-direction: column;
+    gap: 12rpx;
+  }
+
+  &__btn {
+    margin: 0 !important;
+    border-radius: 999rpx !important;
+    font-size: 30rpx !important;
+    font-weight: 600 !important;
+
+    &::after {
+      border: none !important;
+    }
+  }
+
+  &__btn--primary {
+    background: var(--gradient-hero) !important;
+    color: #fff !important;
+  }
+
+  &__btn--secondary {
+    background: var(--color-bg-card) !important;
+    color: var(--color-primary) !important;
+    border: 1rpx solid var(--color-primary) !important;
+  }
+
+  &__btn--ghost {
+    background: transparent !important;
+    color: var(--color-text-secondary) !important;
+  }
+
+  &__status {
+    display: block;
+    text-align: center;
+    font-size: 24rpx;
+    color: var(--color-text-tertiary);
+    margin-bottom: 8rpx;
+  }
+}

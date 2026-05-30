@@ -108,6 +108,15 @@ async def test_coach_course_publish_flow_api(
     assert r_create.status_code == 200
     course_id = r_create.json()["data"]["id"]
 
+    r_detail = await client.get(
+        f"/v1/users/me/coach/courses/{course_id}",
+        headers=headers,
+    )
+    assert r_detail.status_code == 200
+    detail = r_detail.json()["data"]
+    assert detail["course"]["id"] == course_id
+    assert detail["lessons"] == []
+
     r_lesson = await client.post(
         f"/v1/users/me/coach/courses/{course_id}/lessons",
         headers=headers,

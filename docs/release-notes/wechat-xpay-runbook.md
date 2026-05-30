@@ -75,6 +75,24 @@ cd backend && uv run pytest tests/test_wechat_xpay.py -q
 
 ---
 
+## 7. iOS 虚拟支付（Apple 支付）
+
+**报错**：`当前商户尚未开启iOS支付`（errCode `-15001`）
+
+**原因**：Android/Windows 虚拟支付开通 ≠ iOS 已签约。iOS 须单独在 mp 后台完成 Apple 支付签约。
+
+**开通步骤**（须管理员扫码登录 [mp.weixin.qq.com](https://mp.weixin.qq.com/)）：
+
+1. **虚拟支付 → iOS 资金概况** → 按指引完成签约（二级商户 / Apple 小程序合作伙伴计划）
+2. 确认 **小程序简称** 已配置（设置 → 基本设置 → 小程序简称；Apple 展示名要求）
+3. CVM `.env.local` 保持 **`WECHAT_XPAY_ENV=0`**（iOS **不支持沙箱 env=1**）
+4. 道具须在 **现网 env=0** 发布（`scripts/setup_wechat_xpay_goods.py --env 0`）
+5. 真机要求：iOS ≥ 15、微信 ≥ 8.0.68
+
+**联调注意**：体验版/真机 iOS 一律用现网 appKey + env=0；Android 联调可暂用沙箱 env=1。
+
+---
+
 ## 5. 提审注意
 
 - 会员页价格与 mp **道具价格** 必须一致。

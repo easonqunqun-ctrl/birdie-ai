@@ -30,12 +30,12 @@
 | **ENG-06** | 模板就位 | v2_count ≥ 5 且 1 条争议反馈/周 | 周更模板 → eng-06 系列 docs | 运营 + AI 工程 |
 | **W18+** | 监控栈就位 | webhook-echo → 企业微信群机器人 | 改 alertmanager.yml receivers | DevOps |
 | **W18+** | probe rewrite + 自检脚本就位 | 切 COS / OSS / 第三方对象存储 | 改 env → 跑 `cos_switch_selfcheck.py` 校验 → 重启 | DevOps |
-| **W19+** | 朋友圈封面 layout 就位 | 产品决定接入 timeline 海报 | 实现 drawPosterTimeline + 接 poster.tsx | 客户端工程 |
+| **W19+** | 朋友圈封面 layout 就位 | —（**已迁入 W19-A 开发计划**） | 实现 drawPosterTimeline + 接 poster.tsx | 客户端工程 |
 | **M7-11-cal** | 推杆 pipeline 链路就位（W22-W25） | ECS 推杆 ≥10 段人工标注就位 | 回填 `putting/constants.py` ideal 区间 + 验 AC-3（与教练人评 r≥0.7） | AI 工程 |
 | **M7-11-dx** | 推杆诊断 5 条已上 | M7-09 杆/球追踪 or 手腕角序列特征就位 | 补 putter-lift / 手腕翻折 / 回摆过短 / 减速/瞄准偏移 等诊断 | AI 工程 |
 | **M7-12-cal** | 切杆 pipeline 链路就位 | ECS 切杆 ≥10 段人工标注就位 | 回填 `chipping/constants.py` ideal + 验 AC-2（r≥0.65） | AI 工程 |
-| **M7-13-ui** | 多挥识别引擎链路就位（W28-W29） | 产品确认 select-swing UX + M10 训练页入口排期 | 客户端 `select-swing.tsx` + ffmpeg 缩略图 + `selected_swing_index` 回传 | 客户端 + AI 工程 |
-| **M11-06-auth** | 教练定制课程写 API 就位（白名单） | M8-01 教练认证 + 角色切换就位 | 白名单切 `is_coach` 校验；教练端课程编辑 UI（M8） | 后端 + 客户端 |
+| **M7-13-ui** | 多挥识别引擎链路就位（W28-W29） | —（**已迁入 W18-D 开发计划**） | 客户端 `select-swing.tsx` + detect-swings API（W18-C）+ `selected_swing_index` 回传（W18-B ✅） | 客户端 + AI 工程 |
+| **M11-06-auth** | 教练定制课程写 API 就位（白名单） | —（**已迁入 W18-E**；M8-01 已合，`PHASE2_COACH_ENABLED` 开即走 active 教练校验） | 教练端课程编辑 UI（W18-E）；白名单仅 seed 兜底 | 后端 + 客户端 |
 | **M10-04-videos** | drill 库 25 条 + category 就位 | DEP-02 教练 BD + DEP-03 拍摄团队交付 12–17 段示范视频 | 回填 `drills.video_url` + `DRILL_VIDEO_ALIGNED_IDS` 灰度名单 | 教研 + 运营 |
 | **M7-01-ecs** | ECS v2 标定集骨架 | ≥50 段全挥杆 + 推杆/切杆各 ≥10 段教练标注 | 训练 ECS v2 + 回填 ideal/threshold | AI 工程 |
 | **M7-07-nn** | NN 本体占位（W23–W30） | 标定集 + ML 基建（GPU/训练管线） | 替换 rule-based 分段/评分子模块 | AI 工程 |

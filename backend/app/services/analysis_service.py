@@ -30,6 +30,7 @@ from app.constants.putting import (
     PUTTING_FEATURE_PRIMARY_PHASE,
 )
 from app.core.exceptions import (
+    AIEngineError,
     AnalysisDispatchError,
     BadRequestError,
     ConflictError,
@@ -55,6 +56,7 @@ from app.schemas.analysis import (
     AnalysisStatusResponse,
     CreateAnalysisRequest,
     CreateAnalysisResponse,
+    DetectSwingsResponse,
     IssueItem,
     PhaseScore,
     PhaseWindow,
@@ -460,6 +462,73 @@ async def receive_upload_via_api(
 
 
 # ==================================================================
+# 3.1c POST /v1/analyses/uploads/{upload_id}/detect-swings
+# ==================================================================
+async def detect_swings_for_upload(
+    *,
+    user: User,
+    upload_id: str,
+    redis: Redis,
+    storage: MinioStorageClient,
+) -> DetectSwingsResponse:
+    """上传完成后、创建任务前探测多挥候选（不扣配额）。"""
+    from app.integrations.ai_engine import get_ai_engine
+
+    raw = await redis.get(UPLOAD_TOKEN_REDIS_KEY.format(upload_id=upload_id))
+    if raw is None:
+        raise UploadTokenInvalidError()
+    meta = _decode_upload_token_meta(raw)
+    if meta["user_id"] != user.id:
+        raise UploadTokenInvalidError()
+
+    try:
+        stat = storage.head_object(meta["key"])
+    except Exception as exc:
+        log.exception(
+            "storage_head_object_failed",
+            extra={"key": meta.get("key"), "upload_id": upload_id},
+        )
+        raise ThirdPartyError(
+            code=50203,
+            http_status=502,
+            message="存储服务暂时不可用，请稍后重试",
+            detail=str(exc) if settings.APP_DEBUG else None,
+        ) from exc
+    if stat is None:
+        raise UploadObjectMissingError()
+
+    video_url = storage.get_object_url(meta["key"])
+    client = get_ai_engine()
+    try:
+        result = await client.detect_swings(
+            analysis_id=upload_id,
+            video_url=video_url,
+        )
+    except Exception as exc:
+        log.exception(
+            "ai_engine_detect_swings_call_failed",
+            extra={"upload_id": upload_id},
+        )
+        raise AIEngineError(
+            message="挥杆探测服务暂时不可用，请稍后重试",
+            detail=str(exc) if settings.APP_DEBUG else None,
+        ) from exc
+
+    if result.get("status") == "failed":
+        code = int(result.get("error_code") or 50101)
+        msg = str(result.get("error_message") or "挥杆探测失败")
+        if 50101 <= code <= 50123:
+            raise BadRequestError(code=code, message=msg)
+        raise AIEngineError(code=code, message=msg)
+
+    return DetectSwingsResponse(
+        upload_id=upload_id,
+        swing_candidates=result.get("swing_candidates") or [],
+        default_selected_index=int(result.get("default_selected_index") or 0),
+    )
+
+
+# ==================================================================
 # 3.2 POST /v1/analyses
 # ==================================================================
 async def create_analysis(
@@ -485,6 +554,12 @@ async def create_analysis(
         if mode != "full_swing":
             raise BadRequestError(message="仅全挥杆分析可填写目标码数")
         target_yardage = payload.target_yardage
+
+    selected_swing_index: int | None = None
+    if payload.selected_swing_index is not None:
+        if mode != "full_swing":
+            raise BadRequestError(message="仅全挥杆分析可指定挥杆段索引")
+        selected_swing_index = payload.selected_swing_index
 
     # 1) 取凭证上下文 & 归属校验
     raw = await redis.get(UPLOAD_TOKEN_REDIS_KEY.format(upload_id=payload.upload_id))
@@ -562,6 +637,7 @@ async def create_analysis(
         club_type=payload.club_type,
         analysis_mode=mode,
         target_yardage=target_yardage,
+        selected_swing_index=selected_swing_index,
         status="pending",
         stage=None,
         stage_progress=0,

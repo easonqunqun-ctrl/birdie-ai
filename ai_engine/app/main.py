@@ -19,9 +19,12 @@ from app.mock_pipeline import run_mock_analysis
 from app.schemas import (
     AnalyzeRequest,
     AnalyzeResult,
+    DetectSwingsRequest,
+    DetectSwingsResult,
     PhaseScore,
     PrecheckRequest,
     PrecheckResult,
+    SwingCandidateItem,
 )
 from app.version_router import (
     ENGINE_V1,
@@ -501,3 +504,47 @@ async def precheck(req: PrecheckRequest) -> PrecheckResult:
         elapsed_ms=result.elapsed_ms,
         scan_elapsed_ms=result.scan_elapsed_ms,
     )
+
+
+@app.post(
+    "/detect-swings",
+    summary="多挥候选探测（预处理 + pose + detect，不跑评分）",
+    response_model=DetectSwingsResult,
+)
+async def detect_swings(req: DetectSwingsRequest) -> DetectSwingsResult:
+    """P2-M7-13 · 上传后轻量探测，供客户端 select-swing UI 消费。"""
+    log.info("detect_swings_start", analysis_id=req.analysis_id, video_url=req.video_url)
+    if settings.AI_ENGINE_MOCK_MODE:
+        return DetectSwingsResult(
+            analysis_id=req.analysis_id,
+            status="ok",
+            swing_candidates=[
+                SwingCandidateItem(
+                    start_frame=30,
+                    end_frame=120,
+                    is_practice=True,
+                    confidence=0.88,
+                    start_time_sec=1.0,
+                    end_time_sec=4.0,
+                ),
+                SwingCandidateItem(
+                    start_frame=180,
+                    end_frame=270,
+                    is_practice=False,
+                    confidence=0.95,
+                    start_time_sec=6.0,
+                    end_time_sec=9.0,
+                ),
+            ],
+            default_selected_index=1,
+        )
+    from app.pipeline.detect_swings import run_detect_swings
+
+    result = run_detect_swings(req)
+    log.info(
+        "detect_swings_done",
+        analysis_id=req.analysis_id,
+        status=result.status,
+        count=len(result.swing_candidates),
+    )
+    return result

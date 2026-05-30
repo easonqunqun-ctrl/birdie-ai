@@ -8,6 +8,11 @@
 import { http } from './request'
 import type { CourseRead, LessonRead } from './coursesService'
 
+export interface CoachCourseDetailResponse {
+  course: CourseRead
+  lessons: LessonRead[]
+}
+
 export interface CoachCourseCreatePayload {
   code?: string
   title: string
@@ -48,6 +53,11 @@ export interface CoachLessonCreatePayload {
 export const coachCoursesService = {
   listMine() {
     return http.get<CourseRead[]>('/users/me/coach/courses')
+  },
+  getDetail(courseId: string) {
+    return http.get<CoachCourseDetailResponse>(
+      `/users/me/coach/courses/${encodeURIComponent(courseId)}`,
+    )
   },
   create(payload: CoachCourseCreatePayload) {
     return http.post<CourseRead>('/users/me/coach/courses', payload)

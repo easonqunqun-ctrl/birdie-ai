@@ -25,7 +25,9 @@
     "packNpmRelationList": [],
     "minifyWXSS": true,
     "minifyWXML": true,
-    "navigateToMiniProgramAppIdList": ["wxbd687630cd02ce1d"],
+    "navigateToMiniProgramAppIdList": [
+      "wxbd687630cd02ce1d"
+    ],
     "localPlugins": false,
     "disableUseStrict": false,
     "useCompilerPlugins": false,

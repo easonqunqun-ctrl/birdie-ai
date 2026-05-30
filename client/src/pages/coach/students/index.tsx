@@ -13,7 +13,7 @@ import {
   type CoachStudentStatus,
 } from '@/services/coachStudentsService'
 import { useUserStore } from '@/store/userStore'
-import './students.scss'
+import './index.scss'
 
 const STATUS_LABEL: Record<CoachStudentStatus, string> = {
   pending: '待接受',

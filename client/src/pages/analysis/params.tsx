@@ -15,6 +15,7 @@ import Taro, { useRouter } from '@tarojs/taro'
 import { analysisService, uploadLikelyNeedsFreshToken } from '@/services/analysisService'
 import { checkVideoFirstFrame } from '@/services/mediaCheck'
 import { describeIntermittentRequestFailure, isRequestError } from '@/services/request'
+import { describeAnalysisFailure } from '@/constants/analysisEngineErrors'
 import {
   confirmQualityWarningsIfNeeded,
   precheckVideoQuality,
@@ -86,13 +87,14 @@ const AnalysisParamsPage: FC = () => {
   const [submitting, setSubmitting] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [phase, setPhase] = useState<
-    'idle' | 'quality' | 'checking' | 'signing' | 'uploading' | 'creating'
+    'idle' | 'quality' | 'checking' | 'signing' | 'uploading' | 'detecting' | 'creating'
   >('idle')
   const [qualityWarnings, setQualityWarnings] = useState<string[]>([])
   const [qualityBlocks, setQualityBlocks] = useState<string[]>([])
   const [qualityChecking, setQualityChecking] = useState(false)
 
   const setCurrent = useAnalysisStore((s) => s.setCurrent)
+  const setPendingSwingSelection = useAnalysisStore((s) => s.setPendingSwingSelection)
   const fetchMe = useUserStore((s) => s.fetchMe)
 
   const modeOptions = useMemo(
@@ -279,37 +281,95 @@ const AnalysisParamsPage: FC = () => {
       setPhase('creating')
       Taro.showLoading({ title: '创建分析任务' })
       const parsedYardage = targetYardage.trim() ? Number.parseInt(targetYardage.trim(), 10) : NaN
-      const created = await analysisService.createAnalysis({
-        upload_id: token.upload_id,
-        camera_angle: cameraAngle,
-        club_type: clubType,
-        mode: analysisMode,
-        ...(analysisMode === 'full_swing' &&
+      const yardagePayload =
+        analysisMode === 'full_swing' &&
         PHASE2_YARDAGE_BOOK_ENABLED_FLAG &&
         Number.isFinite(parsedYardage) &&
         parsedYardage >= 1 &&
         parsedYardage <= 400
-          ? { target_yardage: parsedYardage }
-          : {}),
-      })
+          ? parsedYardage
+          : undefined
 
-      Taro.hideLoading()
-      setCurrent(created.analysis_id)
-
-      // W8-T5：核心闭环埋点 — 用户成功提交一次分析任务
-      track('analysis_submit', {
-        analysis_id: created.analysis_id,
-        club_type: clubType,
+      const createPayload = {
+        upload_id: token.upload_id,
         camera_angle: cameraAngle,
-        analysis_mode: analysisMode,
-        duration,
-        size,
-      })
+        club_type: clubType,
+        mode: analysisMode,
+        ...(yardagePayload != null ? { target_yardage: yardagePayload } : {}),
+      }
 
-      // 刷新一下用户配额（创建成功后 analysis_remaining 会 -1）
-      fetchMe().catch(() => undefined)
+      const goWaiting = async (selectedIndex?: number) => {
+        const created = await analysisService.createAnalysis({
+          ...createPayload,
+          ...(selectedIndex != null ? { selected_swing_index: selectedIndex } : {}),
+        })
+        Taro.hideLoading()
+        setCurrent(created.analysis_id)
+        track('analysis_submit', {
+          analysis_id: created.analysis_id,
+          club_type: clubType,
+          camera_angle: cameraAngle,
+          analysis_mode: analysisMode,
+          duration,
+          size,
+          ...(selectedIndex != null ? { selected_swing_index: selectedIndex } : {}),
+        })
+        fetchMe().catch(() => undefined)
+        Taro.redirectTo({ url: `/pages/analysis/waiting?id=${created.analysis_id}` })
+      }
 
-      Taro.redirectTo({ url: `/pages/analysis/waiting?id=${created.analysis_id}` })
+      if (analysisMode === 'full_swing') {
+        setPhase('detecting')
+        Taro.showLoading({ title: '识别挥杆段' })
+        try {
+          const detected = await analysisService.detectSwings(token.upload_id)
+          Taro.hideLoading()
+          if (detected.swing_candidates.length > 1) {
+            setPendingSwingSelection({
+              uploadId: token.upload_id,
+              cameraAngle,
+              clubType,
+              mode: analysisMode,
+              targetYardage: yardagePayload,
+              duration,
+              size,
+              swingCandidates: detected.swing_candidates,
+              defaultSelectedIndex: detected.default_selected_index,
+            })
+            Taro.navigateTo({
+              url: `/pages/analysis/select-swing?uploadId=${encodeURIComponent(token.upload_id)}`,
+            })
+            return
+          }
+          setPhase('creating')
+          Taro.showLoading({ title: '创建分析任务' })
+          const autoIndex =
+            detected.swing_candidates.length === 1
+              ? detected.default_selected_index
+              : undefined
+          await goWaiting(autoIndex)
+          return
+        } catch (detectErr) {
+          Taro.hideLoading()
+          if (isRequestError(detectErr) && detectErr.code === 50122) {
+            const copy = describeAnalysisFailure({
+              code: 50122,
+              message: detectErr.message,
+            })
+            await Taro.showModal({
+              title: copy.title,
+              content: copy.hint ?? copy.message,
+              showCancel: false,
+              confirmText: '重新拍摄',
+            })
+            Taro.redirectTo({ url: '/pages/analysis/capture' })
+            return
+          }
+          throw detectErr
+        }
+      }
+
+      await goWaiting()
     } catch (e) {
       Taro.hideLoading()
       let msg =

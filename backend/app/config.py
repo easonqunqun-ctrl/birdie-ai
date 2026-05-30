@@ -166,6 +166,7 @@ class Settings(BaseSettings):
     AI_ENGINE_TIMEOUT: int = 60
     # O-08：引擎快速预检（含下载 + ≤5s 扫描）；默认略大于全量 analyze
     AI_ENGINE_PRECHECK_TIMEOUT: int = 20
+    AI_ENGINE_DETECT_SWINGS_TIMEOUT: int = 120
     # backend 不直接消费这个变量（只在 ai_engine 容器内决定走 mock or real），
     # 留在这里仅为 .env.local 校验完整性 + 便于将来 backend 侧加 fallback 逻辑
     AI_ENGINE_MOCK_MODE: bool = False

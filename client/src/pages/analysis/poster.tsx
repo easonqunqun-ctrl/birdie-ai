@@ -27,9 +27,23 @@ import type { AnalysisReportResponse } from '@/types/analysis'
 import type { CameraAngle, ClubType } from '@/types/api'
 import { POSTER_HEIGHT, POSTER_WIDTH } from '@/utils/posterLayout'
 import { drawPoster, type PosterCanvasContext } from '@/utils/posterCanvas'
+import {
+  drawPosterTimeline,
+  POSTER_TL_HEIGHT,
+  POSTER_TL_WIDTH,
+} from '@/utils/posterCanvasTimeline'
 import './poster.scss'
 
 const CANVAS_ID = 'poster-canvas'
+
+export type PosterVariant = 'share' | 'timeline'
+
+function posterDimensions(variant: PosterVariant): { width: number; height: number } {
+  if (variant === 'timeline') {
+    return { width: POSTER_TL_WIDTH, height: POSTER_TL_HEIGHT }
+  }
+  return { width: POSTER_WIDTH, height: POSTER_HEIGHT }
+}
 
 interface CanvasNodeLike {
   width: number
@@ -149,6 +163,7 @@ const PosterPage: FC = () => {
   const [wxaCodeUrl, setWxaCodeUrl] = useState<string>('')
   const [wxaFetchSettled, setWxaFetchSettled] = useState(false)
   const [posterTempPath, setPosterTempPath] = useState<string>('')
+  const [variant, setVariant] = useState<PosterVariant>('share')
   const [drawing, setDrawing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -185,15 +200,15 @@ const PosterPage: FC = () => {
     setDrawing(true)
     setError(null)
     try {
-      // useReady 还没回调时 selector 拿不到 node；等一下
       if (!readyRef.current) {
         await new Promise<void>((resolve) => setTimeout(resolve, 120))
       }
       const canvas = await resolveCanvasNode()
       const ctx = canvas.getContext('2d')
       const dpr = readCanvasPixelRatio()
-      canvas.width = POSTER_WIDTH * dpr
-      canvas.height = POSTER_HEIGHT * dpr
+      const { width, height } = posterDimensions(variant)
+      canvas.width = width * dpr
+      canvas.height = height * dpr
       ctx.scale(dpr, dpr)
 
       const wxaImage = await loadImageToCanvas(canvas, wxaCodeUrl)
@@ -202,25 +217,26 @@ const PosterPage: FC = () => {
       const phaseLabels = PHASE_ORDER.map((k) => PHASE_LABEL[k])
       const topIssues = (report.issues || []).slice(0, 3).map((i) => i.name)
 
-      drawPoster(
-        ctx,
-        {
-          overallScore: report.overall_score ?? null,
-          scoreLevel: report.score_level ?? null,
-          phaseScores,
-          phaseLabels,
-          clubLabel:
-            CLUB_TYPE_LABEL[report.club_type as ClubType] || '挥杆',
-          cameraAngleLabel:
-            CAMERA_ANGLE_LABEL[report.camera_angle as CameraAngle] || '',
-          thumbnailUrl: report.thumbnail_url || null,
-          wxaCodeUrl: wxaCodeUrl || null,
-          topIssues,
-          engineVersion: report.engine_version ?? null,
-          analysisConfidence: report.analysis_confidence ?? null,
-        },
-        { wxaCodeImage: wxaImage, thumbnailImage: null },
-      )
+      const posterInput = {
+        overallScore: report.overall_score ?? null,
+        scoreLevel: report.score_level ?? null,
+        phaseScores,
+        phaseLabels,
+        clubLabel: CLUB_TYPE_LABEL[report.club_type as ClubType] || '挥杆',
+        cameraAngleLabel:
+          CAMERA_ANGLE_LABEL[report.camera_angle as CameraAngle] || '',
+        thumbnailUrl: report.thumbnail_url || null,
+        wxaCodeUrl: wxaCodeUrl || null,
+        topIssues,
+        engineVersion: report.engine_version ?? null,
+        analysisConfidence: report.analysis_confidence ?? null,
+      }
+
+      if (variant === 'timeline') {
+        drawPosterTimeline(ctx, posterInput, { wxaCodeImage: wxaImage, thumbnailImage: null })
+      } else {
+        drawPoster(ctx, posterInput, { wxaCodeImage: wxaImage, thumbnailImage: null })
+      }
 
       await new Promise<void>((resolve) => setTimeout(resolve, 60))
 
@@ -243,14 +259,14 @@ const PosterPage: FC = () => {
     } finally {
       setDrawing(false)
     }
-  }, [analysisId, drawing, report, wxaCodeUrl])
+  }, [analysisId, drawing, report, variant, wxaCodeUrl])
 
   useEffect(() => {
     if (report && wxaFetchSettled) {
       generatePoster()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [report, wxaFetchSettled, wxaCodeUrl])
+  }, [report, wxaFetchSettled, wxaCodeUrl, variant])
 
   const handleSave = async () => {
     if (!posterTempPath || saving) return
@@ -317,7 +333,26 @@ const PosterPage: FC = () => {
         </View>
       </View>
 
-      <View className='poster__preview'>
+      <View className='poster__variant-row'>
+        <View
+          className={`poster__variant-chip ${variant === 'share' ? 'poster__variant-chip--active' : ''}`}
+          onClick={() => variant !== 'share' && setVariant('share')}
+        >
+          <Text>好友分享 750×1334</Text>
+        </View>
+        <View
+          className={`poster__variant-chip ${variant === 'timeline' ? 'poster__variant-chip--active' : ''}`}
+          onClick={() => variant !== 'timeline' && setVariant('timeline')}
+        >
+          <Text>朋友圈封面 9:16</Text>
+        </View>
+      </View>
+
+      <View
+        className={`poster__preview ${
+          variant === 'timeline' ? 'poster__preview--timeline' : ''
+        }`}
+      >
         {posterTempPath ? (
           <Image
             className='poster__preview-image'
@@ -344,7 +379,11 @@ const PosterPage: FC = () => {
       )}
 
       <View className='poster__tip'>
-        <Text>保存或转发海报，邀请球友扫码查看完整挥杆报告。</Text>
+        <Text>
+          {variant === 'timeline'
+            ? '朋友圈封面版首屏突出评分，适合「分享到朋友圈」封面图。'
+            : '好友分享版信息更紧凑，适合转发给微信好友。'}
+        </Text>
       </View>
 
       <View className='poster__actions'>

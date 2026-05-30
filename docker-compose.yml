@@ -258,6 +258,23 @@ services:
       - "127.0.0.1:9094:9094"
     mem_limit: 32m
 
+  # W19-C · Alertmanager → 企业微信群机器人（需 WECOM_WEBHOOK_KEY）
+  wechat-webhook-bridge:
+    image: python:3.11-alpine
+    container_name: xiaoniao-wechat-webhook-bridge
+    restart: unless-stopped
+    profiles: ["monitoring"]
+    working_dir: /app
+    volumes:
+      - ./infra/monitoring/wechat_webhook_bridge.py:/app/wechat_webhook_bridge.py:ro
+    environment:
+      WECOM_WEBHOOK_PORT: "9095"
+      WECOM_WEBHOOK_KEY: ${WECOM_WEBHOOK_KEY:-}
+    command: ["python", "/app/wechat_webhook_bridge.py"]
+    ports:
+      - "127.0.0.1:9095:9095"
+    mem_limit: 32m
+
 volumes:
   postgres_data:
   redis_data:

@@ -12,6 +12,7 @@ from app.models.user import User
 from app.schemas.base import APIResponse, ok
 from app.schemas.course import (
     CoachCourseCreate,
+    CoachCourseDetailRead,
     CoachCourseUpdate,
     CoachLessonCreate,
     CourseRead,
@@ -51,6 +52,29 @@ async def create_coach_course(
     course = await coach_svc.create_coach_course(db, user=user, payload=payload)
     await db.commit()
     return ok(CourseRead.model_validate(course))
+
+
+@router.get(
+    "/{course_id}",
+    summary="获取自有教练课程详情（含草稿课时）",
+    response_model=APIResponse[CoachCourseDetailRead],
+)
+async def get_my_coach_course_detail(
+    course_id: str,
+    user: User = Depends(get_coach_role_user),
+    db: AsyncSession = Depends(get_db),
+):
+    _ensure_courses_enabled()
+    await coach_svc.assert_coach_author(db, user)
+    course, lessons = await coach_svc.get_coach_course_detail(
+        db, user_id=user.id, course_id=course_id
+    )
+    return ok(
+        CoachCourseDetailRead(
+            course=CourseRead.model_validate(course),
+            lessons=[LessonRead.model_validate(lsn) for lsn in lessons],
+        )
+    )
 
 
 @router.patch(

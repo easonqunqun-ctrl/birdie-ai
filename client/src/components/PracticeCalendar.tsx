@@ -13,6 +13,8 @@ export interface PracticeCalendarProps {
   onNextMonth?: () => void
   /** 是否允许切到下月（通常不允许超过当月） */
   canGoNext?: boolean
+  /** 嵌入训练页白卡时去掉自身卡片底/阴影，避免双层嵌套 */
+  embedded?: boolean
 }
 
 export const PracticeCalendar: FC<PracticeCalendarProps> = ({
@@ -20,11 +22,14 @@ export const PracticeCalendar: FC<PracticeCalendarProps> = ({
   onPrevMonth,
   onNextMonth,
   canGoNext = true,
+  embedded = false,
 }) => {
   const weekdays = practiceCalendarWeekdayLabels()
 
   return (
-    <View className='practice-calendar'>
+    <View
+      className={`practice-calendar${embedded ? ' practice-calendar--embedded' : ''}`}
+    >
       <View className='practice-calendar__header'>
         <Text
           className='practice-calendar__nav'

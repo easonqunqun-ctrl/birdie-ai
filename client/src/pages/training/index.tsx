@@ -331,6 +331,7 @@ const TrainingPage: FC = () => {
     <View className='training__calendar-wrap'>
       <Text className='training__trend-title'>打卡月历</Text>
       <PracticeCalendar
+        embedded
         grid={practiceCalendar}
         canGoNext={canGoNextPracticeMonth}
         onPrevMonth={() => setPracticeMonthKey((k) => shiftMonthKey(k, -1))}
