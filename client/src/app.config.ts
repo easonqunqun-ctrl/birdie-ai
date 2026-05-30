@@ -118,8 +118,7 @@ export default defineAppConfig({
    *
    * 1) `requiredPrivateInfos`：**只**接受位置类 8 个 API（chooseAddress / chooseLocation /
    *    choosePoi / getFuzzyLocation / getLocation / onLocationChange /
-   *    startLocationUpdate / startLocationUpdateBackground）；写其它值会被开发者工具
-   *    静态校验拒绝。一期不取定位，整段不声明。
+   *    startLocationUpdate / startLocationUpdateBackground）；M9-05 常去球馆使用 getLocation。
    *
    * 2) `permission`：**只**接受官方白名单（scope.userLocation / scope.userLocationBackground /
    *    scope.userFuzzyLocation / scope.writePhotosAlbum / scope.werun / scope.bluetooth /
@@ -136,10 +135,20 @@ export default defineAppConfig({
    *  - https://developers.weixin.qq.com/miniprogram/dev/reference/configuration/app.html#requiredPrivateInfos
    *  - https://developers.weixin.qq.com/miniprogram/dev/reference/configuration/app.html#permission
    */
+  /**
+   * M9-05 常去球馆「添加附近球馆」使用 wx.getLocation；须在公众平台隐私指引同步勾选。
+   * Taro 3.6 的 AppConfig 类型未收录 requiredPrivateInfos，运行时以微信校验为准。
+   */
+  // @ts-expect-error 微信官方字段，Taro defineAppConfig 类型过窄
+  requiredPrivateInfos: ['getLocation'],
   permission: {
     /** Q-C1 分享海报：保存到相册时弹的授权说明文案 */
     'scope.writePhotosAlbum': {
       desc: '将挥杆报告海报保存到您的相册，便于分享到朋友圈',
+    },
+    /** M9-05 常去球馆：按定位推荐附近球馆 */
+    'scope.userLocation': {
+      desc: '你的位置信息将用于查找并推荐附近球馆',
     },
   },
 })

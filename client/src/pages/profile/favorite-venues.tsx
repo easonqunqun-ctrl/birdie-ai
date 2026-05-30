@@ -11,6 +11,11 @@
 import { FC, useCallback, useState } from 'react'
 import { View, Text, ScrollView } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
+import {
+  getCurrentGcj02Location,
+  LocationError,
+  promptOpenLocationSettings,
+} from '@/adapters/location'
 import { MAX_FAVORITE_VENUES } from '@/constants/profileV2'
 import { PHASE2_PROFILE_V2_ENABLED_FLAG } from '@/constants/flags'
 import { VENUE_TYPE_LABEL } from '@/constants/meetup'
@@ -79,6 +84,24 @@ const FavoriteVenuesPage: FC = () => {
     await saveIds(nextIds)
   }
 
+  const fetchNearby = async () => {
+    const loc = await getCurrentGcj02Location()
+    const resp = await meetupService.nearbyVenues({
+      lat: loc.latitude,
+      lng: loc.longitude,
+      radius_km: 8,
+      limit: 20,
+    })
+    const existing = new Set(data.items.map((v) => v.id))
+    const candidates = resp.items.filter((v) => !existing.has(v.id))
+    if (candidates.length === 0) {
+      Taro.showToast({ title: '附近暂无可用球馆', icon: 'none' })
+      return
+    }
+    setNearby(candidates)
+    setPickerOpen(true)
+  }
+
   const handleOpenPicker = async () => {
     if (!data || data.total >= MAX_FAVORITE_VENUES) {
       Taro.showToast({ title: `最多 ${MAX_FAVORITE_VENUES} 个`, icon: 'none' })
@@ -86,23 +109,24 @@ const FavoriteVenuesPage: FC = () => {
     }
     setLocating(true)
     try {
-      const loc = await Taro.getLocation({ type: 'gcj02' })
-      const resp = await meetupService.nearbyVenues({
-        lat: loc.latitude,
-        lng: loc.longitude,
-        radius_km: 8,
-        limit: 20,
-      })
-      const existing = new Set(data.items.map((v) => v.id))
-      const candidates = resp.items.filter((v) => !existing.has(v.id))
-      if (candidates.length === 0) {
-        Taro.showToast({ title: '附近暂无可用球馆', icon: 'none' })
+      await fetchNearby()
+    } catch (e) {
+      if (e instanceof LocationError && e.code === 'denied') {
+        const opened = await promptOpenLocationSettings()
+        if (opened) {
+          try {
+            await fetchNearby()
+            return
+          } catch (retryErr) {
+            const msg =
+              retryErr instanceof Error ? retryErr.message : '定位失败，请稍后重试'
+            Taro.showToast({ title: msg, icon: 'none' })
+            return
+          }
+        }
         return
       }
-      setNearby(candidates)
-      setPickerOpen(true)
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : '定位失败，请检查权限'
+      const msg = e instanceof Error ? e.message : '定位失败，请稍后重试'
       Taro.showToast({ title: msg, icon: 'none' })
     } finally {
       setLocating(false)

@@ -96,6 +96,11 @@ const Taro = {
   requestSubscribeMessage: jest.fn(noopAsync),
   getUserProfile: jest.fn(),
   getSetting: jest.fn(() => Promise.resolve({ authSetting: {} })),
+  authorize: jest.fn(() => Promise.resolve()),
+  getLocation: jest.fn(() =>
+    Promise.resolve({ latitude: 31.2, longitude: 121.5, errMsg: 'getLocation:ok' }),
+  ),
+  openSetting: jest.fn(noopAsync),
 
   // ===== 触觉反馈 =====
   vibrateShort: jest.fn(noopAsync),
