@@ -18,9 +18,9 @@ export function computeLabelPositions(axisCount: number): RadarLabelPosition[] {
     const cos = Math.cos(angle)
     const sin = Math.sin(angle)
     let r = baseR
-    if (sin < -0.75) r -= 5
-    else if (sin > 0.75) r -= 7
-    else if (Math.abs(cos) > 0.85) r -= 3
+    if (sin < -0.75) r -= 6
+    else if (sin > 0.75) r -= 10
+    else if (Math.abs(cos) > 0.85) r -= 4
     out.push({
       x: 50 + cos * r,
       y: 50 + sin * r,

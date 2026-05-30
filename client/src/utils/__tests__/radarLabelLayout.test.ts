@@ -19,6 +19,6 @@ describe('radarLabelLayout', () => {
 
   test('正下顶点为六轴 index 3', () => {
     const pts = computeLabelPositions(6)
-    expect(pts[3].y).toBeLessThan(94)
+    expect(pts[3].y).toBeLessThan(92)
   })
 })

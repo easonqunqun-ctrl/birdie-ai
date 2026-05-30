@@ -4,7 +4,7 @@
 
 import { FC, useEffect, useMemo, useState } from 'react'
 import { Canvas, View, Text } from '@tarojs/components'
-import Taro, { useReady } from '@tarojs/taro'
+import Taro, { getCurrentInstance, useReady } from '@tarojs/taro'
 
 import { computeLabelPositions } from '@/utils/radarLabelLayout'
 import type { RadarAxis } from './radar-chart-types'
@@ -13,6 +13,7 @@ import type { DualRadarChartProps } from './dual-radar-chart-types'
 export type { DualRadarChartProps }
 const LEVELS = 4
 const PADDING = 40
+const MAX_DRAW_ATTEMPTS = 8
 
 const DualRadarChart: FC<DualRadarChartProps> = ({
   primaryAxes,
@@ -23,7 +24,9 @@ const DualRadarChart: FC<DualRadarChartProps> = ({
   morphProgress,
 }) => {
   const canvasId = `dual-radar-chart-${instanceId}`
+  const plotDomId = `dual-radar-plot-${instanceId}`
   const [ready, setReady] = useState(false)
+  const [plotVisible, setPlotVisible] = useState(false)
   const displayPrimary = useMemo(() => {
     if (morphProgress == null || secondaryAxes.length === 0) return primaryAxes
     const t = Math.max(0, Math.min(1, morphProgress))
@@ -43,8 +46,35 @@ const DualRadarChart: FC<DualRadarChartProps> = ({
     return () => clearTimeout(t)
   }, [ready])
 
+  /** ScrollView 内靠下的 Canvas 初始尺寸常为 0；进入视口后再绘制。 */
   useEffect(() => {
-    if (!ready || displayPrimary.length === 0) return
+    if (!ready) return
+    const page = getCurrentInstance()?.page
+    if (!page) {
+      setPlotVisible(true)
+      return
+    }
+    let disconnected = false
+    const observer = Taro.createIntersectionObserver(page, {
+      thresholds: [0, 0.05, 0.2],
+    })
+    observer.relativeToViewport({ bottom: 0, top: 0 })
+    observer.observe(`#${plotDomId}`, (res) => {
+      if (disconnected) return
+      if ((res.intersectionRatio ?? 0) > 0) {
+        setPlotVisible(true)
+      }
+    })
+    const fallback = setTimeout(() => setPlotVisible(true), 600)
+    return () => {
+      disconnected = true
+      observer.disconnect()
+      clearTimeout(fallback)
+    }
+  }, [ready, plotDomId])
+
+  useEffect(() => {
+    if (!ready || !plotVisible || displayPrimary.length === 0) return
     let cancelled = false
     let attempt = 0
     const tryDraw = () => {
@@ -53,7 +83,7 @@ const DualRadarChart: FC<DualRadarChartProps> = ({
         if (cancelled) return
         if (ok) return
         attempt += 1
-        if (attempt >= 3) return
+        if (attempt >= MAX_DRAW_ATTEMPTS) return
         setTimeout(tryDraw, 120 * attempt)
       })
     }
@@ -61,13 +91,13 @@ const DualRadarChart: FC<DualRadarChartProps> = ({
     return () => {
       cancelled = true
     }
-  }, [canvasId, displayPrimary, secondaryAxes, showSecondary, ready])
+  }, [canvasId, displayPrimary, secondaryAxes, showSecondary, ready, plotVisible])
 
   const labelPositions = computeLabelPositions(displayPrimary.length)
 
   return (
     <View className='dual-radar'>
-      <View className='dual-radar__plot'>
+      <View id={plotDomId} className='dual-radar__plot'>
         <Canvas type='2d' id={canvasId} canvasId={canvasId} className='dual-radar__canvas' />
         {displayPrimary.map((ax, i) => {
           const pos = labelPositions[i]
@@ -105,7 +135,9 @@ function drawDualRadar(
   secondary: RadarAxis[],
   onDone?: (ok: boolean) => void,
 ) {
-  Taro.createSelectorQuery()
+  const page = getCurrentInstance()?.page
+  const query = page ? Taro.createSelectorQuery().in(page) : Taro.createSelectorQuery()
+  query
     .select(`#${canvasId}`)
     .fields({ node: true, size: true })
     .exec((res) => {
@@ -132,7 +164,9 @@ function drawDualRadar(
       canvas.width = cssW * dpr
       canvas.height = cssH * dpr
       const ctx = canvas.getContext('2d')
+      ctx.setTransform(1, 0, 0, 1, 0, 0)
       ctx.scale(dpr, dpr)
+      ctx.clearRect(0, 0, cssW, cssH)
 
       const cx = cssW / 2
       const cy = cssH / 2
