@@ -30,7 +30,7 @@
 | **M10-01 推杆 UI** | `ModeSelector` · `PuttingReport` · `params.tsx` | 🔧 已实现；体验版 smoke 待验 |
 | **M10-02 切杆 UI** | `ChippingReport` · mode 分支 | 🔧 同上 |
 | **M10-03 yardage** | API + `yardage-book/index` + inference | 🔧 已实现；编辑流 polish 可排 |
-| **M10-04 drill 库** | Alembic `0041` + category | 🔧 数据 26 条级；**视频**仍空 |
+| **M10-04 drill 库** | Alembic `0041`–`0044` + category | ✅ **30 条**；tips 齐；**视频**仍空 |
 | **M10-05 训练类目** | `issue_category.py` + training_service | 🔧 后端已接；LLM prompt 抽测待验 |
 | **M11-06 定制课** | coach/courses/* | ✅ W18-E |
 | **M8 批注 + M12-09** | `analysis-annotate` + ProClipPicker | 🔧 页面在库；真机+素材 smoke |
@@ -104,9 +104,9 @@ Kickoff：[`p2-m12-08-evolution-animation-kickoff.md`](./p2-m12-08-evolution-ani
 
 | Sprint | PLAN-ID | 事项 | 交付物 | 可做 | 状态 |
 |--------|---------|------|--------|------|------|
-| **W26-A** | P2-M10-04-copy | drill 文案质检 | 短杆 8 条补 tips + 步骤可读性 | Now | **✅ 0043** |
+| **W26-A** | P2-M10-04-copy | drill 文案质检 | 全库 tips（0043 短杆 + **0044 全挥杆**） | Now | **✅ Done** |
 | **W26-B** | P2-M10-04-video | 13+ 专属示范视频 | 拍摄 → MinIO → `DRILL_VIDEO_ALIGNED_IDS` | Trigger | ⏳ |
-| **W26-C** | P2-M10-04-seed | drill 补至 30 | Alembic **0043** +4 条 putting/chipping | Now | **✅ 29 条** |
+| **W26-C** | P2-M10-04-seed | drill 补至 30 | Alembic 0043+**0044**（**30 条**） | Now | **✅ Done** |
 
 ---
 

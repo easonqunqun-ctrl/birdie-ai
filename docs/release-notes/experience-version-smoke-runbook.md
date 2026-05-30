@@ -102,6 +102,12 @@ pnpm build:weapp    # 或体验环境用 pnpm build:weapp + 对应 env
 - [ ] 教练完成派发后学员 **打卡** → 教练侧任务状态变 `done`
 - [ ] **教学报告**（session-recap）选学员 → 快捷「写批注/布置作业」→ 生成 LLM 汇总（可选 PDF）
 
+### Phase2 训练 drill（W26，体验版必勾）
+
+- [ ] 训练页展开任务 → 可见 **「教练提示」** 金边区块（推杆/切杆 drill）
+- [ ] 推杆 issue 生成的计划含 putting 类目 drill（如「锁腕推杆」）
+- [ ] `GET /v1/drills` 返回 **30** 条（CVM alembic ≥ 0044）
+
 ### Phase2 演化动画（W25 · M12-08，体验版可选）
 
 前置：`PHASE2_PROS_ENABLED=true`；报告已完成且有 Pro 匹配。
