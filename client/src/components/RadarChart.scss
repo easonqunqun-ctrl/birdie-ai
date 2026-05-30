@@ -1,6 +1,7 @@
 .radar {
   position: relative;
   width: 100%;
+  overflow: visible;
   /**
    * 保持正方形：用 padding-top: 100% 经典 trick 而非 aspect-ratio。
    * 微信基础库 < 2.10 不支持 aspect-ratio，会让 .radar height = 0、

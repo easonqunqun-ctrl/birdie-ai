@@ -6,22 +6,23 @@ import { FC, useEffect, useMemo, useState } from 'react'
 import { Canvas, View, Text } from '@tarojs/components'
 import Taro, { useReady } from '@tarojs/taro'
 
+import { computeLabelPositions } from '@/utils/radarLabelLayout'
 import type { RadarAxis } from './radar-chart-types'
 import type { DualRadarChartProps } from './dual-radar-chart-types'
 
 export type { DualRadarChartProps }
-
-const CANVAS_ID = 'dual-radar-chart-canvas'
 const LEVELS = 4
 const PADDING = 40
 
 const DualRadarChart: FC<DualRadarChartProps> = ({
   primaryAxes,
   secondaryAxes,
+  instanceId = 'main',
   primaryLabel = '你',
   secondaryLabel = '职业参考',
   morphProgress,
 }) => {
+  const canvasId = `dual-radar-chart-${instanceId}`
   const [ready, setReady] = useState(false)
   const displayPrimary = useMemo(() => {
     if (morphProgress == null || secondaryAxes.length === 0) return primaryAxes
@@ -48,7 +49,7 @@ const DualRadarChart: FC<DualRadarChartProps> = ({
     let attempt = 0
     const tryDraw = () => {
       if (cancelled) return
-      drawDualRadar(displayPrimary, showSecondary ? secondaryAxes : [], (ok) => {
+      drawDualRadar(canvasId, displayPrimary, showSecondary ? secondaryAxes : [], (ok) => {
         if (cancelled) return
         if (ok) return
         attempt += 1
@@ -60,26 +61,28 @@ const DualRadarChart: FC<DualRadarChartProps> = ({
     return () => {
       cancelled = true
     }
-  }, [displayPrimary, secondaryAxes, showSecondary, ready])
+  }, [canvasId, displayPrimary, secondaryAxes, showSecondary, ready])
 
   const labelPositions = computeLabelPositions(displayPrimary.length)
 
   return (
     <View className='dual-radar'>
-      <Canvas type='2d' id={CANVAS_ID} canvasId={CANVAS_ID} className='dual-radar__canvas' />
-      {displayPrimary.map((ax, i) => {
-        const pos = labelPositions[i]
-        return (
-          <View
-            key={ax.key}
-            className='dual-radar__label'
-            style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
-          >
-            <Text className='dual-radar__label-name'>{ax.label}</Text>
-            <Text className='dual-radar__label-score'>{ax.score}</Text>
-          </View>
-        )
-      })}
+      <View className='dual-radar__plot'>
+        <Canvas type='2d' id={canvasId} canvasId={canvasId} className='dual-radar__canvas' />
+        {displayPrimary.map((ax, i) => {
+          const pos = labelPositions[i]
+          return (
+            <View
+              key={ax.key}
+              className='dual-radar__label'
+              style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
+            >
+              <Text className='dual-radar__label-name'>{ax.label}</Text>
+              <Text className='dual-radar__label-score'>{ax.score}</Text>
+            </View>
+          )
+        })}
+      </View>
       <View className='dual-radar__legend'>
         <View className='dual-radar__legend-item'>
           <View className='dual-radar__legend-swatch dual-radar__legend-swatch--primary' />
@@ -97,12 +100,13 @@ const DualRadarChart: FC<DualRadarChartProps> = ({
 export default DualRadarChart
 
 function drawDualRadar(
+  canvasId: string,
   primary: RadarAxis[],
   secondary: RadarAxis[],
   onDone?: (ok: boolean) => void,
 ) {
   Taro.createSelectorQuery()
-    .select(`#${CANVAS_ID}`)
+    .select(`#${canvasId}`)
     .fields({ node: true, size: true })
     .exec((res) => {
       const node = res?.[0]?.node
@@ -216,12 +220,3 @@ function polarPoint(cx: number, cy: number, r: number, idx: number, n: number) {
   return { x: cx + Math.cos(angle) * r, y: cy + Math.sin(angle) * r }
 }
 
-function computeLabelPositions(n: number) {
-  const out: { x: number; y: number }[] = []
-  const r = 48
-  for (let i = 0; i < n; i++) {
-    const angle = -Math.PI / 2 + (Math.PI * 2 * i) / n
-    out.push({ x: 50 + Math.cos(angle) * r, y: 50 + Math.sin(angle) * r })
-  }
-  return out
-}

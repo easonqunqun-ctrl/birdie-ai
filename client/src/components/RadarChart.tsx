@@ -17,6 +17,7 @@ import { FC, useEffect, useState } from 'react'
 import { Canvas, View, Text } from '@tarojs/components'
 import Taro, { useReady } from '@tarojs/taro'
 
+import { computeLabelPositions } from '@/utils/radarLabelLayout'
 import type { RadarAxis, RadarChartProps } from './radar-chart-types'
 
 export type { RadarAxis, RadarChartProps }
@@ -224,23 +225,3 @@ function polarPoint(cx: number, cy: number, r: number, idx: number, n: number) {
   }
 }
 
-/**
- * DOM 层顶点标签的百分比坐标（相对容器）。
- *
- * r 值历史教训：原值 54 会让 i=3（底部 downswing）的 label 落到 y=104%，
- * 直接被 .radar 容器（aspect-ratio square）下边缘裁掉，6 个轴只能看到 5 个。
- * 现在锁到 48：再大的 label 也保证 ≤ 100% 留在容器内；canvas 的 PADDING=40
- * 已经把绘制区压缩到 80% 半径，留下的 20% 给 label 浮在多边形外侧足够。
- */
-function computeLabelPositions(n: number) {
-  const out: { x: number; y: number }[] = []
-  const r = 48
-  for (let i = 0; i < n; i++) {
-    const angle = -Math.PI / 2 + (Math.PI * 2 * i) / n
-    out.push({
-      x: 50 + Math.cos(angle) * r,
-      y: 50 + Math.sin(angle) * r,
-    })
-  }
-  return out
-}

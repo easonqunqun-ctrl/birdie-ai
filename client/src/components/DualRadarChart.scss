@@ -1,8 +1,14 @@
 .dual-radar {
-  position: relative;
   width: 100%;
-  padding-top: 100%;
+  overflow: visible;
   box-sizing: border-box;
+
+  &__plot {
+    position: relative;
+    width: 100%;
+    padding-top: 100%;
+    overflow: visible;
+  }
 
   &__canvas {
     position: absolute;
@@ -10,17 +16,44 @@
     top: 0;
     width: 100%;
     height: 100%;
+    display: block;
+  }
+
+  &__label {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    min-width: 100rpx;
+    padding: 6rpx 12rpx;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 2rpx 8rpx rgba(26, 35, 126, 0.1);
+    pointer-events: none;
+  }
+
+  &__label-name {
+    display: block;
+    font-size: 30rpx;
+    color: var(--color-text-secondary);
+    line-height: 1.2;
+  }
+
+  &__label-score {
+    display: block;
+    font-size: 34rpx;
+    font-weight: 700;
+    color: var(--color-primary);
+    line-height: 1.2;
+    margin-top: 2rpx;
   }
 
   &__legend {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 8rpx;
     display: flex;
     flex-direction: row;
     justify-content: center;
     gap: 24rpx;
+    margin-top: 16rpx;
+    padding-bottom: 4rpx;
   }
 
   &__legend-item {
@@ -49,29 +82,5 @@
   &__legend-text {
     font-size: var(--font-size-xs);
     color: var(--color-text-secondary);
-  }
-
-  &__label {
-    position: absolute;
-    transform: translate(-50%, -50%);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-width: 72rpx;
-    pointer-events: none;
-  }
-
-  &__label-name {
-    font-size: var(--font-size-xs);
-    color: var(--color-text-secondary);
-    line-height: 1.2;
-    text-align: center;
-  }
-
-  &__label-score {
-    font-size: var(--font-size-xs);
-    font-weight: 700;
-    color: var(--color-primary);
-    line-height: 1.2;
   }
 }

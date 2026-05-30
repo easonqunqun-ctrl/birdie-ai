@@ -219,7 +219,7 @@ const ProComparePage: FC = () => {
 
         <Text className='pro-compare__credit'>来源：{clip.source_credit}</Text>
 
-        <View className='pro-compare__section'>
+        <View className='pro-compare__section pro-compare__section--chart'>
           <Text className='pro-compare__section-title'>追平演化示意</Text>
           {evolutionScene ? (
             <SkeletonAnimation
@@ -233,6 +233,7 @@ const ProComparePage: FC = () => {
                 暂无骨骼 pose 数据，以雷达渐变示意「向职业参考靠近」的方向。
               </Text>
               <DualRadarChart
+                instanceId='morph'
                 primaryAxes={userAxes}
                 secondaryAxes={proAxes}
                 primaryLabel='你'
@@ -246,7 +247,7 @@ const ProComparePage: FC = () => {
         </View>
 
         {userAxes.length > 0 && proAxes.length > 0 && (
-          <View className='pro-compare__section'>
+          <View className='pro-compare__section pro-compare__section--chart'>
             <Text className='pro-compare__section-title'>六维雷达叠加</Text>
             {proReferenceOnly && (
               <Text className='pro-compare__section-hint'>
@@ -254,6 +255,7 @@ const ProComparePage: FC = () => {
               </Text>
             )}
             <DualRadarChart
+              instanceId='overlay'
               primaryAxes={userAxes}
               secondaryAxes={proAxes}
               primaryLabel='你'
