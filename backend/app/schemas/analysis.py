@@ -253,6 +253,11 @@ class AnalysisReportResponse(BaseModel):
         description="P2-W10 引擎诊断结构化条目；V1 引擎或老报告返回空数组",
     )
 
+    phase_highlights: list[str] = Field(
+        default_factory=list,
+        description="阶段亮点肯定话术（V2；docs/20 §4.3）",
+    )
+
     share_card_url: str | None = None
     analyzed_at: datetime | None = None
     created_at: datetime

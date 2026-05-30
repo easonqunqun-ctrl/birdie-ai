@@ -69,6 +69,7 @@ from app.schemas.analysis import (
     score_level,
 )
 from app.services import quota_service
+from app.services.scoring_narrative import build_phase_highlights
 
 log = logging.getLogger(__name__)
 
@@ -869,6 +870,12 @@ async def get_report(*, analysis_id: str, user: User, db: AsyncSession) -> Analy
     _ew = getattr(analysis, "engine_warnings", None)
     engine_warnings_out: list[dict] = _ew if isinstance(_ew, list) else []
 
+    phase_highlights_out = build_phase_highlights(
+        {k: int(v.get("score", 0)) for k, v in (analysis.phase_scores or {}).items()}
+        if isinstance(analysis.phase_scores, dict)
+        else None
+    )
+
     return AnalysisReportResponse(
         id=analysis.id,
         user_id=analysis.user_id,
@@ -900,6 +907,7 @@ async def get_report(*, analysis_id: str, user: User, db: AsyncSession) -> Analy
             dict(getattr(analysis, "feature_confidences", None) or {})
         ),
         engine_warnings=engine_warnings_out,  # type: ignore[arg-type]
+        phase_highlights=phase_highlights_out,
         share_card_url=to_proxy_image_url(analysis.share_card_url),
         analyzed_at=analysis.analyzed_at,
         created_at=analysis.created_at,
