@@ -34,7 +34,7 @@
 | **M10-05 训练类目** | `issue_category.py` + training_service | 🔧 后端已接；LLM prompt 抽测待验 |
 | **M11-06 定制课** | coach/courses/* | ✅ W18-E |
 | **M8 批注 + M12-09** | `analysis-annotate` + ProClipPicker | 🔧 页面在库；真机+素材 smoke |
-| **M12-08 演化动画** | — | 📋 未开始 |
+| **M12-08 演化动画** | `SkeletonAnimation` · pro-compare | ✅ W25 |
 | **M9-02 装备 UI** | `profile/clubs.tsx` | 🔧 在库 |
 | **监控 PushPlus** | bridge + CVM token | ✅ |
 
@@ -46,11 +46,11 @@
 
 | Sprint | PLAN-ID | 事项 | 交付物 | 可做 | 状态 |
 |--------|---------|------|--------|------|------|
-| **W21-A** | P2-W21-A | **Git 合流 + 体验版** | commit `294b63c` + push；`client/dist/` 已 build | Ops | **✅ Done**（上传 DevTools 待人工） |
-| **W21-B** | P2-W21-B | **Phase2 体验版 Smoke** | 本机：putting 单测 16/16 · type-check ✅ · health ✅ | Ops | **🔧 真机勾选待验** |
-| **W21-C** | P2-W21-C | **xpay 真机冒烟** | `xpay_smoke_check.py` 环境自检（见下方输出） | Ops | **🔧 脚本已跑** |
-| **W21-D** | P2-W21-D | **CVM git 整理** | 仍 rsync 发版；`REMOTE_GIT_PULL=no` | Ops | **📋 待整理** |
-| **W21-E** | DOC-P2-01 | **docs/21/23 状态回填** | 已合入 `294b63c` | Now | **✅ Done** |
+| **W21-A** | P2-W21-A | **Git 合流 + 体验版** | commit + push；CLI 上传 **1.2.18** | Ops | **✅ Done** |
+| **W21-B** | P2-W21-B | **Phase2 体验版 Smoke** | 见 [`experience-version-smoke-runbook`](./experience-version-smoke-runbook.md) §D Phase2 | Ops | **🔧 真机待验** |
+| **W21-C** | P2-W21-C | **xpay 真机冒烟** | `xpay_smoke_check.py` | Ops | **🔧 脚本 OK · 真机待验** |
+| **W21-D** | P2-W21-D | **CVM git 整理** | `REMOTE_GIT_PULL=no` rsync 发版 | Ops | **📋 待整理** |
+| **W21-E** | DOC-P2-01 | **docs/21/23 状态回填** | 已合入 | Now | **✅ Done** |
 
 ---
 
@@ -58,8 +58,8 @@
 
 | Sprint | PLAN-ID | 事项 | 交付物 | 可做 | 状态 |
 |--------|---------|------|--------|------|------|
-| **W22-A** | P2-M10-01-smoke | 推杆 mode E2E | params→分析→PuttingReport；50123 toast | Now | **🔧 本地单测+50123 UX** |
-| **W22-B** | P2-M10-02-smoke | 切杆 mode E2E | 同上 + wedge 联动 | Now | **🔧 analysisMode 单测** |
+| **W22-A** | P2-M10-01-smoke | 推杆 mode E2E | params→分析→PuttingReport；50123 toast | Now | **✅ 代码 · smoke 待验** |
+| **W22-B** | P2-M10-02-smoke | 切杆 mode E2E | 同上 + wedge 联动 | Now | **✅ 代码 · smoke 待验** |
 | **W22-C** | P2-M7-13-thumb | 多挥候选缩略图 | backend/ffmpeg 按区间抽帧；select-swing 展示 thumb | Now | **✅ 代码已合** |
 | **W22-D** | P2-M10-03-polish | yardage 编辑闭环 | yardage-book 页 PUT 自填码数 + 反推展示 polish | Now | **✅ 代码已合** |
 | **W22-E** | P2-M10-05-smoke | 训练计划短杆 drill | putting issue → putting drill 端到端 pytest + 1 条 jest | Now | **✅ pytest+jest** |
@@ -81,7 +81,7 @@
 
 | Sprint | PLAN-ID | 事项 | 交付物 | 可做 | 状态 |
 |--------|---------|------|--------|------|------|
-| **W24-A** | P2-V2-ROLLOUT | V2 灰度上调 | CVM `M7_V2_ROLLOUT_PCT` 5→25→50；盯 Prometheus 7d | Now | **🔧 runbook+脚本；R1 待 Ops** |
+| **W24-A** | P2-V2-ROLLOUT | V2 灰度上调 | CVM `M7_V2_ROLLOUT_PCT` 5→25→50；盯 Prometheus 7d | Now | **🔧 R0 维持 · R1 待 7d** |
 | **W24-B** | P2-W14-C-exec | 真实流量 diff | 满足 runbook 触发后跑 `v1_v2_diff.py` | Trigger | ⏳ |
 | **W24-C** | P2-MON-05 | `make publish-monitoring-cvm` | 发版脚本同步 infra/monitoring（可选） | Now | **✅ Done** |
 | **W24-D** | ENG-06-exec | 争议样本周更 | 首版 [`eng-06-W24-2026-05-29.md`](./eng-06-W24-2026-05-29.md) | Now | **✅ Done** |
@@ -104,9 +104,9 @@ Kickoff：[`p2-m12-08-evolution-animation-kickoff.md`](./p2-m12-08-evolution-ani
 
 | Sprint | PLAN-ID | 事项 | 交付物 | 可做 | 状态 |
 |--------|---------|------|--------|------|------|
-| **W26-A** | P2-M10-04-copy | drill 文案质检 | 26 条 steps/tips 教研校对（无视频） | Now | 📋 |
+| **W26-A** | P2-M10-04-copy | drill 文案质检 | 短杆 8 条补 tips + 步骤可读性 | Now | **✅ 0043** |
 | **W26-B** | P2-M10-04-video | 13+ 专属示范视频 | 拍摄 → MinIO → `DRILL_VIDEO_ALIGNED_IDS` | Trigger | ⏳ |
-| **W26-C** | P2-M10-04-seed | drill 补至 30 | 后端 seed 再 +4 条 putting/chipping | Now | 📋 |
+| **W26-C** | P2-M10-04-seed | drill 补至 30 | Alembic **0043** +4 条 putting/chipping | Now | **✅ 29 条** |
 
 ---
 
@@ -161,3 +161,4 @@ W21 发版收口（体验版 + smoke + git + 文档回填）
 | 版本 | 日期 | 说明 |
 |------|------|------|
 | v0.1 | 2026-05-30 | 初版：W21–W27 可开发项全量入队；代码审计修正 M10-01/02/03、M7-12 等「已在库」状态 |
+| v0.2 | 2026-05-30 | W21–W25 状态回填；W26-A/C 0043 drill tips+seed（29 条） |

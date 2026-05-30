@@ -9,7 +9,7 @@
 - 断签后打卡 → streak 重置为 1
 - 同一周第二次分析 → 增量追加新 drill（不重建）
 - 他人 task 打卡 → 40301；已完成任务打卡 → 40014
-- `/v1/drills` 返回 13 条 seed；`/me/practice-logs?month=...` 过滤正确
+- `/v1/drills` 返回 seed（0004 13 + 0041 12 + 0043 4 = 29）；`/me/practice-logs?month=...` 过滤正确
 """
 
 from __future__ import annotations
@@ -42,16 +42,23 @@ async def test_drills_endpoint_returns_seeded_rows(
     resp = await client.get("/v1/drills", headers=auth_headers)
     assert resp.status_code == 200, resp.text
     drills = resp.json()["data"]
-    assert len(drills) == 13
+    assert len(drills) == 29
     ids = {d["id"] for d in drills}
     assert "drill_towel_arm" in ids
     assert "drill_grip_checkpoint" in ids
+    assert "drill_wrist_lock_putt" in ids
     # 静态业务字段完整
     towel = next(d for d in drills if d["id"] == "drill_towel_arm")
     assert "casting" in towel["target_issues"]
     assert towel["duration_minutes"] == 15
     assert towel["difficulty"] == "easy"
     assert len(towel["steps"]) >= 3
+    # W26-A · 短杆 drill 含 tips
+    wrist_putt = next(d for d in drills if d["id"] == "drill_wrist_lock_putt")
+    assert wrist_putt["category"] == "putting"
+    assert len(wrist_putt["tips"]) >= 1
+    gate = next(d for d in drills if d["id"] == "drill_gate_putt")
+    assert len(gate["tips"]) >= 1
 
 
 # ==================== 当周无 plan 时 /current 返回 null ====================

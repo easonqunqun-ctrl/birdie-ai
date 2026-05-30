@@ -59,12 +59,12 @@
 
 | Sprint | 主题 | PLAN-ID | 交付物 | 状态 |
 |--------|------|---------|--------|------|
-| **W21** | **发版收口** | P2-W21-A～E | 体验版上传 + Phase2 smoke + xpay 冒烟 + CVM git + docs 状态回填 | **🔧 自动化 Done；真机/DevTools 待验** |
-| **W22** | **短杆闭环抛光** | M10-01/02/03/05 · M7-13-thumb | 推杆/切杆 E2E smoke · 多挥缩略图 · yardage 编辑 · 训练类目 drill | **📋 Planned** |
-| **W23** | **教练 / Pro** | M8-05/06 · M12-09 | 批注 + Pro clip 引用 smoke · 作业/ recap polish | **📋 Planned** |
-| **W24** | **观测与灰度** | V2-ROLLOUT · MON-05 · ENG-06 | V2 pct runbook+脚本 · `make publish-monitoring-cvm` · eng-06-W24 周报 | **🔧 代码 Done · R1 灰度待 Ops** |
-| **W25** | **演化动画** | P2-M12-08 | poseInterpolate + SkeletonAnimation + pro-compare 降级 | **✅ Done** |
-| **W26** | **Drill 内容** | M10-04 | 文案质检 + seed 补全；**视频**等拍摄 Trigger | **📋 Planned** |
+| **W21** | **发版收口** | P2-W21-A～E | 体验版 **1.2.18** + Phase2 smoke + xpay 冒烟 | **🔧 上传 Done · 真机 smoke 待验** |
+| **W22** | **短杆闭环抛光** | M10-01/02/03/05 · M7-13-thumb | 推杆/切杆 E2E · 多挥缩略图 · yardage · 训练类目 | **✅ 代码 Done · smoke 待验** |
+| **W23** | **教练 / Pro** | M8-05/06 · M12-09 | 批注 + Pro clip · 作业/ recap | **✅ 代码 Done · smoke 待验** |
+| **W24** | **观测与灰度** | V2-ROLLOUT · MON-05 · ENG-06 | V2 pct runbook · monitoring · eng-06 周报 | **🔧 R0 · R1 待 7d** |
+| **W25** | **演化动画** | P2-M12-08 | poseInterpolate + SkeletonAnimation | **✅ Done** |
+| **W26** | **Drill 内容** | M10-04 | tips + seed 0043（29 条）；**视频** Trigger | **🔧 A/C Done · B Trigger** |
 | **W27+** | **ECS / 追踪** | M7-11-cal · M7-12-cal · M7-09 | 等标注样本（[`wait-for-triggers`](./wait-for-triggers-checklist.md)） | **⏳ Trigger** |
 
 **并行泳道（不占 Sprint 主表）**：U-2 COS · Q-B5 papay（商户签约仍等触发）· O-01/O-04 性能抽测 · Q-D1 RN · ECS 标定（M7-01/11-cal/12-cal，等标注样本）
