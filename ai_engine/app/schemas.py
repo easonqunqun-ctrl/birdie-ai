@@ -45,6 +45,10 @@ class SwingCandidateItem(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     start_time_sec: float
     end_time_sec: float
+    preview_frame_url: str | None = Field(
+        default=None,
+        description="该段 impact 附近抽帧 JPG（MinIO URL；detect-swings 可选返回）",
+    )
 
 
 class PhaseScore(BaseModel):

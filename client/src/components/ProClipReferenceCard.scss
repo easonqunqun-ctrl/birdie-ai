@@ -21,7 +21,19 @@
     font-size: var(--font-size-xs);
     color: var(--color-gold);
     font-weight: 600;
+  }
+
+  &__head {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
     margin-bottom: 8rpx;
+  }
+
+  &__delete {
+    font-size: var(--font-size-xs);
+    color: var(--color-error);
   }
 
   &__note {

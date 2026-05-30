@@ -3,7 +3,7 @@
  */
 
 import { FC, useEffect, useMemo, useState } from 'react'
-import { View, Text, Button } from '@tarojs/components'
+import { View, Text, Button, Image } from '@tarojs/components'
 import Taro, { useRouter } from '@tarojs/taro'
 import { analysisService } from '@/services/analysisService'
 import { describeIntermittentRequestFailure, isRequestError } from '@/services/request'
@@ -125,19 +125,34 @@ const SelectSwingPage: FC = () => {
               className={`select-swing__item ${active ? 'select-swing__item--active' : ''}`}
               onClick={() => setSelectedIndex(index)}
             >
-              <View className='select-swing__item-row'>
-                <Text className='select-swing__item-title'>第 {index + 1} 段</Text>
-                <Text
-                  className={`select-swing__badge ${
-                    item.is_practice
-                      ? 'select-swing__badge--practice'
-                      : 'select-swing__badge--formal'
-                  }`}
-                >
-                  {item.is_practice ? '试挥' : '正式'}
-                </Text>
+              <View className='select-swing__item-body'>
+                {item.preview_frame_url ? (
+                  <Image
+                    mode='aspectFill'
+                    src={item.preview_frame_url}
+                    className='select-swing__thumb'
+                  />
+                ) : (
+                  <View className='select-swing__thumb select-swing__thumb--placeholder'>
+                    <Text className='select-swing__thumb-label'>{index + 1}</Text>
+                  </View>
+                )}
+                <View className='select-swing__item-content'>
+                  <View className='select-swing__item-row'>
+                    <Text className='select-swing__item-title'>第 {index + 1} 段</Text>
+                    <Text
+                      className={`select-swing__badge ${
+                        item.is_practice
+                          ? 'select-swing__badge--practice'
+                          : 'select-swing__badge--formal'
+                      }`}
+                    >
+                      {item.is_practice ? '试挥' : '正式'}
+                    </Text>
+                  </View>
+                  <Text className='select-swing__item-time'>{formatCandidateRange(item)}</Text>
+                </View>
               </View>
-              <Text className='select-swing__item-time'>{formatCandidateRange(item)}</Text>
             </View>
           )
         })}

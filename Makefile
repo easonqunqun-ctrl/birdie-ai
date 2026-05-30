@@ -10,7 +10,7 @@
         deploy-check-env deploy-check-cvm-pay \
         deploy-test test-logs test-ps test-reset test-restart test-certs test-health \
         issue-le-cert sync-le-certs renew-le-cert verify-weapp-https \
-        deploy-cvm-up deploy-cvm-ps deploy-cvm-logs publish-backend-cvm setup-cvm-ssh-key \
+        deploy-cvm-up deploy-cvm-ps deploy-cvm-logs publish-backend-cvm publish-monitoring-cvm setup-cvm-ssh-key \
         release-cvm ship-cvm cvm-migrate-git-doc cvm-stable-from-mac cvm-deploy-help cvm-deploy-dry-run cvm-env-preflight cvm-preflight cvm-preflight-tls cvm-remote-release cvm-smoke
 
 # 默认目标：显示帮助
@@ -78,6 +78,7 @@ help:
 	@echo "  make cvm-migrate-git-doc   云上从 rsync 切 git clone：读 docs/release-notes/CVM-migrate-rsync-to-git.md"
 	@echo "  make publish-backend-cvm   无云上 git：scp compose 三件套 + rsync backend/ai_engine → 远端 build + alembic"
 	@echo "                              （REMOTE_RSYNC_COMPOSE=no 可跳过 scp compose；慎用）"
+	@echo "  make publish-monitoring-cvm  rsync infra/monitoring + 重启 monitoring profile（PushPlus/告警 rule）"
 	@echo "  ===== W8-T4：测试环境与证书（按需）======"
 	@echo "  make deploy-check-env     自检 .env.local 尖括号/穿透占位（可加 ENV_FILE=路径）"
 	@echo "  make deploy-check-cvm-pay WECHAT_PAY_MOCK=false 时须有 docker-compose.wechat-pay-key.yml（ENV_FILE=）"
@@ -352,6 +353,9 @@ cvm-migrate-git-doc:
 # 从本 Mac 推到当前 CVM（优先使用 ~/.ssh/id_ed25519_birdie_golf）
 publish-backend-cvm:
 	bash infra/deploy/publish-backend-to-cvm.sh
+
+publish-monitoring-cvm:
+	bash infra/deploy/publish-monitoring-to-cvm.sh
 
 # ---------------------------------------------------------------------------
 # 极简发版：代码已在 Git 远端后，本条只 SSH 触发 CVM 上的 release-cvm-on-server.sh；

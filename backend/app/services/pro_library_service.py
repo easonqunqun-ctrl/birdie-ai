@@ -126,6 +126,8 @@ DEFAULT_PRO_CLIP_DOMAINS: frozenset[str] = frozenset(
         # 测试 / mock
         "example.com",
         "minio.local",
+        # 生产 API 同源（MinIO 经 nginx /minio 反代）
+        "api.birdieai.cn",
         # 自有对象存储常见前缀
         "cos.ap-shanghai.myqcloud.com",
         "cdn.lingniao-golf.com",
@@ -601,6 +603,23 @@ async def seed_initial_weekly_topic(db: AsyncSession) -> ProTopic | None:
     return topic
 
 
+def pro_swing_clip_to_read(clip: ProSwingClip) -> ProSwingClipRead:
+    """读端点返回：MinIO 直链改写为 ``/v1/assets/video/`` 同源代理（小程序可播）."""
+
+    from app.schemas.pro_library import ProSwingClipRead
+    from app.services.analysis_service import to_proxy_image_url, to_proxy_video_url
+
+    read = ProSwingClipRead.model_validate(clip)
+    return read.model_copy(
+        update={
+            "video_url": to_proxy_video_url(read.video_url) or read.video_url,
+            "thumbnail_url": (
+                to_proxy_image_url(read.thumbnail_url) if read.thumbnail_url else None
+            ),
+        }
+    )
+
+
 __all__ = [
     "DEFAULT_PRO_CLIP_DOMAINS",
     "add_annotation",
@@ -614,6 +633,7 @@ __all__ = [
     "list_active_players",
     "list_published_clips",
     "load_topic_clip_items",
+    "pro_swing_clip_to_read",
     "record_match",
     "seed_initial_pros",
     "seed_initial_weekly_topic",

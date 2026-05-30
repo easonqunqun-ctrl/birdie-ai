@@ -22,8 +22,9 @@ from httpx import AsyncClient
 from app.core.database import AsyncSessionLocal
 from app.core.security import new_id
 from app.models.analysis import SwingAnalysis
-from app.models.training import PracticeLog
+from app.models.training import Drill, PracticeLog
 from app.models.user import User
+from app.config import settings
 from app.services import training_service
 
 
@@ -110,6 +111,47 @@ async def test_generate_plan_from_analysis_issues(
     assert len(data["tasks"]) == 3
     drill_ids = {t["drill_id"] for t in data["tasks"]}
     assert len(drill_ids) == 3  # 去重成功
+
+
+@pytest.mark.asyncio
+async def test_generate_plan_from_putting_issues_picks_putting_drill(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """W22-E · category-aware drill pick：推杆 issue → putting drill."""
+    monkeypatch.setattr(settings, "PHASE2_TRAINING_CATEGORIES_ENABLED", True)
+    user_id = await _get_user_id(client, auth_headers)
+
+    async with AsyncSessionLocal() as db:
+        analysis_id = new_id("swa")
+        db.add(
+            SwingAnalysis(
+                id=analysis_id,
+                user_id=user_id,
+                video_url="s3://fake/putt.mp4",
+                video_file_size=1024,
+                camera_angle="face_on",
+                club_type="putter",
+                status="completed",
+            )
+        )
+        await db.commit()
+
+        plan = await training_service.generate_or_update_weekly(
+            db,
+            user_id=user_id,
+            analysis_id=analysis_id,
+            issues=[{"type": "putting_head_moved", "severity": "high"}],
+        )
+        await db.commit()
+
+        assert plan is not None
+        assert plan.total_tasks == 1
+        drill = await db.get(Drill, plan.tasks[0].drill_id)
+        assert drill is not None
+        assert drill.category == "putting"
+        assert "putting_head_moved" in (drill.target_issues or [])
 
 
 # ==================== 没有 issue → 不建 plan ====================

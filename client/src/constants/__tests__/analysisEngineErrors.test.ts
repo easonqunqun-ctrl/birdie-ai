@@ -84,9 +84,9 @@ describe('describeAnalysisFailure', () => {
   })
 
   test('50106 视频过短 → title 命中', () => {
-    const r = describeAnalysisFailure({ code: 50106, message: 'duration < 3s' })
+    const r = describeAnalysisFailure({ code: 50106, message: 'duration < 2s' })
     expect(r.title).toBe('视频时长过短')
-    expect(r.hint).toMatch(/3 秒/)
+    expect(r.hint).toMatch(/2 秒/)
   })
 
   test('50109 暗光 → AC-3 真机场景命中', () => {
@@ -111,6 +111,16 @@ describe('describeAnalysisFailure', () => {
     const r = describeAnalysisFailure({ code: 50120, message: 'HEVC' })
     expect(r.title).toBe('视频格式暂不支持')
     expect(r.hint).toMatch(/H\.264|兼容性|mp4/i)
+  })
+
+  test('50123 mode/club 不匹配 → 推杆提示（W22-A）', () => {
+    const r = describeAnalysisFailure({
+      code: 50123,
+      message: '推杆模式建议选 putter',
+    })
+    expect(r.title).toBe('模式与球杆不匹配')
+    expect(r.hint).toMatch(/推杆/)
+    expect(r.reshootRecommended).toBe(true)
   })
 
   test('50118/50119 系统类 → reshootRecommended=false', () => {

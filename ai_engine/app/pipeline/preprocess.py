@@ -64,8 +64,8 @@ MIN_STABILITY_HARD_BLOCK = 0.12
 # 帧丢失比例上限（读帧失败 / 总帧数）。正常视频应该 < 1%。
 MAX_FRAME_LOSS_RATIO = 0.1
 
-# 视频最短时长（秒）。MVP §4.1 规定挥杆视频 3-15s，客户端已拦 <3s，
-# 这里服务端再兜一次（防止伪造请求绕过前端）。
+# 视频最短时长（秒）。产品约束 2-30s；客户端与 backend upload-token 已拦 <2s，
+# 这里引擎再兜一次（防止伪造请求绕过前端）。
 MIN_DURATION_SEC = 2.0
 MAX_DURATION_SEC = 30.0
 

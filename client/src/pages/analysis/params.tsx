@@ -38,6 +38,7 @@ import type { CameraAngle, ClubType } from '@/types/api'
 import { PHASE2_CHIPPING_MODE_ENABLED_FLAG, PHASE2_PUTTING_MODE_ENABLED_FLAG, PHASE2_YARDAGE_BOOK_ENABLED_FLAG } from '@/constants/flags'
 import { CHIPPING_CLUB_HINT } from '@/constants/chippingLabels'
 import ModeSelector from '@/components/ModeSelector'
+import { defaultClubTypeForMode, modeClubMismatchHint } from '@/utils/analysisMode'
 import '@/components/ModeSelector.scss'
 import './params.scss'
 
@@ -126,7 +127,7 @@ const AnalysisParamsPage: FC = () => {
       setClubType('putter')
       setCameraAngle('face_on')
     } else if (analysisMode === 'chipping' && clubType === 'putter') {
-      setClubType('wedge')
+      setClubType(defaultClubTypeForMode('chipping'))
     }
   }, [analysisMode, clubType])
 
@@ -194,6 +195,16 @@ const AnalysisParamsPage: FC = () => {
     if (submitting) return
     if (overLimit) {
       Taro.showToast({ title: overLimit, icon: 'none' })
+      return
+    }
+    const modeMismatch = modeClubMismatchHint(analysisMode, clubType)
+    if (modeMismatch) {
+      Taro.showModal({
+        title: '模式与球杆不匹配',
+        content: modeMismatch,
+        showCancel: false,
+        confirmText: '我知道了',
+      })
       return
     }
     setSubmitting(true)
@@ -392,6 +403,26 @@ const AnalysisParamsPage: FC = () => {
         msg = ((e as Error).message || '').trim()
       }
       if (!msg) msg = describeIntermittentRequestFailure(e).toastTitle
+
+      if (isRequestError(e)) {
+        const errCode = e.code
+        if (errCode != null && errCode >= 50101 && errCode <= 50123) {
+          const copy = describeAnalysisFailure({ code: errCode, message: msg })
+          let body = copy.hint ?? copy.message
+          if (traceId) body += `\n\n追踪 ID：${traceId}`
+          await Taro.showModal({
+            title: copy.title,
+            content: body.length > 220 ? `${body.slice(0, 217)}…` : body,
+            showCancel: false,
+            confirmText: copy.reshootRecommended ? '重新拍摄' : '我知道了',
+          })
+          if (copy.reshootRecommended) {
+            Taro.redirectTo({ url: '/pages/analysis/capture' })
+          }
+          return
+        }
+      }
+
       let body = msg.length > 220 ? `${msg.slice(0, 217)}…` : msg
       if (traceId) body += `\n\n追踪 ID：${traceId}`
       Taro.showModal({

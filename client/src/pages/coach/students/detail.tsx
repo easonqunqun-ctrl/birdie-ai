@@ -145,6 +145,18 @@ const CoachStudentDetailPage: FC = () => {
           >
             布置作业
           </Button>
+          {detail.recent_analyses[0] ? (
+            <Button
+              className='coach-student-detail__action-btn coach-student-detail__action-btn--ghost'
+              onClick={() =>
+                Taro.navigateTo({
+                  url: `/pages/coach/analysis-annotate?analysisId=${encodeURIComponent(detail.recent_analyses[0].id)}`,
+                })
+              }
+            >
+              批注最近报告
+            </Button>
+          ) : null}
         </View>
       </View>
 
@@ -171,6 +183,16 @@ const CoachStudentDetailPage: FC = () => {
                 }
               >
                 查看报告 →
+              </Text>
+              <Text
+                className='coach-student-detail__link coach-student-detail__link--secondary'
+                onClick={() =>
+                  Taro.navigateTo({
+                    url: `/pages/coach/analysis-annotate?analysisId=${encodeURIComponent(item.id)}`,
+                  })
+                }
+              >
+                写批注
               </Text>
             </View>
           ))

@@ -247,7 +247,7 @@ class Settings(BaseSettings):
     FREE_USER_MONTHLY_ANALYSES: int = 3
     FREE_USER_DAILY_CHATS: int = 5
     MAX_VIDEO_DURATION_SECONDS: int = 30
-    MIN_VIDEO_DURATION_SECONDS: int = 3
+    MIN_VIDEO_DURATION_SECONDS: int = 2
     MAX_VIDEO_SIZE_BYTES: int = 100 * 1024 * 1024  # 100MB
 
     # ==================== W8-T3：测试期配额放宽 ====================

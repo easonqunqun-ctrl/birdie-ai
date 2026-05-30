@@ -30,7 +30,7 @@ from app.schemas.analysis import (
 from app.schemas.base import APIResponse, ok
 from app.schemas.coach_annotation import CoachAnnotationClipRefRead
 from app.schemas.pro_library import ProMatchItemRead, ProMatchResultRead, ProPlayerRead, ProSwingClipRead
-from app.services import analysis_service, coach_annotation_service, pro_match_service
+from app.services import analysis_service, coach_annotation_service, pro_library_service, pro_match_service
 from app.services.analysis_service import FREE_HISTORY_VISIBLE_LIMIT, _load_owned
 from app.services.sample_fixture import build_sample_report
 from app.services.share_card_service import ensure_share_wxa_code_url
@@ -239,7 +239,7 @@ async def get_analysis_pro_matches(
         ProMatchItemRead(
             match_score=m.match_score,
             match_details=m.match_details,
-            clip=ProSwingClipRead.model_validate(m.clip),
+            clip=pro_library_service.pro_swing_clip_to_read(m.clip),
             player=ProPlayerRead.model_validate(m.player),
         )
         for m in matches

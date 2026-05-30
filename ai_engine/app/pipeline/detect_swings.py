@@ -12,7 +12,8 @@ from app.pipeline.multi_swing import (
 )
 from app.pipeline.pose import estimate_poses
 from app.pipeline.preprocess import preprocess_video
-from app.schemas import DetectSwingsRequest, DetectSwingsResult, SwingCandidateItem
+from app.pipeline.swing_candidate_previews import build_swing_candidate_items
+from app.schemas import DetectSwingsRequest, DetectSwingsResult
 
 log = logging.getLogger("ai_engine.detect_swings")
 
@@ -33,7 +34,12 @@ def run_detect_swings(req: DetectSwingsRequest) -> DetectSwingsResult:
             raise MultiSwingOverflowError(
                 f"检测到 {len(raw)} 段挥杆，超过上限 5"
             )
-        candidates = [SwingCandidateItem(**c.to_dict(fps)) for c in raw]
+        candidates = build_swing_candidate_items(
+            analysis_id=req.analysis_id,
+            normalized_video_path=pre.normalized_video_path,
+            raw=raw,
+            fps=fps,
+        )
         default_idx = default_swing_index(raw) if raw else 0
         log.info(
             "detect_swings_done",

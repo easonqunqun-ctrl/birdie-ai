@@ -87,6 +87,30 @@ const CoachAnalysisAnnotatePage: FC = () => {
     }
   }
 
+  const handleDelete = async (annotationId: string) => {
+    if (submitting) return
+    const confirm = await Taro.showModal({
+      title: '删除批注',
+      content: '删除后学员将不再看到这条内容，确定继续？',
+      confirmText: '删除',
+      cancelText: '取消',
+    })
+    if (!confirm.confirm) return
+    setSubmitting(true)
+    try {
+      await coachAnnotationService.remove(annotationId)
+      Taro.showToast({ title: '已删除', icon: 'success' })
+      await load()
+    } catch (e) {
+      Taro.showToast({
+        title: e instanceof Error ? e.message : '删除失败',
+        icon: 'none',
+      })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   const handleSubmitText = async () => {
     const text = textDraft.trim()
     if (!analysisId || submitting || !text) {
@@ -157,7 +181,13 @@ const CoachAnalysisAnnotatePage: FC = () => {
       ) : textItems.length === 0 ? (
         <Text className='coach-annotate__empty-list'>尚无文字批注</Text>
       ) : (
-        textItems.map((ann) => <CoachTextAnnotationCard key={ann.id} annotation={ann} />)
+        textItems.map((ann) => (
+          <CoachTextAnnotationCard
+            key={ann.id}
+            annotation={ann}
+            onDelete={(id) => void handleDelete(id)}
+          />
+        ))
       )}
 
       {PHASE2_PROS_ENABLED_FLAG ? (
@@ -176,6 +206,7 @@ const CoachAnalysisAnnotatePage: FC = () => {
                 key={ann.id}
                 annotation={ann}
                 analysisId={analysisId}
+                onDelete={(id) => void handleDelete(id)}
               />
             ))
           )}

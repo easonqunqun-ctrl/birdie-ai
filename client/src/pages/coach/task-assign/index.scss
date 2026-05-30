@@ -44,6 +44,37 @@
     color: var(--color-text);
   }
 
+  &__picker-meta {
+    display: block;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    margin-top: 6rpx;
+  }
+
+  &__tabs {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-bottom: 20rpx;
+  }
+
+  &__tab {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    padding: 10rpx 20rpx;
+    margin-right: 12rpx;
+    margin-bottom: 12rpx;
+    border-radius: var(--radius-md);
+    border: 1rpx solid var(--color-border);
+    background: var(--color-surface);
+  }
+
+  &__tab--active {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+    background: rgba(26, 35, 126, 0.06);
+  }
+
   &__input {
     width: 100%;
     padding: 20rpx 24rpx;

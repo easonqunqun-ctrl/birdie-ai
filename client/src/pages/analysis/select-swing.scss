@@ -39,6 +39,38 @@
     box-shadow: var(--shadow-sm);
   }
 
+  &__item-body {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+  }
+
+  &__item-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__thumb {
+    width: 120rpx;
+    height: 120rpx;
+    border-radius: var(--radius-sm);
+    margin-right: 20rpx;
+    flex-shrink: 0;
+    background: var(--color-bg-muted);
+  }
+
+  &__thumb--placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &__thumb-label {
+    font-size: 36rpx;
+    font-weight: 700;
+    color: var(--color-text-tertiary);
+  }
+
   &__item--active {
     border-color: var(--color-primary);
     background: rgba(26, 35, 126, 0.04);

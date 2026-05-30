@@ -44,12 +44,8 @@
     margin-bottom: 12rpx;
   }
 
-  &__student {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12rpx 0;
+  &__student-wrap {
+    padding: 8rpx 0;
     border-bottom: 1rpx solid var(--color-border);
 
     &:last-child {
@@ -59,9 +55,15 @@
     &--selected {
       background: var(--color-bg-page);
       border-radius: 12rpx;
-      padding-left: 12rpx;
-      padding-right: 12rpx;
+      padding: 8rpx 12rpx;
     }
+  }
+
+  &__student {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
   }
 
   &__student-name {
@@ -73,6 +75,20 @@
   &__student-meta {
     font-size: 24rpx;
     color: var(--color-text-tertiary);
+  }
+
+  &__quick-actions {
+    display: flex;
+    flex-direction: row;
+    gap: 16rpx;
+    margin-top: 8rpx;
+    padding-left: 4rpx;
+  }
+
+  &__quick-btn {
+    font-size: 24rpx;
+    color: var(--color-primary);
+    padding: 8rpx 0;
   }
 
   &__label {

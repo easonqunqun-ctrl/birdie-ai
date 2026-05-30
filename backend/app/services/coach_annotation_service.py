@@ -103,7 +103,7 @@ def _to_clip_ref_read(
         audit_status=ann.audit_status,
         is_visible=ann.is_visible,
         created_at=ann.created_at,
-        clip=ProSwingClipRead.model_validate(clip) if clip else None,
+        clip=pro_library_service.pro_swing_clip_to_read(clip) if clip else None,
         player=ProPlayerRead.model_validate(player) if player else None,
         clip_unavailable=clip_unavailable,
     )

@@ -40,7 +40,7 @@ def _favorite_to_read(
         note=fav.note,
         training_task_id=fav.training_task_id,
         created_at=fav.created_at,
-        clip=ProSwingClipRead.model_validate(clip),
+        clip=pro_svc.pro_swing_clip_to_read(clip),
         player=ProPlayerRead.model_validate(player),
         clip_unavailable=unavailable,
     )

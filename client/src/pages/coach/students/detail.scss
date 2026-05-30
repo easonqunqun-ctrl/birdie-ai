@@ -91,6 +91,12 @@
     color: var(--color-on-primary) !important;
     border-radius: 999rpx !important;
 
+    &--ghost {
+      background: transparent !important;
+      color: var(--color-primary) !important;
+      border: 1rpx solid var(--color-primary) !important;
+    }
+
     &::after {
       border: none !important;
     }
@@ -160,5 +166,11 @@
     font-size: 24rpx;
     color: var(--color-primary);
     font-weight: 600;
+
+    &--secondary {
+      margin-left: 24rpx;
+      font-weight: 500;
+      color: var(--color-text-secondary);
+    }
   }
 }

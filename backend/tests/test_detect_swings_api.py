@@ -44,6 +44,7 @@ async def test_detect_swings_returns_candidates(
     assert data["upload_id"] == token_data["upload_id"]
     assert len(data["swing_candidates"]) == 2
     assert data["default_selected_index"] == 1
+    assert data["swing_candidates"][0].get("preview_frame_url")
     assert any(c.get("method") == "detect_swings" for c in fake_ai_engine.calls)
 
 

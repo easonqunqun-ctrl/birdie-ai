@@ -206,6 +206,7 @@ class FakeAIEngine:
                         "confidence": 0.88,
                         "start_time_sec": 1.0,
                         "end_time_sec": 4.0,
+                        "preview_frame_url": "http://minio.local/bucket/keyframes/upl_x/swing_0.jpg",
                     },
                     {
                         "start_frame": 180,
@@ -214,6 +215,7 @@ class FakeAIEngine:
                         "confidence": 0.95,
                         "start_time_sec": 6.0,
                         "end_time_sec": 9.0,
+                        "preview_frame_url": "http://minio.local/bucket/keyframes/upl_x/swing_1.jpg",
                     },
                 ],
                 "default_selected_index": 1,

@@ -110,6 +110,7 @@ class SwingCandidateItem(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     start_time_sec: float
     end_time_sec: float
+    preview_frame_url: str | None = None
 
 
 class DetectSwingsResponse(BaseModel):

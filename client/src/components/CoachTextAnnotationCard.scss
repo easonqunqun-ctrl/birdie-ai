@@ -11,7 +11,19 @@
     font-size: var(--font-size-xs);
     font-weight: 600;
     color: var(--color-gold);
+  }
+
+  &__head {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
     margin-bottom: 12rpx;
+  }
+
+  &__delete {
+    font-size: var(--font-size-xs);
+    color: var(--color-error);
   }
 
   &__body {

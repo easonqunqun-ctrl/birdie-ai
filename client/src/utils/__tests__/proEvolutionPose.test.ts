@@ -43,7 +43,7 @@ const clipWithPoses: ProSwingClipRead = {
   is_published: true,
 }
 
-function reportWithIssue(name: string): AnalysisReportResponse {
+function reportWithIssue(type: string, name?: string): AnalysisReportResponse {
   return {
     id: 'ana_1',
     status: 'completed',
@@ -53,12 +53,20 @@ function reportWithIssue(name: string): AnalysisReportResponse {
     video_url: 'https://x/v.mp4',
     recommendations: [],
     created_at: '2026-05-29T00:00:00Z',
-    issues: [{ name, severity: 'moderate', confidence_tier: 'confirmed' }],
+    issues: [
+      {
+        type,
+        name: name ?? type,
+        severity: 'medium',
+        description: 'test',
+        confidence_tier: 'confirmed',
+      },
+    ],
   } as unknown as AnalysisReportResponse
 }
 
 describe('resolveEvolutionScene', () => {
-  test('maps issue to matching scenario', () => {
+  test('maps issue.type to matching scenario', () => {
     const scene = resolveEvolutionScene(
       reportWithIssue('early_extension'),
       clipWithPoses,
@@ -67,6 +75,45 @@ describe('resolveEvolutionScene', () => {
     expect(scene?.label).toBe('早伸')
     expect(scene?.userPose[2].x).toBe(0.42)
     expect(scene?.proPose[2].x).toBe(0.44)
+  })
+
+  test('maps trail_elbow_break alias to chicken_wing', () => {
+    const scene = resolveEvolutionScene(
+      reportWithIssue('trail_elbow_break', '鸡翼肘'),
+      clipWithPoses,
+    )
+    expect(scene?.key).toBe('chicken_wing')
+  })
+
+  test('all three demo scenarios parse from seed clip', () => {
+    const fullClip: ProSwingClipRead = {
+      ...clipWithPoses,
+      features_snapshot: {
+        evolution_poses: {
+          early_extension: {
+            user: basePose,
+            pro: basePose,
+          },
+          chicken_wing: {
+            user: basePose,
+            pro: basePose,
+          },
+          reverse_spine: {
+            user: basePose,
+            pro: basePose,
+          },
+        },
+      },
+    }
+    expect(resolveEvolutionScene(reportWithIssue('early_extension'), fullClip)?.key).toBe(
+      'early_extension',
+    )
+    expect(resolveEvolutionScene(reportWithIssue('chicken_wing'), fullClip)?.key).toBe(
+      'chicken_wing',
+    )
+    expect(resolveEvolutionScene(reportWithIssue('reverse_spine'), fullClip)?.key).toBe(
+      'reverse_spine',
+    )
   })
 
   test('falls back to first available scenario', () => {

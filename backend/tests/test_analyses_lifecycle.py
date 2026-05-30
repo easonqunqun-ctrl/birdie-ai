@@ -39,7 +39,7 @@ async def test_upload_token_rejects_oversized_file(
 async def test_upload_token_rejects_too_short_duration(
     client: AsyncClient, auth_headers: dict[str, str]
 ):
-    """时长 < 3s 应拒绝（40004）。"""
+    """时长 < 2s 应拒绝（40004）。"""
     resp = await client.post(
         "/v1/analyses/upload-token",
         headers=auth_headers,
@@ -52,6 +52,24 @@ async def test_upload_token_rejects_too_short_duration(
     )
     assert resp.status_code == 400
     assert resp.json()["code"] == 40004
+
+
+@pytest.mark.asyncio
+async def test_upload_token_accepts_two_second_duration(
+    client: AsyncClient, auth_headers: dict[str, str]
+):
+    """时长 = 2s 应通过 upload-token 预检。"""
+    resp = await client.post(
+        "/v1/analyses/upload-token",
+        headers=auth_headers,
+        json={
+            "file_name": "two_sec.mp4",
+            "file_size": 1024,
+            "file_type": "video/mp4",
+            "duration": 2.0,
+        },
+    )
+    assert resp.status_code == 200, resp.text
 
 
 @pytest.mark.asyncio

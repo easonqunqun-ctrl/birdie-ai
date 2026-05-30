@@ -46,4 +46,12 @@ describe('coachAnnotationService', () => {
       text_content: '注意送杆',
     })
   })
+
+  test('remove → DELETE /coach/annotations/{id}', async () => {
+    T.request.mockResolvedValueOnce({ statusCode: 200, data: { code: 0, data: {} } })
+    await coachAnnotationService.remove('can_9')
+    const sent = T.request.mock.calls[0][0]
+    expect(sent.method).toBe('DELETE')
+    expect(sent.url).toMatch(/\/coach\/annotations\/can_9$/)
+  })
 })

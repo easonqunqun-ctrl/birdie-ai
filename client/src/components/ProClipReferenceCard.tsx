@@ -11,11 +11,14 @@ import './ProClipReferenceCard.scss'
 export interface ProClipReferenceCardProps {
   annotation: CoachAnnotationClipRef
   analysisId: string
+  /** 教练端编辑模式：展示删除 */
+  onDelete?: (annotationId: string) => void
 }
 
 const ProClipReferenceCard: FC<ProClipReferenceCardProps> = ({
   annotation,
   analysisId,
+  onDelete,
 }) => {
   const { clip, player, clip_unavailable: unavailable, text_content: note } = annotation
 
@@ -29,7 +32,17 @@ const ProClipReferenceCard: FC<ProClipReferenceCardProps> = ({
 
   return (
     <View className='pro-clip-ref'>
-      <Text className='pro-clip-ref__label'>教练推荐参考</Text>
+      <View className='pro-clip-ref__head'>
+        <Text className='pro-clip-ref__label'>教练推荐参考</Text>
+        {onDelete ? (
+          <Text
+            className='pro-clip-ref__delete'
+            onClick={() => onDelete(annotation.id)}
+          >
+            删除
+          </Text>
+        ) : null}
+      </View>
       {note ? <Text className='pro-clip-ref__note'>{note}</Text> : null}
       <View className='pro-clip-ref__main'>
         {clip.thumbnail_url ? (

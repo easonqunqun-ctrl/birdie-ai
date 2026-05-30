@@ -2,13 +2,18 @@
  * M8-05 · 教练向学员派发 drill 作业。
  */
 
-import { FC, useMemo, useState } from 'react'
+import { FC, useEffect, useMemo, useState } from 'react'
 import { View, Text, Button, Picker, Textarea, Input } from '@tarojs/components'
 import Taro, { useRouter } from '@tarojs/taro'
-import { DRILL_CATALOG } from '@/constants/drillLibrary'
 import { PHASE2_COACH_ENABLED_FLAG } from '@/constants/flags'
 import { coachTaskService } from '@/services/coachTaskService'
 import { useUserStore } from '@/store/userStore'
+import {
+  COACH_DRILL_CATEGORY_LABEL,
+  filterDrillsByCategory,
+  findDrillIndexInList,
+  type CoachDrillCategory,
+} from '@/utils/coachDrillFilter'
 import './index.scss'
 
 function currentWeekMondayIso(): string {
@@ -23,20 +28,32 @@ function currentWeekMondayIso(): string {
   return `${y}-${m}-${d}`
 }
 
+const CATEGORY_TABS: CoachDrillCategory[] = ['all', 'full_swing', 'putting', 'chipping']
+
 const CoachTaskAssignPage: FC = () => {
   const router = useRouter()
   const studentUserId = (router.params.studentUserId || '').trim()
   const studentName = decodeURIComponent(router.params.studentName || '').trim()
+  const presetDrillId = (router.params.drillId || '').trim()
+  const presetIssue = decodeURIComponent(router.params.targetIssue || '').trim()
   const currentRole = useUserStore((s) => s.currentRole)
 
-  const drillOptions = useMemo(
-    () => DRILL_CATALOG.map((d) => ({ id: d.drill_id, name: d.name })),
-    [],
-  )
+  const [category, setCategory] = useState<CoachDrillCategory>('all')
+  const drillOptions = useMemo(() => filterDrillsByCategory(category), [category])
   const [drillIndex, setDrillIndex] = useState(0)
   const [targetCount, setTargetCount] = useState('3')
   const [coachNote, setCoachNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    setDrillIndex(findDrillIndexInList(drillOptions, presetDrillId))
+  }, [drillOptions, presetDrillId])
+
+  useEffect(() => {
+    if (presetIssue && !coachNote) {
+      setCoachNote(`针对 ${presetIssue} 加强练习`)
+    }
+  }, [presetIssue, coachNote])
 
   const handleSubmit = async () => {
     if (!studentUserId || submitting) return
@@ -55,12 +72,13 @@ const CoachTaskAssignPage: FC = () => {
       await coachTaskService.assign({
         student_user_id: studentUserId,
         source_type: 'drill',
-        drill_id: drill.id,
+        drill_id: drill.drill_id,
         target_week: currentWeekMondayIso(),
         target_count: count,
+        target_issue: presetIssue || drill.target_issue,
         coach_note: coachNote.trim() || undefined,
       })
-      Taro.showToast({ title: '已派发', icon: 'success' })
+      Taro.showToast({ title: '已派发到训练 Tab', icon: 'success' })
       setTimeout(() => {
         Taro.navigateBack().catch(() => undefined)
       }, 600)
@@ -90,12 +108,32 @@ const CoachTaskAssignPage: FC = () => {
     )
   }
 
+  const selectedDrill = drillOptions[drillIndex]
+
   return (
     <View className='coach-task-assign'>
       <Text className='coach-task-assign__title'>布置本周作业</Text>
       <Text className='coach-task-assign__meta'>
-        学员：{studentName || studentUserId.slice(0, 8)}…
+        学员：{studentName || studentUserId.slice(0, 8)}… · 派发后出现在学员「训练」Tab
       </Text>
+
+      <Text className='coach-task-assign__label'>动作类目</Text>
+      <View className='coach-task-assign__tabs'>
+        {CATEGORY_TABS.map((tab) => (
+          <Text
+            key={tab}
+            className={`coach-task-assign__tab${
+              category === tab ? ' coach-task-assign__tab--active' : ''
+            }`}
+            onClick={() => {
+              setCategory(tab)
+              setDrillIndex(0)
+            }}
+          >
+            {COACH_DRILL_CATEGORY_LABEL[tab]}
+          </Text>
+        ))}
+      </View>
 
       <Text className='coach-task-assign__label'>训练动作</Text>
       <Picker
@@ -106,8 +144,14 @@ const CoachTaskAssignPage: FC = () => {
       >
         <View className='coach-task-assign__picker'>
           <Text className='coach-task-assign__picker-text'>
-            {drillOptions[drillIndex]?.name || '请选择'}
+            {selectedDrill?.name || '请选择'}
           </Text>
+          {selectedDrill?.category ? (
+            <Text className='coach-task-assign__picker-meta'>
+              {COACH_DRILL_CATEGORY_LABEL[selectedDrill.category as CoachDrillCategory] ||
+                selectedDrill.category}
+            </Text>
+          ) : null}
         </View>
       </Picker>
 

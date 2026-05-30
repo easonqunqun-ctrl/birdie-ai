@@ -1,5 +1,6 @@
 .yardage-book {
   padding: 24rpx;
+  padding-bottom: 240rpx;
   min-height: 100vh;
   background: var(--color-bg-page);
 
@@ -31,7 +32,7 @@
   }
 
   &__list {
-    max-height: calc(100vh - 200rpx);
+    max-height: calc(100vh - 320rpx);
   }
 
   &__row {
@@ -54,12 +55,32 @@
     font-size: 30rpx;
     font-weight: 600;
     color: var(--color-text-primary);
+    flex: 1;
+    margin-right: 16rpx;
   }
 
-  &__yards {
+  &__input-wrap {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+  }
+
+  &__input {
+    width: 120rpx;
+    height: 64rpx;
+    padding: 0 12rpx;
+    text-align: right;
     font-size: 32rpx;
     font-weight: 700;
     color: var(--color-primary);
+    background: var(--color-bg-muted);
+    border-radius: var(--radius-sm);
+  }
+
+  &__unit {
+    margin-left: 8rpx;
+    font-size: 26rpx;
+    color: var(--color-text-secondary);
   }
 
   &__row-meta {
@@ -74,11 +95,31 @@
     color: var(--color-text-tertiary);
   }
 
-  &__edit-btn {
+  &__footer {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 24rpx 32rpx calc(24rpx + env(safe-area-inset-bottom));
+    background: var(--color-bg-page);
+    box-shadow: 0 -4rpx 16rpx rgba(26, 35, 126, 0.06);
+  }
+
+  &__save-btn {
+    background: var(--gradient-hero);
+    color: #fff;
+    border-radius: var(--radius-lg);
+    font-size: 32rpx;
+    font-weight: 600;
+    border: none;
+    margin-bottom: 12rpx;
+  }
+
+  &__link-btn {
     margin: 0;
     background: transparent;
     color: var(--color-primary);
     border: 1rpx solid var(--color-primary);
-    font-size: 24rpx;
+    font-size: 26rpx;
   }
 }

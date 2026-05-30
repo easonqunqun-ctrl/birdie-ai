@@ -106,7 +106,7 @@ def test_get_error_class_returns_base_on_unknown():
 
 def test_50106_video_too_short_message():
     inst = ERROR_REGISTRY[50106]("")
-    assert "3 秒" in inst.user_message
+    assert "2 秒" in inst.user_message
 
 
 def test_50109_low_light_message():

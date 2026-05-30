@@ -139,7 +139,7 @@ class VideoTooShortError(PipelineError):
     """50106：duration < MIN_DURATION_SEC（precheck 早失败）。"""
 
     code = 50106
-    user_message = "挥杆视频至少拍 3 秒，请包含完整上杆到收杆后再上传"
+    user_message = "挥杆视频至少拍 2 秒，请包含完整上杆到收杆后再上传"
 
 
 class VideoTooLongError(PipelineError):

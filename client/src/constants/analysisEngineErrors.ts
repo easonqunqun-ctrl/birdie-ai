@@ -47,7 +47,7 @@ const ENGINE_FAILURE_COPY: Record<number, Omit<AnalysisFailureCopy, 'message'>> 
   // 文案与 ai_engine/app/errors.py ERROR_REGISTRY 1:1 对齐
   50106: {
     title: '视频时长过短',
-    hint: '挥杆视频至少拍 3 秒，请包含完整上杆到收杆后再上传。',
+    hint: '挥杆视频至少拍 2 秒，请包含完整上杆到收杆后再上传。',
     reshootRecommended: true,
   },
   50107: {

@@ -66,7 +66,7 @@ async def _topic_to_read(db: AsyncSession, topic) -> ProTopicRead:
         published_at=topic.published_at,
         clips=[
             ProTopicClipItemRead(
-                clip=ProSwingClipRead.model_validate(clip),
+                clip=pro_library_service.pro_swing_clip_to_read(clip),
                 player=ProPlayerRead.model_validate(player),
             )
             for clip, player in items
@@ -194,4 +194,4 @@ async def list_player_clips(
     )
     if camera_angle is not None:
         clips = [c for c in clips if c.camera_angle == camera_angle]
-    return ok([ProSwingClipRead.model_validate(c) for c in clips])
+    return ok([pro_library_service.pro_swing_clip_to_read(c) for c in clips])

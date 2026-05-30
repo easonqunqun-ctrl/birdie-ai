@@ -62,6 +62,7 @@ from app.schemas.analysis import (
     PhaseWindow,
     RecommendationItem,
     ScorePercentileResponse,
+    SwingCandidateItem,
     UploadTokenRequest,
     UploadTokenResponse,
     estimate_swing_remaining_seconds,
@@ -275,7 +276,7 @@ def to_proxy_video_url(url: str | None) -> str | None:
     for prefix in prefixes:
         if trimmed.startswith(prefix):
             key = trimmed[len(prefix) :]
-            if key.startswith(("uploads/", "skeleton/")):
+            if key.startswith(("uploads/", "skeleton/", "samples/", "pro-clips/")):
                 return f"{proxy_root}{key}"
             return trimmed
 
@@ -353,7 +354,7 @@ async def create_upload_token(
             message=f"视频文件过大，请压缩后重试（上限 {settings.MAX_VIDEO_SIZE_BYTES // 1024 // 1024}MB）",
         )
     if payload.duration < settings.MIN_VIDEO_DURATION_SECONDS:
-        raise BadRequestError(code=40004, message="视频时长不足 3 秒，请拍摄完整挥杆过程")
+        raise BadRequestError(code=40004, message="视频时长不足 2 秒，请拍摄完整挥杆过程")
     if payload.duration > settings.MAX_VIDEO_DURATION_SECONDS:
         raise BadRequestError(code=40004, message="视频超过 30 秒，请裁剪后重试")
 
@@ -523,9 +524,21 @@ async def detect_swings_for_upload(
 
     return DetectSwingsResponse(
         upload_id=upload_id,
-        swing_candidates=result.get("swing_candidates") or [],
+        swing_candidates=_map_swing_candidates(result.get("swing_candidates") or []),
         default_selected_index=int(result.get("default_selected_index") or 0),
     )
+
+
+def _map_swing_candidates(raw_list: list) -> list[SwingCandidateItem]:
+    """透传 ai_engine 候选并改写 preview_frame_url 为同源代理。"""
+    out: list[SwingCandidateItem] = []
+    for item in raw_list:
+        data = dict(item) if isinstance(item, dict) else item.model_dump()
+        preview = data.get("preview_frame_url")
+        if preview:
+            data["preview_frame_url"] = to_proxy_image_url(preview)
+        out.append(SwingCandidateItem(**data))
+    return out
 
 
 # ==================================================================

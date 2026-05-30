@@ -58,11 +58,11 @@
 
 | Sprint | PLAN-ID | 事项 | 交付物 | 可做 | 状态 |
 |--------|---------|------|--------|------|------|
-| **W22-A** | P2-M10-01-smoke | 推杆 mode E2E | params→分析→PuttingReport；50123 toast | Now | 📋 |
-| **W22-B** | P2-M10-02-smoke | 切杆 mode E2E | 同上 + wedge 联动 | Now | 📋 |
-| **W22-C** | P2-M7-13-thumb | 多挥候选缩略图 | backend/ffmpeg 按区间抽帧；select-swing 展示 thumb | Now | 📋 |
-| **W22-D** | P2-M10-03-polish | yardage 编辑闭环 | yardage-book 页 PUT 自填码数 + 反推展示 polish | Now | 📋 |
-| **W22-E** | P2-M10-05-smoke | 训练计划短杆 drill | putting issue → putting drill 端到端 pytest + 1 条 jest | Now | 📋 |
+| **W22-A** | P2-M10-01-smoke | 推杆 mode E2E | params→分析→PuttingReport；50123 toast | Now | **🔧 本地单测+50123 UX** |
+| **W22-B** | P2-M10-02-smoke | 切杆 mode E2E | 同上 + wedge 联动 | Now | **🔧 analysisMode 单测** |
+| **W22-C** | P2-M7-13-thumb | 多挥候选缩略图 | backend/ffmpeg 按区间抽帧；select-swing 展示 thumb | Now | **✅ 代码已合** |
+| **W22-D** | P2-M10-03-polish | yardage 编辑闭环 | yardage-book 页 PUT 自填码数 + 反推展示 polish | Now | **✅ 代码已合** |
+| **W22-E** | P2-M10-05-smoke | 训练计划短杆 drill | putting issue → putting drill 端到端 pytest + 1 条 jest | Now | **✅ pytest+jest** |
 
 ---
 
@@ -70,10 +70,10 @@
 
 | Sprint | PLAN-ID | 事项 | 交付物 | 可做 | 状态 |
 |--------|---------|------|--------|------|------|
-| **W23-A** | P2-M8-05 | 教练批注 smoke | analysis-annotate 文字批注 CRUD 真机路径 | Now | 📋 |
-| **W23-B** | P2-M12-09 | Pro clip 引用 smoke | ProClipPicker → 学员侧展示引用卡 | Now | 📋 |
-| **W23-C** | P2-M8-06 | 作业布置 polish | `task-assign` UX + 与 training 任务联动验收 | Now | 📋 |
-| **W23-D** | P2-M8-session | 课后 recap | `session-recap` 与批注/作业串联 smoke | Now | 📋 |
+| **W23-A** | P2-M8-05 | 教练批注 smoke | analysis-annotate 文字批注 CRUD 真机路径 | Now | **🔧 删除+单测；真机待验** |
+| **W23-B** | P2-M12-09 | Pro clip 引用 smoke | ProClipPicker → 学员侧展示引用卡 | Now | **🔧 组件单测；真机待验** |
+| **W23-C** | P2-M8-06 | 作业布置 polish | `task-assign` UX + 与 training 任务联动验收 | Now | **✅ 类目筛选+联动** |
+| **W23-D** | P2-M8-session | 课后 recap | `session-recap` 与批注/作业串联 smoke | Now | **✅ 快捷入口+runbook** |
 
 ---
 
@@ -81,10 +81,10 @@
 
 | Sprint | PLAN-ID | 事项 | 交付物 | 可做 | 状态 |
 |--------|---------|------|--------|------|------|
-| **W24-A** | P2-V2-ROLLOUT | V2 灰度上调 | CVM `AI_ENGINE_V2_ROLLOUT_PCT` 5→25→50；盯 Prometheus 7d | Now | 📋 |
+| **W24-A** | P2-V2-ROLLOUT | V2 灰度上调 | CVM `M7_V2_ROLLOUT_PCT` 5→25→50；盯 Prometheus 7d | Now | **🔧 runbook+脚本；R1 待 Ops** |
 | **W24-B** | P2-W14-C-exec | 真实流量 diff | 满足 runbook 触发后跑 `v1_v2_diff.py` | Trigger | ⏳ |
-| **W24-C** | P2-MON-05 | `make publish-monitoring-cvm` | 发版脚本同步 infra/monitoring（可选） | Now | 📋 |
-| **W24-D** | ENG-06-exec | 争议样本周更 | 首版填 [`eng-06-disputed-sample-weekly-template.md`](./eng-06-disputed-sample-weekly-template.md) | Now | 📋 |
+| **W24-C** | P2-MON-05 | `make publish-monitoring-cvm` | 发版脚本同步 infra/monitoring（可选） | Now | **✅ Done** |
+| **W24-D** | ENG-06-exec | 争议样本周更 | 首版 [`eng-06-W24-2026-05-29.md`](./eng-06-W24-2026-05-29.md) | Now | **✅ Done** |
 
 ---
 
@@ -92,9 +92,9 @@
 
 | Sprint | PLAN-ID | 事项 | 交付物 | 可做 | 状态 |
 |--------|---------|------|--------|------|------|
-| **W25-A** | P2-M12-08-01 | 骨骼插值 util | `client/src/utils/poseInterpolate.ts` + jest | Now | 📋 |
-| **W25-B** | P2-M12-08-02 | SkeletonAnimation 组件 | pros/compare 或 report 入口 best-effort | Now | 📋 |
-| **W25-C** | P2-M12-08-03 | 失败降级 | 无 gap 数据 → 仅雷达静态对比 | Now | 📋 |
+| **W25-A** | P2-M12-08-01 | 骨骼插值 util | `poseInterpolate.ts` + `posInterpolate.ts` + jest | Now | **✅ Done** |
+| **W25-B** | P2-M12-08-02 | SkeletonAnimation 组件 | pro-compare 演化区块 + 三态切换 | Now | **✅ Done** |
+| **W25-C** | P2-M12-08-03 | 失败降级 | 无 pose → DualRadarChart morphProgress | Now | **✅ Done** |
 
 Kickoff：[`p2-m12-08-evolution-animation-kickoff.md`](./p2-m12-08-evolution-animation-kickoff.md)
 

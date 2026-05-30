@@ -27,7 +27,12 @@ ALLOWED_IMAGE_PREFIXES: tuple[str, ...] = (
     "samples/",
 )
 
-ALLOWED_VIDEO_PREFIXES: tuple[str, ...] = ("uploads/", "skeleton/", "samples/")
+ALLOWED_VIDEO_PREFIXES: tuple[str, ...] = (
+    "uploads/",
+    "skeleton/",
+    "samples/",
+    "pro-clips/",
+)
 
 # 304 协商缓存的客户端缓存时间：1 天足够覆盖单次会话；图本身按 analysis_id 命名不会变
 _IMAGE_CACHE_CONTROL = "public, max-age=86400, immutable"

@@ -9,15 +9,30 @@ import './CoachTextAnnotationCard.scss'
 
 export interface CoachTextAnnotationCardProps {
   annotation: CoachAnnotationClipRef
+  /** 教练端编辑模式：展示删除 */
+  onDelete?: (annotationId: string) => void
 }
 
-const CoachTextAnnotationCard: FC<CoachTextAnnotationCardProps> = ({ annotation }) => {
+const CoachTextAnnotationCard: FC<CoachTextAnnotationCardProps> = ({
+  annotation,
+  onDelete,
+}) => {
   const text = (annotation.text_content || '').trim()
   if (!text) return null
 
   return (
     <View className='coach-text-ann'>
-      <Text className='coach-text-ann__label'>教练点评</Text>
+      <View className='coach-text-ann__head'>
+        <Text className='coach-text-ann__label'>教练点评</Text>
+        {onDelete ? (
+          <Text
+            className='coach-text-ann__delete'
+            onClick={() => onDelete(annotation.id)}
+          >
+            删除
+          </Text>
+        ) : null}
+      </View>
       <Text className='coach-text-ann__body'>{text}</Text>
     </View>
   )

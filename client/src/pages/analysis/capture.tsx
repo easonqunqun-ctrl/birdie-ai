@@ -48,7 +48,7 @@ function formatSize(bytes: number): string {
 
 const TIPS = [
   { icon: '📐', text: '将球员放在画面中央，脚到头部全部露出' },
-  { icon: '🎬', text: '拍 3-30 秒，建议只录 1 次完整挥杆' },
+  { icon: '🎬', text: '拍 2-30 秒，建议只录 1 次完整挥杆' },
   { icon: '💡', text: '优选自然光，避免强背光和严重抖动' },
 ]
 

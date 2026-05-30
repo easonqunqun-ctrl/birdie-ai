@@ -78,6 +78,26 @@ pnpm build:weapp    # 或体验环境用 pnpm build:weapp + 对应 env
 - [ ] **我的 → yardage book** 列表可读；装备页可跳转
 - [ ] 教练 → **定制课程** 列表/编辑（`PHASE2_COACH_ENABLED`）
 
+### Phase2 教练 / Pro（W23，体验版必勾）
+
+前置：教练账号已审核通过；与至少 1 名学员 **active** 绑定；`PHASE2_COACH_*` / `PHASE2_PROS_ENABLED` 已开。
+
+- [ ] 学员详情 → **写批注** → `analysis-annotate` 发送文字 → 学员报告页「教练点评」可见
+- [ ] 教练批注页 **删除** 一条文字/参考 → 学员侧同步消失
+- [ ] 批注页 **引用球手 clip** → 学员报告「教练参考素材」→ **看对比** 可进 pro-compare
+- [ ] 学员详情 / recap → **布置作业** → 选推杆/切杆类目 drill → 学员 **训练 Tab**「教练布置的任务」可见
+- [ ] 教练完成派发后学员 **打卡** → 教练侧任务状态变 `done`
+- [ ] **教学报告**（session-recap）选学员 → 快捷「写批注/布置作业」→ 生成 LLM 汇总（可选 PDF）
+
+### Phase2 演化动画（W25 · M12-08，体验版可选）
+
+前置：`PHASE2_PROS_ENABLED=true`；报告已完成且有 Pro 匹配。
+
+- [ ] 报告 → **并排对比**（pro-compare）→ 「追平演化示意」区块可见
+- [ ] 有 `evolution_poses` 的 demo clip → **SkeletonAnimation** 三态 + 「播放演化」
+- [ ] 无 pose 数据 clip → 自动降级为 **雷达渐变**（不白屏、不报错）
+- [ ] 文案含「示意动画，非 AI 逐帧预测」
+
 ---
 
 ## E. 红灯时快速分工

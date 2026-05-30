@@ -122,3 +122,17 @@ docker compose --profile monitoring down
 # 数据卷保留：prometheus_data / alertmanager_data
 # 彻底清：docker volume rm xiaoniao-golf_prometheus_data xiaoniao-golf_alertmanager_data
 ```
+
+## 8 · CVM 发版（W24-C）
+
+从本机同步监控配置（不必整包 backend 发版）：
+
+```bash
+make publish-monitoring-cvm
+# 等价：bash infra/deploy/publish-monitoring-to-cvm.sh
+```
+
+会 rsync `infra/monitoring/`、可选 scp `docker-compose.yml`，并 `--force-recreate`  
+`prometheus` / `alertmanager` / `wechat-webhook-bridge`。
+
+V2 灰度操作见 [`docs/release-notes/v2-rollout-runbook.md`](../docs/release-notes/v2-rollout-runbook.md)。

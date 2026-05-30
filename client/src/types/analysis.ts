@@ -53,6 +53,8 @@ export interface SwingCandidateItem {
   confidence: number
   start_time_sec: number
   end_time_sec: number
+  /** detect-swings 按段抽帧预览（backend 同源代理 URL） */
+  preview_frame_url?: string | null
 }
 
 export interface DetectSwingsResponse {
@@ -246,7 +248,7 @@ export interface AnalysisListResponse extends PageData<AnalysisListItem> {
 
 /* ==================== 前端校验常量 ==================== */
 export const VIDEO_CONSTRAINTS = {
-  MIN_DURATION_SECONDS: 3,
+  MIN_DURATION_SECONDS: 2,
   MAX_DURATION_SECONDS: 30,
   MAX_SIZE_BYTES: 100 * 1024 * 1024,
   ACCEPTED_EXTENSIONS: ['mp4', 'mov'] as const,

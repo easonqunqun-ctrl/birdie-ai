@@ -250,3 +250,36 @@ async def test_coach_video_ref_happy_path(
     me = await client.get("/v1/users/me", headers=coach_headers)
     assert me.json()["data"]["can_coach_annotate"] is False
     assert me.json()["data"]["is_active_coach"] is True
+
+
+@pytest.mark.asyncio
+async def test_coach_delete_annotation(
+    client: AsyncClient,
+    coach_ann_enabled: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    coach_headers, student_headers, student_id = await _setup_coach_student_pair(
+        client, monkeypatch
+    )
+    analysis_id = await _seed_completed_analysis(user_id=student_id)
+
+    create = await client.post(
+        f"/v1/coach/analyses/{analysis_id}/annotations",
+        headers=coach_headers,
+        json={"annotation_type": "text", "text_content": "待删除"},
+    )
+    assert create.status_code == 200
+    ann_id = create.json()["data"]["id"]
+
+    deleted = await client.delete(
+        f"/v1/coach/annotations/{ann_id}",
+        headers=coach_headers,
+    )
+    assert deleted.status_code == 200
+
+    student_list = await client.get(
+        f"/v1/analyses/{analysis_id}/coach-annotations",
+        headers=student_headers,
+    )
+    assert student_list.status_code == 200
+    assert student_list.json()["data"] == []

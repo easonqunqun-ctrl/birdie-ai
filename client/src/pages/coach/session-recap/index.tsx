@@ -93,6 +93,23 @@ const CoachSessionRecapPage: FC = () => {
     setSelected((prev) => ({ ...prev, [studentUserId]: checked }))
   }
 
+  const handleQuickAnnotate = (studentUserId: string) => {
+    const analysisId = analysisMap[studentUserId]
+    if (!analysisId) {
+      Taro.showToast({ title: '该学员暂无可用报告', icon: 'none' })
+      return
+    }
+    Taro.navigateTo({
+      url: `/pages/coach/analysis-annotate?analysisId=${encodeURIComponent(analysisId)}`,
+    }).catch(() => undefined)
+  }
+
+  const handleQuickAssign = (studentUserId: string, displayName: string) => {
+    Taro.navigateTo({
+      url: `/pages/coach/task-assign/index?studentUserId=${encodeURIComponent(studentUserId)}&studentName=${encodeURIComponent(displayName)}`,
+    }).catch(() => undefined)
+  }
+
   const handleGenerate = async () => {
     if (submitting) return
     if (selectedStudentIds.length === 0) {
@@ -186,21 +203,41 @@ const CoachSessionRecapPage: FC = () => {
               students.map((item) => (
                 <View
                   key={item.student_user_id}
-                  className={`coach-session-recap__student${
-                    selected[item.student_user_id] ? ' coach-session-recap__student--selected' : ''
+                  className={`coach-session-recap__student-wrap${
+                    selected[item.student_user_id]
+                      ? ' coach-session-recap__student-wrap--selected'
+                      : ''
                   }`}
                 >
-                  <View>
-                    <Text className='coach-session-recap__student-name'>{item.display_name}</Text>
-                    <Text className='coach-session-recap__student-meta'>
-                      7 天分析 {item.analyses_7d}
-                      {analysisMap[item.student_user_id] ? ' · 已匹配最近报告' : ' · 无可用报告'}
-                    </Text>
+                  <View className='coach-session-recap__student'>
+                    <View>
+                      <Text className='coach-session-recap__student-name'>{item.display_name}</Text>
+                      <Text className='coach-session-recap__student-meta'>
+                        7 天分析 {item.analyses_7d}
+                        {analysisMap[item.student_user_id] ? ' · 已匹配最近报告' : ' · 无可用报告'}
+                      </Text>
+                    </View>
+                    <Switch
+                      checked={Boolean(selected[item.student_user_id])}
+                      onChange={(e) => toggleStudent(item.student_user_id, Boolean(e.detail.value))}
+                    />
                   </View>
-                  <Switch
-                    checked={Boolean(selected[item.student_user_id])}
-                    onChange={(e) => toggleStudent(item.student_user_id, Boolean(e.detail.value))}
-                  />
+                  {selected[item.student_user_id] ? (
+                    <View className='coach-session-recap__quick-actions'>
+                      <Text
+                        className='coach-session-recap__quick-btn'
+                        onClick={() => handleQuickAnnotate(item.student_user_id)}
+                      >
+                        写批注
+                      </Text>
+                      <Text
+                        className='coach-session-recap__quick-btn'
+                        onClick={() => handleQuickAssign(item.student_user_id, item.display_name)}
+                      >
+                        布置作业
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
               ))
             )}

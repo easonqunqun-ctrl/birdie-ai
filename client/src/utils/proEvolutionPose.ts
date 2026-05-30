@@ -51,8 +51,11 @@ function readEvolutionPoses(
 
 function pickScenarioKey(report: AnalysisReportResponse): EvolutionScenarioKey | null {
   for (const issue of report.issues) {
-    const mapped = ISSUE_TO_SCENARIO[issue.name]
-    if (mapped) return mapped
+    const keys = [issue.type, issue.name].filter(Boolean) as string[]
+    for (const key of keys) {
+      const mapped = ISSUE_TO_SCENARIO[key]
+      if (mapped) return mapped
+    }
   }
   return null
 }
