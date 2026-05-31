@@ -47,6 +47,12 @@ import {
   shouldStartPrepareFullSwingUpload,
   type PrepareFullSwingPhase,
 } from '@/utils/prepareFullSwingUpload'
+import {
+  detectPrepareFailureBannerLines,
+  resolveDetectSwingsFailure,
+  shouldBlockSubmitOnDetectPrepareFailure,
+  type DetectSwingsFailureInfo,
+} from '@/utils/detectSwingsFailure'
 import type { CameraAngle, ClubType } from '@/types/api'
 import { PHASE2_CHIPPING_MODE_ENABLED_FLAG, PHASE2_PUTTING_MODE_ENABLED_FLAG, PHASE2_YARDAGE_BOOK_ENABLED_FLAG } from '@/constants/flags'
 import { CHIPPING_CLUB_HINT } from '@/constants/chippingLabels'
@@ -110,6 +116,8 @@ const AnalysisParamsPage: FC = () => {
   const [preparePhase, setPreparePhase] = useState<PrepareFullSwingPhase>('idle')
   const [preparedToken, setPreparedToken] = useState<UploadTokenResponse | null>(null)
   const [preparedDetect, setPreparedDetect] = useState<DetectSwingsResponse | null>(null)
+  const [prepareDetectFailure, setPrepareDetectFailure] =
+    useState<DetectSwingsFailureInfo | null>(null)
   const [cameraAngleHint, setCameraAngleHint] = useState<string | null>(null)
   const cameraAngleTouchedRef = useRef(false)
 
@@ -199,6 +207,7 @@ const AnalysisParamsPage: FC = () => {
     setPreparePhase('idle')
     setPreparedToken(null)
     setPreparedDetect(null)
+    setPrepareDetectFailure(null)
   }, [tempFilePath])
 
   // full_swing：质量检查通过后立即上传 + detect-swings，在 params 页预选机位（docs/02 §3.4）
@@ -219,6 +228,7 @@ const AnalysisParamsPage: FC = () => {
     let cancelled = false
     const run = async () => {
       setPreparePhase('uploading')
+      setPrepareDetectFailure(null)
       try {
         const contentType = guessContentType(tempFilePath)
         const tokenPayload = {
@@ -252,11 +262,12 @@ const AnalysisParamsPage: FC = () => {
           })
         }
         setPreparePhase('ready')
-      } catch {
+      } catch (err) {
         if (!cancelled) {
           setPreparePhase('failed')
           setPreparedToken(null)
           setPreparedDetect(null)
+          setPrepareDetectFailure(resolveDetectSwingsFailure(err))
         }
       }
     }
@@ -274,14 +285,26 @@ const AnalysisParamsPage: FC = () => {
     qualityBlocks.length,
   ])
 
-  const qualityHintLines = useMemo(
-    () => linesForQualityWarnings(qualityWarnings),
-    [qualityWarnings],
+  const prepareDetectFailureLines = useMemo(
+    () =>
+      prepareDetectFailure
+        ? detectPrepareFailureBannerLines(prepareDetectFailure)
+        : [],
+    [prepareDetectFailure],
+  )
+
+  const prepareFailureBlocking = shouldBlockSubmitOnDetectPrepareFailure(
+    prepareDetectFailure,
   )
 
   const qualityBlockLines = useMemo(
     () => linesForQualityBlocks(qualityBlocks),
     [qualityBlocks],
+  )
+
+  const qualityHintLines = useMemo(
+    () => linesForQualityWarnings(qualityWarnings),
+    [qualityWarnings],
   )
 
   const overLimit = useMemo(() => {
@@ -499,18 +522,17 @@ const AnalysisParamsPage: FC = () => {
           return
         } catch (detectErr) {
           Taro.hideLoading()
-          if (isRequestError(detectErr) && detectErr.code === 50122) {
-            const copy = describeAnalysisFailure({
-              code: 50122,
-              message: detectErr.message,
-            })
+          if (isRequestError(detectErr) && detectErr.code != null && detectErr.code >= 50101 && detectErr.code <= 50123) {
+            const copy = resolveDetectSwingsFailure(detectErr)
             await Taro.showModal({
               title: copy.title,
               content: copy.hint ?? copy.message,
               showCancel: false,
-              confirmText: '重新拍摄',
+              confirmText: copy.reshootRecommended ? '重新拍摄' : '我知道了',
             })
-            Taro.redirectTo({ url: '/pages/analysis/capture' })
+            if (copy.reshootRecommended) {
+              Taro.redirectTo({ url: '/pages/analysis/capture' })
+            }
             return
           }
           throw detectErr
@@ -577,7 +599,11 @@ const AnalysisParamsPage: FC = () => {
 
   const prepareBlocking = shouldBlockSubmitWhilePreparing(preparePhase)
   const disabled =
-    submitting || !!overLimit || qualityBlocks.length > 0 || prepareBlocking
+    submitting ||
+    !!overLimit ||
+    qualityBlocks.length > 0 ||
+    prepareBlocking ||
+    prepareFailureBlocking
 
   return (
     <View className='params'>
@@ -611,6 +637,21 @@ const AnalysisParamsPage: FC = () => {
             ))}
             <Text className='params__quality-warn-foot'>
               可继续上传，分析报告会再次提示；建议改善后重拍。
+            </Text>
+          </View>
+        )}
+        {analysisMode === 'full_swing' && prepareDetectFailure && prepareDetectFailureLines.length > 0 && (
+          <View className='params__quality-block'>
+            <Text className='params__quality-block-title'>
+              {prepareDetectFailure.title}
+            </Text>
+            {prepareDetectFailureLines.map((line) => (
+              <Text key={line} className='params__quality-block-line'>
+                {line}
+              </Text>
+            ))}
+            <Text className='params__quality-block-foot'>
+              机位自动识别未成功；请返回重新拍摄后再试。
             </Text>
           </View>
         )}

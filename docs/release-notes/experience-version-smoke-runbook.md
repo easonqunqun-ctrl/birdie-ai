@@ -5,16 +5,16 @@
 
 ---
 
-## 当前体验版基线（2026-05-31 · M7-R1 B5）
+## 当前体验版基线（2026-05-31 · detect-swings 失败提示）
 
 | 项 | 值 |
 |----|-----|
-| **小程序版本** | **1.2.28**（构建后上传；公众平台 **选为体验版**） |
+| **小程序版本** | **1.2.29**（构建后上传；公众平台 **选为体验版**） |
 | **API** | `https://api.birdieai.cn/v1` |
-| **CVM** | M7-R1 B5（`1e53615` · top 双证据）+ 1.2.27 机位预选 |
-| **待验** | 本节 **§M7-R1**（含 `top_frame_mismatch` 报告文案） |
+| **CVM** | M7-R1 B5 + B7 router（`6e41673`） |
+| **待验** | 本节 **§M7-R1** + **短视频 50101 → params 页阻断提示** |
 
-**发版后必做**：mp 后台 → **版本管理 → 1.2.28 → 选为体验版** → 真机扫码 → 重跑 face-on 样本，确认转肩读数与 B5 提示。
+**发版后必做**：mp 后台 → **版本管理 → 1.2.29 → 选为体验版** → 用 &lt;2s 视频验证 params 页出现「视频时长过短」并禁用提交。
 
 **AC-A1 真视频**：`test_rotation_regression_real.py` 2 passed（本地 `dtl_iron_01` + `face_on_iron_01`）；**AC-B1** 连拍 CV 见 `test_rotation_repeatability.py`（需 `take1–3` fixture）。
 
@@ -106,6 +106,7 @@ cd client && pnpm exec jest src/constants/__tests__/qualityWarnings.test.ts src/
 - [ ] 正面 7 铁自拍：不应出现 **severity≥medium** 的 `under_rotation`（明显转肩场景）
 - [ ] full_swing 进 **params 页** 后后台识别机位 → **拍摄角度默认选中** + 说明条「已识别为…，可手动调整」（与默认不同时另有 toast）
 - [ ] face-on 腕 top 与肩转峰值不一致时：报告 **拍摄提示** 含「顶点时刻与转肩峰值不完全一致」（`top_frame_mismatch`）
+- [ ] **短视频**：&lt;2s 或引擎报 50101 时长 → params 页 **红色阻断条**「视频时长过短」，「开始分析」不可点
 - [ ] （可选）多挥视频 → detect-swings 后机位与创任务参数一致
 
 **红灯**
