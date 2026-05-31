@@ -10,7 +10,7 @@ import { View, Text, ScrollView } from '@tarojs/components'
 import { CURRENT_TERMS_VERSION } from '@/utils/storage'
 import './legal.scss'
 
-const LEGAL_META_DATE = '2026-05-13'
+const LEGAL_META_DATE = '2026-05-29'
 
 const TermsPage: FC = () => {
   return (
@@ -59,6 +59,21 @@ const TermsPage: FC = () => {
             <Text className='legal__item'>
               您可在「我的」等入口按指引申请注销账号；注销将导致您无法再访问历史数据，
               具体数据处理规则以《隐私政策》为准。
+            </Text>
+            <Text className='legal__item'>
+              <Text className='legal__item-title'>约球功能实名验证：</Text>
+              您使用约球邀请、附近球馆搜索等约球相关功能前，须完成实名验证，包括：
+              确认出生日期（须已满 14 周岁）、授权绑定微信手机号，并阅读同意《约球功能服务须知》。
+              您应保证所填出生日期真实、准确；冒用他人信息或提供虚假信息的，我们有权限制或终止约球相关功能，
+              并依法配合有关部门处理。
+            </Text>
+            <Text className='legal__item'>
+              约球功能仅提供球友信息匹配与活动组织工具，
+              <Text className='legal__item-title'>
+                不参与任何线下约球或练球活动，不对线下见面过程中的人身安全、财产安全或纠纷承担任何责任。
+              </Text>
+              请勿在平台内交换手机号、微信号等联系方式；禁止以约球为名组织赌博、现金或实物对赌。
+              约球功能的详细规则以《约球功能服务须知》及《隐私政策》为准。
             </Text>
           </View>
         </View>

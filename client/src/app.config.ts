@@ -58,6 +58,7 @@ export default defineAppConfig({
     'pages/meetup/detail',
     'pages/meetup/feedback',
     'pages/meetup/create',
+    'pages/meetup/identity-verify',
     'pages/coach-invite/index',
     'pages/meetup/events/index',
     'pages/meetup/events/create',
@@ -119,6 +120,7 @@ export default defineAppConfig({
    * 1) `requiredPrivateInfos`：**只**接受位置类 8 个 API（chooseAddress / chooseLocation /
    *    choosePoi / getFuzzyLocation / getLocation / onLocationChange /
    *    startLocationUpdate / startLocationUpdateBackground）；M9-05 常去球馆使用 getLocation。
+   *    手机号（getPhoneNumber）不在此数组内，须在公众平台《用户隐私保护指引》勾选即可。
    *
    * 2) `permission`：**只**接受官方白名单（scope.userLocation / scope.userLocationBackground /
    *    scope.userFuzzyLocation / scope.writePhotosAlbum / scope.werun / scope.bluetooth /

@@ -11,18 +11,22 @@ import {
   type MeetupGenderPreference,
   type MeetupTosContent,
 } from '@/services/meetupSafetyService'
+import { handleMeetupGateError } from '@/utils/meetupGate'
 import './MeetupTosModal.scss'
 
 export interface MeetupTosModalProps {
   visible: boolean
   onAccepted: () => void
   onRejected: () => void
+  /** 未实名时回调（由父级跳转实名页） */
+  onIdentityRequired?: () => void
 }
 
 export const MeetupTosModal: FC<MeetupTosModalProps> = ({
   visible,
   onAccepted,
   onRejected,
+  onIdentityRequired,
 }) => {
   const [tos, setTos] = useState<MeetupTosContent | null>(null)
   const [preference, setPreference] = useState<MeetupGenderPreference>('any')
@@ -38,6 +42,9 @@ export const MeetupTosModal: FC<MeetupTosModalProps> = ({
         ])
         setTos(content)
         setPreference(status.gender_preference)
+        if (!status.identity_eligible) {
+          onIdentityRequired?.()
+        }
       } catch (e) {
         Taro.showToast({
           title: e instanceof Error ? e.message : '加载协议失败',
@@ -55,6 +62,10 @@ export const MeetupTosModal: FC<MeetupTosModalProps> = ({
       await meetupSafetyService.acceptTos(preference)
       onAccepted()
     } catch (e) {
+      if (await handleMeetupGateError(e, { onTosRequired: () => undefined })) {
+        onIdentityRequired?.()
+        return
+      }
       Taro.showToast({
         title: e instanceof Error ? e.message : '同意失败',
         icon: 'none',

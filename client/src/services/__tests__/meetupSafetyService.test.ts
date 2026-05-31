@@ -39,4 +39,16 @@ describe('meetupSafetyService', () => {
       coach_spectator_optin: true,
     })
   })
+
+  it('verifyIdentity posts birth_date and phone_code', async () => {
+    http.post.mockResolvedValue({ identity_eligible: true })
+    await meetupSafetyService.verifyIdentity({
+      birth_date: '1990-05-01',
+      phone_code: 'mock_code',
+    })
+    expect(http.post).toHaveBeenCalledWith('/meetups/safety/verify-identity', {
+      birth_date: '1990-05-01',
+      phone_code: 'mock_code',
+    })
+  })
 })

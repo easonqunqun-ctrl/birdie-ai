@@ -20,6 +20,56 @@ def meetup_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_verify_identity_success(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    meetup_enabled: None,
+) -> None:
+    resp = await client.post(
+        "/v1/meetups/safety/verify-identity",
+        json={"birth_date": "1990-05-01", "phone_code": "mock_phone_code"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["identity_eligible"] is True
+    assert data["phone_verified"] is True
+    assert data["can_use_meetup"] is False
+
+
+@pytest.mark.asyncio
+async def test_verify_identity_minor_blocked(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    meetup_enabled: None,
+) -> None:
+    resp = await client.post(
+        "/v1/meetups/safety/verify-identity",
+        json={"birth_date": "2015-01-01", "phone_code": "mock_phone_code"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 403
+    assert resp.json()["code"] == 40332
+
+
+@pytest.mark.asyncio
+async def test_verify_identity_then_accept_tos(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    meetup_enabled: None,
+) -> None:
+    verify = await client.post(
+        "/v1/meetups/safety/verify-identity",
+        json={"birth_date": "1992-03-15", "phone_code": "mock_phone_code"},
+        headers=auth_headers,
+    )
+    assert verify.status_code == 200
+    accept = await client.post("/v1/meetups/safety/accept-tos", headers=auth_headers)
+    assert accept.status_code == 200
+    assert accept.json()["data"]["can_use_meetup"] is True
+
+
+@pytest.mark.asyncio
 async def test_minor_blocked_on_accept_tos(
     client: AsyncClient,
     auth_headers: dict[str, str],

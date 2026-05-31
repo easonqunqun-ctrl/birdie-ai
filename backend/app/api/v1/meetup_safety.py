@@ -13,6 +13,7 @@ from app.models.user import User
 from app.schemas.base import APIResponse, ok
 from app.schemas.meetup_safety import (
     MeetupGenderPreferenceUpdate,
+    MeetupIdentityVerify,
     MeetupSafetyStatus,
     MeetupSpectatorOptinUpdate,
     MeetupTosAccept,
@@ -66,6 +67,27 @@ async def get_meetup_safety_status(
 ):
     _ensure_meetup_enabled()
     data = await safety_svc.get_safety_status(db, user=user)
+    return ok(MeetupSafetyStatus.model_validate(data))
+
+
+@router.post(
+    "/safety/verify-identity",
+    summary="约球实名验证（M13-09）",
+    response_model=APIResponse[MeetupSafetyStatus],
+)
+async def verify_meetup_identity(
+    payload: MeetupIdentityVerify,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    _ensure_meetup_enabled()
+    data = await safety_svc.verify_meetup_identity(
+        db,
+        user=user,
+        birth_date=payload.birth_date,
+        phone_code=payload.phone_code,
+    )
+    await db.commit()
     return ok(MeetupSafetyStatus.model_validate(data))
 
 

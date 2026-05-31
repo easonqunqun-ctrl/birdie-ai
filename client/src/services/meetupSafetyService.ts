@@ -57,4 +57,8 @@ export const meetupSafetyService = {
       coach_spectator_optin,
     })
   },
+
+  verifyIdentity(payload: { birth_date: string; phone_code: string }): Promise<MeetupSafetyStatus> {
+    return http.post<MeetupSafetyStatus>('/meetups/safety/verify-identity', payload)
+  },
 }

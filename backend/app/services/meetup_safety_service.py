@@ -107,6 +107,53 @@ def _can_use_meetup(user: User, payload: dict) -> bool:
     return bool(payload.get(MEETUP_TOS_KEY))
 
 
+async def verify_meetup_identity(
+    db: AsyncSession,
+    *,
+    user: User,
+    birth_date: date,
+    phone_code: str,
+) -> dict:
+    """M13-09 · 微信手机号 + 出生日期实名."""
+
+    from app.core.exceptions import BadRequestError
+    from app.integrations.wechat_phone import get_user_phone_number
+
+    today = _now().date()
+    if birth_date > today:
+        raise BadRequestError(code=40052, message="出生日期不能晚于今天")
+
+    if user.phone_verified_at is not None and user.birth_date is not None:
+        if user.birth_date == birth_date:
+            assert_identity_eligible(user)
+            return await get_safety_status(db, user=user)
+        raise BadRequestError(code=40052, message="实名信息已提交，如需修改请联系客服")
+
+    if user.birth_date is not None and user.birth_date != birth_date:
+        raise BadRequestError(code=40052, message="出生日期与已保存信息不一致")
+
+    years = today.year - birth_date.year
+    if (today.month, today.day) < (birth_date.month, birth_date.day):
+        years -= 1
+    if years < MIN_MEETUP_AGE:
+        raise MeetupMinorBlockedError()
+
+    if user.birth_date is None:
+        user.birth_date = birth_date
+
+    if settings.MEETUP_MOCK_IDENTITY_VERIFIED and settings.WECHAT_MOCK_LOGIN:
+        user.phone_verified_at = _now()
+        await db.flush()
+        logger.info("meetup_identity_verified_mock", user_id=user.id)
+        return await get_safety_status(db, user=user)
+
+    await get_user_phone_number(phone_code)
+    user.phone_verified_at = _now()
+    await db.flush()
+    logger.info("meetup_identity_verified", user_id=user.id)
+    return await get_safety_status(db, user=user)
+
+
 async def accept_meetup_tos(
     db: AsyncSession, *, user: User, gender_preference: GenderPreference | None = None
 ) -> dict:
@@ -201,4 +248,5 @@ __all__ = [
     "update_coach_spectator_optin",
     "update_gender_preference",
     "user_age_years",
+    "verify_meetup_identity",
 ]

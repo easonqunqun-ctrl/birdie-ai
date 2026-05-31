@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 GenderPreferenceLiteral = Literal["any", "same", "coach_only"]
 
@@ -34,6 +35,13 @@ class MeetupSpectatorOptinUpdate(BaseModel):
 
 class MeetupTosAccept(BaseModel):
     gender_preference: GenderPreferenceLiteral | None = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class MeetupIdentityVerify(BaseModel):
+    birth_date: date
+    phone_code: str = Field(..., min_length=1, max_length=512)
 
     model_config = ConfigDict(extra="forbid")
 

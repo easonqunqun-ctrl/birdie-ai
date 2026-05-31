@@ -12,7 +12,7 @@ const AGREED_TERMS_KEY = 'agreed_terms'
  * 老用户会在下一次启动被 consent 页重新拦截同意。
  * 仅文案排版调整（错别字、标点）不需要 bump。
  */
-export const CURRENT_TERMS_VERSION = 'v1.2'
+export const CURRENT_TERMS_VERSION = 'v1.3'
 
 export interface AgreedTermsRecord {
   /** 用户同意的协议版本号 */

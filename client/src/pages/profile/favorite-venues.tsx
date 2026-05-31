@@ -11,6 +11,7 @@
 import { FC, useCallback, useState } from 'react'
 import { View, Text, ScrollView } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
+import MeetupTosModal from '@/components/MeetupTosModal'
 import {
   getCurrentGcj02Location,
   LocationError,
@@ -25,6 +26,8 @@ import {
   type FavoriteVenuesList,
 } from '@/services/profileV2'
 import { meetupService, type VenueNearbyItem } from '@/services/meetupService'
+import { isRequestError } from '@/services/request'
+import { handleMeetupGateError, navigateToMeetupIdentityVerify } from '@/utils/meetupGate'
 import './favorite-venues.scss'
 
 const FavoriteVenuesPage: FC = () => {
@@ -35,6 +38,9 @@ const FavoriteVenuesPage: FC = () => {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [nearby, setNearby] = useState<VenueNearbyItem[]>([])
   const [locating, setLocating] = useState(false)
+  const [showTos, setShowTos] = useState(false)
+
+  const venueRedirect = '/pages/profile/favorite-venues'
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -85,6 +91,7 @@ const FavoriteVenuesPage: FC = () => {
   }
 
   const fetchNearby = async () => {
+    if (!data) return
     const loc = await getCurrentGcj02Location()
     const resp = await meetupService.nearbyVenues({
       lat: loc.latitude,
@@ -118,6 +125,14 @@ const FavoriteVenuesPage: FC = () => {
             await fetchNearby()
             return
           } catch (retryErr) {
+            if (
+              await handleMeetupGateError(retryErr, {
+                redirect: venueRedirect,
+                onTosRequired: () => setShowTos(true),
+              })
+            ) {
+              return
+            }
             const msg =
               retryErr instanceof Error ? retryErr.message : '定位失败，请稍后重试'
             Taro.showToast({ title: msg, icon: 'none' })
@@ -126,7 +141,19 @@ const FavoriteVenuesPage: FC = () => {
         }
         return
       }
-      const msg = e instanceof Error ? e.message : '定位失败，请稍后重试'
+      if (
+        await handleMeetupGateError(e, {
+          redirect: venueRedirect,
+          onTosRequired: () => setShowTos(true),
+        })
+      ) {
+        return
+      }
+      const msg = isRequestError(e)
+        ? e.message
+        : e instanceof Error
+          ? e.message
+          : '定位失败，请稍后重试'
       Taro.showToast({ title: msg, icon: 'none' })
     } finally {
       setLocating(false)
@@ -248,6 +275,21 @@ const FavoriteVenuesPage: FC = () => {
           <Text>{locating ? '定位中…' : remaining > 0 ? '添加附近球馆' : '已达上限'}</Text>
         </View>
       </View>
+
+      <MeetupTosModal
+        visible={showTos}
+        onAccepted={() => {
+          setShowTos(false)
+          void fetchNearby().catch((e) => {
+            void handleMeetupGateError(e, { redirect: venueRedirect })
+          })
+        }}
+        onRejected={() => setShowTos(false)}
+        onIdentityRequired={() => {
+          setShowTos(false)
+          navigateToMeetupIdentityVerify(venueRedirect)
+        }}
+      />
     </View>
   )
 }

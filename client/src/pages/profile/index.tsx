@@ -323,6 +323,18 @@ const ProfilePage: FC = () => {
               <Text className='profile__menu-arrow'>›</Text>
             </View>
           )}
+          {PHASE2_MEETUP_ENABLED_FLAG && (
+            <View
+              className='profile__menu-item'
+              onClick={() =>
+                Taro.navigateTo({ url: '/pages/meetup/identity-verify' })
+              }
+            >
+              <Text className='profile__menu-icon'>🛡️</Text>
+              <Text className='profile__menu-label'>约球合规</Text>
+              <Text className='profile__menu-arrow'>›</Text>
+            </View>
+          )}
 
           {PHASE2_COACH_ENABLED_FLAG && !user?.is_active_coach && (
             <View

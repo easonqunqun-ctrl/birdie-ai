@@ -283,6 +283,7 @@
 | 2026-05-29 | **Phase D · M13-07 ✅**（互评 + 信用）：`meetup_feedback_service` + feedback API + 24h 隔离；`pages/meetup/feedback`；Alembic 0029 唯一约束 |
 | 2026-05-29 | **Phase D · M13-08 ✅**（挑战赛模板）：3 rule_template + events API + 排行 + honor badge；`pages/meetup/events/*`；Alembic 0030 `score_payload` |
 | 2026-05-29 | **Phase D · M13-09 ✅**（合规）：TOS 强弹窗 + 40332/40333/40334 + gender_preference；Alembic 0031 用户实名字段 |
+| 2026-05-29 | **M13-09 客户端 ✅**：实名页 + `verify-identity` + gate 引导 → [`p2-m13-09-meetup-identity-client-kickoff.md`](./p2-m13-09-meetup-identity-client-kickoff.md) |
 | 2026-05-29 | **Phase D · M13-10**（教练旁观）：`coach_student_relations` + `GET /coach/students/{id}/meetups` + 40336 + 学员 opt-in |
 | 2026-05-29 | **Phase D · M8-01**（教练档案）：`coach_profiles` + `coach_verifications` + 申请/Admin 审核 + 40310/40311 |
 | 2026-05-29 | **Phase D · M8-02**（教练身份切换）：JWT `role` claim + `POST /auth/role-switch` + 40320；教练业务端点须 `role=coach`；Profile Switch + TabBar 文案 |

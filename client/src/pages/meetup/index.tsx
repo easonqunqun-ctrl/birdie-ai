@@ -15,6 +15,7 @@ import {
 import { meetupService, type MeetupInvitationRead } from '@/services/meetupService'
 import { meetupSafetyService } from '@/services/meetupSafetyService'
 import { useUserStore } from '@/store/userStore'
+import { navigateToMeetupIdentityVerify } from '@/utils/meetupGate'
 import './index.scss'
 
 function formatWhen(iso: string | null): string {
@@ -53,6 +54,12 @@ const MeetupListPage: FC = () => {
   const checkSafety = useCallback(async () => {
     try {
       const status = await meetupSafetyService.status()
+      if (!status.identity_eligible) {
+        navigateToMeetupIdentityVerify('/pages/meetup/index')
+        setMeetupReady(false)
+        setShowTos(false)
+        return
+      }
       if (!status.can_use_meetup) {
         setShowTos(true)
         setMeetupReady(false)
@@ -228,6 +235,10 @@ const MeetupListPage: FC = () => {
           setShowTos(false)
         }}
         onRejected={() => Taro.navigateBack()}
+        onIdentityRequired={() => {
+          setShowTos(false)
+          navigateToMeetupIdentityVerify('/pages/meetup/index')
+        }}
       />
     </View>
   )

@@ -16,7 +16,7 @@ import { View, Text, ScrollView } from '@tarojs/components'
 import { CURRENT_TERMS_VERSION } from '@/utils/storage'
 import './legal.scss'
 
-const LEGAL_META_DATE = '2026-05-13'
+const LEGAL_META_DATE = '2026-05-29'
 
 const PrivacyPage: FC = () => {
   return (
@@ -61,14 +61,30 @@ const PrivacyPage: FC = () => {
               设备及环境信息（如设备型号、操作系统版本、微信小程序基础库版本、网络类型等）。
             </Text>
             <Text className='legal__item'>
+              <Text className='legal__item-title'>位置信息（在您主动使用时）：</Text>
+              当您使用「常去球馆 · 添加附近球馆」等功能并授权后，我们会通过微信
+              `getLocation` 接口获取您设备当前的大致地理位置（GCJ-02 坐标），
+              用于按距离推荐附近球馆；我们不会持续后台定位，亦不会在您未触发相关功能时读取位置。
+            </Text>
+            <Text className='legal__item'>
+              <Text className='legal__item-title'>约球实名信息（在您使用约球相关功能时）：</Text>
+              当您使用约球邀请、附近球馆搜索等约球相关能力前，我们会依法收集：
+              （1）您主动选择的出生日期，用于确认是否已满 14 周岁；
+              （2）经您点击「微信授权手机号」后，由微信接口返回的手机号验证结果（我们通过微信官方
+              `getPhoneNumber` 换取验证凭证，在服务端完成校验；通常仅记录「已验证」状态与时间，
+              不向其他用户展示您的完整手机号）。
+              上述信息用于约球安全合规、未成年人保护与账号安全，不用于电话营销或向无关第三方出售。
+            </Text>
+            <Text className='legal__item'>
               <Text className='legal__item-title'>付费与履约信息：</Text>
               若您购买会员或服务包，我们可能通过微信支付等平台获取订单编号、开通状态、履约时间等与交易直接相关的最少信息，
               具体以支付渠道提供的数据为准。
             </Text>
           </View>
           <Text className='legal__paragraph'>
-            我们不会以「本产品核心功能之外的用途」为名，主动向您索要通讯录、精确位置信息、通讯录、相册全量读写、通话记录等与功能无关的系统权限，
-            亦不会强求您填写与挥杆分析与训练无关的敏感个人信息。
+            除实现挥杆分析、AI 教练等核心功能所必需的信息外，我们不会主动索要通讯录、相册全量读写、
+            通话记录等与功能无关的系统权限。精确位置信息、手机号等敏感权限仅在您使用对应功能
+            （如添加附近球馆、约球实名验证）且通过微信授权弹窗明示同意后才会读取。
           </Text>
         </View>
 
@@ -83,6 +99,11 @@ const PrivacyPage: FC = () => {
               <Text className='legal__item-title'>改进与安全：</Text>
               在产品升级、性能优化与安全审计过程中，我们可能基于去标识或统计后的信息进行内部分析，
               并保留必要的技术与安全日志以满足合规与安全事件处置要求。
+            </Text>
+            <Text className='legal__item'>
+              <Text className='legal__item-title'>约球与附近球馆：</Text>
+              在您完成约球实名验证并同意《约球功能服务须知》后，使用您的出生日期判断是否具备约球资格，
+              使用位置坐标检索附近球馆列表；约球匹配过程中不向其他用户展示您的完整手机号。
             </Text>
             <Text className='legal__item'>
               <Text className='legal__item-title'>履行法定义务：</Text>
@@ -138,6 +159,10 @@ const PrivacyPage: FC = () => {
               您也可在「我的 → 分析历史」中更早地删除对应记录（删除后我们通常无法在合理技术上恢复原件）。
             </Text>
             <Text className='legal__item'>
+              约球实名相关字段（出生日期、手机号验证状态）在您持有账号期间一般予以保留，以便您持续使用约球功能；
+              您注销账号后，我们将与账号其他信息一并删除或匿名化，依法需留存的除外。
+            </Text>
+            <Text className='legal__item'>
               分析报告、结构化训练数据等在您持有账号期间一般予以保留以便您回看；
               您注销账号后，我们会在法律要求的最短期限内删除或匿名化处理，依法需留存的账务、日志等按其法定保存年限处理。
             </Text>
@@ -156,13 +181,28 @@ const PrivacyPage: FC = () => {
         <View className='legal__section'>
           <Text className='legal__section-title'>六、未成年人保护</Text>
           <Text className='legal__paragraph'>
-            若您未满 14 周岁，请在监护人同意后使用本产品；已满 14 周岁未满 18 周岁的，
-            应在监护人陪同下阅读并理解本政策。若您作为监护人不同意被监护人向我们提供个人信息，请停止使用或联系我们删除。
+            若您未满 14 周岁，请在监护人同意后使用本产品挥杆分析、AI 教练等一般功能；
+            已满 14 周岁未满 18 周岁的，应在监护人陪同下阅读并理解本政策。
+          </Text>
+          <Text className='legal__paragraph'>
+            <Text className='legal__item-title'>约球功能特别说明：</Text>
+            约球邀请、附近球馆搜索等约球相关功能仅向已满 14 周岁且完成手机号实名的用户开放。
+            若我们根据您提供的出生日期判断您未满 14 周岁，将拒绝为您提供约球相关服务。
+            若您作为监护人不同意被监护人向我们提供个人信息，请停止使用或联系我们删除。
           </Text>
         </View>
 
         <View className='legal__section'>
-          <Text className='legal__section-title'>七、本政策的更新</Text>
+          <Text className='legal__section-title'>七、约球功能与增量服务须知</Text>
+          <Text className='legal__paragraph'>
+            约球、附近球馆等功能除受本《隐私政策》约束外，还须您另行阅读并同意《约球功能服务须知》
+            （可在「我的 → 约球合规 / 约球邀请」等入口查看）。该须知说明平台在约球场景中的角色边界、
+            线下安全提示及禁止行为；拒绝同意将导致无法使用约球相关功能，但不影响您使用挥杆分析等其他功能。
+          </Text>
+        </View>
+
+        <View className='legal__section'>
+          <Text className='legal__section-title'>八、本政策的更新</Text>
           <Text className='legal__paragraph'>
             我们可能适时修订本政策。若修订可能实质影响您的权利（例如收集使用目的、共享方、保存期限发生重大变化），
             我们将通过本产品内弹窗、公告或其他合理方式进行提示；
@@ -171,7 +211,7 @@ const PrivacyPage: FC = () => {
         </View>
 
         <View className='legal__section'>
-          <Text className='legal__section-title'>八、联系我们</Text>
+          <Text className='legal__section-title'>九、联系我们</Text>
           <Text className='legal__paragraph'>公司名称：北京思无界控股有限公司</Text>
           <Text className='legal__paragraph'>联系邮箱：easongolf@outlook.com</Text>
           <Text className='legal__paragraph'>

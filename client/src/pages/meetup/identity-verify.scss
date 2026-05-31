@@ -1,0 +1,70 @@
+.meetup-identity {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 32rpx 28rpx 120rpx;
+  background: var(--color-bg);
+  box-sizing: border-box;
+
+  &--blocked {
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-muted);
+  }
+
+  &__title {
+    font-size: var(--font-size-xl);
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin-bottom: 16rpx;
+  }
+
+  &__desc {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    line-height: 1.6;
+    margin-bottom: 32rpx;
+  }
+
+  &__field {
+    margin-bottom: 28rpx;
+  }
+
+  &__label {
+    display: block;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-primary);
+    margin-bottom: 12rpx;
+  }
+
+  &__hint {
+    display: block;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    margin-bottom: 12rpx;
+  }
+
+  &__picker {
+    padding: 24rpx 20rpx;
+    border-radius: var(--radius-md);
+    background: var(--color-bg-card);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-primary);
+  }
+
+  &__phone-btn {
+    background: var(--color-bg-card);
+    color: var(--color-primary);
+    font-size: var(--font-size-sm);
+    border: 2rpx solid var(--color-primary);
+    border-radius: var(--radius-md);
+  }
+
+  &__submit {
+    margin-top: 16rpx;
+    background: var(--color-primary);
+    color: var(--color-text-on-primary);
+    font-size: var(--font-size-md);
+    border-radius: var(--radius-md);
+  }
+}
