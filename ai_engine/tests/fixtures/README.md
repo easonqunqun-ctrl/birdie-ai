@@ -84,10 +84,10 @@ manifest：``fixtures/rotation_regression_manifest.json``（v0.2）
 | `dtl_iron_01.mp4` | DTL/转播 — `test_rotation_regression_real` · 零 rotation severity≥medium |
 | `face_on_iron_01.mp4` | 室内 7 铁正面 — 不得 high `under_rotation` · AC-B2 ≥45° |
 | `face_on_iron_01_take{1,2,3}.mp4` | AC-B1 同一人连拍 3 段 — CV < 15% |
+| 同上 | AC-B7 V1 vs V2 preprocess 阶段时刻 Δt < 0.25s |
 
 ```bash
-# 缺文件时 CI skip；本地 drop 视频后：
-cd ai_engine && uv run pytest tests/test_rotation_regression_real.py tests/test_rotation_repeatability.py -v
+cd ai_engine && .venv/bin/python -m pytest tests/test_rotation_regression_real.py tests/test_rotation_repeatability.py tests/test_preprocess_v2_timing_regression.py -v
 ```
 
 示例：

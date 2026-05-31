@@ -218,7 +218,7 @@ ai-engine-test-local:
 
 # P2-M7-R1 · Phase A 旋转感知回归（CI 子集；全量仍走 ai-engine-test / ai-engine-pytest.yml）
 ai-engine-test-rotation:
-	cd ai_engine && uv run pytest tests/test_rotation_track.py tests/test_rotation_regression.py tests/test_rotation_regression_real.py tests/test_rotation_repeatability.py tests/test_rotation_regression_v1_path.py tests/test_rotation_issue_copy.py tests/test_nelly_dtl_scoring.py tests/test_diagnose.py tests/test_diagnose_v2_measurability.py tests/test_pose_refine.py tests/test_preprocess_router.py -v --tb=short
+	cd ai_engine && uv run pytest tests/test_rotation_track.py tests/test_rotation_regression.py tests/test_rotation_regression_real.py tests/test_rotation_repeatability.py tests/test_preprocess_v2_timing_regression.py tests/test_rotation_regression_v1_path.py tests/test_rotation_issue_copy.py tests/test_nelly_dtl_scoring.py tests/test_diagnose.py tests/test_diagnose_v2_measurability.py tests/test_pose_refine.py tests/test_preprocess_router.py -v --tb=short
 
 # W6-T5：优先跑容器内（不要求宿主机装 uv）；容器没起时 fallback 到宿主机 uv
 ai-engine-lint:

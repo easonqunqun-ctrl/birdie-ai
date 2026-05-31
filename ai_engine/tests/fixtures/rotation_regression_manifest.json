@@ -1,5 +1,5 @@
 {
-  "version": "v0.3",
+  "version": "v0.4",
   "description": "P2-M7-R1 rotation/perception regression manifest. fixture_file paths are under tests/fixtures/real/ (gitignored); missing files → pytest skip.",
   "packs": {
     "R2_dtl_broadcast": {
@@ -62,6 +62,19 @@
               "fixture_file": "face_on_iron_01_take3.mp4"
             }
           ]
+        }
+      ]
+    },
+    "R3_preprocess_v2_timing": {
+      "max_phase_delta_sec": 0.25,
+      "description": "AC-B7 · V1 30fps vs V2 60fps preprocess 阶段 top/impact 时刻差",
+      "cases": [
+        {
+          "id": "office_iron_face_on",
+          "source": "fixture",
+          "fixture_file": "face_on_iron_01.mp4",
+          "alt_fixture_files": ["face_on_iron_01_take1.mp4"],
+          "note": "Run before enabling M7_VIDEO_READER_V2 on staging"
         }
       ]
     },

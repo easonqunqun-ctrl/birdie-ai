@@ -26,9 +26,10 @@ _MANIFEST = Path(__file__).parent / "fixtures" / "rotation_regression_manifest.j
 
 def test_manifest_loads() -> None:
     data = json.loads(_MANIFEST.read_text(encoding="utf-8"))
-    assert data["version"] in ("v0.1", "v0.2", "v0.3")
+    assert data["version"] in ("v0.1", "v0.2", "v0.3", "v0.4")
     assert "R2_dtl_broadcast" in data["packs"]
     assert "R1_face_on_repeatability" in data["packs"]
+    assert "R3_preprocess_v2_timing" in data["packs"]
     assert "R3_synthetic" in data["packs"]
 
 
