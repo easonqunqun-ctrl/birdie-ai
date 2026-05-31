@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from app.main import analyze
+from app.pipeline.feature_measurability import WARN_ROTATION_SANITY
 from app.pipeline.rotation_issue_copy import ROTATION_ISSUE_TYPES
 from app.schemas import AnalyzeRequest
 from tests.conftest import REAL_DIR, resolve_manifest_fixture_video
@@ -115,3 +116,23 @@ async def test_r2_face_on_fixture_no_severe_under_rotation(
     assert result.status == "completed"
     under = [i for i in (result.issues or []) if i.type == "under_rotation"]
     assert not any(i.severity == "high" for i in under), under
+
+    pack = json.loads(_MANIFEST.read_text(encoding="utf-8")).get("packs", {})
+    face_pack = pack.get("R2_face_on_clear_turn", {})
+    min_deg = face_pack.get("expect_shoulder_rotation_min_deg")
+    if min_deg is not None:
+        from tests.rotation_regression_helpers import shoulder_rotation_from_video
+
+        shoulder, _, track = shoulder_rotation_from_video(
+            video,
+            declared_camera_angle=declared,
+        )
+        if shoulder is not None:
+            assert shoulder >= float(min_deg), (
+                f"AC-B2 shoulder_rotation_top={shoulder:.1f}° < {min_deg}°"
+            )
+        elif track is not None and track.rotation_confidence <= 0.0:
+            assert WARN_ROTATION_SANITY in (result.quality_warnings or []) or any(
+                w in (result.quality_warnings or [])
+                for w in ("rotation_reading_unreliable", "top_frame_mismatch")
+            ), "AC-B2: low reading must be flagged unreliable"

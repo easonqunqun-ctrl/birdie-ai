@@ -16,7 +16,7 @@
 
 **发版后必做**：mp 后台 → **版本管理 → 1.2.28 → 选为体验版** → 真机扫码 → 重跑 face-on 样本，确认转肩读数与 B5 提示。
 
-**AC-A1 真视频**：`test_rotation_regression_real.py` 2 passed（本地 `dtl_iron_01` + `face_on_iron_01`）。
+**AC-A1 真视频**：`test_rotation_regression_real.py` 2 passed（本地 `dtl_iron_01` + `face_on_iron_01`）；**AC-B1** 连拍 CV 见 `test_rotation_repeatability.py`（需 `take1–3` fixture）。
 
 ---
 

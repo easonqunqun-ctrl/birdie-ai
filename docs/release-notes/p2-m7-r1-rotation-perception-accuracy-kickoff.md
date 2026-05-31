@@ -150,7 +150,9 @@ L0 输入         preprocess · 多挥 · 质量门（已有；Phase B 接 prepr
 **Phase B 验收（AC-B）**
 
 - [ ] AC-B1：R1 包 20 段 face-on 业余，`shoulder_rotation_top` 帧间 CV < 15%（同一人连拍 3 次）  
+  - **infra ✅**：`R1_face_on_repeatability` manifest + `test_rotation_repeatability.py`（fixture 齐后自动门禁）  
 - [ ] AC-B2：明显转肩 face-on 样本 `shoulder_rotation_top` ≥ 45° 或标记 `rotation_unreliable`（不得 3° 严重）  
+  - **真视频 ✅**：`test_rotation_regression_real` 接 helper 断言 ≥45° 或 unreliable warning  
 - [ ] AC-B3：`rotation_confidence` 与估计器分歧度相关（单测 + 5 例人工）  
 - [ ] AC-B4：B6 就绪后，impact/release 特征窗口误差 < 3 帧（相对人工标定子集）  
 
@@ -403,6 +405,7 @@ Sprint R3（Phase B 后半）：B5–B7；B6/B8 与 M7-09 / 标注并行
 | 版本 | 日期 | 说明 |
 |------|------|------|
 | v0.4 | 2026-05-30 | B2–B3 三估计器 + fusion + rotation_confidence；pipeline 机位前置 |
+| v0.5 | 2026-05-31 | AC-B1 R1 manifest + repeatability test infra；AC-B2 真视频 shoulder 断言 |
 | v0.4 | 2026-05-30 | B4 几何下界 C + B5 top 双证据 repo；`top_frame_mismatch` quality_warning |
 | v0.3 | 2026-05-30 | AC-A1 manifest v0.2 + 真视频 skip 测试；AC-A4 V1 单测；B1 pose_refine |
 | v0.2 | 2026-05-30 | Phase A repo 闭环；AC-A2/A3/A5 ✅；CI 改 `ai-engine-test-rotation`；warning 走 quality_warnings |

@@ -1,5 +1,5 @@
 {
-  "version": "v0.2",
+  "version": "v0.3",
   "description": "P2-M7-R1 rotation/perception regression manifest. fixture_file paths are under tests/fixtures/real/ (gitignored); missing files → pytest skip.",
   "packs": {
     "R2_dtl_broadcast": {
@@ -37,6 +37,31 @@
           "camera_angle": "face_on",
           "declared_camera_angle": "face_on",
           "failure_modes": ["F-Low"]
+        }
+      ]
+    },
+    "R1_face_on_repeatability": {
+      "max_cv_percent": 15,
+      "description": "AC-B1 · 同一业余球友 face-on 连拍 ≥3 段；shoulder_rotation_top CV < 15%",
+      "groups": [
+        {
+          "id": "office_iron_triple",
+          "min_swings": 3,
+          "camera_angle": "face_on",
+          "declared_camera_angle": "face_on",
+          "note": "Drop face_on_iron_01_take{1,2,3}.mp4 or rename consecutive takes",
+          "cases": [
+            {
+              "fixture_file": "face_on_iron_01_take1.mp4",
+              "alt_fixture_files": ["face_on_iron_01.mp4"]
+            },
+            {
+              "fixture_file": "face_on_iron_01_take2.mp4"
+            },
+            {
+              "fixture_file": "face_on_iron_01_take3.mp4"
+            }
+          ]
         }
       ]
     },
