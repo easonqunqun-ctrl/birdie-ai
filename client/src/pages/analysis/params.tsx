@@ -9,7 +9,7 @@
  * 任一步失败 toast + 解除 loading；已签发但没上传成功的凭证由后端 TTL 清理，前端无需处理。
  */
 
-import { FC, useEffect, useMemo, useState } from 'react'
+import { FC, useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, Button, ScrollView, Input } from '@tarojs/components'
 import Taro, { useRouter } from '@tarojs/taro'
 import { analysisService, uploadLikelyNeedsFreshToken } from '@/services/analysisService'
@@ -33,12 +33,20 @@ import {
   CLUB_TYPE_LABEL,
   VIDEO_CONSTRAINTS,
   type DetectSwingsResponse,
+  type UploadTokenResponse,
 } from '@/types/analysis'
 import type { AnalysisMode } from '@/types/analysis'
 import {
+  applyDetectedCameraAngle,
   resolveSuggestedCameraAngle,
   suggestedCameraAngleToastCopy,
 } from '@/utils/suggestedCameraAngle'
+import {
+  canReusePreparedUpload,
+  shouldBlockSubmitWhilePreparing,
+  shouldStartPrepareFullSwingUpload,
+  type PrepareFullSwingPhase,
+} from '@/utils/prepareFullSwingUpload'
 import type { CameraAngle, ClubType } from '@/types/api'
 import { PHASE2_CHIPPING_MODE_ENABLED_FLAG, PHASE2_PUTTING_MODE_ENABLED_FLAG, PHASE2_YARDAGE_BOOK_ENABLED_FLAG } from '@/constants/flags'
 import { CHIPPING_CLUB_HINT } from '@/constants/chippingLabels'
@@ -98,6 +106,12 @@ const AnalysisParamsPage: FC = () => {
   const [qualityWarnings, setQualityWarnings] = useState<string[]>([])
   const [qualityBlocks, setQualityBlocks] = useState<string[]>([])
   const [qualityChecking, setQualityChecking] = useState(false)
+  /** 进入页后后台上传 + detect-swings，供机位预选与提交复用 */
+  const [preparePhase, setPreparePhase] = useState<PrepareFullSwingPhase>('idle')
+  const [preparedToken, setPreparedToken] = useState<UploadTokenResponse | null>(null)
+  const [preparedDetect, setPreparedDetect] = useState<DetectSwingsResponse | null>(null)
+  const [cameraAngleHint, setCameraAngleHint] = useState<string | null>(null)
+  const cameraAngleTouchedRef = useRef(false)
 
   const setCurrent = useAnalysisStore((s) => s.setCurrent)
   const setPendingSwingSelection = useAnalysisStore((s) => s.setPendingSwingSelection)
@@ -178,6 +192,87 @@ const AnalysisParamsPage: FC = () => {
       cancelled = true
     }
   }, [thumbTempFilePath, tempFilePath, duration])
+
+  useEffect(() => {
+    cameraAngleTouchedRef.current = false
+    setCameraAngleHint(null)
+    setPreparePhase('idle')
+    setPreparedToken(null)
+    setPreparedDetect(null)
+  }, [tempFilePath])
+
+  // full_swing：质量检查通过后立即上传 + detect-swings，在 params 页预选机位（docs/02 §3.4）
+  useEffect(() => {
+    if (
+      !shouldStartPrepareFullSwingUpload({
+        tempFilePath,
+        size,
+        duration,
+        analysisMode,
+        qualityChecking,
+        qualityBlockCount: qualityBlocks.length,
+      })
+    ) {
+      return
+    }
+
+    let cancelled = false
+    const run = async () => {
+      setPreparePhase('uploading')
+      try {
+        const contentType = guessContentType(tempFilePath)
+        const tokenPayload = {
+          file_name: deriveFileName(tempFilePath),
+          file_size: size,
+          file_type: contentType,
+          duration,
+        }
+        let token = await analysisService.getUploadToken(tokenPayload)
+        await analysisService.uploadToMinio(tempFilePath, token)
+        if (cancelled) return
+
+        setPreparePhase('detecting')
+        const detected = await analysisService.detectSwings(token.upload_id)
+        if (cancelled) return
+
+        setPreparedToken(token)
+        setPreparedDetect(detected)
+        const applied = applyDetectedCameraAngle(
+          'face_on',
+          detected,
+          cameraAngleTouchedRef.current,
+        )
+        setCameraAngle(applied.angle)
+        setCameraAngleHint(applied.hint)
+        if (applied.autoApplied) {
+          Taro.showToast({
+            title: suggestedCameraAngleToastCopy(applied.angle),
+            icon: 'none',
+            duration: 2000,
+          })
+        }
+        setPreparePhase('ready')
+      } catch {
+        if (!cancelled) {
+          setPreparePhase('failed')
+          setPreparedToken(null)
+          setPreparedDetect(null)
+        }
+      }
+    }
+
+    void run()
+    return () => {
+      cancelled = true
+    }
+  }, [
+    tempFilePath,
+    size,
+    duration,
+    analysisMode,
+    qualityChecking,
+    qualityBlocks.length,
+  ])
 
   const qualityHintLines = useMemo(
     () => linesForQualityWarnings(qualityWarnings),
@@ -262,8 +357,6 @@ const AnalysisParamsPage: FC = () => {
         }
       }
 
-      setPhase('signing')
-      Taro.showLoading({ title: '申请上传凭证' })
       const contentType = guessContentType(tempFilePath)
       const tokenPayload = {
         file_name: deriveFileName(tempFilePath),
@@ -271,27 +364,43 @@ const AnalysisParamsPage: FC = () => {
         file_type: contentType,
         duration,
       }
-      let token = await analysisService.getUploadToken(tokenPayload)
 
-      setPhase('uploading')
-      Taro.showLoading({ title: '上传视频中 0%' })
-      const progressOpts = {
-        onProgress: (e: { progress: number }) => {
-          setUploadProgress(e.progress)
-          Taro.showLoading({ title: `上传视频中 ${e.progress}%` })
-        },
-      }
-      try {
-        await analysisService.uploadToMinio(tempFilePath, token, progressOpts)
-      } catch (uploadErr) {
-        const raw =
-          uploadErr instanceof Error ? uploadErr.message : String(uploadErr)
-        if (!uploadLikelyNeedsFreshToken(raw)) {
-          throw uploadErr instanceof Error ? uploadErr : new Error(raw)
-        }
-        Taro.showLoading({ title: '刷新凭证并重试上传' })
+      let token: UploadTokenResponse
+      let preDetected: DetectSwingsResponse | null = null
+
+      if (
+        analysisMode === 'full_swing' &&
+        canReusePreparedUpload(preparePhase) &&
+        preparedToken &&
+        preparedDetect
+      ) {
+        token = preparedToken
+        preDetected = preparedDetect
+      } else {
+        setPhase('signing')
+        Taro.showLoading({ title: '申请上传凭证' })
         token = await analysisService.getUploadToken(tokenPayload)
-        await analysisService.uploadToMinio(tempFilePath, token, progressOpts)
+
+        setPhase('uploading')
+        Taro.showLoading({ title: '上传视频中 0%' })
+        const progressOpts = {
+          onProgress: (e: { progress: number }) => {
+            setUploadProgress(e.progress)
+            Taro.showLoading({ title: `上传视频中 ${e.progress}%` })
+          },
+        }
+        try {
+          await analysisService.uploadToMinio(tempFilePath, token, progressOpts)
+        } catch (uploadErr) {
+          const raw =
+            uploadErr instanceof Error ? uploadErr.message : String(uploadErr)
+          if (!uploadLikelyNeedsFreshToken(raw)) {
+            throw uploadErr instanceof Error ? uploadErr : new Error(raw)
+          }
+          Taro.showLoading({ title: '刷新凭证并重试上传' })
+          token = await analysisService.getUploadToken(tokenPayload)
+          await analysisService.uploadToMinio(tempFilePath, token, progressOpts)
+        }
       }
 
       setPhase('creating')
@@ -337,25 +446,32 @@ const AnalysisParamsPage: FC = () => {
       }
 
       const applySuggestedCameraAngle = (detected: DetectSwingsResponse) => {
+        if (cameraAngleTouchedRef.current) {
+          angleForAnalysis = cameraAngle
+          return
+        }
         const resolved = resolveSuggestedCameraAngle(cameraAngle, detected)
         angleForAnalysis = resolved.angle
         if (resolved.changed) {
           setCameraAngle(resolved.angle)
-          Taro.showToast({
-            title: suggestedCameraAngleToastCopy(resolved.angle),
-            icon: 'none',
-            duration: 2500,
-          })
+          setCameraAngleHint(null)
         }
       }
 
       if (analysisMode === 'full_swing') {
-        setPhase('detecting')
-        Taro.showLoading({ title: '识别挥杆段' })
         try {
-          const detected = await analysisService.detectSwings(token.upload_id)
+          let detected = preDetected
+          if (!detected) {
+            setPhase('detecting')
+            Taro.showLoading({ title: '识别挥杆段' })
+            detected = await analysisService.detectSwings(token.upload_id)
+          } else {
+            Taro.showLoading({ title: '创建分析任务' })
+          }
           applySuggestedCameraAngle(detected)
-          Taro.hideLoading()
+          if (!preDetected) {
+            Taro.hideLoading()
+          }
           if (detected.swing_candidates.length > 1) {
             setPendingSwingSelection({
               uploadId: token.upload_id,
@@ -459,7 +575,9 @@ const AnalysisParamsPage: FC = () => {
     }
   }
 
-  const disabled = submitting || !!overLimit || qualityBlocks.length > 0
+  const prepareBlocking = shouldBlockSubmitWhilePreparing(preparePhase)
+  const disabled =
+    submitting || !!overLimit || qualityBlocks.length > 0 || prepareBlocking
 
   return (
     <View className='params'>
@@ -515,6 +633,15 @@ const AnalysisParamsPage: FC = () => {
       <View className='params__section'>
         <Text className='params__section-title'>拍摄角度</Text>
         <Text className='params__section-hint'>正确的角度让分析更精准</Text>
+        {analysisMode === 'full_swing' && preparePhase === 'uploading' && (
+          <Text className='params__camera-prepare-hint'>正在上传视频并识别机位…</Text>
+        )}
+        {analysisMode === 'full_swing' && preparePhase === 'detecting' && (
+          <Text className='params__camera-prepare-hint'>正在识别拍摄角度…</Text>
+        )}
+        {cameraAngleHint && (
+          <Text className='params__camera-auto-hint'>{cameraAngleHint}</Text>
+        )}
         <View className='params__angle-grid'>
           {CAMERA_ANGLES.map((a) => {
             const active = cameraAngle === a
@@ -522,7 +649,11 @@ const AnalysisParamsPage: FC = () => {
               <View
                 key={a}
                 className={`params__angle-card ${active ? 'params__angle-card--active' : ''}`}
-                onClick={() => setCameraAngle(a)}
+                onClick={() => {
+                  cameraAngleTouchedRef.current = true
+                  setCameraAngle(a)
+                  setCameraAngleHint(null)
+                }}
               >
                 <Text className='params__angle-title'>{CAMERA_ANGLE_LABEL[a]}</Text>
                 <Text className='params__angle-desc'>{CAMERA_ANGLE_DESC[a]}</Text>
@@ -594,7 +725,11 @@ const AnalysisParamsPage: FC = () => {
           loading={submitting}
           onClick={handleStart}
         >
-          {submitting ? '处理中…' : '开始分析'}
+          {submitting
+            ? '处理中…'
+            : prepareBlocking
+              ? '识别机位中…'
+              : '开始分析'}
         </Button>
       </View>
     </View>

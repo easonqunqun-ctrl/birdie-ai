@@ -1,6 +1,6 @@
 {
   "name": "xiaoniao-client",
-  "version": "1.2.26",
+  "version": "1.2.27",
   "private": true,
   "description": "领翼golf 客户端 - Taro 3（微信小程序 + React Native 双端）",
   "scripts": {

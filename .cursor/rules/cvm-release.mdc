@@ -1,0 +1,31 @@
+---
+description: CVM + 体验版发版闭环（用户说发版/发布时由 AI 按此执行）
+alwaysApply: true
+---
+
+# CVM / 体验版发版（AI 执行）
+
+用户说 **发版 / 发布 / 上线体验版** 时，由 AI **主动跑完整流程**，勿只给命令让用户自己敲。
+
+## 真源文档
+
+- [`docs/release-notes/cvm-release-smooth-runbook.md`](../docs/release-notes/cvm-release-smooth-runbook.md)
+- [`docs/release-notes/experience-version-smoke-runbook.md`](../docs/release-notes/experience-version-smoke-runbook.md)
+
+## 发版顺序（Mac 仓库根）
+
+1. **门禁**：相关改动已提交；`main` 与待发版一致；有 `client/` 变更则同步 bump `client/package.json` + `client/src/constants/version.ts`。
+2. **预检**：`DEPLOY_HOST=ubuntu@1.13.198.172 ENV_FILE=~/secrets/lingniao-prod.env make cvm-preflight`
+3. **推送**：`git push origin main`（未 push 则先 push；`ship-cvm` 要求本地在 `main`）。
+4. **CVM**：`DEPLOY_HOST=ubuntu@1.13.198.172 ENV_FILE=~/secrets/lingniao-prod.env make ship-cvm`  
+   已 push 仅重建：`make release-cvm`（同上 ENV）。**默认不用** `REMOTE_GIT_PULL=no`。
+5. **验收**：`curl -sfS https://api.birdieai.cn/v1/health`；可选 `make cvm-smoke DOMAIN=api.birdieai.cn`
+6. **小程序**：`make client-build-weapp-prod`；更新 `experience-version-smoke-runbook.md` 基线版本号。
+7. **告知用户**（AI 无法代操作）：开发者工具上传 `client/dist` → mp 后台 **选为体验版** → 真机 smoke 勾选。
+
+## 约束
+
+- **禁止**在 CVM 上改业务代码；密钥只存在于服务器 `.env.local`，勿提交 Git。
+- CVM `git pull` 失败（脏工作区）：SSH 执行 `git fetch && git reset --hard origin/main && git clean -fd`（**勿删** `.env.local`），再 `make release-cvm`。
+- 用户未明确要求时 **不要** force push / 改 git config。
+- 发版相关 engine 改动：发版前跑 `make ai-engine-test-rotation`（或等价 pytest 子集）。

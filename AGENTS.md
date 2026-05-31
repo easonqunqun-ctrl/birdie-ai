@@ -117,6 +117,12 @@ make publish-monitoring-cvm            # CVM：rsync infra/monitoring + 重启 p
 make deploy-check-cvm-pay               # WECHAT_PAY_MOCK_MODE=false 时须有 docker-compose.wechat-pay-key.yml（ENV_FILE= 可改）
 # W8 从零搭机：docs/release-notes/W8-test-env-runbook.md；**规范化/Git+密钥+去 bind**：docs/release-notes/CVM-canonical-deploy.md；**顺滑发版/踩坑**：docs/release-notes/cvm-release-smooth-runbook.md
 
+# 体验版发版（用户说「发版/发布」时由 AI 执行，勿只贴命令）
+# DEPLOY_HOST=ubuntu@1.13.198.172 ENV_FILE=~/secrets/lingniao-prod.env make cvm-preflight
+# git push origin main && make ship-cvm   # 或已 push：make release-cvm
+# make client-build-weapp-prod && 更新 docs/release-notes/experience-version-smoke-runbook.md
+# 细则：.cursor/rules/cvm-release.mdc · docs/release-notes/cvm-release-smooth-runbook.md
+
 # 后端
 make backend-lint     # ruff
 make backend-test     # pytest

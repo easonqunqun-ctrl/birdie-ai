@@ -24,3 +24,37 @@ export function resolveSuggestedCameraAngle(
 export function suggestedCameraAngleToastCopy(angle: CameraAngle): string {
   return `已根据画面识别为${CAMERA_ANGLE_LABEL[angle]}`
 }
+
+/** params 页静态说明条：上传后机位预选成功时展示（用户仍可改）。 */
+export function suggestedCameraAngleHintCopy(angle: CameraAngle): string {
+  return `已识别为${CAMERA_ANGLE_LABEL[angle]}，可手动调整`
+}
+
+export interface ApplyDetectedCameraAngleResult {
+  angle: CameraAngle
+  /** 相对进入页时的默认 face_on 是否被引擎改写 */
+  autoApplied: boolean
+  hint: string | null
+}
+
+/**
+ * 上传后 detect-swings 机位预选：用户未手动改机位时才应用建议值。
+ */
+export function applyDetectedCameraAngle(
+  current: CameraAngle,
+  detected: Pick<DetectSwingsResponse, 'suggested_camera_angle'>,
+  userTouched: boolean,
+): ApplyDetectedCameraAngleResult {
+  if (userTouched) {
+    return { angle: current, autoApplied: false, hint: null }
+  }
+  const resolved = resolveSuggestedCameraAngle(current, detected)
+  if (!detected.suggested_camera_angle) {
+    return { angle: current, autoApplied: false, hint: null }
+  }
+  return {
+    angle: resolved.angle,
+    autoApplied: resolved.changed,
+    hint: suggestedCameraAngleHintCopy(resolved.angle),
+  }
+}

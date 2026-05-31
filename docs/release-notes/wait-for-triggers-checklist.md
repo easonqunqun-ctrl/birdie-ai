@@ -275,7 +275,7 @@ cd client && pnpm exec jest src/constants/__tests__/qualityWarnings.test.ts src/
 - [ ] 拍摄页「机位怎么选？」可见
 - [ ] DTL 转播感：无 3°/155° 荒谬 rotation issue；有机位说明或 `rotation_reading_unreliable` 提示
 - [ ] face-on 明显转肩：无 severity≥medium 的 `under_rotation`
-- [ ] detect-swings 机位预选 toast（与手动不一致时）
+- [x] detect-swings 机位预选：params 页进入后后台上传识别，默认选中 + 说明条（与手动不一致时 toast）
 
 **仍 pending**：
 
