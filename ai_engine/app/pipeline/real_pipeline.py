@@ -39,7 +39,8 @@ from app.pipeline.features import extract_features
 from app.pipeline.phases import PhaseSegmentResult
 from app.pipeline.pose import PoseResult, estimate_poses, quality_warnings_from_pose
 from app.pipeline.club_profiles import to_club_category
-from app.pipeline.preprocess import preprocess_video, quality_warnings_from_preprocess
+from app.pipeline.preprocess import quality_warnings_from_preprocess
+from app.pipeline.preprocess_router import preprocess_for_pipeline
 from app.pipeline.recommend import recommend
 from app.pipeline.scoring import score_all_phases, score_overall, weakest_phase
 from app.pipeline.scoring_narrative import build_phase_highlights
@@ -96,6 +97,7 @@ async def run_real_analysis(
     diagnose_fn: DiagnoseFn | None = None,
     enrichment_fn: EnrichmentFn | None = None,
     club_aware_scoring: bool = False,
+    use_preprocess_v2: bool = False,
 ) -> AnalyzeResult:
     """真实分析主入口（替换 mock_pipeline.run_mock_analysis）。
 
@@ -118,7 +120,10 @@ async def run_real_analysis(
     )
 
     # 1. 预处理（下载 + 转码 + 质量门）
-    pre = preprocess_video(req.video_url)
+    pre, preprocess_engine_warnings, preprocess_reader = preprocess_for_pipeline(
+        req.video_url,
+        use_v2=use_preprocess_v2,
+    )
     fps = pre.fps
     log.info(
         "preprocess_done",
@@ -127,6 +132,7 @@ async def run_real_analysis(
             "fps": fps,
             "duration_sec": pre.duration_sec,
             "clarity": round(pre.clarity_score, 2),
+            "preprocess_reader": preprocess_reader,
         },
     )
 
@@ -362,8 +368,11 @@ async def run_real_analysis(
         swing_candidates=swing_candidates_out,
         selected_swing_index=selected_idx if raw_candidates else 0,
     )
-    if ms_warning is not None:
-        result.engine_warnings = [ms_warning]
+    if preprocess_engine_warnings or ms_warning is not None:
+        engine_w: list[dict] = list(preprocess_engine_warnings)
+        if ms_warning is not None:
+            engine_w.append(ms_warning)
+        result.engine_warnings = engine_w
 
     # P2-W7 ENG-B：V2 通过 enrichment_fn 把三层 confidence + engine_warnings 注入 result；
     # V1 默认 enrichment_fn=None → 不调用 → analysis_confidence=1.0 / issues 无 confidence 字段（向后兼容）

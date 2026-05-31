@@ -118,7 +118,7 @@ Kickoff：[`p2-m12-08-evolution-animation-kickoff.md`](./p2-m12-08-evolution-ani
 |--------|---------|------|--------|------|------|
 | **R1** | P2-M7-R1-A | Phase A 止血 | sanity + auto-detect sanitize + 矛盾合并 + setup/top 窗口 + R2 CI | Now | ✅ repo · 待真视频 + smoke |
 | **R2** | P2-M7-R1-B1 | pose_refine + rotation_track 融合 | `pose_refine.py` + `rotation_track.py` + AC-B | Now | ✅ B1–B5 repo · AC-B1 infra · AC-B2 真视频 |
-| **R3** | P2-M7-R1-B2 | top 双证据 + preprocess_v2 灰度 | 接 M7-09 后 refine impact 窗 | Now / Trigger | 📋 Planned |
+| **R3** | P2-M7-R1-B2 | top 双证据 + preprocess_v2 灰度 | 接 M7-09 后 refine impact 窗 | Now / Trigger | ✅ B5 + B7 router · flag off |
 
 **并行**：R1 与 W24 V2 灰度可并行；**R1 必须在 R2 之前发版**（先止血再抬准度）。
 

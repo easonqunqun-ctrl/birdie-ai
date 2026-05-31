@@ -144,7 +144,7 @@ L0 输入         preprocess · 多挥 · 质量门（已有；Phase B 接 prepr
 | **B4** | 引擎 | **几何下界 C（交叉验证）** | `top_wrist_position` + 臂几何 → `min_plausible_shoulder_rot`；A<20 且 C>35 → 否决 A | `rotation_track.py` |
 | **B5** | 引擎 | **top 双证据（可选）** | `top_wrist` vs `argmax(shoulder_rot(t))` 相差 >8 帧 → 用 backswing max，降 confidence | `phases.py` 或 `rotation_track.py` |
 | **B6** | 引擎 | **M7-09 杆头 2D** | 杆头点 → refine top/impact/release 窗 | 见 M7-09 kickoff；**依赖标注** |
-| **B7** | 引擎 | **preprocess_v2 灰度** | 60fps / slowmo nominal；全链路 timing 回归后切主链 | `preprocess_v2.py`, flag |
+| **B7** | 引擎 | **preprocess_v2 灰度** | 60fps / slowmo nominal；全链路 timing 回归后切主链 | `preprocess_v2.py`, flag | ✅ router repo · 默认 flag off |
 | **B8** | 引擎 | **pose 模型 A/B（可选）** | MediaPipe vs RTMPose-m；Golf 小集 fine-tune 评估 | 独立 spike |
 
 **Phase B 验收（AC-B）**
@@ -392,9 +392,10 @@ Sprint R3（Phase B 后半）：B5–B7；B6/B8 与 M7-09 / 标注并行
 | B2–B3 三估计器 + 融合 | ✅ `compute_rotation_track` + 机位前置推断 |
 | B4 几何下界 C | ✅ repo · `test_rotation_track` 合成否决 |
 | B5 top 双证据 | ✅ repo · 腕/肩峰值 >8 帧 → backswing max + `top_frame_mismatch` |
+| B7 preprocess_v2 router | ✅ repo · V2 桶 + `M7_VIDEO_READER_V2_ENABLED`（默认 off） |
 | AC-A1 真视频 R2 | ⏳ drop `fixtures/real/*.mp4` → `test_rotation_regression_real` |
 | AC-A4 真机 E2E | ⏳ 体验版 smoke 人工勾 |
-| Phase B 余量（B6–B8） | 📋 B6 等 M7-09 · B7 preprocess_v2 · B8 pose A/B |
+| Phase B 余量（B6–B8） | 📋 B6 等 M7-09 · B7 flag 开前 timing 回归 · B8 pose A/B |
 
 **发版前**：CVM `publish` ai_engine + 体验版跑 smoke §M7-R1 全勾。
 
@@ -405,6 +406,7 @@ Sprint R3（Phase B 后半）：B5–B7；B6/B8 与 M7-09 / 标注并行
 | 版本 | 日期 | 说明 |
 |------|------|------|
 | v0.4 | 2026-05-30 | B2–B3 三估计器 + fusion + rotation_confidence；pipeline 机位前置 |
+| v0.6 | 2026-05-31 | B7 preprocess_router · V2 桶 + `M7_VIDEO_READER_V2_ENABLED` 接线 |
 | v0.5 | 2026-05-31 | AC-B1 R1 manifest + repeatability test infra；AC-B2 真视频 shoulder 断言 |
 | v0.4 | 2026-05-30 | B4 几何下界 C + B5 top 双证据 repo；`top_frame_mismatch` quality_warning |
 | v0.3 | 2026-05-30 | AC-A1 manifest v0.2 + 真视频 skip 测试；AC-A4 V1 单测；B1 pose_refine |

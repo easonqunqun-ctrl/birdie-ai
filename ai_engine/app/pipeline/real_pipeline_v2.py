@@ -22,8 +22,7 @@ P2-W7 收口（V2 灌溉续）
   后填三层 confidence + tier（M7-06）+ engine_warnings 占位（M7-02）
 - ✅ V1 路径默认不调 enrichment_fn → ``analysis_confidence=1.0`` /
   ``IssueItem.confidence=None``（schema 默认值，向后兼容）
-- ⏸ V2 pipeline 切到 ``phases_v2`` / ``preprocess_v2``：留 W8+（让 engine_warnings
-  真有内容；当前 MVP 只在 fallback 时塞一条 ``fallback_to_v1`` 占位）
+- ⏸ V2 pipeline 切到 ``phases_v2``：留 W8+；``preprocess_v2`` 已 B7 接线（``M7_VIDEO_READER_V2_ENABLED`` + V2 桶）
 """
 
 from __future__ import annotations
@@ -791,12 +790,23 @@ async def run_real_analysis_v2(req: AnalyzeRequest) -> AnalyzeResult:
     # 探测失败静默返回 []，绝不影响主分析（metrics 仍记数，便于线上观察）。
     probe_warnings = _probe_video_warnings(req.video_url)
 
+    from app.config import settings
+    from app.pipeline.preprocess_router import should_use_preprocess_v2
+
+    use_v2_reader = should_use_preprocess_v2(engine_version="v2")
+    if use_v2_reader:
+        log.info(
+            "preprocess_v2_enabled",
+            extra={"analysis_id": req.analysis_id},
+        )
+
     result = await run_real_analysis(
         req,
         diagnose_fn=diagnose_impl,
         enrichment_fn=enrichment_impl,
         # W22：球杆相位权重只在 V2 生效，跟随 version_router 的 5%→25%→50% 灰度爬坡
         club_aware_scoring=True,
+        use_preprocess_v2=use_v2_reader,
     )
 
     # 合并所有 engine_warnings：probe 探测 + fallback 占位（若有）
