@@ -537,6 +537,9 @@ async def detect_swings(req: DetectSwingsRequest) -> DetectSwingsResult:
                 ),
             ],
             default_selected_index=1,
+            suggested_camera_angle="face_on",
+            detected_camera_angle="face_on",
+            camera_angle_confidence=0.85,
         )
     from app.pipeline.detect_swings import run_detect_swings
 

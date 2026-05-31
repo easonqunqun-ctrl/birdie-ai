@@ -152,8 +152,18 @@ def _build_issue_from_rule_result(
     name = fallback_name or render_i18n_key(
         res.display_name_key, res.payload, locale_dict=locale
     )
-    summary_key = res.display_name_key.replace(".title", ".summary")
-    description = render_i18n_key(summary_key, res.payload, locale_dict=locale)
+    from app.pipeline.rotation_issue_copy import (
+        ROTATION_ISSUE_TYPES,
+        render_rotation_issue_description,
+    )
+
+    if res.type in ROTATION_ISSUE_TYPES:
+        description = render_rotation_issue_description(
+            res.type, res.payload, locale
+        )
+    else:
+        summary_key = res.display_name_key.replace(".title", ".summary")
+        description = render_i18n_key(summary_key, res.payload, locale_dict=locale)
     return DiagnosedIssue(
         type=res.type,
         name=name,
@@ -175,6 +185,7 @@ def diagnose_v2(
     engine: RuleEngine | None = None,
     locale: dict[str, str] | None = None,
     confidences: dict[str, float] | None = None,
+    guard_warnings_out: list[str] | None = None,
 ) -> list[DiagnosedIssue]:
     """V2 诊断主入口：YAML 规则 + i18n locale → DiagnosedIssue。
 
@@ -212,7 +223,14 @@ def diagnose_v2(
             continue
         issues.append(issue)
 
-    return issues[:max_issues]
+    from app.pipeline.diagnose import finalize_diagnose_issues
+
+    finalized, guard_warnings = finalize_diagnose_issues(
+        issues, features, camera_angle=camera_angle, max_issues=max_issues
+    )
+    if guard_warnings_out is not None:
+        guard_warnings_out.extend(guard_warnings)
+    return finalized
 
 
 # ============================================================

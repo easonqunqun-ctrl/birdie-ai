@@ -181,6 +181,14 @@ def test_every_rule_has_phase_anchor_and_locale_summary() -> None:
         assert rule.display_name_key in locale
         summary_key = rule.display_name_key.replace(".title", ".summary")
         assert summary_key in locale, f"locale 缺 summary key={summary_key}"
+        if rule.name in (
+            "over_rotation",
+            "under_rotation",
+            "flat_shoulder",
+            "steep_shoulder",
+        ):
+            safe_key = summary_key + "_safe"
+            assert safe_key in locale, f"locale 缺 A6 safe key={safe_key}"
 
 
 def test_coerce_rule_rejects_invalid_phase_anchor() -> None:

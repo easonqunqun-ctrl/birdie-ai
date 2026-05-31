@@ -12,9 +12,14 @@
 
   "issues.over_rotation.title": "转肩过度（Over Rotation）",
   "issues.over_rotation.summary": "顶点肩转 {shoulder_rotation_top:.0f}°（理想 80°-100°），过度转肩可能影响节奏。",
+  "issues.over_rotation.summary_safe": "顶点转肩幅度偏大（理想约 80°-100°），过度转肩可能影响节奏。",
 
   "issues.under_rotation.title": "转肩不足（Under Rotation）",
   "issues.under_rotation.summary": "顶点肩转仅 {shoulder_rotation_top:.0f}°（理想 80°-100°），上杆力量传递受限。",
+  "issues.under_rotation.summary_safe": "顶点转肩幅度偏小（理想约 80°-100°），上杆力量传递可能受限。",
+
+  "issues.rotation_unreliable.title": "转肩数据本次无法可靠测量",
+  "issues.rotation_unreliable.summary": "画面机位或遮挡导致 AI 无法稳定读取转肩角度，已跳过相关诊断读数。建议在正面全身、光线充足下重拍。",
 
   "issues.over_the_top.title": "由外到内下杆（Over-the-Top）",
   "issues.over_the_top.summary": "下杆顺序错乱（肩比髋早 {downswing_sequence:.0f} 帧），杆头容易从身体外侧切入。",
@@ -36,9 +41,11 @@
 
   "issues.flat_shoulder.title": "肩平面过平（Flat Shoulder）",
   "issues.flat_shoulder.summary": "X-Factor {x_factor:.0f}°（理想 20-50°），肩旋转平面偏水平，上杆路径可能过内。",
+  "issues.flat_shoulder.summary_safe": "肩髋分离度偏大（理想约 20°-50°），肩旋转平面可能偏平，上杆路径可能过内。",
 
   "issues.steep_shoulder.title": "肩平面过陡（Steep Shoulder）",
   "issues.steep_shoulder.summary": "X-Factor 仅 {x_factor:.0f}°（理想 20-50°），肩旋转平面偏陡，上杆路径可能过外。",
+  "issues.steep_shoulder.summary_safe": "肩髋分离度偏小（理想约 20°-50°），肩旋转平面可能偏陡，上杆路径可能过外。",
 
   "issues.open_stance.title": "开放站位（Open Stance）",
   "issues.open_stance.summary": "准备位膝弯角 {knee_flexion_setup:.0f}°（理想 130°-170°），双腿过直，站位可能偏开。"

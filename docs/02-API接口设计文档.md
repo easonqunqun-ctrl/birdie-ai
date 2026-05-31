@@ -703,6 +703,16 @@ POST /v1/analyses/uploads/{upload_id}/detect-swings
 }
 ```
 
+可选字段（P2-M7-R1 / M7-04-UI）：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `suggested_camera_angle` | `face_on \| down_the_line \| null` | 引擎建议默认机位；置信度 <0.7 或 oblique 时为 null |
+| `detected_camera_angle` | `face_on \| down_the_line \| oblique \| null` | 启发式检测机位 |
+| `camera_angle_confidence` | `number 0-1 \| null` | 机位检测置信度 |
+
+客户端：`full_swing` 上传成功后调用；若 `suggested_camera_angle` 非 null，params 页默认选中该机位后再创任务；候选 **>1** 时跳转 `pages/analysis/select-swing`，否则直接 `POST /v1/analyses`（可带 `selected_swing_index`）。`putting` / `chipping` 跳过本接口。
+
 **错误**：
 
 | 场景 | code |
@@ -711,8 +721,6 @@ POST /v1/analyses/uploads/{upload_id}/detect-swings
 | 视频未上传 | 40012 |
 | 检测到 >5 段挥杆 | 50122 |
 | 其他引擎预处理失败 | 50101–50121 |
-
-客户端：`full_swing` 上传成功后调用；候选 **>1** 时跳转 `pages/analysis/select-swing`，否则直接 `POST /v1/analyses`（可带 `selected_swing_index`）。`putting` / `chipping` 跳过本接口。
 
 ---
 
@@ -2043,8 +2051,10 @@ POST /v1/meetups/events/{id}/submit-score
 ```
 GET  /v1/meetups/safety/tos
 GET  /v1/meetups/safety/status
+POST /v1/meetups/safety/verify-identity     Body: { birth_date, phone_code }
 POST /v1/meetups/safety/accept-tos          Body: { gender_preference? }
 PATCH /v1/meetups/safety/preferences         Body: { gender_preference }
+PATCH /v1/meetups/safety/spectator-optin     Body: { coach_spectator_optin }
 POST /v1/meetups/safety/mock-identity       仅 WECHAT_MOCK_LOGIN
 ```
 
@@ -2053,6 +2063,36 @@ POST /v1/meetups/safety/mock-identity       仅 WECHAT_MOCK_LOGIN
 - **40332** 未满 14 岁；**40333** 未完成手机号实名 / 缺少出生日期；**40334** 未同意约球协议。
 - `user_profiles_v2.privacy_payload` 扩展：`meetup_tos_accepted_at`、`gender_preference`（`any` / `same` / `coach_only`；女性默认 `same`）。
 - 协议正文：`docs/legal/tos-m13.md`；客户端 `MeetupTosModal` 首次强提醒（不可遮罩关闭）。
+- **实名顺序**：须先 `verify-identity`（`identity_eligible=true`），再 `accept-tos`（`can_use_meetup=true`）。产品设计：[`p2-m13-09-meetup-identity-client-kickoff.md`](./release-notes/p2-m13-09-meetup-identity-client-kickoff.md)。
+
+#### POST /v1/meetups/safety/verify-identity
+
+**需认证**。提交微信 `getPhoneNumber` 返回的 `phone_code` 与用户自报 `birth_date`，服务端换号并写入 `users.birth_date` / `users.phone_verified_at`。
+
+**请求体**：
+
+```json
+{
+  "birth_date": "1990-05-01",
+  "phone_code": "wx_phone_code_from_button"
+}
+```
+
+**成功** `200`：`data` 结构同 `GET …/status`（`MeetupSafetyStatus`）。
+
+**失败**：
+
+| code | 含义 |
+|------|------|
+| 40052 | 参数非法 |
+| 40332 | 未满 14 岁 |
+| 502xx | 微信换号失败（code 无效/过期等） |
+
+**约束**：
+
+- `birth_date` 仅允许**首次**设置；已验证用户不可通过本接口改小年龄（防绕过）。
+- 手机号须加密存储或仅存 hash + 脱敏 last4；禁止明文日志（见 `docs/06`）。
+- 客户端须在按钮 `getPhoneNumber` 前 `ensurePrivacyAuthorized('getPhoneNumber')`；`app.config` 声明 `requiredPrivateInfos`。
 
 ### 5C.5 教练旁观约球（M13-10）
 

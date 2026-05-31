@@ -61,6 +61,10 @@ export interface DetectSwingsResponse {
   upload_id: string
   swing_candidates: SwingCandidateItem[]
   default_selected_index: number
+  /** 引擎建议机位；低置信时为 null，客户端保持用户默认 */
+  suggested_camera_angle?: CameraAngle | null
+  detected_camera_angle?: CameraAngle | 'oblique' | null
+  camera_angle_confidence?: number | null
 }
 
 export interface CreateAnalysisResponse {

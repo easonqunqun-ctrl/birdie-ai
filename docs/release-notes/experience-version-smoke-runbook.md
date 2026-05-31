@@ -5,16 +5,18 @@
 
 ---
 
-## 当前体验版基线（2026-05-30）
+## 当前体验版基线（2026-05-31 · M7-R1）
 
 | 项 | 值 |
 |----|-----|
-| **小程序版本** | **1.2.18**（CLI 已上传；公众平台 **选为体验版** 待勾） |
+| **小程序版本** | **1.2.25**（构建后上传；公众平台 **选为体验版**） |
 | **API** | `https://api.birdieai.cn/v1` |
-| **CVM** | W22–W25 backend + ai_engine + monitoring 已发 |
-| **待验** | 本节 **§D Phase2** 全段 + xpay 真机（W21-C） |
+| **CVM** | ai_engine M7-R1 Phase A/B1–B3 + pose_refine DTL 修复 |
+| **待验** | 本节 **§M7-R1** + **§D Phase2** |
 
-**发版后必做**：mp 后台 → **版本管理 → 开发版本 1.2.18 → 选为体验版** → 真机扫码 → 按 §D 勾选。
+**发版后必做**：mp 后台 → **版本管理 → 1.2.25 → 选为体验版** → 真机扫码 → 按 §M7-R1 勾选。
+
+**AC-A1 真视频**：`test_rotation_regression_real.py` 2 passed（本地 `dtl_iron_01` + `face_on_iron_01`）。
 
 ---
 
@@ -29,6 +31,9 @@ make up
 # 后端
 make backend-lint
 make backend-test   # 含 test_analysis_soft_delete；需 Postgres/Redis 已起
+
+# AI 引擎 · P2-M7-R1 旋转感知（发版前快测，~1min）
+make ai-engine-test-rotation
 
 # 客户端
 cd client && pnpm type-check && pnpm lint
@@ -81,6 +86,34 @@ pnpm build:weapp    # 或体验环境用 pnpm build:weapp + 对应 env
 
 - [ ] `mock_mode=true`：模拟支付弹窗 → 确认后会员生效  
 - [ ] `mock_mode=false`：拉起真实 `requestPayment`（小额）→ 「我的」会员态与订单
+
+### P2-M7-R1 · 旋转感知 Phase A（2026-05 体验版建议勾）
+
+前置：体验包含 M7-R1 改动（拍摄页机位引导、detect-swings 机位预选、报告「机位说明」）。
+
+**自动化（发版前）**
+
+```bash
+make ai-engine-test-rotation
+cd client && pnpm exec jest src/constants/__tests__/qualityWarnings.test.ts src/utils/__tests__/suggestedCameraAngle.test.ts src/utils/__tests__/measurabilityNotice.test.ts
+```
+
+**真机 / 体验版**
+
+- [ ] **拍摄页** 出现「机位怎么选？」（正面测转肩 / 侧面跳过旋转）
+- [ ] 上传 **侧面转播感** 视频 → 报告 **无**「转肩仅 3°/155°」类荒谬 issue 文案
+- [ ] 侧面报告：TrustBadge 下有 **机位说明**（转肩类已跳过）或 **拍摄提示** 含 `rotation_reading_unreliable` 语义
+- [ ] 正面 7 铁自拍：不应出现 **severity≥medium** 的 `under_rotation`（明显转肩场景）
+- [ ] full_swing 上传后若引擎识别机位与手动不同 → **toast**「已根据画面识别为…」
+- [ ] （可选）多挥视频 → detect-swings 后机位与创任务参数一致
+
+**红灯**
+
+| 现象 | 查 |
+|------|-----|
+| 侧面仍报转肩不足/155° X-Factor | CVM ai_engine 是否已 `publish`；V2 桶是否走新 pipeline |
+| 报告仍显示「肩转 3°」 | `rotation_issue_copy` / sanitize 是否生效 |
+| 无机位说明 | `report.camera_angle` + `quality_warnings` 是否回传 |
 
 ### Phase2 短杆 / 多挥（W18–W22，体验版必勾）
 

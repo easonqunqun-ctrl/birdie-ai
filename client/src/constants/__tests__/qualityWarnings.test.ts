@@ -22,6 +22,9 @@ describe('linesForQualityWarnings', () => {
     expect(linesForQualityWarnings(['low_pose_confidence'])).toEqual([
       expect.stringMatching(/置信度/),
     ])
+    expect(linesForQualityWarnings(['rotation_reading_unreliable'])).toEqual([
+      expect.stringMatching(/无法稳定读取转肩角度/),
+    ])
   })
 
   test('未知 code → 兜底模板', () => {

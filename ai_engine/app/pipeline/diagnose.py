@@ -39,11 +39,24 @@ from dataclasses import dataclass, field
 
 from app.pipeline.constants import issue_meta
 from app.pipeline.phases import PhaseSegmentResult
+from app.pipeline.rotation_issue_copy import ROTATION_ISSUE_TYPES
 
 log = logging.getLogger("ai_engine.diagnose")
 
 # docs/05：confidence < 0.6 的 issue 不展示
 MIN_DISPLAY_CONFIDENCE = 0.6
+
+
+def _rotation_description(issue_type: str, metrics: dict[str, float]) -> str:
+    """P2-M7-R1 A6 · 旋转 issue 文案（locale + sanity 安全句）。"""
+    from app.pipeline.rotation_issue_copy import (
+        get_zh_cn_locale,
+        render_rotation_issue_description,
+    )
+
+    return render_rotation_issue_description(
+        issue_type, metrics, get_zh_cn_locale()
+    )
 
 # 单次分析最多返回几条 issue（防刷屏）
 MAX_ISSUES = 5
@@ -312,8 +325,8 @@ def _rule_hanging_back(
 def _rule_over_rotation(
     feat: dict[str, float], phases: PhaseSegmentResult
 ) -> DiagnosedIssue | None:
-    shoulder = feat["shoulder_rotation_top"]
-    if shoulder <= 105:
+    shoulder = feat.get("shoulder_rotation_top")
+    if shoulder is None or shoulder <= 105:
         return None
     dev = (shoulder - 105) / 15
     conf = min(1.0, 0.55 + dev * 0.3)
@@ -322,8 +335,8 @@ def _rule_over_rotation(
         type="over_rotation",
         name=issue_meta("over_rotation")["name"],
         severity=sev,
-        description=(
-            f"顶点肩旋转 {shoulder:.0f}°（理想 80°-100°），过度转肩可能影响节奏。"
+        description=_rotation_description(
+            "over_rotation", {"shoulder_rotation_top": shoulder}
         ),
         confidence=conf,
         key_frame_timestamp=_frame_to_time(phases.top_frame, phases.fps),
@@ -334,8 +347,11 @@ def _rule_over_rotation(
 def _rule_under_rotation(
     feat: dict[str, float], phases: PhaseSegmentResult
 ) -> DiagnosedIssue | None:
-    shoulder = feat["shoulder_rotation_top"]
-    if shoulder >= 75:
+    shoulder = feat.get("shoulder_rotation_top")
+    if shoulder is None or shoulder >= 75:
+        return None
+    wrist = feat.get("top_wrist_position")
+    if shoulder < 20 and wrist is not None and wrist > 0.12:
         return None
     dev = (75 - shoulder) / 20
     conf = min(1.0, 0.6 + dev * 0.3)
@@ -344,8 +360,8 @@ def _rule_under_rotation(
         type="under_rotation",
         name=issue_meta("under_rotation")["name"],
         severity=sev,
-        description=(
-            f"顶点肩旋转仅 {shoulder:.0f}°（理想 80°-100°），上杆力量传递受限。"
+        description=_rotation_description(
+            "under_rotation", {"shoulder_rotation_top": shoulder}
         ),
         confidence=conf,
         key_frame_timestamp=_frame_to_time(phases.top_frame, phases.fps),
@@ -356,8 +372,8 @@ def _rule_under_rotation(
 def _rule_flat_shoulder(
     feat: dict[str, float], phases: PhaseSegmentResult
 ) -> DiagnosedIssue | None:
-    xf = feat["x_factor"]
-    if xf <= 60:
+    xf = feat.get("x_factor")
+    if xf is None or xf <= 60:
         return None
     dev = (xf - 60) / 20
     conf = min(0.9, 0.55 + dev * 0.3)  # 粗估，不给 1.0
@@ -366,9 +382,7 @@ def _rule_flat_shoulder(
         type="flat_shoulder",
         name=issue_meta("flat_shoulder")["name"],
         severity=sev,
-        description=(
-            f"肩/髋角度差 {xf:.0f}°，肩旋转平面偏水平，上杆路径可能过内。"
-        ),
+        description=_rotation_description("flat_shoulder", {"x_factor": xf}),
         confidence=conf,
         key_frame_timestamp=_frame_to_time(phases.top_frame, phases.fps),
         metrics={"x_factor": xf},
@@ -378,8 +392,8 @@ def _rule_flat_shoulder(
 def _rule_steep_shoulder(
     feat: dict[str, float], phases: PhaseSegmentResult
 ) -> DiagnosedIssue | None:
-    xf = feat["x_factor"]
-    if xf >= 25:
+    xf = feat.get("x_factor")
+    if xf is None or xf >= 25:
         return None
     dev = (25 - xf) / 15
     conf = min(0.85, 0.55 + dev * 0.3)
@@ -388,9 +402,7 @@ def _rule_steep_shoulder(
         type="steep_shoulder",
         name=issue_meta("steep_shoulder")["name"],
         severity=sev,
-        description=(
-            f"肩/髋角度差仅 {xf:.0f}°，肩旋转平面偏陡，上杆可能过外。"
-        ),
+        description=_rotation_description("steep_shoulder", {"x_factor": xf}),
         confidence=conf,
         key_frame_timestamp=_frame_to_time(phases.top_frame, phases.fps),
         metrics={"x_factor": xf},
@@ -448,15 +460,59 @@ _RULES = [
     _rule_grip_weak,
 ]
 
+def finalize_diagnose_issues(
+    issues: list[DiagnosedIssue],
+    features: dict[str, float],
+    *,
+    camera_angle: str | None = None,
+    max_issues: int = MAX_ISSUES,
+) -> tuple[list[DiagnosedIssue], list[str]]:
+    """P2-M7-R1 · V1/V2 共用：DTL 旋转过滤 + 矛盾对合并 + 严重度排序。
+
+    Returns:
+        (issues, guard_warnings) — 矛盾旋转对合并时追加 ``rotation_reading_unreliable``。
+    """
+    from app.pipeline.feature_measurability import WARN_ROTATION_SANITY
+
+    guard_warnings: list[str] = []
+    if camera_angle == "down_the_line":
+        issues = [i for i in issues if i.type not in ROTATION_ISSUE_TYPES]
+    issues, contradicted = _apply_diagnose_guards(issues, features)
+    if contradicted and WARN_ROTATION_SANITY not in guard_warnings:
+        guard_warnings.append(WARN_ROTATION_SANITY)
+    severity_order = {"high": 0, "medium": 1, "low": 2}
+    issues.sort(key=lambda x: (severity_order[x.severity], -x.confidence))
+    return issues[:max_issues], guard_warnings
+
+
+def _apply_diagnose_guards(
+    issues: list[DiagnosedIssue], features: dict[str, float]
+) -> tuple[list[DiagnosedIssue], bool]:
+    """P2-M7-R1 · 矛盾旋转 issue 合并丢弃。返回 (过滤后, 是否发生矛盾合并)。"""
+    types = {i.type for i in issues}
+    drop: set[str] = set()
+    if "under_rotation" in types and "steep_shoulder" in types:
+        drop |= {"under_rotation", "steep_shoulder"}
+    if "flat_shoulder" in types and "over_rotation" in types:
+        drop |= {"flat_shoulder", "over_rotation"}
+    if not drop:
+        return issues, False
+    return [i for i in issues if i.type not in drop], True
+
 
 def diagnose(
     features: dict[str, float],
     phases: PhaseSegmentResult,
     *,
+    camera_angle: str | None = None,
     min_confidence: float = MIN_DISPLAY_CONFIDENCE,
     max_issues: int = MAX_ISSUES,
+    guard_warnings_out: list[str] | None = None,
 ) -> list[DiagnosedIssue]:
     """跑所有 rule，过滤置信度，按严重度排序返回 TopN。
+
+    P2-M7-R1：``camera_angle=down_the_line`` 时跳过旋转类 issue；
+    矛盾旋转对由 ``_apply_diagnose_guards`` 剔除。
 
     排序规则：
     1. severity 降序（high > medium > low）
@@ -479,7 +535,9 @@ def diagnose(
             continue
         issues.append(result)
 
-    severity_order = {"high": 0, "medium": 1, "low": 2}
-    issues.sort(key=lambda x: (severity_order[x.severity], -x.confidence))
-
-    return issues[:max_issues]
+    finalized, guard_warnings = finalize_diagnose_issues(
+        issues, features, camera_angle=camera_angle, max_issues=max_issues
+    )
+    if guard_warnings_out is not None:
+        guard_warnings_out.extend(guard_warnings)
+    return finalized

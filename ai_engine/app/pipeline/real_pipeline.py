@@ -135,6 +135,9 @@ async def run_real_analysis(
     from app.pipeline.pose_denoise import denoise_pose_result
 
     pose_result = denoise_pose_result(pose_result)
+    from app.pipeline.pose_refine import refine_pose_result
+
+    pose_result = refine_pose_result(pose_result)
     quality_warnings = _merge_quality_warnings(
         quality_warnings_from_preprocess(pre),
         quality_warnings_from_pose(pose_result),
@@ -165,28 +168,53 @@ async def run_real_analysis(
     ]
     ms_warning = multi_swing_engine_warning(raw_candidates, selected_idx, fps)
 
-    # 4. 特征抽取 + 机位可测性预处理（P2 评分护城河）
+    # 4. 特征抽取 + 机位推断（须在 rotation_track 之前，B2 DTL 门控）
     features = extract_features(pose_result.keypoints, phases)
+
+    from app.pipeline.camera_angle import infer_camera_angle_from_pose
+
+    angle_result = infer_camera_angle_from_pose(
+        pose_result, declared_raw=getattr(req, "camera_angle", None)
+    )
+    effective_camera_angle = angle_result.effective_angle
+
+    rotation_track_meta: list = []
+    from app.pipeline.rotation_track import apply_rotation_track
+
+    features = apply_rotation_track(
+        features,
+        pose_result.keypoints,
+        phases,
+        visibility=pose_result.visibility,
+        camera_angle=effective_camera_angle,  # type: ignore[arg-type]
+        track_result_out=rotation_track_meta,
+    )
+    if rotation_track_meta and rotation_track_meta[0].quality_warnings:
+        quality_warnings = _merge_quality_warnings(
+            quality_warnings, rotation_track_meta[0].quality_warnings
+        )
+
     club_category = (
         to_club_category(getattr(req, "club_type", None)) if club_aware_scoring else None
     )
-    camera_angle = getattr(req, "camera_angle", None) if club_aware_scoring else None
+    # P2-M7-R1：sanitize / 诊断全路径用 effective；计分仅 V2（club_aware）带机位 profile
+    scoring_camera_angle = effective_camera_angle if club_aware_scoring else None
     from app.pipeline.feature_measurability import sanitize_features, scoring_quality_warnings
     from app.pipeline.scoring import collect_skipped_features_for_scoring
 
     features, sanitize_warnings = sanitize_features(
-        features, camera_angle=camera_angle  # type: ignore[arg-type]
+        features, camera_angle=effective_camera_angle  # type: ignore[arg-type]
     )
     quality_warnings = _merge_quality_warnings(quality_warnings, sanitize_warnings)
-    if camera_angle is not None:
+    if scoring_camera_angle is not None:
         from app.pipeline.feature_measurability import WARN_ANGLE_LIMITED_SCORING
 
         skipped = collect_skipped_features_for_scoring(
-            features, camera_angle=camera_angle  # type: ignore[arg-type]
+            features, camera_angle=scoring_camera_angle  # type: ignore[arg-type]
         )
         quality_warnings = _merge_quality_warnings(
             quality_warnings,
-            scoring_quality_warnings(camera_angle, skipped),  # type: ignore[arg-type]
+            scoring_quality_warnings(scoring_camera_angle, skipped),  # type: ignore[arg-type]
         )
         if sanitize_warnings and WARN_ANGLE_LIMITED_SCORING not in quality_warnings:
             quality_warnings = _merge_quality_warnings(
@@ -208,25 +236,30 @@ async def run_real_analysis(
     phase_scores_int = score_all_phases(
         features,
         club_category=club_category,
-        camera_angle=camera_angle,
+        camera_angle=scoring_camera_angle,
         feature_confidences=feature_confidences_for_score,
     )
     overall = score_overall(
         phase_scores_int,
         club_category=club_category,
-        camera_angle=camera_angle,
+        camera_angle=scoring_camera_angle,
         features=features,
         feature_confidences=feature_confidences_for_score,
     )
     weakest = weakest_phase(phase_scores_int)
 
     # 6. 诊断（V1 默认 ``diagnose``；V2 灰度桶可注入 ``diagnose_v2``）
-    if camera_angle is not None:
-        issues_raw = diagnose_impl(
-            features, phases, camera_angle=camera_angle  # type: ignore[call-arg]
+    diagnose_guard_warnings: list[str] = []
+    issues_raw = diagnose_impl(
+        features,
+        phases,
+        camera_angle=effective_camera_angle,  # type: ignore[call-arg]
+        guard_warnings_out=diagnose_guard_warnings,  # type: ignore[call-arg]
+    )
+    if diagnose_guard_warnings:
+        quality_warnings = _merge_quality_warnings(
+            quality_warnings, diagnose_guard_warnings
         )
-    else:
-        issues_raw = diagnose_impl(features, phases)
 
     # 7. 推荐
     recommendations = recommend(issues_raw)
@@ -364,7 +397,7 @@ async def run_real_analysis(
                     or feature_confidences_for_score,
                     analysis_confidence=result.analysis_confidence or 1.0,
                     quality_warnings=quality_warnings,
-                    camera_angle=camera_angle,
+                    camera_angle=scoring_camera_angle,
                 )
                 result.overall_score = calibrated
                 if trust_warnings:

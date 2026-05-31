@@ -60,6 +60,22 @@ def test_build_issue_uses_locale_title_and_summary() -> None:
     assert "30%" in issue.description
 
 
+def test_build_issue_rotation_uses_safe_copy_for_absurd_x_factor() -> None:
+    """A6 · 荒谬 x_factor 不得出现在 flat_shoulder 文案。"""
+    locale = load_locale(LOCALES_DIR / "zh_CN.json")
+    res = RuleResult(
+        type="flat_shoulder",
+        severity=0.75,
+        confidence=0.85,
+        rule_engine_version="v2.0",
+        display_name_key="issues.flat_shoulder.title",
+        payload={"x_factor": 155.0},
+    )
+    issue = _build_issue_from_rule_result(res, locale)
+    assert "155" not in issue.description
+    assert "分离度" in issue.description or "偏平" in issue.description
+
+
 def test_build_issue_falls_back_to_v1_name_when_locale_missing() -> None:
     locale = {}  # 空 locale → render 走 key 本身；fallback_name=V1 中文名
     res = RuleResult(

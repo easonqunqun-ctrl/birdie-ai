@@ -292,3 +292,97 @@ def angle_engine_warnings(result: CameraAngleResult) -> list[EngineWarning]:
             )
         )
     return warnings
+
+
+# ============================================================
+# P2-M7-R1 / M7-04-UI · 从 PoseResult 推断机位（upload / pipeline 共用）
+# ============================================================
+
+
+def summarize_pose_result_for_angle(pose) -> _PoseSummary | None:  # PoseResult
+    """从完整 PoseResult 聚合肩/髋/头几何，供 detect_camera_angle 使用。"""
+    from app.pipeline.pose import (
+        LANDMARK_LEFT_HIP,
+        LANDMARK_LEFT_SHOULDER,
+        LANDMARK_NOSE,
+        LANDMARK_RIGHT_HIP,
+        LANDMARK_RIGHT_SHOULDER,
+    )
+
+    if pose is None or pose.num_frames <= 0 or pose.valid_mask.sum() == 0:
+        return None
+    kp = pose.keypoints
+    mask = pose.valid_mask
+    valid = kp[mask]
+    try:
+        return summarize_pose_for_angle(
+            left_shoulder_x=float(valid[:, LANDMARK_LEFT_SHOULDER, 0].mean()),
+            right_shoulder_x=float(valid[:, LANDMARK_RIGHT_SHOULDER, 0].mean()),
+            left_hip_x=float(valid[:, LANDMARK_LEFT_HIP, 0].mean()),
+            right_hip_x=float(valid[:, LANDMARK_RIGHT_HIP, 0].mean()),
+            head_x=float(valid[:, LANDMARK_NOSE, 0].mean()),
+            head_y=float(valid[:, LANDMARK_NOSE, 1].mean()),
+            valid_frame_ratio=float(pose.valid_frame_ratio),
+        )
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def summarize_pose_address_window(pose, *, max_frames: int = 15) -> _PoseSummary | None:
+    """detect-swings 等轻量路径：取视频前段 valid 帧均值（近似 address）。"""
+    from app.pipeline.pose import (
+        LANDMARK_LEFT_HIP,
+        LANDMARK_LEFT_SHOULDER,
+        LANDMARK_NOSE,
+        LANDMARK_RIGHT_HIP,
+        LANDMARK_RIGHT_SHOULDER,
+    )
+
+    if pose is None or pose.num_frames <= 0:
+        return None
+    indices = [i for i in range(min(max_frames, pose.num_frames)) if pose.valid_mask[i]]
+    if not indices:
+        return summarize_pose_result_for_angle(pose)
+    kp = pose.keypoints[indices]
+    return summarize_pose_for_angle(
+        left_shoulder_x=float(kp[:, LANDMARK_LEFT_SHOULDER, 0].mean()),
+        right_shoulder_x=float(kp[:, LANDMARK_RIGHT_SHOULDER, 0].mean()),
+        left_hip_x=float(kp[:, LANDMARK_LEFT_HIP, 0].mean()),
+        right_hip_x=float(kp[:, LANDMARK_RIGHT_HIP, 0].mean()),
+        head_x=float(kp[:, LANDMARK_NOSE, 0].mean()),
+        head_y=float(kp[:, LANDMARK_NOSE, 1].mean()),
+        valid_frame_ratio=float(pose.valid_frame_ratio),
+    )
+
+
+def infer_camera_angle_from_pose(
+    pose,
+    *,
+    declared_raw: str | None = None,
+    use_address_window: bool = False,
+) -> CameraAngleResult:
+    """推断机位；``declared_raw`` 为用户选择，用于 mismatch / effective_angle。"""
+    if use_address_window:
+        summary = summarize_pose_address_window(pose)
+    else:
+        summary = summarize_pose_result_for_angle(pose)
+    if summary is None:
+        declared = normalize_camera_angle(declared_raw)
+        return CameraAngleResult(
+            detected_angle="oblique",
+            offset_deg=0.0,
+            confidence=0.0,
+            declared_angle=declared,
+            mismatch=False,
+        )
+    detected = detect_camera_angle(summary)
+    return attach_declared(detected, declared_raw)
+
+
+def suggested_camera_angle_for_upload(result: CameraAngleResult) -> str | None:
+    """上传后给客户端的默认机位；低置信或 oblique 时不强行推荐。"""
+    if result.confidence < DETECTION_CONFIDENCE_FALLBACK:
+        return None
+    if result.detected_angle in ("face_on", "down_the_line"):
+        return result.detected_angle
+    return None

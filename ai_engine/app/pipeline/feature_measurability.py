@@ -100,6 +100,31 @@ def sanitize_features(
     out = dict(features)
     warnings: list[str] = []
 
+    rotation_keys = ("shoulder_rotation_top", "hip_rotation_top", "x_factor")
+
+    def _drop_rotation() -> None:
+        for k in rotation_keys:
+            out.pop(k, None)
+        if WARN_ROTATION_SANITY not in warnings:
+            warnings.append(WARN_ROTATION_SANITY)
+
+    # P2-M7-R1 · 全局旋转 sanity（不限机位）
+    shoulder = out.get("shoulder_rotation_top")
+    if shoulder is not None and (
+        shoulder < 15.0 or shoulder > 110.0
+    ):
+        _drop_rotation()
+        shoulder = out.get("shoulder_rotation_top")
+
+    xf = out.get("x_factor")
+    if xf is not None and xf > 80.0:
+        _drop_rotation()
+
+    # DTL：旋转类 2D 不可信，一律不参与计分/诊断
+    if camera_angle == "down_the_line":
+        if any(k in out for k in rotation_keys):
+            _drop_rotation()
+
     hip = out.get("hip_rotation_top")
     if hip is not None and hip > 90.0:
         out.pop("hip_rotation_top", None)

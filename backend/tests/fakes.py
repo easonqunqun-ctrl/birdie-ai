@@ -219,6 +219,9 @@ class FakeAIEngine:
                     },
                 ],
                 "default_selected_index": 1,
+                "suggested_camera_angle": "face_on",
+                "detected_camera_angle": "face_on",
+                "camera_angle_confidence": 0.85,
             }
         return {
             "analysis_id": analysis_id,
@@ -234,6 +237,9 @@ class FakeAIEngine:
                 }
             ],
             "default_selected_index": 0,
+            "suggested_camera_angle": "down_the_line",
+            "detected_camera_angle": "down_the_line",
+            "camera_angle_confidence": 0.9,
         }
 
 

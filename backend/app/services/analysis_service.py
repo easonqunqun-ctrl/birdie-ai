@@ -527,6 +527,9 @@ async def detect_swings_for_upload(
         upload_id=upload_id,
         swing_candidates=_map_swing_candidates(result.get("swing_candidates") or []),
         default_selected_index=int(result.get("default_selected_index") or 0),
+        suggested_camera_angle=result.get("suggested_camera_angle"),
+        detected_camera_angle=result.get("detected_camera_angle"),
+        camera_angle_confidence=result.get("camera_angle_confidence"),
     )
 
 

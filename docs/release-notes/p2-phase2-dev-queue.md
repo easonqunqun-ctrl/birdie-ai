@@ -110,6 +110,20 @@ Kickoff：[`p2-m12-08-evolution-animation-kickoff.md`](./p2-m12-08-evolution-ani
 
 ---
 
+### Batch-I · 全挥杆 2D 感知准确度（优先于 ECS 标定）
+
+> Kickoff：[`p2-m7-r1-rotation-perception-accuracy-kickoff.md`](./p2-m7-r1-rotation-perception-accuracy-kickoff.md) · FR：[`docs/23` §3.14](../23-二期可编码规格说明书.md#314-p2-m7-r1--全挥杆-2d-感知准确度)
+
+| Sprint | PLAN-ID | 事项 | 交付物 | 可做 | 状态 |
+|--------|---------|------|--------|------|------|
+| **R1** | P2-M7-R1-A | Phase A 止血 | sanity + auto-detect sanitize + 矛盾合并 + setup/top 窗口 + R2 CI | Now | ✅ repo · 待真视频 + smoke |
+| **R2** | P2-M7-R1-B1 | pose_refine + rotation_track 融合 | `pose_refine.py` + `rotation_track.py` + AC-B | Now | ✅ B1–B3 repo · B4–B5 backlog |
+| **R3** | P2-M7-R1-B2 | top 双证据 + preprocess_v2 灰度 | 接 M7-09 后 refine impact 窗 | Now / Trigger | 📋 Planned |
+
+**并行**：R1 与 W24 V2 灰度可并行；**R1 必须在 R2 之前发版**（先止血再抬准度）。
+
+---
+
 ### Batch-G · 引擎标定与追踪（等样本）
 
 | Sprint | PLAN-ID | 事项 | 触发条件 | 可做 | 状态 |
@@ -140,10 +154,11 @@ W21 发版收口（体验版 + smoke + git + 文档回填）
   → W24 V2 灰度 + 监控发版脚本 + ENG-06
   → W25 M12-08 演化动画
   → W26 drill 文案/seed（视频等拍摄 Trigger）
+  → R1–R3 M7-R1 2D 感知准确度（Batch-I，优先于 ECS 标定）
   → W27+ ECS/追踪（样本 Trigger 并行）
 ```
 
-**并行泳道**（不占主 Sprint）：U-2 COS · Q-B5 papay · Q-D1 RN · 拍摄团队 W26-B
+**并行泳道**（不占主 Sprint）：U-2 COS · Q-B5 papay · Q-D1 RN · 拍摄团队 W26-B · **Batch-I R1 止血**
 
 ---
 
@@ -162,3 +177,5 @@ W21 发版收口（体验版 + smoke + git + 文档回填）
 |------|------|------|
 | v0.1 | 2026-05-30 | 初版：W21–W27 可开发项全量入队；代码审计修正 M10-01/02/03、M7-12 等「已在库」状态 |
 | v0.2 | 2026-05-30 | W21–W25 状态回填；W26-A/C 0043 drill tips+seed（29 条） |
+| v0.4 | 2026-05-30 | Batch-I R1 Phase A → ✅ repo · 待体验版 smoke |
+| v0.3 | 2026-05-30 | Batch-I P2-M7-R1 全挥杆 2D 感知准确度队列 + kickoff 互链 |

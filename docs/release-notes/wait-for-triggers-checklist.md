@@ -40,6 +40,7 @@
 | **M7-01-ecs** | ECS v2 标定集骨架 | ≥50 段全挥杆 + 推杆/切杆各 ≥10 段教练标注 | 训练 ECS v2 + 回填 ideal/threshold | AI 工程 |
 | **M7-07-nn** | NN 本体占位（W23–W30） | 标定集 + ML 基建（GPU/训练管线） | 替换 rule-based 分段/评分子模块 | AI 工程 |
 | **M7-08-features** | 新特征设计 doc 就位 | ECS 特征相关性验收 | 接入 V2 feature 矩阵 | AI 工程 |
+| **M7-R1-perception** | Phase A **repo Done**（[`p2-m7-r1-rotation-perception-accuracy-kickoff.md`](./p2-m7-r1-rotation-perception-accuracy-kickoff.md)） | 体验版 smoke §M7-R1 + Rose/室内真视频 AC-A1 | `make ai-engine-test-rotation` + CVM 发版 | AI + 客户端 · **待真机签收** |
 | **M7-09-tracking** | YOLO 杆/球追踪 stub | 标注集 + 微调权重 | 替换 wrist-proxy 杆面/触球特征 | AI 工程 |
 | **M7-15-feedback** | 反馈池 schema stub | 产品定反馈 UX + 存储合规 | 启用 in-app 纠错回流 | 产品 + AI 工程 |
 | **M7-16-llm** | LLM 个性化 prompt stub | DeepSeek/Qwen key + 隐私评审 | 报告话术个性化 | AI 工程 |
@@ -257,6 +258,31 @@
 3. 学员侧课程详情标注「教练定制」来源（`created_by_user_id` 非空）
 
 > 写 API（M11-06）已合；当前仅 seed 教练 user_id 白名单可写。
+
+### 2.17 M7-R1-perception · 旋转感知 Phase A 体验版签收
+
+**当前**：引擎 + 客户端 **repo Done**（见 kickoff §十四）。
+
+**发版前自动化**：
+
+```bash
+make ai-engine-test-rotation
+cd client && pnpm exec jest src/constants/__tests__/qualityWarnings.test.ts src/utils/__tests__/suggestedCameraAngle.test.ts src/utils/__tests__/measurabilityNotice.test.ts
+```
+
+**体验版人工 smoke**（[`experience-version-smoke-runbook.md`](./experience-version-smoke-runbook.md) §M7-R1）：
+
+- [ ] 拍摄页「机位怎么选？」可见
+- [ ] DTL 转播感：无 3°/155° 荒谬 rotation issue；有机位说明或 `rotation_reading_unreliable` 提示
+- [ ] face-on 明显转肩：无 severity≥medium 的 `under_rotation`
+- [ ] detect-swings 机位预选 toast（与手动不一致时）
+
+**仍 pending**：
+
+- [ ] AC-A1：Rose DTL + 室内 7 铁真视频入 `rotation_regression_manifest.json`
+- [ ] AC-A4：V1 桶真机 E2E（计分冻结、sanitize 生效）
+
+**签收后**：kickoff AC-A1/A4 勾 ✅ → `docs/19` §四 记 M7-R1 Phase A 完成 → 开 R2（pose_refine）
 
 ---
 

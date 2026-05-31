@@ -52,6 +52,18 @@ const TIPS = [
   { icon: '💡', text: '优选自然光，避免强背光和严重抖动' },
 ]
 
+/** P2-M7-R1 · A7 机位能力差异（与报告页 measurability 文案一致） */
+const CAMERA_ANGLE_TIPS = [
+  {
+    icon: '👤',
+    text: '测转肩、X-Factor：建议正面全身（Face-On）拍摄，球员居中入镜',
+  },
+  {
+    icon: '↗️',
+    text: '侧面（Down-the-Line）适合看下杆轨迹；转肩类指标会自动跳过',
+  },
+]
+
 const CaptureAnalysisPage: FC = () => {
   const [showGuide, setShowGuide] = useState(false)
 
@@ -134,6 +146,16 @@ const CaptureAnalysisPage: FC = () => {
       <View className='capture__tips'>
         {TIPS.map((t) => (
           <View key={t.text} className='capture__tip'>
+            <Text className='capture__tip-icon'>{t.icon}</Text>
+            <Text className='capture__tip-text'>{t.text}</Text>
+          </View>
+        ))}
+      </View>
+
+      <View className='capture__camera-tips'>
+        <Text className='capture__camera-tips-title'>机位怎么选？</Text>
+        {CAMERA_ANGLE_TIPS.map((t) => (
+          <View key={t.text} className='capture__tip capture__tip--compact'>
             <Text className='capture__tip-icon'>{t.icon}</Text>
             <Text className='capture__tip-text'>{t.text}</Text>
           </View>

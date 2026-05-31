@@ -44,6 +44,7 @@ help:
 	@echo "  make ai-logs                  查看 AI Engine 日志"
 	@echo "  make ai-engine-test           在容器里运行 AI Engine 测试"
 	@echo "  make ai-engine-test-local     在宿主机 ai_engine/ 目录下 uv run pytest"
+	@echo "  make ai-engine-test-rotation  P2-M7-R1 旋转感知回归门禁（快测）"
 	@echo "  make ai-engine-lint           ruff check ai_engine/app"
 	@echo "  make ai-engine-synth-fixtures 生成合成测试视频（需要本机装 ffmpeg）"
 	@echo "  make ai-engine-ecs-regression   ENG-04 ECS v1 CI 回归单测（宿主机 uv）"
@@ -214,6 +215,10 @@ ai-engine-test:
 # 在宿主机跑（用 uv 在 ai_engine/.venv 里跑；没装 mediapipe/ffmpeg 的测试会自动 skip）
 ai-engine-test-local:
 	cd ai_engine && uv run pytest -v
+
+# P2-M7-R1 · Phase A 旋转感知回归（CI 子集；全量仍走 ai-engine-test / ai-engine-pytest.yml）
+ai-engine-test-rotation:
+	cd ai_engine && uv run pytest tests/test_rotation_track.py tests/test_rotation_regression.py tests/test_rotation_regression_v1_path.py tests/test_rotation_issue_copy.py tests/test_nelly_dtl_scoring.py tests/test_diagnose.py tests/test_diagnose_v2_measurability.py tests/test_pose_refine.py -v --tb=short
 
 # W6-T5：优先跑容器内（不要求宿主机装 uv）；容器没起时 fallback 到宿主机 uv
 ai-engine-lint:

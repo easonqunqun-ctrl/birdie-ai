@@ -10,7 +10,7 @@ export const QUALITY_WARNING_COPY: Record<string, string> = {
   angle_limited_scoring:
     '当前机位下部分维度（如转肩角度）无法从 2D 画面稳定测量，系统已自动调整计分方式；建议同机位多拍几次看趋势。',
   rotation_reading_unreliable:
-    '旋转类读数波动较大（常见于侧面转播/慢动作），相关诊断已降权，请以可测维度为主。',
+    '画面机位或遮挡导致 AI 无法稳定读取转肩角度，已跳过相关诊断读数。建议在正面全身、光线充足下重拍。',
   score_low_trust:
     '本次视频的可测维度偏少或关键点不够稳，总分已保守处理；建议在规范机位、光线充足处重拍后再对比。',
 }

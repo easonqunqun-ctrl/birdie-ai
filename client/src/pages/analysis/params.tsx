@@ -32,8 +32,13 @@ import {
   CLUB_TYPE_GROUPS,
   CLUB_TYPE_LABEL,
   VIDEO_CONSTRAINTS,
+  type DetectSwingsResponse,
 } from '@/types/analysis'
 import type { AnalysisMode } from '@/types/analysis'
+import {
+  resolveSuggestedCameraAngle,
+  suggestedCameraAngleToastCopy,
+} from '@/utils/suggestedCameraAngle'
 import type { CameraAngle, ClubType } from '@/types/api'
 import { PHASE2_CHIPPING_MODE_ENABLED_FLAG, PHASE2_PUTTING_MODE_ENABLED_FLAG, PHASE2_YARDAGE_BOOK_ENABLED_FLAG } from '@/constants/flags'
 import { CHIPPING_CLUB_HINT } from '@/constants/chippingLabels'
@@ -301,17 +306,19 @@ const AnalysisParamsPage: FC = () => {
           ? parsedYardage
           : undefined
 
-      const createPayload = {
+      let angleForAnalysis: CameraAngle = cameraAngle
+
+      const createPayload = () => ({
         upload_id: token.upload_id,
-        camera_angle: cameraAngle,
+        camera_angle: angleForAnalysis,
         club_type: clubType,
         mode: analysisMode,
         ...(yardagePayload != null ? { target_yardage: yardagePayload } : {}),
-      }
+      })
 
       const goWaiting = async (selectedIndex?: number) => {
         const created = await analysisService.createAnalysis({
-          ...createPayload,
+          ...createPayload(),
           ...(selectedIndex != null ? { selected_swing_index: selectedIndex } : {}),
         })
         Taro.hideLoading()
@@ -319,7 +326,7 @@ const AnalysisParamsPage: FC = () => {
         track('analysis_submit', {
           analysis_id: created.analysis_id,
           club_type: clubType,
-          camera_angle: cameraAngle,
+          camera_angle: angleForAnalysis,
           analysis_mode: analysisMode,
           duration,
           size,
@@ -329,16 +336,30 @@ const AnalysisParamsPage: FC = () => {
         Taro.redirectTo({ url: `/pages/analysis/waiting?id=${created.analysis_id}` })
       }
 
+      const applySuggestedCameraAngle = (detected: DetectSwingsResponse) => {
+        const resolved = resolveSuggestedCameraAngle(cameraAngle, detected)
+        angleForAnalysis = resolved.angle
+        if (resolved.changed) {
+          setCameraAngle(resolved.angle)
+          Taro.showToast({
+            title: suggestedCameraAngleToastCopy(resolved.angle),
+            icon: 'none',
+            duration: 2500,
+          })
+        }
+      }
+
       if (analysisMode === 'full_swing') {
         setPhase('detecting')
         Taro.showLoading({ title: '识别挥杆段' })
         try {
           const detected = await analysisService.detectSwings(token.upload_id)
+          applySuggestedCameraAngle(detected)
           Taro.hideLoading()
           if (detected.swing_candidates.length > 1) {
             setPendingSwingSelection({
               uploadId: token.upload_id,
-              cameraAngle,
+              cameraAngle: angleForAnalysis,
               clubType,
               mode: analysisMode,
               targetYardage: yardagePayload,

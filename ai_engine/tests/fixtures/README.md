@@ -75,6 +75,20 @@ bash generate_synthetic.sh
 
 当 T2 完成后，用脚本对每段 `real/*.mp4` 跑一次 pipeline 并**手工审核**关键字段（阶段时间戳、主 issue），存入 `expected/<video_name>.json`。之后单元测试会把真实输出与这个 golden set 对比，防止算法回归。
 
+### P2-M7-R1 · AC-A1 真视频（R2 包）
+
+manifest：``fixtures/rotation_regression_manifest.json``（v0.2）
+
+| 文件名 | 用途 |
+|--------|------|
+| `dtl_iron_01.mp4` | DTL/转播 — `test_rotation_regression_real` · 零 rotation severity≥medium |
+| `face_on_iron_01.mp4` | 室内 7 铁正面 — 不得 high `under_rotation` |
+
+```bash
+# 缺文件时 CI skip；本地 drop 视频后：
+cd ai_engine && uv run pytest tests/test_rotation_regression_real.py -v
+```
+
 示例：
 
 ```json

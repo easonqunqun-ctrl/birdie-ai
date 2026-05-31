@@ -48,6 +48,7 @@ import {
   type VideoPlaybackMode,
 } from '@/utils/reportPlayback'
 import { groupIssuesByConfidence, ISSUE_SEVERITY_ORDER } from '@/utils/issueConfidenceGroup'
+import { linesForMeasurabilityNotice } from '@/utils/measurabilityNotice'
 import { resolveTrustTier } from '@/utils/trustLabel'
 import { PHASE2_PROS_ENABLED_FLAG } from '@/constants/flags'
 import { prosService, type ProMatchItemRead } from '@/services/prosService'
@@ -301,6 +302,11 @@ const ReportPage: FC = () => {
   const qualityWarningLines = useMemo(
     () => linesForQualityWarnings(report?.quality_warnings),
     [report?.quality_warnings],
+  )
+
+  const measurabilityNoticeLines = useMemo(
+    () => linesForMeasurabilityNotice(report?.camera_angle, report?.quality_warnings),
+    [report?.camera_angle, report?.quality_warnings],
   )
 
   const scoreLevel = report?.score_level ?? scoreLevelFromScore(report?.overall_score)
@@ -805,6 +811,17 @@ const ReportPage: FC = () => {
           confidence={report.analysis_confidence}
           onRetake={isSample ? undefined : handleShootAgain}
         />
+      )}
+
+      {measurabilityNoticeLines.length > 0 && (
+        <View className='report__measurability-notice'>
+          <Text className='report__measurability-notice-title'>机位说明</Text>
+          {measurabilityNoticeLines.map((line, i) => (
+            <Text key={i} className='report__measurability-notice-item'>
+              {line}
+            </Text>
+          ))}
+        </View>
       )}
 
       {/* P2-W14-B：把 W13-B camera_angle_mismatch + W12-2 camera_angle_large_offset

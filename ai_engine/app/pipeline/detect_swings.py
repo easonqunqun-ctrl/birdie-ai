@@ -41,12 +41,24 @@ def run_detect_swings(req: DetectSwingsRequest) -> DetectSwingsResult:
             fps=fps,
         )
         default_idx = default_swing_index(raw) if raw else 0
+        from app.pipeline.camera_angle import (
+            infer_camera_angle_from_pose,
+            suggested_camera_angle_for_upload,
+        )
+
+        angle_result = infer_camera_angle_from_pose(
+            pose_result, use_address_window=True
+        )
+        suggested = suggested_camera_angle_for_upload(angle_result)
         log.info(
             "detect_swings_done",
             extra={
                 "analysis_id": req.analysis_id,
                 "count": len(candidates),
                 "default_index": default_idx,
+                "suggested_camera_angle": suggested,
+                "detected_camera_angle": angle_result.detected_angle,
+                "camera_angle_confidence": round(angle_result.confidence, 3),
                 "elapsed_ms": round((time.perf_counter() - t0) * 1000, 1),
             },
         )
@@ -55,6 +67,9 @@ def run_detect_swings(req: DetectSwingsRequest) -> DetectSwingsResult:
             status="ok",
             swing_candidates=candidates,
             default_selected_index=default_idx,
+            suggested_camera_angle=suggested,  # type: ignore[arg-type]
+            detected_camera_angle=angle_result.detected_angle,
+            camera_angle_confidence=angle_result.confidence,
         )
     except PipelineError as exc:
         log.warning(

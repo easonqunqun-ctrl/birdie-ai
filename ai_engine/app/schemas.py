@@ -197,5 +197,20 @@ class DetectSwingsResult(BaseModel):
         ge=0,
         description="建议默认段（第一段非试挥）",
     )
+    # P2-M7-R1 / M7-04-UI：上传后机位预选（低置信时为 null，客户端保持用户默认）
+    suggested_camera_angle: Literal["face_on", "down_the_line"] | None = Field(
+        default=None,
+        description="建议默认机位；confidence≥0.7 且 detected 非 oblique 时返回",
+    )
+    detected_camera_angle: Literal["face_on", "down_the_line", "oblique"] | None = Field(
+        default=None,
+        description="启发式检测机位（含 oblique 中间态）",
+    )
+    camera_angle_confidence: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="机位检测置信度 0-1",
+    )
     error_code: int | None = None
     error_message: str | None = None

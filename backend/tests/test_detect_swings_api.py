@@ -45,6 +45,9 @@ async def test_detect_swings_returns_candidates(
     assert len(data["swing_candidates"]) == 2
     assert data["default_selected_index"] == 1
     assert data["swing_candidates"][0].get("preview_frame_url")
+    assert data["suggested_camera_angle"] == "face_on"
+    assert data["detected_camera_angle"] == "face_on"
+    assert data["camera_angle_confidence"] == 0.85
     assert any(c.get("method") == "detect_swings" for c in fake_ai_engine.calls)
 
 

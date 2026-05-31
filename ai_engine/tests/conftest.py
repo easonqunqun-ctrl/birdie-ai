@@ -138,6 +138,34 @@ def bouncing_box_video(synthetic_videos: dict[str, Path]) -> Path:
     return synthetic_videos["bouncing_box"]
 
 
+def resolve_manifest_fixture_video(
+    case: dict,
+    *,
+    real_dir: Path = REAL_DIR,
+) -> Path | None:
+    """按 manifest case 的 ``fixture_file`` / ``alt_fixture_files`` 解析本地视频路径。"""
+    candidates: list[str] = []
+    primary = case.get("fixture_file")
+    if primary:
+        candidates.append(str(primary))
+    candidates.extend(str(p) for p in case.get("alt_fixture_files") or [])
+    for name in candidates:
+        path = real_dir / name
+        if path.is_file():
+            return path
+    return None
+
+
+@pytest.fixture(scope="session")
+def rotation_regression_manifest() -> dict:
+    manifest_path = FIXTURES_DIR / "rotation_regression_manifest.json"
+    if not manifest_path.is_file():
+        pytest.skip("rotation_regression_manifest.json 缺失")
+    import json
+
+    return json.loads(manifest_path.read_text(encoding="utf-8"))
+
+
 # ============================================================
 # T2 合成关键点 fixture（不依赖真实视频，纯 numpy）
 # ============================================================

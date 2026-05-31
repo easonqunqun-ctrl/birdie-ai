@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from app.pipeline.constants import FEATURES
 from app.pipeline.diagnose import MIN_DISPLAY_CONFIDENCE, DiagnosedIssue, diagnose
+from app.pipeline.feature_measurability import WARN_ROTATION_SANITY
 from app.pipeline.phases import PhaseInfo, PhaseSegmentResult
 from app.pipeline.pose import LANDMARK_LEFT_SHOULDER, LANDMARK_LEFT_WRIST
 
@@ -136,3 +137,31 @@ def test_diagnose_returns_list_of_diagnosed_issue() -> None:
         assert i.description
         assert 0 <= i.confidence <= 1
         assert i.severity in {"high", "medium", "low"}
+
+
+def test_diagnose_under_rotation_guard_high_wrist_low_shoulder() -> None:
+    feats = _ideal_features()
+    feats["shoulder_rotation_top"] = 10.0
+    feats["top_wrist_position"] = 0.18
+    issues = diagnose(feats, _fake_phases())
+    assert "under_rotation" not in {i.type for i in issues}
+
+
+def test_diagnose_dtl_skips_rotation_issues() -> None:
+    feats = _ideal_features()
+    feats["shoulder_rotation_top"] = 60.0
+    issues = diagnose(feats, _fake_phases(), camera_angle="down_the_line")
+    assert "under_rotation" not in {i.type for i in issues}
+
+
+def test_diagnose_contradictory_rotation_pairs_dropped() -> None:
+    feats = _ideal_features()
+    feats["shoulder_rotation_top"] = 60.0
+    feats["hip_rotation_top"] = 55.0
+    feats["x_factor"] = 5.0
+    guard: list[str] = []
+    issues = diagnose(feats, _fake_phases(), guard_warnings_out=guard)
+    types = {i.type for i in issues}
+    assert "under_rotation" not in types
+    assert "steep_shoulder" not in types
+    assert WARN_ROTATION_SANITY in guard

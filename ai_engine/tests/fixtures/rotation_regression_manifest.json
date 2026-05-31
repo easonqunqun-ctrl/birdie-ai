@@ -1,0 +1,63 @@
+{
+  "version": "v0.2",
+  "description": "P2-M7-R1 rotation/perception regression manifest. fixture_file paths are under tests/fixtures/real/ (gitignored); missing files → pytest skip.",
+  "packs": {
+    "R2_dtl_broadcast": {
+      "expect_no_rotation_issues": true,
+      "expect_quality_warnings_any": ["angle_limited_scoring", "rotation_reading_unreliable"],
+      "cases": [
+        {
+          "id": "nelly_dtl_live",
+          "source": "synthetic",
+          "note": "Use NELLY_LIVE dict in tests/test_nelly_dtl_scoring.py",
+          "camera_angle": "down_the_line"
+        },
+        {
+          "id": "rose_dtl_pro_clip",
+          "source": "fixture",
+          "fixture_file": "dtl_iron_01.mp4",
+          "alt_fixture_files": ["dtl_broadcast_01.mp4", "rose_dtl_01.mp4"],
+          "note": "Rose Zhang driver DTL or any DTL/broadcast iron; drop as dtl_iron_01.mp4",
+          "camera_angle": "down_the_line",
+          "declared_camera_angle": "down_the_line",
+          "failure_modes": ["F-High"]
+        }
+      ]
+    },
+    "R2_face_on_clear_turn": {
+      "expect_no_under_rotation_severe": true,
+      "expect_shoulder_rotation_min_deg": 45,
+      "cases": [
+        {
+          "id": "office_iron_face_on",
+          "source": "fixture",
+          "fixture_file": "face_on_iron_01.mp4",
+          "alt_fixture_files": ["office_iron_7_01.mp4"],
+          "note": "Indoor 7-iron face-on — shoulder must not read 3deg severe",
+          "camera_angle": "face_on",
+          "declared_camera_angle": "face_on",
+          "failure_modes": ["F-Low"]
+        }
+      ]
+    },
+    "R3_synthetic": {
+      "cases": [
+        {
+          "id": "setup_equals_top_shoulder",
+          "expect": "rotation_unreliable_or_missing",
+          "failure_modes": ["F-Low"]
+        },
+        {
+          "id": "x_factor_155",
+          "expect": "no_flat_shoulder_in_issues",
+          "failure_modes": ["F-High"]
+        },
+        {
+          "id": "under_plus_steep_same_report",
+          "expect": "rotation_reading_unreliable_only",
+          "failure_modes": ["F-Contra"]
+        }
+      ]
+    }
+  }
+}

@@ -123,6 +123,12 @@ class DetectSwingsResponse(BaseModel):
         ge=0,
         description="建议默认段（第一段非试挥）",
     )
+    suggested_camera_angle: Literal["face_on", "down_the_line"] | None = Field(
+        default=None,
+        description="引擎建议机位；低置信时为 null",
+    )
+    detected_camera_angle: Literal["face_on", "down_the_line", "oblique"] | None = None
+    camera_angle_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
 # ==================== 3.3 GET /v1/analyses/{id}/status ====================
