@@ -388,9 +388,11 @@ Sprint R3（Phase B 后半）：B5–B7；B6/B8 与 M7-09 / 标注并行
 | AC-A4 V1 单测 | ✅ `test_rotation_regression_v1_path` |
 | B1 pose_refine | ✅ repo + 接入 `real_pipeline` |
 | B2–B3 三估计器 + 融合 | ✅ `compute_rotation_track` + 机位前置推断 |
+| B4 几何下界 C | ✅ repo · `test_rotation_track` 合成否决 |
+| B5 top 双证据 | ✅ repo · 腕/肩峰值 >8 帧 → backswing max + `top_frame_mismatch` |
 | AC-A1 真视频 R2 | ⏳ drop `fixtures/real/*.mp4` → `test_rotation_regression_real` |
 | AC-A4 真机 E2E | ⏳ 体验版 smoke 人工勾 |
-| Phase B（pose_refine / 三估计器） | 📋 backlog R2 sprint |
+| Phase B 余量（B6–B8） | 📋 B6 等 M7-09 · B7 preprocess_v2 · B8 pose A/B |
 
 **发版前**：CVM `publish` ai_engine + 体验版跑 smoke §M7-R1 全勾。
 
@@ -401,6 +403,7 @@ Sprint R3（Phase B 后半）：B5–B7；B6/B8 与 M7-09 / 标注并行
 | 版本 | 日期 | 说明 |
 |------|------|------|
 | v0.4 | 2026-05-30 | B2–B3 三估计器 + fusion + rotation_confidence；pipeline 机位前置 |
+| v0.4 | 2026-05-30 | B4 几何下界 C + B5 top 双证据 repo；`top_frame_mismatch` quality_warning |
 | v0.3 | 2026-05-30 | AC-A1 manifest v0.2 + 真视频 skip 测试；AC-A4 V1 单测；B1 pose_refine |
 | v0.2 | 2026-05-30 | Phase A repo 闭环；AC-A2/A3/A5 ✅；CI 改 `ai-engine-test-rotation`；warning 走 quality_warnings |
 | v0.1 | 2026-05-30 | 初版：Phase A/B/C + rotation_track 规格 + 产品清单 + AC + 文件清单 |

@@ -25,6 +25,9 @@ describe('linesForQualityWarnings', () => {
     expect(linesForQualityWarnings(['rotation_reading_unreliable'])).toEqual([
       expect.stringMatching(/无法稳定读取转肩角度/),
     ])
+    expect(linesForQualityWarnings(['top_frame_mismatch'])).toEqual([
+      expect.stringMatching(/顶点时刻与转肩峰值/),
+    ])
   })
 
   test('未知 code → 兜底模板', () => {

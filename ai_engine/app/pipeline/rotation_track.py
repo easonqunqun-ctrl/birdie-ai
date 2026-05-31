@@ -51,8 +51,13 @@ WEIGHT_B_FACE_ON = 0.85
 WEIGHT_B_DTL = 0.2
 BASE_CONFIDENCE = 0.85
 
+# B5 · 腕 top vs 肩转峰值帧差
+TOP_SHOULDER_PEAK_FRAME_GAP = 8
+TOP_FRAME_MISMATCH_CONF_MUL = 0.75
+
 WARN_ESTIMATOR_DISAGREEMENT = "estimator_disagreement"
 WARN_ROTATION_LOW_VISIBILITY = "rotation_low_visibility"
+WARN_TOP_FRAME_MISMATCH = "top_frame_mismatch"
 
 
 @dataclass(frozen=True)
@@ -138,12 +143,50 @@ def _setup_baseline_angles(
     )
 
 
-def _backswing_frame_range(phases: PhaseSegmentResult, num_frames: int) -> range:
+def _backswing_frame_range(
+    phases: PhaseSegmentResult,
+    num_frames: int,
+    *,
+    shoulder_peak_frame: int | None = None,
+    top_frame_mismatch: bool = False,
+) -> range:
     start = max(0, phases.swing_start)
-    end = min(num_frames - 1, phases.top_frame)
+    if top_frame_mismatch and shoulder_peak_frame is not None:
+        # B5：腕 top 过早/过晚时，扩展扫描至肩转峰值，避免 backswing 窗被截断
+        end = min(num_frames - 1, max(phases.top_frame, shoulder_peak_frame))
+    else:
+        end = min(num_frames - 1, phases.top_frame)
     if end <= start:
         end = min(num_frames - 1, start + 1)
     return range(start, end + 1)
+
+
+def _shoulder_peak_frame(
+    keypoints: np.ndarray,
+    baseline_sh: float,
+    *,
+    swing_start: int,
+    search_end: int,
+) -> int | None:
+    """B5 · 挥杆窗内肩线角 delta 最大帧（用于与 wrist top 对照）。"""
+    lo = max(0, swing_start)
+    hi = min(len(keypoints) - 1, search_end)
+    if hi < lo:
+        return None
+    best_frame: int | None = None
+    best_delta = -1.0
+    for f in range(lo, hi + 1):
+        delta = _norm_angle_delta(_shoulder_line_angle(keypoints[f]), baseline_sh)
+        if delta > best_delta:
+            best_delta = delta
+            best_frame = f
+    return best_frame
+
+
+def _top_frame_mismatch(phases: PhaseSegmentResult, shoulder_peak_frame: int | None) -> bool:
+    if shoulder_peak_frame is None:
+        return False
+    return abs(phases.top_frame - shoulder_peak_frame) > TOP_SHOULDER_PEAK_FRAME_GAP
 
 
 def _rotation_aggregate(
@@ -153,8 +196,12 @@ def _rotation_aggregate(
     top_frame: int,
     baseline: float,
     angle_fn,
+    prefer_backswing_max_only: bool = False,
 ) -> float | None:
-    """估计器 A 核心：backswing max 与 top±5 median 取较大值（A5）。"""
+    """估计器 A 核心：backswing max 与 top±5 median 取较大值（A5）。
+
+    B5：腕 top 与肩转峰值帧差 >8 时仅用 backswing max（忽略 wrist-top 窗口）。
+    """
     backswing_deltas: list[float] = []
     for f in backswing_frames:
         if f < 0 or f >= len(keypoints):
@@ -165,6 +212,8 @@ def _rotation_aggregate(
         return None
 
     max_backswing = float(max(backswing_deltas))
+    if prefer_backswing_max_only:
+        return max_backswing
 
     top_lo = max(0, top_frame - TOP_WINDOW_RADIUS)
     top_hi = min(len(keypoints) - 1, top_frame + TOP_WINDOW_RADIUS)
@@ -184,6 +233,8 @@ def _estimator_a_shoulder(
     phases: PhaseSegmentResult,
     baseline_sh: float,
     frames: range,
+    *,
+    prefer_backswing_max_only: bool = False,
 ) -> float | None:
     return _rotation_aggregate(
         keypoints,
@@ -191,6 +242,7 @@ def _estimator_a_shoulder(
         top_frame=phases.top_frame,
         baseline=baseline_sh,
         angle_fn=_shoulder_line_angle,
+        prefer_backswing_max_only=prefer_backswing_max_only,
     )
 
 
@@ -280,10 +332,15 @@ def fuse_rotation_estimators(
     hip_rotation: float | None,
     camera_angle: CameraAngleLike,
     visibility_mean: float,
+    top_frame_mismatch: bool = False,
 ) -> RotationTrackResult:
     """B3 · 融合 A/B/C + ``rotation_confidence``（kickoff §6.5）。"""
     warnings: list[str] = []
     conf = BASE_CONFIDENCE
+
+    if top_frame_mismatch:
+        conf *= TOP_FRAME_MISMATCH_CONF_MUL
+        warnings.append(WARN_TOP_FRAME_MISMATCH)
 
     if visibility_mean < VISIBILITY_MEAN_MIN:
         return RotationTrackResult(
@@ -385,9 +442,29 @@ def compute_rotation_track(
         )
 
     baseline_sh, baseline_hip, baseline_torso = baselines
-    frames = _backswing_frame_range(phases, len(keypoints))
+    num_frames = len(keypoints)
+    search_end = min(num_frames - 1, phases.impact_frame, phases.swing_end)
+    shoulder_peak = _shoulder_peak_frame(
+        keypoints,
+        baseline_sh,
+        swing_start=phases.swing_start,
+        search_end=search_end,
+    )
+    top_mismatch = _top_frame_mismatch(phases, shoulder_peak)
+    frames = _backswing_frame_range(
+        phases,
+        num_frames,
+        shoulder_peak_frame=shoulder_peak,
+        top_frame_mismatch=top_mismatch,
+    )
 
-    est_a = _estimator_a_shoulder(keypoints, phases, baseline_sh, frames)
+    est_a = _estimator_a_shoulder(
+        keypoints,
+        phases,
+        baseline_sh,
+        frames,
+        prefer_backswing_max_only=top_mismatch,
+    )
     est_b = _estimator_b_torso(keypoints, phases, baseline_torso, frames)
     est_c = _estimator_c_min(existing_features)
     hip = _rotation_aggregate(
@@ -396,6 +473,7 @@ def compute_rotation_track(
         top_frame=phases.top_frame,
         baseline=baseline_hip,
         angle_fn=_hip_line_angle,
+        prefer_backswing_max_only=top_mismatch,
     )
 
     vis_mean = _shoulder_visibility_mean(visibility, keypoints, phases)
@@ -406,6 +484,7 @@ def compute_rotation_track(
         hip_rotation=hip,
         camera_angle=camera_angle,
         visibility_mean=vis_mean,
+        top_frame_mismatch=top_mismatch,
     )
 
 

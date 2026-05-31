@@ -15,6 +15,7 @@ from app.pipeline.pose import (
 from app.pipeline.rotation_track import (
     ESTIMATOR_DISAGREEMENT_DEG,
     WARN_ESTIMATOR_DISAGREEMENT,
+    WARN_TOP_FRAME_MISMATCH,
     apply_rotation_track,
     compute_rotation_features,
     compute_rotation_track,
@@ -196,3 +197,42 @@ def test_track_result_out_populated() -> None:
     assert meta[0].rotation_confidence > 0.0
     assert meta[0].estimator_a is not None
     assert meta[0].estimator_a >= 45.0
+
+
+def test_b5_early_wrist_top_extends_to_shoulder_peak() -> None:
+    """B5 · wrist top@6 但肩转峰值@16 → 仍应读到 ≥45° 且 top_frame_mismatch。"""
+    phases = _fake_phases(top_frame=6)
+    angles: list[float] = []
+    for f in range(20):
+        if f <= 5:
+            angles.append(0.0)
+        elif f <= 16:
+            angles.append(min(52.0, (f - 5) * 4.0))
+        else:
+            angles.append(48.0)
+    keypoints = np.stack([_frame_with_shoulder_angle(a) for a in angles])
+    result = compute_rotation_track(keypoints, phases, camera_angle="face_on")
+    assert result.shoulder_rotation_top is not None
+    assert result.shoulder_rotation_top >= 45.0
+    assert WARN_TOP_FRAME_MISMATCH in result.quality_warnings
+
+
+def test_b5_top_mismatch_lowers_confidence_vs_aligned_top() -> None:
+    angles: list[float] = []
+    for f in range(24):
+        if f <= 5:
+            angles.append(0.0)
+        elif f <= 16:
+            angles.append(min(55.0, (f - 5) * 4.2))
+        else:
+            angles.append(50.0)
+    keypoints = np.stack([_frame_with_shoulder_angle(a) for a in angles])
+    misaligned = compute_rotation_track(
+        keypoints, _fake_phases(top_frame=6), camera_angle="face_on"
+    )
+    aligned = compute_rotation_track(
+        keypoints, _fake_phases(top_frame=16), camera_angle="face_on"
+    )
+    assert WARN_TOP_FRAME_MISMATCH in misaligned.quality_warnings
+    assert WARN_TOP_FRAME_MISMATCH not in aligned.quality_warnings
+    assert misaligned.rotation_confidence < aligned.rotation_confidence
