@@ -18,6 +18,7 @@ import { chooseVideo } from '@/adapters/media'
 import { describeIntermittentRequestFailure } from '@/services/request'
 import { storage } from '@/utils/storage'
 import { VIDEO_CONSTRAINTS } from '@/types/analysis'
+import { validateVideoDurationForUpload } from '@/utils/videoDurationValidation'
 import './capture.scss'
 
 type MediaSource = 'camera' | 'album'
@@ -48,7 +49,7 @@ function formatSize(bytes: number): string {
 
 const TIPS = [
   { icon: '📐', text: '将球员放在画面中央，脚到头部全部露出' },
-  { icon: '🎬', text: '拍 2-30 秒，建议只录 1 次完整挥杆' },
+  { icon: '🎬', text: '拍满至少 2 秒（建议 3–5 秒），只录 1 次完整挥杆' },
   { icon: '💡', text: '优选自然光，避免强背光和严重抖动' },
 ]
 
@@ -183,15 +184,10 @@ const CaptureAnalysisPage: FC = () => {
 
 /** 返回 null 表示合规；返回字符串是面向用户的错误提示 */
 function validateVideo(v: ChosenVideo, originalPath: string): string | null {
-  const { MIN_DURATION_SECONDS, MAX_DURATION_SECONDS, MAX_SIZE_BYTES, ACCEPTED_EXTENSIONS } =
-    VIDEO_CONSTRAINTS
+  const { MAX_SIZE_BYTES, ACCEPTED_EXTENSIONS } = VIDEO_CONSTRAINTS
 
-  if (v.duration < MIN_DURATION_SECONDS) {
-    return `视频太短（${v.duration.toFixed(1)}s），至少需要 ${MIN_DURATION_SECONDS}s`
-  }
-  if (v.duration > MAX_DURATION_SECONDS) {
-    return `视频太长（${v.duration.toFixed(1)}s），最多 ${MAX_DURATION_SECONDS}s`
-  }
+  const durationErr = validateVideoDurationForUpload(v.duration)
+  if (durationErr) return durationErr
   if (v.size > MAX_SIZE_BYTES) {
     return `文件过大（${formatSize(v.size)}），限 ${Math.round(MAX_SIZE_BYTES / 1024 / 1024)}MB 以内`
   }

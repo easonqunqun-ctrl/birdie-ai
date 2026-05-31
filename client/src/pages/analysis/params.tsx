@@ -47,6 +47,7 @@ import {
   shouldStartPrepareFullSwingUpload,
   type PrepareFullSwingPhase,
 } from '@/utils/prepareFullSwingUpload'
+import { isVideoDurationOverLimit } from '@/utils/videoDurationValidation'
 import {
   detectPrepareFailureBannerLines,
   resolveDetectSwingsFailure,
@@ -309,8 +310,8 @@ const AnalysisParamsPage: FC = () => {
 
   const overLimit = useMemo(() => {
     if (size > VIDEO_CONSTRAINTS.MAX_SIZE_BYTES) return `文件过大：${formatSize(size)}`
-    if (duration < VIDEO_CONSTRAINTS.MIN_DURATION_SECONDS) return `时长过短：${duration.toFixed(1)}s`
-    if (duration > VIDEO_CONSTRAINTS.MAX_DURATION_SECONDS) return `时长过长：${duration.toFixed(1)}s`
+    const durationErr = isVideoDurationOverLimit(duration)
+    if (durationErr) return durationErr
     return null
   }, [size, duration])
 

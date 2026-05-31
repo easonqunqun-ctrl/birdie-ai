@@ -254,6 +254,7 @@ export interface AnalysisListResponse extends PageData<AnalysisListItem> {
 
 /* ==================== 前端校验常量 ==================== */
 export const VIDEO_CONSTRAINTS = {
+  /** 面向用户的时长下限说明（引擎硬门槛 2.0s；客户端门禁见 `videoDurationValidation`） */
   MIN_DURATION_SECONDS: 2,
   MAX_DURATION_SECONDS: 30,
   MAX_SIZE_BYTES: 100 * 1024 * 1024,
