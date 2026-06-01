@@ -183,6 +183,17 @@ def _validate_coach_visible_fields(fields: list[str]) -> None:
         )
 
 
+def _consent_payload_only(raw: dict | None) -> dict[str, bool]:
+    """从 ``privacy_payload`` JSONB 提取 FR-3 consent 位（读响应 schema 用）.
+
+    M13 约球合规会把 ``gender_preference`` / ``meetup_tos_accepted_at`` 等同列
+    复用存储；``PrivacyPayload`` 禁止 extra 字段，GET 投影时必须剥离。
+    """
+
+    payload = raw or {}
+    return {key: bool(payload.get(key, False)) for key in CONSENT_FIELDS}
+
+
 def project_for_self(profile: UserProfileV2) -> dict:
     """按 ``privacy_payload`` 投影，给"用户自己"看的完整视图.
 
@@ -208,7 +219,7 @@ def project_for_self(profile: UserProfileV2) -> dict:
         ),
         "weekly_target_sessions": profile.weekly_target_sessions,
         "favorite_course_ids": list(profile.favorite_course_ids or []),
-        "privacy_payload": dict(profile.privacy_payload or {}),
+        "privacy_payload": _consent_payload_only(profile.privacy_payload),
         "coach_visible_fields": list(profile.coach_visible_fields or []),
     }
 

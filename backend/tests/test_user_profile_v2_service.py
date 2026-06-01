@@ -33,6 +33,7 @@ from app.models.user_profile_v2 import (
 from app.schemas.user_profile_v2 import (
     PrivacyPayload,
     UserClubCreate,
+    UserProfileV2Read,
     UserProfileV2Update,
 )
 from app.services import user_profile_v2_service as svc
@@ -558,3 +559,26 @@ def test_dedupe_helper_preserves_order_pure_function() -> None:
     assert svc._dedupe_preserve_order(["a"]) == ["a"]
     assert svc._dedupe_preserve_order(["a", "a", "a"]) == ["a"]
     assert svc._dedupe_preserve_order(["a", "b", "a", "c", "b"]) == ["a", "b", "c"]
+
+
+def test_project_for_self_strips_meetup_privacy_keys() -> None:
+    """M13 约球字段与 consent 共用 JSONB；GET profile-v2 响应不得带 extra 键。"""
+
+    profile = UserProfileV2(
+        user_id="usr_test_meetup_privacy",
+        privacy_payload={
+            "handicap_consent": True,
+            "gender_preference": "any",
+            "meetup_tos_accepted_at": "2026-05-31T05:04:26.686520+00:00",
+            "coach_spectator_optin": True,
+        },
+    )
+    payload = svc.project_for_self(profile)
+    assert payload["privacy_payload"] == {
+        "handicap_consent": True,
+        "body_consent": False,
+        "injury_consent": False,
+        "location_consent": False,
+        "coach_visible_consent": False,
+    }
+    UserProfileV2Read.model_validate(payload)
