@@ -31,6 +31,8 @@ from app.pipeline.pose import PoseResult
 log = logging.getLogger("ai_engine.multi_swing")
 
 MAX_SWING_CANDIDATES = 5
+# 两段之间 idle 少于该帧数 → 视为同一挥杆在顶点波谷被误切（真·多次挥杆间通常 ≥30 帧）
+MIN_INTER_SWING_IDLE_FRAMES = 20
 # 候选峰速 < 全局峰速 × 此比例 → 试挥（kickoff §3.3 启发式）
 PRACTICE_SPEED_RATIO = 0.55
 # follow 段长度 < backswing × 此比例 → follow 不完整，倾向试挥
@@ -96,6 +98,25 @@ def find_swing_windows(
     return windows
 
 
+def merge_intr_swing_split_windows(
+    windows: list[tuple[int, int]],
+    *,
+    min_inter_swing_idle: int = MIN_INTER_SWING_IDLE_FRAMES,
+) -> list[tuple[int, int]]:
+    """合并因顶点速度波谷误切开的相邻窗口，保留真·多次挥杆间的长 idle 分界。"""
+    if len(windows) <= 1:
+        return windows
+    merged: list[tuple[int, int]] = [windows[0]]
+    for start, end in windows[1:]:
+        prev_start, prev_end = merged[-1]
+        gap = start - prev_end - 1
+        if gap < min_inter_swing_idle:
+            merged[-1] = (prev_start, end)
+        else:
+            merged.append((start, end))
+    return merged
+
+
 def _analyze_window(
     speeds: np.ndarray,
     keypoints: np.ndarray,
@@ -148,7 +169,7 @@ def detect_swing_candidates(pose: PoseResult) -> list[SwingCandidate]:
     _, lead_wrist_idx, _ = _choose_lead_side(keypoints, valid_mask)
     speeds = _wrist_speed(keypoints, valid_mask, lead_wrist_idx)
 
-    windows = find_swing_windows(speeds)
+    windows = merge_intr_swing_split_windows(find_swing_windows(speeds))
     if not windows:
         return []
 

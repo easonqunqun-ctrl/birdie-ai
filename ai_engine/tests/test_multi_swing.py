@@ -15,10 +15,12 @@ from app.pipeline.pose import (
 )
 from app.pipeline.multi_swing import (
     MAX_SWING_CANDIDATES,
+    MIN_INTER_SWING_IDLE_FRAMES,
     SwingCandidate,
     default_swing_index,
     detect_swing_candidates,
     find_swing_windows,
+    merge_intr_swing_split_windows,
     resolve_swing_selection,
     segment_phases_with_multi_swing,
 )
@@ -99,6 +101,48 @@ def test_find_swing_windows_finds_three() -> None:
         gap_frames=SWING_END_IDLE_FRAMES,
     )
     assert len(windows) == 3
+    merged = merge_intr_swing_split_windows(windows)
+    assert len(merged) == 3
+
+
+def test_merge_top_of_swing_valley_false_split() -> None:
+    """顶点速度低于阈值时不应把一次挥杆切成两段。"""
+    n = 90
+    speeds = np.zeros(n, dtype=np.float32)
+    speeds[10:27] = 0.015
+    speeds[27:39] = 0.002
+    speeds[39:58] = 0.018
+    speeds[58] = 0.025
+
+    raw = find_swing_windows(speeds)
+    assert len(raw) == 2
+    merged = merge_intr_swing_split_windows(raw)
+    assert merged == [(10, 58)]
+
+
+def test_detect_single_swing_after_top_valley_merge() -> None:
+    n = 90
+    kp = np.zeros((n, 33, 3), dtype=np.float32)
+    _fill_static_body(kp)
+    kp[:, LANDMARK_LEFT_WRIST, :2] = (0.48, 0.58)
+    _paint_swing_segment(kp, 10, 58, step=0.022)
+    pose = PoseResult(
+        keypoints=kp,
+        visibility=np.ones((n, 33), dtype=np.float32),
+        valid_mask=np.ones(n, dtype=bool),
+        num_frames=n,
+        fps=_FPS,
+    )
+    cands = detect_swing_candidates(pose)
+    assert len(cands) == 1
+    assert not cands[0].is_practice
+
+
+def test_inter_swing_idle_threshold_between_split_and_multi() -> None:
+    """真·两次挥杆 idle ≥ MIN_INTER_SWING_IDLE_FRAMES 时不合并。"""
+    assert MIN_INTER_SWING_IDLE_FRAMES == 20
+    windows = [(10, 40), (61, 90)]
+    assert merge_intr_swing_split_windows(windows) == [(10, 40), (61, 90)]
 
 
 def test_practice_swing_classified_by_low_peak() -> None:
