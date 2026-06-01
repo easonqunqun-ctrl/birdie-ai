@@ -33,3 +33,10 @@ def test_face_on_still_diagnoses_under_rotation() -> None:
     issues = diagnose_v2(features, phases=None, camera_angle="face_on")
     types = {i.type for i in issues}
     assert "under_rotation" in types
+
+
+def test_face_on_diagnoses_over_the_top_by_sequence() -> None:
+    features = {"downswing_sequence": -3.0}
+    issues = diagnose_v2(features, phases=None, camera_angle="face_on")
+    types = {i.type for i in issues}
+    assert "over_the_top" in types

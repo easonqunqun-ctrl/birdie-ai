@@ -20,11 +20,23 @@ import logging
 from app.pipeline.constants import (
     ISSUE_DRILL_MAP,
     MAX_RECOMMENDATIONS_PER_ANALYSIS,
+    PHASE_LABELS,
 )
 from app.pipeline.diagnose import DiagnosedIssue
 from app.schemas import RecommendationItem
 
 log = logging.getLogger("ai_engine.recommend")
+
+# 无命名 issue 时，按最弱阶段推荐基础练习
+PHASE_WEAK_DRILL: dict[str, str] = {
+    "setup": "drill_alignment_stick",
+    "backswing": "drill_shoulder_turn",
+    "top": "drill_backswing_stop",
+    "downswing": "drill_half_swing",
+    "impact": "drill_impact_bag",
+    "follow_through": "drill_weight_shift",
+}
+LOW_SCORE_RECOMMEND_THRESHOLD = 65
 
 # Drill 详情表：从 mock_pipeline 镜像（T2-drills 会把这份数据独立成 `drill_library.py`；
 # 暂时这样 import，避免循环依赖写一层 getter）。
@@ -100,3 +112,47 @@ def recommend(
         )
 
     return recommendations
+
+
+def recommend_with_phase_fallback(
+    issues: list[DiagnosedIssue],
+    *,
+    phase_scores: dict[str, int] | None = None,
+    overall_score: int | None = None,
+    weakest_phase: str | None = None,
+    max_recommendations: int = MAX_RECOMMENDATIONS_PER_ANALYSIS,
+) -> list[RecommendationItem]:
+    """issue 映射 drill；无 issue 且综合分偏低时按最弱阶段兜底 1 条练习。"""
+    recs = recommend(issues, max_recommendations=max_recommendations)
+    if recs or not phase_scores or not weakest_phase:
+        return recs
+    weak_score = int(phase_scores.get(weakest_phase, 100))
+    if (
+        overall_score is not None
+        and overall_score >= LOW_SCORE_RECOMMEND_THRESHOLD
+        and weak_score >= 55
+    ):
+        return recs
+
+    drill_id = PHASE_WEAK_DRILL.get(weakest_phase, "drill_half_swing")
+    drill_details = _load_drill_details()
+    detail = drill_details.get(drill_id)
+    if detail is None:
+        log.warning("phase_fallback_drill_missing", extra={"drill_id": drill_id})
+        return recs
+
+    phase_label = PHASE_LABELS.get(weakest_phase, weakest_phase)
+    return [
+        RecommendationItem(
+            drill_id=detail["drill_id"],
+            name=detail["name"],
+            target_issue=f"weak_{weakest_phase}",
+            description=(
+                f"本次「{phase_label}」相对最弱（{weak_score} 分），"
+                f"建议优先练习：{detail['description']}"
+            ),
+            duration_minutes=detail["duration_minutes"],
+            sets=detail["sets"],
+            steps=detail["steps"],
+        )
+    ]

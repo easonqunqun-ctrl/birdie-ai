@@ -8,7 +8,7 @@ Rules 清单（docs/14 附录 A）
 | # | type                | 触发条件（主）                                        |
 |---|---------------------|---------------------------------------------------|
 | 1 | casting             | wrist_release_timing < 0.40                       |
-| 2 | over_the_top        | (需 down_the_line，这里用 x_factor 负值 + 肩过度转做粗略代理) |
+| 2 | over_the_top        | downswing_sequence < 0（可选结合 x_factor）           |
 | 3 | early_extension     | spine_angle_impact_delta > 8                      |
 | 4 | sway_slide          | head_lateral_shift > 0.12                         |
 | 5 | loss_of_posture     | spine_angle_impact_delta ∈ (5, 8] 或头抖动中等         |
@@ -30,6 +30,7 @@ Rules 清单（docs/14 附录 A）
 - 严重度按偏离程度动态计算，而不是用 constants 里的 default_severity（那只作兜底）
 - 规则是**互斥的**：某些 issue 会互相抑制（比如 over_rotation + under_rotation 不可能共存，
   代码里的阈值设计保证不会同时触发）
+- sanitize 剔除的特征键用 ``feat.get`` 读取，避免 KeyError 静默跳过整条 rule
 """
 
 from __future__ import annotations
@@ -104,12 +105,22 @@ def _frame_to_time(frame: int, fps: float) -> float:
     return round(frame / fps, 2) if fps > 0 else None
 
 
+def _feat(feat: dict[str, float], key: str) -> float | None:
+    val = feat.get(key)
+    if val is None:
+        return None
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return None
+
+
 # ==================== Rule 集 ====================
 
 
 def _rule_casting(feat: dict[str, float], phases: PhaseSegmentResult) -> DiagnosedIssue | None:
-    timing = feat["wrist_release_timing"]
-    if timing >= 0.40:
+    timing = _feat(feat, "wrist_release_timing")
+    if timing is None or timing >= 0.40:
         return None
     dev = (0.40 - timing) / 0.20  # 0-2
     conf = min(1.0, dev)
@@ -132,33 +143,46 @@ def _rule_casting(feat: dict[str, float], phases: PhaseSegmentResult) -> Diagnos
 def _rule_over_the_top(
     feat: dict[str, float], phases: PhaseSegmentResult
 ) -> DiagnosedIssue | None:
-    # MVP 代理：X-Factor 过大（肩远转而髋没转）+ 下杆顺序错乱
-    xf = feat["x_factor"]
-    seq = feat["downswing_sequence"]
-    if xf < 55 or seq >= 0:
+    """与 V2 YAML 对齐：下杆顺序错乱（seq<0）即可触发；x_factor 缺失时不静默失败。"""
+    seq = _feat(feat, "downswing_sequence")
+    if seq is None or seq >= 0:
         return None
-    dev = (xf - 55) / 20
-    conf = min(1.0, 0.55 + dev * 0.3)
+    xf = _feat(feat, "x_factor")
+    seq_dev = min(1.5, max(0.0, -seq / 4.0))
+    if xf is not None and xf >= 55:
+        dev = max(seq_dev, (xf - 55) / 20)
+        description = (
+            f"X-Factor {xf:.0f}° 偏大、且下杆顺序不正（肩先于髋 {abs(seq):.0f} 帧），"
+            "杆头容易从身体外侧切入击球区。"
+        )
+        metrics: dict[str, float] = {"x_factor": xf, "downswing_sequence": seq}
+    else:
+        dev = seq_dev
+        description = (
+            f"下杆顺序不正（肩先于髋约 {abs(seq):.0f} 帧），"
+            "杆头容易从身体外侧切入击球区。"
+        )
+        metrics = {"downswing_sequence": seq}
+        if xf is not None:
+            metrics["x_factor"] = xf
+    conf = min(1.0, 0.55 + dev * 0.25)
     sev = _severity(dev, 0.3, 0.8)
     return DiagnosedIssue(
         type="over_the_top",
         name=issue_meta("over_the_top")["name"],
         severity=sev,
-        description=(
-            f"X-Factor {xf:.0f}° 偏大、且下杆顺序不正（肩先于髋 {-seq:.0f} 帧），"
-            "杆头容易从身体外侧切入击球区。"
-        ),
+        description=description,
         confidence=conf,
         key_frame_timestamp=_frame_to_time(phases.impact_frame, phases.fps),
-        metrics={"x_factor": xf, "downswing_sequence": seq},
+        metrics=metrics,
     )
 
 
 def _rule_early_extension(
     feat: dict[str, float], phases: PhaseSegmentResult
 ) -> DiagnosedIssue | None:
-    delta = feat["spine_angle_impact_delta"]
-    if delta <= 8.0:
+    delta = _feat(feat, "spine_angle_impact_delta")
+    if delta is None or delta <= 8.0:
         return None
     dev = (delta - 8.0) / 10.0
     conf = min(1.0, 0.6 + dev * 0.3)
@@ -180,8 +204,8 @@ def _rule_early_extension(
 def _rule_sway_slide(
     feat: dict[str, float], phases: PhaseSegmentResult
 ) -> DiagnosedIssue | None:
-    shift = feat["head_lateral_shift"]
-    if shift <= 0.12:
+    shift = _feat(feat, "head_lateral_shift")
+    if shift is None or shift <= 0.12:
         return None
     dev = (shift - 0.12) / 0.08
     conf = min(1.0, 0.6 + dev * 0.3)
@@ -203,8 +227,10 @@ def _rule_sway_slide(
 def _rule_loss_of_posture(
     feat: dict[str, float], phases: PhaseSegmentResult
 ) -> DiagnosedIssue | None:
-    delta = feat["spine_angle_impact_delta"]
-    shift = feat["head_lateral_shift"]
+    delta = _feat(feat, "spine_angle_impact_delta")
+    shift = _feat(feat, "head_lateral_shift")
+    if delta is None or shift is None:
+        return None
     # early_extension 阈值 8° 以下；这里抓中等偏离
     if delta <= 5.0 or delta > 8.0:
         if shift <= 0.08 or shift > 0.12:
@@ -229,8 +255,8 @@ def _rule_loss_of_posture(
 def _rule_reverse_spine(
     feat: dict[str, float], phases: PhaseSegmentResult
 ) -> DiagnosedIssue | None:
-    wp = feat["top_wrist_position"]
-    if wp >= 0.0:
+    wp = _feat(feat, "top_wrist_position")
+    if wp is None or wp >= 0.0:
         return None
     dev = -wp / 0.2
     conf = min(1.0, 0.55 + dev * 0.3)
@@ -252,8 +278,10 @@ def _rule_reverse_spine(
 def _rule_chicken_wing(
     feat: dict[str, float], phases: PhaseSegmentResult
 ) -> DiagnosedIssue | None:
-    arm = feat["left_arm_straightness"]
-    finish_h = feat["finish_height"]
+    arm = _feat(feat, "left_arm_straightness")
+    finish_h = _feat(feat, "finish_height")
+    if arm is None or finish_h is None:
+        return None
     # 左臂明显弯折 + 收杆位偏低
     if arm >= 150.0 and finish_h <= -0.05:
         return None
@@ -279,8 +307,8 @@ def _rule_chicken_wing(
 def _rule_sway_lead(
     feat: dict[str, float], phases: PhaseSegmentResult
 ) -> DiagnosedIssue | None:
-    seq = feat["downswing_sequence"]
-    if seq >= -2.0:
+    seq = _feat(feat, "downswing_sequence")
+    if seq is None or seq >= -2.0:
         return None
     dev = (-seq - 2.0) / 3.0
     conf = min(1.0, 0.6 + dev * 0.3)
@@ -302,8 +330,8 @@ def _rule_sway_lead(
 def _rule_hanging_back(
     feat: dict[str, float], phases: PhaseSegmentResult
 ) -> DiagnosedIssue | None:
-    balance = feat["finish_balance"]
-    if balance <= 0.04:
+    balance = _feat(feat, "finish_balance")
+    if balance is None or balance <= 0.04:
         return None
     dev = (balance - 0.04) / 0.04
     conf = min(1.0, 0.55 + dev * 0.3)
@@ -325,7 +353,7 @@ def _rule_hanging_back(
 def _rule_over_rotation(
     feat: dict[str, float], phases: PhaseSegmentResult
 ) -> DiagnosedIssue | None:
-    shoulder = feat.get("shoulder_rotation_top")
+    shoulder = _feat(feat, "shoulder_rotation_top")
     if shoulder is None or shoulder <= 105:
         return None
     dev = (shoulder - 105) / 15
@@ -347,10 +375,10 @@ def _rule_over_rotation(
 def _rule_under_rotation(
     feat: dict[str, float], phases: PhaseSegmentResult
 ) -> DiagnosedIssue | None:
-    shoulder = feat.get("shoulder_rotation_top")
+    shoulder = _feat(feat, "shoulder_rotation_top")
     if shoulder is None or shoulder >= 75:
         return None
-    wrist = feat.get("top_wrist_position")
+    wrist = _feat(feat, "top_wrist_position")
     if shoulder < 20 and wrist is not None and wrist > 0.12:
         return None
     dev = (75 - shoulder) / 20
@@ -372,7 +400,7 @@ def _rule_under_rotation(
 def _rule_flat_shoulder(
     feat: dict[str, float], phases: PhaseSegmentResult
 ) -> DiagnosedIssue | None:
-    xf = feat.get("x_factor")
+    xf = _feat(feat, "x_factor")
     if xf is None or xf <= 60:
         return None
     dev = (xf - 60) / 20
@@ -392,7 +420,7 @@ def _rule_flat_shoulder(
 def _rule_steep_shoulder(
     feat: dict[str, float], phases: PhaseSegmentResult
 ) -> DiagnosedIssue | None:
-    xf = feat.get("x_factor")
+    xf = _feat(feat, "x_factor")
     if xf is None or xf >= 25:
         return None
     dev = (25 - xf) / 15
@@ -413,8 +441,8 @@ def _rule_open_stance(
     feat: dict[str, float], phases: PhaseSegmentResult
 ) -> DiagnosedIssue | None:
     # Setup 阶段肩线相对水平偏斜：用 knee_flexion_setup 过直（>165）做代理（粗估）。
-    kf = feat["knee_flexion_setup"]
-    if kf <= 170:
+    kf = _feat(feat, "knee_flexion_setup")
+    if kf is None or kf <= 170:
         return None
     dev = (kf - 170) / 10
     conf = min(0.8, 0.55 + dev * 0.3)

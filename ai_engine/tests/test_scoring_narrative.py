@@ -39,3 +39,19 @@ def test_angle_limited_preface() -> None:
     )
     assert lines[0].startswith("当前机位下")
     assert any("击球触球" in ln for ln in lines)
+
+
+def test_weak_phase_hint_when_all_scores_low() -> None:
+    lines = build_phase_highlights(
+        {
+            "setup": 45,
+            "backswing": 50,
+            "top": 42,
+            "downswing": 38,
+            "impact": 55,
+            "follow_through": 52,
+        }
+    )
+    assert len(lines) == 1
+    assert "下杆转换" in lines[0]
+    assert "最弱" in lines[0]

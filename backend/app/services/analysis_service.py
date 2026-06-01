@@ -876,7 +876,8 @@ async def get_report(*, analysis_id: str, user: User, db: AsyncSession) -> Analy
     phase_highlights_out = build_phase_highlights(
         {k: int(v.get("score", 0)) for k, v in (analysis.phase_scores or {}).items()}
         if isinstance(analysis.phase_scores, dict)
-        else None
+        else None,
+        quality_warnings=quality_warnings_out,
     )
 
     return AnalysisReportResponse(

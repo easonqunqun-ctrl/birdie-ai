@@ -154,6 +154,24 @@ def test_diagnose_dtl_skips_rotation_issues() -> None:
     assert "under_rotation" not in {i.type for i in issues}
 
 
+def test_diagnose_over_the_top_without_x_factor() -> None:
+    """sanitize 剔除 x_factor 后仍应能报由外到内（仅 seq<0）。"""
+    feats = _ideal_features()
+    feats["downswing_sequence"] = -3.0
+    del feats["x_factor"]
+    issues = diagnose(feats, _fake_phases())
+    types = {i.type for i in issues}
+    assert "over_the_top" in types
+
+
+def test_diagnose_over_the_top_by_sequence_only() -> None:
+    feats = _ideal_features()
+    feats["downswing_sequence"] = -4.0
+    feats["x_factor"] = 40.0
+    issues = diagnose(feats, _fake_phases())
+    assert any(i.type == "over_the_top" for i in issues)
+
+
 def test_diagnose_contradictory_rotation_pairs_dropped() -> None:
     feats = _ideal_features()
     feats["shoulder_rotation_top"] = 60.0

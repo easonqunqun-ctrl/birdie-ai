@@ -40,7 +40,7 @@ MEASURABILITY_BY_ANGLE: dict[str, dict[str, float]] = {
         "x_factor": 0.85,
         "left_arm_straightness": 0.72,
         "top_wrist_position": 0.80,
-        "downswing_sequence": 0.42,
+        "downswing_sequence": 0.55,
         "wrist_release_angle": 0.78,
         "wrist_release_timing": 0.75,
         "spine_angle_impact_delta": 0.90,

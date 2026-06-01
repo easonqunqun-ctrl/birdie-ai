@@ -44,4 +44,13 @@ def build_phase_highlights(
                 "说明您在这个环节已经有不错的基础，可以在此基础上继续打磨其它环节。"
             )
             praise_count += 1
+
+    if praise_count == 0 and ranked:
+        weakest_phase, weakest_score = ranked[-1]
+        if weakest_score < 65:
+            label = PHASE_LABELS.get(weakest_phase, weakest_phase)
+            lines.append(
+                f"本次「{label}」相对最弱（{weakest_score} 分），建议优先打磨这一环；"
+                "下方训练建议会给出对应练习。"
+            )
     return lines

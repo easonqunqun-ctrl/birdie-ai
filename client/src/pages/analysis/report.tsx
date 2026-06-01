@@ -299,6 +299,17 @@ const ReportPage: FC = () => {
     [report?.issues],
   )
 
+  const emptyDiagnosisCopy = useMemo(() => {
+    const score = report?.overall_score
+    if (score != null && score < 65) {
+      return (
+        '综合分偏低，但未命中典型错误模式。请查看六维雷达里「最需改进」的阶段，' +
+        '并参考下方训练建议；也可展开「AI 不太确定」或问 AI 教练。'
+      )
+    }
+    return '🎉 这一杆没有明显问题，继续保持！'
+  }, [report?.overall_score])
+
   const qualityWarningLines = useMemo(
     () => linesForQualityWarnings(report?.quality_warnings),
     [report?.quality_warnings],
@@ -976,7 +987,7 @@ const ReportPage: FC = () => {
           <Text className='report__section-hint'>共 {sortedIssues.length} 项</Text>
         </View>
         {confidentIssues.length === 0 && hiddenIssues.length === 0 ? (
-          <Text className='report__empty'>🎉 这一杆没有明显问题，继续保持！</Text>
+          <Text className='report__empty'>{emptyDiagnosisCopy}</Text>
         ) : confidentIssues.length === 0 ? (
           <Text className='report__empty'>
             🤔 AI 对本次诊断不太有把握，下方「不太确定」区可展开查看

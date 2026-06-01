@@ -41,7 +41,7 @@ from app.pipeline.pose import PoseResult, estimate_poses, quality_warnings_from_
 from app.pipeline.club_profiles import to_club_category
 from app.pipeline.preprocess import quality_warnings_from_preprocess
 from app.pipeline.preprocess_router import preprocess_for_pipeline
-from app.pipeline.recommend import recommend
+from app.pipeline.recommend import recommend_with_phase_fallback
 from app.pipeline.scoring import score_all_phases, score_overall, weakest_phase
 from app.pipeline.scoring_narrative import build_phase_highlights
 from app.pipeline.visualize import (
@@ -267,8 +267,13 @@ async def run_real_analysis(
             quality_warnings, diagnose_guard_warnings
         )
 
-    # 7. 推荐
-    recommendations = recommend(issues_raw)
+    # 7. 推荐（无 issue 时按最弱阶段兜底）
+    recommendations = recommend_with_phase_fallback(
+        issues_raw,
+        phase_scores=phase_scores_int,
+        overall_score=overall,
+        weakest_phase=weakest,
+    )
 
     # 8. 组装 schema
     phase_scores: dict[str, PhaseScore] = {
@@ -360,10 +365,8 @@ async def run_real_analysis(
         thumbnail_url=thumb_url,
         duration_ms=duration_ms,
         quality_warnings=quality_warnings,
-        phase_highlights=(
-            build_phase_highlights(phase_scores_int, quality_warnings=quality_warnings)
-            if club_aware_scoring
-            else []
+        phase_highlights=build_phase_highlights(
+            phase_scores_int, quality_warnings=quality_warnings
         ),
         swing_candidates=swing_candidates_out,
         selected_swing_index=selected_idx if raw_candidates else 0,
