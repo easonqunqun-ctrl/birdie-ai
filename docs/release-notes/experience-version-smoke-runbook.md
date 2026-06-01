@@ -5,16 +5,17 @@
 
 ---
 
-## 当前体验版基线（2026-05-31 · 短视频门禁 2.3s）
+## 当前体验版基线（2026-06-01 · 训练 Tab 宽度对齐）
 
 | 项 | 值 |
 |----|-----|
-| **小程序版本** | **1.2.30**（构建后上传；公众平台 **选为体验版**） |
+| **小程序版本** | **1.2.31**（构建后上传；公众平台 **选为体验版**） |
 | **API** | `https://api.birdieai.cn/v1` |
-| **CVM** | M7-R1 B5 + B7 router（`3a1d825` 前引擎即可） |
-| **待验** | capture/params **2.3s 门禁** + §M7-R1 |
+| **CVM backend** | `4b1b08c`（profile-v2 500 修复） |
+| **本版变更** | 训练 Tab 卡片宽度与首页/我的对齐（去掉 ScrollView 双层 + 24rpx margin） |
+| **待验** | 训练 Tab 四 Tab 宽度一致；我的画像可打开（profile-v2） |
 
-**发版后必做**：mp 后台 → **1.2.30 → 选为体验版** → 选 2.0–2.2s 视频应被 capture 拦截；&lt;2.3s 不进 params。
+**发版后必做**：mp 后台 → **1.2.31 → 选为体验版** → 训练 Tab 卡片外缘与首页 hero 对齐。
 
 **AC-A1 真视频**：`test_rotation_regression_real.py` 2 passed（本地 `dtl_iron_01` + `face_on_iron_01`）；**AC-B1** 连拍 CV 见 `test_rotation_repeatability.py`（需 `take1–3` fixture）。
 
