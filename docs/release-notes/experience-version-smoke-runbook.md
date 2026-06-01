@@ -5,17 +5,17 @@
 
 ---
 
-## 当前体验版基线（2026-06-01 · 训练 Tab 宽度对齐）
+## 当前体验版基线（2026-06-01 · 参数页 prepare + 拍摄页精简）
 
 | 项 | 值 |
 |----|-----|
-| **小程序版本** | **1.2.31**（构建后上传；公众平台 **选为体验版**） |
+| **小程序版本** | **1.2.32**（构建后上传；公众平台 **选为体验版**） |
 | **API** | `https://api.birdieai.cn/v1` |
 | **CVM backend** | `4b1b08c`（profile-v2 500 修复） |
-| **本版变更** | 训练 Tab 卡片宽度与首页/我的对齐（去掉 ScrollView 双层 + 24rpx margin） |
-| **待验** | 训练 Tab 四 Tab 宽度一致；我的画像可打开（profile-v2） |
+| **本版变更** | 参数页后台 prepare 不阻塞提交 + 5s 慢路径提示；拍摄页去掉「机位怎么选」；profile-v2 错误文案优化 |
+| **待验** | 参数页可立即点「开始分析」；拍摄页「立即拍摄」首屏可见；我的画像可打开 |
 
-**发版后必做**：mp 后台 → **1.2.31 → 选为体验版** → 训练 Tab 卡片外缘与首页 hero 对齐。
+**发版后必做**：mp 后台 → **1.2.32 → 选为体验版** → 真机走一遍 capture → params → waiting 主路径。
 
 **AC-A1 真视频**：`test_rotation_regression_real.py` 2 passed（本地 `dtl_iron_01` + `face_on_iron_01`）；**AC-B1** 连拍 CV 见 `test_rotation_repeatability.py`（需 `take1–3` fixture）。
 

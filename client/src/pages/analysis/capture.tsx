@@ -2,7 +2,7 @@
  * 拍摄引导页（MVP §4.1）
  *
  * 职责：
- * 1. 告诉用户合规的拍摄要点（3 条 tips + 正/侧示意）
+ * 1. 告诉用户合规的拍摄要点（3 条 tips）
  * 2. 拉起微信 chooseMedia：可直接拍摄也可从相册选
  * 3. 前端先做一层硬约束（时长 / 大小 / 扩展名）过滤掉明显不合规的视频
  * 4. 合规后跳转 params 页，把 `tempFilePath / duration / size / fileType` 通过 URL 带过去
@@ -51,18 +51,6 @@ const TIPS = [
   { icon: '📐', text: '将球员放在画面中央，脚到头部全部露出' },
   { icon: '🎬', text: '拍满至少 2 秒（建议 3–5 秒），只录 1 次完整挥杆' },
   { icon: '💡', text: '优选自然光，避免强背光和严重抖动' },
-]
-
-/** P2-M7-R1 · A7 机位能力差异（与报告页 measurability 文案一致） */
-const CAMERA_ANGLE_TIPS = [
-  {
-    icon: '👤',
-    text: '测转肩、X-Factor：建议正面全身（Face-On）拍摄，球员居中入镜',
-  },
-  {
-    icon: '↗️',
-    text: '侧面（Down-the-Line）适合看下杆轨迹；转肩类指标会自动跳过',
-  },
 ]
 
 const CaptureAnalysisPage: FC = () => {
@@ -147,16 +135,6 @@ const CaptureAnalysisPage: FC = () => {
       <View className='capture__tips'>
         {TIPS.map((t) => (
           <View key={t.text} className='capture__tip'>
-            <Text className='capture__tip-icon'>{t.icon}</Text>
-            <Text className='capture__tip-text'>{t.text}</Text>
-          </View>
-        ))}
-      </View>
-
-      <View className='capture__camera-tips'>
-        <Text className='capture__camera-tips-title'>机位怎么选？</Text>
-        {CAMERA_ANGLE_TIPS.map((t) => (
-          <View key={t.text} className='capture__tip capture__tip--compact'>
             <Text className='capture__tip-icon'>{t.icon}</Text>
             <Text className='capture__tip-text'>{t.text}</Text>
           </View>

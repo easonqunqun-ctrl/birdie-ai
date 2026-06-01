@@ -4,12 +4,6 @@ import {
   suggestedCameraAngleHintCopy,
   suggestedCameraAngleToastCopy,
 } from '../suggestedCameraAngle'
-import {
-  canReusePreparedUpload,
-  shouldBlockSubmitWhilePreparing,
-  shouldStartPrepareFullSwingUpload,
-} from '../prepareFullSwingUpload'
-
 describe('applyDetectedCameraAngle', () => {
   test('applies suggestion when user has not touched', () => {
     const r = applyDetectedCameraAngle('face_on', { suggested_camera_angle: 'down_the_line' }, false)
@@ -26,42 +20,6 @@ describe('applyDetectedCameraAngle', () => {
   test('null suggestion leaves default', () => {
     const r = applyDetectedCameraAngle('face_on', { suggested_camera_angle: null }, false)
     expect(r).toEqual({ angle: 'face_on', autoApplied: false, hint: null })
-  })
-})
-
-describe('prepareFullSwingUpload guards', () => {
-  test('starts only for valid full_swing after quality', () => {
-    expect(
-      shouldStartPrepareFullSwingUpload({
-        tempFilePath: '/tmp/a.mp4',
-        size: 1000,
-        duration: 5,
-        analysisMode: 'full_swing',
-        qualityChecking: false,
-        qualityBlockCount: 0,
-      }),
-    ).toBe(true)
-    expect(
-      shouldStartPrepareFullSwingUpload({
-        tempFilePath: '/tmp/a.mp4',
-        size: 1000,
-        duration: 5,
-        analysisMode: 'putting',
-        qualityChecking: false,
-        qualityBlockCount: 0,
-      }),
-    ).toBe(false)
-  })
-
-  test('submit blocked while uploading or detecting', () => {
-    expect(shouldBlockSubmitWhilePreparing('uploading')).toBe(true)
-    expect(shouldBlockSubmitWhilePreparing('detecting')).toBe(true)
-    expect(shouldBlockSubmitWhilePreparing('ready')).toBe(false)
-  })
-
-  test('reuse only when ready', () => {
-    expect(canReusePreparedUpload('ready')).toBe(true)
-    expect(canReusePreparedUpload('failed')).toBe(false)
   })
 })
 

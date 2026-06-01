@@ -81,7 +81,7 @@ export interface FavoriteVenuesList {
 
 export const profileV2Service = {
   get() {
-    return http.get<ProfileV2Read>('/users/me/profile-v2')
+    return http.get<ProfileV2Read>('/users/me/profile-v2', { silent: true })
   },
   update(payload: ProfileV2UpdatePayload) {
     return http.put<ProfileV2Read>('/users/me/profile-v2', payload)

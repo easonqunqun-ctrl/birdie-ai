@@ -43,7 +43,9 @@ import {
 } from '@/utils/suggestedCameraAngle'
 import {
   canReusePreparedUpload,
-  shouldBlockSubmitWhilePreparing,
+  isPrepareInFlight,
+  PREPARE_BACKGROUND_HINT_TIMEOUT_MS,
+  prepareBackgroundStatusHint,
   shouldStartPrepareFullSwingUpload,
   type PrepareFullSwingPhase,
 } from '@/utils/prepareFullSwingUpload'
@@ -119,8 +121,14 @@ const AnalysisParamsPage: FC = () => {
   const [preparedDetect, setPreparedDetect] = useState<DetectSwingsResponse | null>(null)
   const [prepareDetectFailure, setPrepareDetectFailure] =
     useState<DetectSwingsFailureInfo | null>(null)
+  const [prepareUploadProgress, setPrepareUploadProgress] = useState(0)
+  const [prepareSlowPathUnlocked, setPrepareSlowPathUnlocked] = useState(false)
   const [cameraAngleHint, setCameraAngleHint] = useState<string | null>(null)
   const cameraAngleTouchedRef = useRef(false)
+  type BackgroundPrepareResult =
+    | { ok: true; token: UploadTokenResponse; detected: DetectSwingsResponse }
+    | { ok: false; failure: DetectSwingsFailureInfo | null }
+  const prepareRunRef = useRef<Promise<BackgroundPrepareResult> | null>(null)
 
   const setCurrent = useAnalysisStore((s) => s.setCurrent)
   const setPendingSwingSelection = useAnalysisStore((s) => s.setPendingSwingSelection)
@@ -209,7 +217,21 @@ const AnalysisParamsPage: FC = () => {
     setPreparedToken(null)
     setPreparedDetect(null)
     setPrepareDetectFailure(null)
+    setPrepareUploadProgress(0)
+    setPrepareSlowPathUnlocked(false)
+    prepareRunRef.current = null
   }, [tempFilePath])
+
+  useEffect(() => {
+    if (!isPrepareInFlight(preparePhase)) {
+      setPrepareSlowPathUnlocked(false)
+      return
+    }
+    const timer = setTimeout(() => {
+      setPrepareSlowPathUnlocked(true)
+    }, PREPARE_BACKGROUND_HINT_TIMEOUT_MS)
+    return () => clearTimeout(timer)
+  }, [preparePhase])
 
   // full_swing：质量检查通过后立即上传 + detect-swings，在 params 页预选机位（docs/02 §3.4）
   useEffect(() => {
@@ -227,8 +249,10 @@ const AnalysisParamsPage: FC = () => {
     }
 
     let cancelled = false
-    const run = async () => {
+    const run = async (): Promise<BackgroundPrepareResult> => {
       setPreparePhase('uploading')
+      setPrepareUploadProgress(0)
+      setPrepareSlowPathUnlocked(false)
       setPrepareDetectFailure(null)
       try {
         const contentType = guessContentType(tempFilePath)
@@ -238,19 +262,35 @@ const AnalysisParamsPage: FC = () => {
           file_type: contentType,
           duration,
         }
-        let token = await analysisService.getUploadToken(tokenPayload)
-        await analysisService.uploadToMinio(tempFilePath, token)
-        if (cancelled) return
+        const token = await analysisService.getUploadToken(tokenPayload)
+        await analysisService.uploadToMinio(tempFilePath, token, {
+          onProgress: (e: { progress: number }) => {
+            if (!cancelled) setPrepareUploadProgress(e.progress)
+          },
+        })
+        if (cancelled) return { ok: false, failure: null }
 
         setPreparePhase('detecting')
         const detected = await analysisService.detectSwings(token.upload_id)
-        if (cancelled) return
+        if (cancelled) return { ok: false, failure: null }
 
-        setPreparedToken(token)
-        setPreparedDetect(detected)
+        return { ok: true, token, detected }
+      } catch (err) {
+        if (cancelled) return { ok: false, failure: null }
+        return { ok: false, failure: resolveDetectSwingsFailure(err) }
+      }
+    }
+
+    const promise = run()
+    prepareRunRef.current = promise
+    void promise.then((result) => {
+      if (cancelled) return
+      if (result.ok) {
+        setPreparedToken(result.token)
+        setPreparedDetect(result.detected)
         const applied = applyDetectedCameraAngle(
           'face_on',
-          detected,
+          result.detected,
           cameraAngleTouchedRef.current,
         )
         setCameraAngle(applied.angle)
@@ -263,17 +303,14 @@ const AnalysisParamsPage: FC = () => {
           })
         }
         setPreparePhase('ready')
-      } catch (err) {
-        if (!cancelled) {
-          setPreparePhase('failed')
-          setPreparedToken(null)
-          setPreparedDetect(null)
-          setPrepareDetectFailure(resolveDetectSwingsFailure(err))
-        }
+        setPrepareUploadProgress(100)
+        return
       }
-    }
-
-    void run()
+      setPreparePhase('failed')
+      setPreparedToken(null)
+      setPreparedDetect(null)
+      setPrepareDetectFailure(result.failure)
+    })
     return () => {
       cancelled = true
     }
@@ -389,7 +426,7 @@ const AnalysisParamsPage: FC = () => {
         duration,
       }
 
-      let token: UploadTokenResponse
+      let token: UploadTokenResponse | undefined
       let preDetected: DetectSwingsResponse | null = null
 
       if (
@@ -400,7 +437,38 @@ const AnalysisParamsPage: FC = () => {
       ) {
         token = preparedToken
         preDetected = preparedDetect
-      } else {
+      } else if (
+        analysisMode === 'full_swing' &&
+        isPrepareInFlight(preparePhase) &&
+        prepareRunRef.current
+      ) {
+        Taro.showLoading({
+          title: preparePhase === 'uploading' ? '等待上传完成…' : '等待机位识别…',
+        })
+        const result = await prepareRunRef.current
+        Taro.hideLoading()
+        if (result.ok) {
+          token = result.token
+          preDetected = result.detected
+        } else if (
+          result.failure &&
+          shouldBlockSubmitOnDetectPrepareFailure(result.failure)
+        ) {
+          const lines = detectPrepareFailureBannerLines(result.failure)
+          await Taro.showModal({
+            title: result.failure.title,
+            content: lines.join('\n'),
+            showCancel: false,
+            confirmText: result.failure.reshootRecommended ? '重新拍摄' : '我知道了',
+          })
+          if (result.failure.reshootRecommended) {
+            Taro.redirectTo({ url: '/pages/analysis/capture' })
+          }
+          return
+        }
+      }
+
+      if (!token) {
         setPhase('signing')
         Taro.showLoading({ title: '申请上传凭证' })
         token = await analysisService.getUploadToken(tokenPayload)
@@ -598,12 +666,22 @@ const AnalysisParamsPage: FC = () => {
     }
   }
 
-  const prepareBlocking = shouldBlockSubmitWhilePreparing(preparePhase)
+  const prepareBackgroundHint = useMemo(
+    () =>
+      analysisMode === 'full_swing'
+        ? prepareBackgroundStatusHint(
+            preparePhase,
+            prepareUploadProgress,
+            prepareSlowPathUnlocked,
+          )
+        : null,
+    [analysisMode, preparePhase, prepareUploadProgress, prepareSlowPathUnlocked],
+  )
+
   const disabled =
     submitting ||
     !!overLimit ||
     qualityBlocks.length > 0 ||
-    prepareBlocking ||
     prepareFailureBlocking
 
   return (
@@ -652,7 +730,9 @@ const AnalysisParamsPage: FC = () => {
               </Text>
             ))}
             <Text className='params__quality-block-foot'>
-              机位自动识别未成功；请返回重新拍摄后再试。
+              {prepareFailureBlocking
+                ? '机位自动识别未成功；请返回重新拍摄后再试。'
+                : '可手动选择机位后继续开始分析，或返回重新拍摄。'}
             </Text>
           </View>
         )}
@@ -675,11 +755,8 @@ const AnalysisParamsPage: FC = () => {
       <View className='params__section'>
         <Text className='params__section-title'>拍摄角度</Text>
         <Text className='params__section-hint'>正确的角度让分析更精准</Text>
-        {analysisMode === 'full_swing' && preparePhase === 'uploading' && (
-          <Text className='params__camera-prepare-hint'>正在上传视频并识别机位…</Text>
-        )}
-        {analysisMode === 'full_swing' && preparePhase === 'detecting' && (
-          <Text className='params__camera-prepare-hint'>正在识别拍摄角度…</Text>
+        {prepareBackgroundHint && (
+          <Text className='params__camera-prepare-hint'>{prepareBackgroundHint}</Text>
         )}
         {cameraAngleHint && (
           <Text className='params__camera-auto-hint'>{cameraAngleHint}</Text>
@@ -767,11 +844,7 @@ const AnalysisParamsPage: FC = () => {
           loading={submitting}
           onClick={handleStart}
         >
-          {submitting
-            ? '处理中…'
-            : prepareBlocking
-              ? '识别机位中…'
-              : '开始分析'}
+          {submitting ? '处理中…' : '开始分析'}
         </Button>
       </View>
     </View>

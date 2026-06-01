@@ -19,6 +19,7 @@ import {
   type InjuryKey,
 } from '@/constants/profileV2'
 import { profileV2Service } from '@/services/profileV2'
+import { describePageLoadFailure } from '@/services/request'
 import {
   goalsFromMidLongLabels,
   handicapRangeIdFromSelf,
@@ -55,7 +56,7 @@ const ProfileV2Page: FC = () => {
       setTrainingPref(p.training_preference)
       setWeeklySessions(p.weekly_target_sessions)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '加载失败')
+      setError(describePageLoadFailure(e))
     } finally {
       setLoading(false)
     }
