@@ -1,34 +1,19 @@
 /**
- * 训练页样式（W9 视觉对齐 UI/birdie_ai_light_all_pages.html · 训练区）
- *
- * 设计要点：
- *  - hero 改为浅色卡（白底）+ 大标题 + 周日期范围 + 进度条
- *  - 进度条用品牌→mint 渐变（gradient-progress）
- *  - streak 单独"火苗"卡：橙黄渐变 + 🔥 + 大数字（稿底部 streak 元素）
- *  - 进步趋势横滑：每张白卡 + 大分数 + 日期
- *  - 任务卡：白底 + 圆角 + 阴影；done 状态浅绿底 + 左 mint 边
- *  - 步骤号：渐变圆点（与 report 页对齐）
- *  - 单位统一改 rpx，视觉密度更接近稿
+ * 训练页样式（W9 视觉对齐 · 与首页/我的 Tab 同宽：页面原生滚动 + 卡片 margin 24rpx）
  */
 
-.training {
-  /**
-   * tabBar 页：根为 ScrollView 时不要用 min-height:100vh 撑穿可视高度。
-   * webview 渲染模式下 scroll-view 不支持 padding，水平内边距见 &__scroll-inner。
-   */
-  background: var(--color-bg-page);
-  min-height: 100%;
-  box-sizing: border-box;
+$page-gutter: 24rpx;
+$page-block-gap: 16rpx;
 
-  &__scroll-inner {
-    width: 100%;
-    padding: 16rpx 24rpx 32rpx;
-    box-sizing: border-box;
-  }
+.training {
+  box-sizing: border-box;
+  min-height: 100%;
+  padding: 0 0 $page-gutter;
+  background: var(--color-bg-page);
 
   /* ================= 空态 ================= */
   &--empty {
-    padding: 120rpx 48rpx;
+    padding: 120rpx $page-gutter;
     text-align: center;
     color: var(--color-text-secondary);
     display: flex;
@@ -40,7 +25,7 @@
     .training__member-curve,
     .training__curve-lock {
       width: 100%;
-      max-width: 100%;
+      align-self: stretch;
     }
   }
 
@@ -83,10 +68,8 @@
 
   /* ================= 进步趋势（横滑） ================= */
   &__trend {
-    width: 100%;
-    max-width: 100%;
-    margin-bottom: 16rpx;
-    padding: 28rpx 28rpx 24rpx;
+    margin-bottom: $page-block-gap;
+    padding: 24rpx;
     background: var(--color-bg-card);
     border: 1rpx solid var(--color-border);
     border-radius: 24rpx;
@@ -122,10 +105,8 @@
 
   /* ========== 进步曲线（会员）；内含统计大卡 + 折线图 + 打卡柱 ========== */
   &__member-curve {
-    width: 100%;
-    max-width: 100%;
+    margin: $page-block-gap $page-gutter 0;
     box-sizing: border-box;
-    margin-bottom: 16rpx;
   }
 
   &__member-curve-heading {
@@ -165,9 +146,7 @@
     line-height: 1.55;
     color: var(--color-text-tertiary);
     display: block;
-    width: 100%;
-    max-width: 100%;
-    padding: 28rpx 28rpx 24rpx;
+    padding: 24rpx;
     background: var(--color-bg-card);
     border: 1rpx solid var(--color-border);
     border-radius: 24rpx;
@@ -179,11 +158,7 @@
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
-    justify-content: space-between;
-    row-gap: 12rpx;
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
+    gap: 12rpx;
     margin-bottom: 20rpx;
   }
 
@@ -192,7 +167,7 @@
     box-sizing: border-box;
     background: var(--color-bg-subtle);
     border-radius: 16rpx;
-    padding: 18rpx 12rpx;
+    padding: 18rpx 16rpx;
     text-align: center;
   }
 
@@ -318,8 +293,8 @@
   }
 
   &__curve-lock {
-    margin-bottom: 16rpx;
-    padding: 24rpx 28rpx;
+    margin: $page-block-gap $page-gutter 0;
+    padding: 24rpx;
     background: var(--color-bg-card);
     border: 1rpx solid var(--color-border);
     border-left: 6rpx solid var(--color-gold);
@@ -364,7 +339,7 @@
     flex-direction: row;
     flex-wrap: wrap;
     gap: 12rpx;
-    margin: 16rpx 0 24rpx;
+    margin: $page-block-gap $page-gutter 24rpx;
   }
 
   &__category-chip {
@@ -383,15 +358,13 @@
   }
 
   &__hero {
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
+    margin: $page-block-gap $page-gutter 0;
     background: var(--color-bg-card);
     border: 1rpx solid var(--color-border);
     border-radius: 24rpx;
-    padding: 28rpx 28rpx 24rpx;
+    padding: 24rpx;
     box-shadow: var(--shadow-xs);
-    margin-bottom: 16rpx;
+    box-sizing: border-box;
     position: relative;
     overflow: hidden;
   }
@@ -459,7 +432,6 @@
     background: linear-gradient(135deg, #ff9a3c 0%, #ff6b3c 100%);
     border-radius: 16rpx;
     padding: 18rpx 24rpx;
-    width: 100%;
     box-sizing: border-box;
     box-shadow: 0 4rpx 16rpx rgba(255, 107, 60, 0.22);
   }
@@ -478,11 +450,12 @@
 
   /* ================= AI 教练本周提示 ================= */
   &__summary {
+    margin: $page-block-gap $page-gutter 20rpx;
     background: var(--color-primary-tint);
     border-left: 6rpx solid var(--color-primary);
     border-radius: 16rpx;
     padding: 18rpx 22rpx;
-    margin-bottom: 20rpx;
+    box-sizing: border-box;
   }
 
   &__summary-title {
@@ -501,11 +474,11 @@
   }
 
   &__pro-section {
-    margin-bottom: 12rpx;
+    margin: 0 $page-gutter 12rpx;
   }
 
   &__coach-section {
-    margin-bottom: 12rpx;
+    margin: 0 $page-gutter 12rpx;
   }
 
   &__coach-section-title {
@@ -514,7 +487,6 @@
     color: var(--color-primary);
     display: block;
     margin-bottom: 8rpx;
-    padding: 0 4rpx;
   }
 
   &__task--coach {
@@ -535,7 +507,6 @@
     color: var(--color-gold-dark);
     display: block;
     margin-bottom: 8rpx;
-    padding: 0 4rpx;
   }
 
   &__section-divider {
@@ -543,19 +514,19 @@
     font-weight: 600;
     color: var(--color-text-secondary);
     display: block;
-    margin: 8rpx 4rpx 16rpx;
+    margin: 8rpx $page-gutter 16rpx;
   }
 
   /* ================= 按日分组 ================= */
   &__day {
-    margin-bottom: 20rpx;
+    margin: 0 $page-gutter 20rpx;
   }
 
   &__day-header {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    padding: 8rpx 4rpx 12rpx;
+    padding: 8rpx 0 12rpx;
   }
 
   &__day-label {

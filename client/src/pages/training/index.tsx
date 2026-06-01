@@ -686,8 +686,7 @@ const TrainingPage: FC = () => {
   }
 
   return (
-    <ScrollView scrollY className='training'>
-      <View className='training__scroll-inner'>
+    <View className='training'>
       <EnvBadge />
       {memberProgressSection}
       <View className='training__hero'>
@@ -792,8 +791,7 @@ const TrainingPage: FC = () => {
           {tasks.map((task) => renderTaskCard(task))}
         </View>
       ))}
-      </View>
-    </ScrollView>
+    </View>
   )
 }
 
