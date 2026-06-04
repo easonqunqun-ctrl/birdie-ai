@@ -55,6 +55,47 @@ const MAX_CONTENT_LEN = 500
 const WELCOME_TEXT =
   '你好！我是领翼golf 的 AI 高尔夫教练。随时问我挥杆技术、练习方法或高尔夫知识方面的问题。'
 
+/** 访客预览：静态示例对话（微信审核须可先浏览页面详情） */
+const GUEST_DEMO_MESSAGES: DisplayChatMessage[] = [
+  {
+    id: 'guest-demo-user',
+    role: 'user',
+    content: '开球老是右曲，应该怎么练？',
+    attachments: [],
+    created_at: '',
+  },
+  {
+    id: 'guest-demo-assistant',
+    role: 'assistant',
+    content:
+      '右曲常与挥杆路径偏外、杆面相对路径偏开有关。可以先做「墙面路径练习」：慢速半挥，让杆头贴近墙面内侧通过，感受由内向外的释放顺序。登录并完成挥杆分析后，我会结合你的实际数据给出更具体的训练建议。',
+    attachments: [],
+    created_at: '',
+  },
+]
+
+const GUEST_FALLBACK_QUICK_QUESTIONS: QuickQuestionItem[] = [
+  { id: 'guest-q1', text: '7 铁击球总是打薄，怎么改？', requires_analysis: false },
+  { id: 'guest-q2', text: '推杆时手腕容易松，有什么练习？', requires_analysis: false },
+  { id: 'guest-q3', text: '结合我的报告，这次最该先练什么？', requires_analysis: true },
+]
+
+function promptGuestLogin(content?: string) {
+  Taro.showModal({
+    title: '登录后开始对话',
+    content:
+      content ??
+      '登录后 AI 教练将根据你的问题与挥杆分析生成个性化回复。',
+    confirmText: '去登录',
+    cancelText: '继续浏览',
+    success: ({ confirm }) => {
+      if (confirm) {
+        Taro.navigateTo({ url: '/pages/login/index' })
+      }
+    },
+  })
+}
+
 const CoachPage: FC = () => {
   const router = useRouter()
   const user = useUserStore((s) => s.user)
@@ -75,6 +116,7 @@ const CoachPage: FC = () => {
     bootstrapError,
     bootstrapSession,
     bootstrapExistingSession,
+    loadGuestPreview,
     submitMessage,
     clearSession,
     cancelActiveStream,
@@ -139,6 +181,10 @@ const CoachPage: FC = () => {
 
   useDidShow(() => {
     if (!token) {
+      if (bootstrappedKeyRef.current !== 'guest-preview') {
+        bootstrappedKeyRef.current = 'guest-preview'
+        void loadGuestPreview()
+      }
       return
     }
     hydrateQuotaFromUser(user?.quota)
@@ -228,10 +274,13 @@ const CoachPage: FC = () => {
   }, [lastAssistantLen, sending])
 
   /* ---------- 发送逻辑 ---------- */
+  const isGuest = initialized && !token
   const trimmed = input.trim()
-  const canSend = Boolean(
-    trimmed && !sending && currentSessionId && !isQuotaExhausted(quota),
-  )
+  const canSend = isGuest
+    ? Boolean(trimmed && !sending)
+    : Boolean(
+        trimmed && !sending && currentSessionId && !isQuotaExhausted(quota),
+      )
 
   const runSend = useCallback(
     async (content: string) => {
@@ -248,11 +297,19 @@ const CoachPage: FC = () => {
   )
 
   const handleSend = useCallback(() => {
+    if (isGuest) {
+      promptGuestLogin(
+        trimmed
+          ? '登录后即可发送本条问题并获取个性化回复'
+          : '输入问题后，登录即可发送',
+      )
+      return
+    }
     if (!canSend) return
     const content = trimmed
     setInput('')
     void runSend(content)
-  }, [canSend, runSend, trimmed])
+  }, [isGuest, canSend, runSend, trimmed])
 
   const handleInput = (e: BaseEventOrig<{ value: string }>) => {
     const raw = e.detail?.value ?? ''
@@ -277,6 +334,10 @@ const CoachPage: FC = () => {
   const handleTapQuickQuestion = useCallback(
     (q: QuickQuestionItem) => {
       if (sending) return
+      if (isGuest) {
+        setInput(q.text)
+        return
+      }
       if (q.requires_analysis && (user?.stats?.total_analyses ?? 0) === 0) {
         Taro.showModal({
           title: '需要先上传一次挥杆',
@@ -291,7 +352,7 @@ const CoachPage: FC = () => {
       }
       setInput(q.text)
     },
-    [sending, user?.stats?.total_analyses],
+    [isGuest, sending, user?.stats?.total_analyses],
   )
 
   /* ---------- 清空对话 ---------- */
@@ -337,7 +398,6 @@ const CoachPage: FC = () => {
     [messages, runSend],
   )
 
-  /* ---------- 访客态（微信审核：须可先浏览说明再主动登录） ---------- */
   if (!initialized) {
     return (
       <View className='coach coach--loading'>
@@ -346,32 +406,7 @@ const CoachPage: FC = () => {
     )
   }
 
-  if (!token) {
-    const goLogin = () => {
-      Taro.navigateTo({ url: '/pages/login/index' })
-    }
-    return (
-      <View className='coach coach--guest'>
-        <EnvBadge />
-        <View className='coach__guest-main'>
-          <Text className='coach__guest-icon'>💬</Text>
-          <Text className='coach__guest-title'>AI 高尔夫教练</Text>
-          <Text className='coach__guest-body'>
-            根据你的挥杆分析与问题，用大模型生成训练建议与答疑。回复为人工智能生成内容，仅供参考，不能替代持证教练现场指导或医疗处置。
-          </Text>
-          <Text className='coach__guest-hint'>
-            登录后即可开始对话；你可先在首页查看示例报告了解产品形态。
-          </Text>
-          <Button className='coach__guest-btn' onClick={goLogin}>
-            登录后与教练对话
-          </Button>
-        </View>
-      </View>
-    )
-  }
-
-  /* ---------- 渲染 loading / error ---------- */
-  if (loading && messages.length === 0 && !bootstrapError) {
+  if (!isGuest && loading && messages.length === 0 && !bootstrapError) {
     return (
       <View className='coach coach--loading'>
         <Text className='coach__loading-text'>正在接入 AI 教练...</Text>
@@ -379,7 +414,7 @@ const CoachPage: FC = () => {
     )
   }
 
-  if (bootstrapError) {
+  if (!isGuest && bootstrapError) {
     return (
       <View className='coach coach--error'>
         <Text className='coach__error-icon'>⚠️</Text>
@@ -391,35 +426,59 @@ const CoachPage: FC = () => {
     )
   }
 
-  const showEmptyState = messages.length === 0 && !sending
-  const quotaExhausted = isQuotaExhausted(quota)
-  const remainingText = renderQuotaText(quota)
+  const showEmptyState = !isGuest && messages.length === 0 && !sending
+  const displayQuickQuestions =
+    isGuest && quickQuestions.length === 0
+      ? GUEST_FALLBACK_QUICK_QUESTIONS
+      : quickQuestions
+  const showQuickQuestions =
+    isGuest || (showEmptyState && displayQuickQuestions.length > 0)
+  const quotaExhausted = !isGuest && isQuotaExhausted(quota)
+  const remainingText = isGuest
+    ? '登录后可开始对话 · 可先浏览示例'
+    : renderQuotaText(quota)
   const userBubbleInitial = pickUserBubbleInitial(user?.nickname)
 
   return (
-    <View className='coach'>
+    <View className={`coach${isGuest ? ' coach--browse' : ''}`}>
       <EnvBadge />
       <View
         className={`coach__header ${
-          contextAnalysisId ? '' : 'coach__header--compact'
+          contextAnalysisId && !isGuest ? '' : 'coach__header--compact'
         }`}
       >
-        {contextAnalysisId ? (
-          <View className='coach__context-banner'>
-            <Text className='coach__context-banner-text'>
-              基于报告 {shortId(contextAnalysisId)} 的对话
+        {isGuest ? (
+          <View className='coach__guest-banner'>
+            <Text className='coach__guest-banner-text'>
+              功能预览 · 登录后开启完整对话
             </Text>
             <Text
-              className='coach__context-banner-link'
-              onClick={() => openOriginalReport(contextAnalysisId)}
+              className='coach__guest-banner-link'
+              onClick={() => Taro.navigateTo({ url: '/pages/login/index' })}
             >
-              查看原报告 ›
+              登录
             </Text>
           </View>
-        ) : null}
-        <Text className='coach__clear-btn' onClick={handleClear}>
-          清空对话
-        </Text>
+        ) : (
+          <>
+            {contextAnalysisId ? (
+              <View className='coach__context-banner'>
+                <Text className='coach__context-banner-text'>
+                  基于报告 {shortId(contextAnalysisId)} 的对话
+                </Text>
+                <Text
+                  className='coach__context-banner-link'
+                  onClick={() => openOriginalReport(contextAnalysisId)}
+                >
+                  查看原报告 ›
+                </Text>
+              </View>
+            ) : null}
+            <Text className='coach__clear-btn' onClick={handleClear}>
+              清空对话
+            </Text>
+          </>
+        )}
       </View>
 
       <ScrollView
@@ -438,10 +497,31 @@ const CoachPage: FC = () => {
             logoSrc={BRAND_LOGO}
           />
 
-          {showEmptyState && (
+          {isGuest ? (
+            <>
+              <View className='coach__demo-label'>
+                <Text className='coach__demo-label-text'>示例对话（预览）</Text>
+              </View>
+              {GUEST_DEMO_MESSAGES.map((m) => (
+                <MessageBubble
+                  key={m.id}
+                  message={m}
+                  logoSrc={BRAND_LOGO}
+                  userInitial='访'
+                />
+              ))}
+              <View className='coach__disclaimer'>
+                <Text className='coach__disclaimer-text'>
+                  回复为人工智能生成内容，仅供参考，不能替代持证教练现场指导或医疗处置。
+                </Text>
+              </View>
+            </>
+          ) : null}
+
+          {showQuickQuestions && (
             <View className='coach__quick'>
               <Text className='coach__quick-title'>试试这些问题：</Text>
-              {quickQuestions.map((q) => (
+              {displayQuickQuestions.map((q) => (
                 <View
                   key={q.id}
                   className={`coach__quick-chip ${
@@ -525,7 +605,13 @@ const CoachPage: FC = () => {
             <Input
               className='coach__input'
               type='text'
-              placeholder={sending ? 'AI 正在回复，稍等片刻...' : '问问 AI 教练...'}
+              placeholder={
+                isGuest
+                  ? '输入问题，登录后发送…'
+                  : sending
+                    ? 'AI 正在回复，稍等片刻...'
+                    : '问问 AI 教练...'
+              }
               value={input}
               confirmType='send'
               maxlength={MAX_CONTENT_LEN}
@@ -541,24 +627,25 @@ const CoachPage: FC = () => {
               loading={sending}
               onClick={handleSend}
             >
-              发送
+              {isGuest ? '登录发送' : '发送'}
             </Button>
           </View>
         )}
         <View className='coach__meta'>
           <Text className='coach__quota'>{remainingText}</Text>
-          {/* P2-C1：接近上限黄色提醒，达上限红色 + 粗体，让用户能"看见"自己快/已碰到 500 字 */}
-          <Text
-            className={`coach__len ${
-              input.length >= MAX_CONTENT_LEN
-                ? 'coach__len--danger'
-                : input.length >= MAX_CONTENT_LEN - 50
-                  ? 'coach__len--warning'
-                  : ''
-            }`}
-          >
-            {input.length}/{MAX_CONTENT_LEN}
-          </Text>
+          {!isGuest ? (
+            <Text
+              className={`coach__len ${
+                input.length >= MAX_CONTENT_LEN
+                  ? 'coach__len--danger'
+                  : input.length >= MAX_CONTENT_LEN - 50
+                    ? 'coach__len--warning'
+                    : ''
+              }`}
+            >
+              {input.length}/{MAX_CONTENT_LEN}
+            </Text>
+          ) : null}
         </View>
       </View>
     </View>

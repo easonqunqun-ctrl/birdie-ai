@@ -74,6 +74,29 @@ describe('useChatStore.hydrateQuotaFromUser', () => {
   })
 })
 
+describe('useChatStore.loadGuestPreview', () => {
+  test('成功 → 仅填充 quickQuestions，不创建 session', async () => {
+    mocked.getQuickQuestions.mockResolvedValue({
+      questions: [{ id: 'q1', text: 'test', requires_analysis: false }],
+    })
+    await useChatStore.getState().loadGuestPreview()
+    const s = useChatStore.getState()
+    expect(s.quickQuestions).toHaveLength(1)
+    expect(s.currentSessionId).toBeNull()
+    expect(s.loading).toBe(false)
+    expect(mocked.createSession).not.toHaveBeenCalled()
+  })
+
+  test('失败 → 不写入 bootstrapError', async () => {
+    mocked.getQuickQuestions.mockRejectedValue(new Error('network'))
+    await useChatStore.getState().loadGuestPreview()
+    const s = useChatStore.getState()
+    expect(s.quickQuestions).toEqual([])
+    expect(s.bootstrapError).toBeNull()
+    expect(s.loading).toBe(false)
+  })
+})
+
 describe('useChatStore.bootstrapSession', () => {
   test('成功 → 同时填充 session + quickQuestions', async () => {
     mocked.getQuickQuestions.mockResolvedValue({ questions: [{ id: 'q1' }] })

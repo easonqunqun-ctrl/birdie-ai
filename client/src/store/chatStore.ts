@@ -75,6 +75,8 @@ interface ChatState {
   submitMessageSync(content: string): Promise<void>
   clearSession(): Promise<void>
   hydrateQuotaFromUser(userQuota: UserQuota | null | undefined): void
+  /** 未登录访客：仅拉快捷问题（noAuth），不创建会话 */
+  loadGuestPreview(): Promise<void>
   cancelActiveStream(): void
   reset(): void
 }
@@ -129,6 +131,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const msg = describePageLoadFailure(err)
       set({ loading: false, bootstrapError: msg })
       throw err
+    }
+  },
+
+  async loadGuestPreview() {
+    set({ loading: true, bootstrapError: null })
+    try {
+      const quickResp = await chatService.getQuickQuestions()
+      set({ quickQuestions: quickResp.questions, loading: false })
+    } catch {
+      // 访客预览：快捷问题失败不阻断页面，页面侧有本地 fallback
+      set({ quickQuestions: [], loading: false, bootstrapError: null })
     }
   },
 

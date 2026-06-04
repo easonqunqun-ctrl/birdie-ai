@@ -20,6 +20,65 @@ page {
     padding: 200rpx 40rpx;
   }
 
+  &__guest-banner {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16rpx;
+    padding: 8rpx 12rpx;
+    background: var(--color-bg-page);
+    border-radius: var(--radius-sm);
+    border: 1rpx solid var(--color-border-muted);
+  }
+
+  &__guest-banner-text {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+  }
+
+  &__guest-banner-link {
+    flex-shrink: 0;
+    font-size: var(--font-size-xs);
+    color: var(--color-primary);
+    font-weight: 600;
+
+    &:active {
+      opacity: 0.7;
+    }
+  }
+
+  &__demo-label {
+    display: flex;
+    justify-content: center;
+    margin: 8rpx 0 16rpx;
+  }
+
+  &__demo-label-text {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-tertiary);
+    padding: 4rpx 16rpx;
+    background: var(--color-bg-page);
+    border-radius: 20rpx;
+  }
+
+  &__disclaimer {
+    margin: 8rpx 24rpx 20rpx;
+    padding: 16rpx 20rpx;
+    background: var(--color-bg-page);
+    border-radius: var(--radius-sm);
+    border: 1rpx solid var(--color-border-muted);
+  }
+
+  &__disclaimer-text {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+  }
+
   &__loading-text {
     font-size: 30rpx;
     color: var(--color-text-secondary);
