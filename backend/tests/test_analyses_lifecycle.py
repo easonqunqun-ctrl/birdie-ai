@@ -480,6 +480,50 @@ async def test_list_analyses_paywall_caps_free_user_at_three(
 
 
 @pytest.mark.asyncio
+async def test_list_analyses_paywall_skipped_during_promo(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    fake_minio: FakeMinioStorage,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """公测 PROMO_FREE_UNTIL 期间免费用户也不截断历史."""
+    from app.config import settings as _settings
+
+    monkeypatch.setattr(_settings, "PROMO_FREE_UNTIL", "2026-07-30")
+    monkeypatch.setattr(_settings, "PROMO_FREE_SKIP_HISTORY_PAYWALL", True)
+
+    for i in range(4):
+        t = await client.post(
+            "/v1/analyses/upload-token",
+            headers=auth_headers,
+            json={
+                "file_name": f"p{i}.mp4",
+                "file_size": 1024 * 1024,
+                "file_type": "video/mp4",
+                "duration": 4.0,
+            },
+        )
+        token = t.json()["data"]
+        fake_minio.mark_uploaded(token["key"], size=1024 * 1024)
+        await client.post(
+            "/v1/analyses",
+            headers=auth_headers,
+            json={
+                "upload_id": token["upload_id"],
+                "camera_angle": "face_on",
+                "club_type": "driver",
+            },
+        )
+
+    r = await client.get("/v1/analyses?page=1&page_size=20", headers=auth_headers)
+    assert r.status_code == 200, r.text
+    body = r.json()["data"]
+    assert body["total"] == 4
+    assert len(body["items"]) == 4
+    assert body["paywall"] is None
+
+
+@pytest.mark.asyncio
 async def test_list_analyses_paywall_skipped_for_member(
     client: AsyncClient,
     auth_headers: dict[str, str],

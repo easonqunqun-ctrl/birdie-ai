@@ -28,6 +28,19 @@
     line-height: 1.4;
   }
 
+  &__notice-sub {
+    display: block;
+    margin-top: 8rpx;
+    font-size: 26rpx;
+    color: var(--color-text-secondary);
+    line-height: 1.4;
+  }
+
+  &__notice--promo {
+    background: rgba(0, 208, 132, 0.12);
+    border-left-color: var(--color-accent-mint);
+  }
+
   &__hero {
     background: var(--gradient-hero);
     color: var(--color-on-primary);

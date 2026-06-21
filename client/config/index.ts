@@ -113,6 +113,8 @@ const config: UserConfigExport = {
     PHASE2_TRAINING_CATEGORIES_ENABLED: JSON.stringify(
       process.env.TARO_APP_PHASE2_TRAINING_CATEGORIES_ENABLED === 'true',
     ),
+    /** 公测免费截止日 YYYY-MM-DD；与 backend PROMO_FREE_UNTIL 双端同步 */
+    PROMO_FREE_UNTIL: JSON.stringify(process.env.TARO_APP_PROMO_FREE_UNTIL || ''),
     /** 逗号分隔的订阅消息模板 ID；空则 `requestSubscribeMessage` 不调用 */
     SUBSCRIBE_TEMPLATES: JSON.stringify(process.env.TARO_APP_SUBSCRIBE_TMPL_IDS || ''),
     /** 顺序：1 分析完成 2 会员已到期 3 会员即将到期（到期前 N 天，与后端第三模板一致） */

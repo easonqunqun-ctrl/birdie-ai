@@ -6,6 +6,7 @@ import { requestWechatPayment } from '@/adapters/payment'
 import { describeIntermittentRequestFailure, describePageLoadFailure, isRequestError } from '@/services/request'
 import { useUserStore } from '@/store/userStore'
 import { PAYMENT_ENABLED_FLAG, PAYMENT_MOCK_FLAG } from '@/constants/flags'
+import { isPromoFreeActive, promoFreeBannerText } from '@/utils/promoFree'
 import { SUBSCRIBE_TPL_MEMBERSHIP_EXPIRE, SUBSCRIBE_TPL_MEMBERSHIP_PRE_EXPIRE } from '@/constants/subscribeTemplates'
 import { useMembershipExpiringSoonModal } from '@/hooks/useMembershipExpiringSoonModal'
 import type { MembershipInfo } from '@/types/payment'
@@ -314,12 +315,23 @@ const MembershipPage: FC = () => {
   const headlineSub = useMemo(() => {
     if (!user) return ''
     if (user.is_member) return '感谢你的支持，继续精进挥杆'
+    if (isPromoFreeActive(user)) return '公测期间分析与 AI 对话不限次'
     return '升级会员解锁无限分析与完整训练计划'
   }, [user])
+
+  const promoBanner = promoFreeBannerText(user)
 
   return (
     <ScrollView className='membership' scrollY>
       <View className='membership__inner'>
+      {promoBanner ? (
+        <View className='membership__notice membership__notice--promo'>
+          <Text className='membership__notice-text'>{promoBanner}</Text>
+          <Text className='membership__notice-sub'>
+            公测期间全员不限次；7 月 30 日后恢复免费版月度配额
+          </Text>
+        </View>
+      ) : null}
       {/*
         W8-T3：PAYMENT_ENABLED=false 时本页是"管理员/QA 入口"，
           普通内测用户不应该出现在这里（profile 页的入口已经隐藏）。
@@ -327,7 +339,7 @@ const MembershipPage: FC = () => {
           数据被误读。
         W9 上线（PAYMENT_ENABLED=true）后该 banner 自动消失。
       */}
-      {!PAYMENT_ENABLED_FLAG && (
+      {!promoBanner && !PAYMENT_ENABLED_FLAG && (
         <View className='membership__notice'>
           <Text className='membership__notice-text'>
             内测阶段·付费功能未开放，所有用户均按「无限」配额体验

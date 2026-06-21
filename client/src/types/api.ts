@@ -52,6 +52,13 @@ export interface UserQuota {
   chat_total_today: number
 }
 
+/** 公测免费促销（``GET /users/me``.promo_free）；见 backend ``promo_service`` */
+export interface PromoFreeStatus {
+  active: boolean
+  until: string | null
+  message: string | null
+}
+
 export interface User {
   id: string
   nickname: string | null
@@ -85,6 +92,8 @@ export interface User {
     rejected_at?: string | null
   } | null
   is_active_coach?: boolean
+  /** 公测免费至 PROMO_FREE_UNTIL；active 时配额视同无限 */
+  promo_free?: PromoFreeStatus | null
 }
 
 export interface WechatLoginRequest {

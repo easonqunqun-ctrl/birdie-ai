@@ -8,6 +8,7 @@ import { switchToCoach, switchToProfile, toastTabNavigationFailure } from '@/uti
 import { analysisService } from '@/services/analysisService'
 import { deferReLaunch } from '@/utils/deferNavigation'
 import { PAYMENT_ENABLED_FLAG } from '@/constants/flags'
+import { isPromoFreeActive, promoFreeBannerText } from '@/utils/promoFree'
 import { SCORE_LEVEL_META, scoreLevelFromScore } from '@/constants/scoreLevel'
 import { CLUB_TYPE_LABEL } from '@/types/analysis'
 import { BRAND_LOGO } from '@/constants/brandAssets'
@@ -60,6 +61,7 @@ const HomePage: FC = () => {
   }
 
   if (!token) {
+    const guestPromoBanner = promoFreeBannerText(null)
     const goLogin = () => {
       Taro.navigateTo({ url: '/pages/login/index' })
     }
@@ -85,6 +87,13 @@ const HomePage: FC = () => {
             登录
           </Text>
         </View>
+
+        {guestPromoBanner ? (
+          <View className='home__promo-banner'>
+            <Text className='home__promo-banner-text'>{guestPromoBanner}</Text>
+            <Text className='home__promo-banner-sub'>分析与 AI 对话不限次，欢迎邀请球友体验</Text>
+          </View>
+        ) : null}
 
         <View className='home__hero home__hero--guest'>
           <View className='home__hero-deco' />
@@ -190,6 +199,7 @@ const HomePage: FC = () => {
     const exhausted =
       user != null &&
       !user.is_member &&
+      !isPromoFreeActive(user) &&
       typeof remaining === 'number' &&
       remaining === 0
     if (exhausted) {
@@ -242,9 +252,12 @@ const HomePage: FC = () => {
   const hasScore = latest && latest.status === 'completed' && latest.overall_score != null
   const scoreChange = latest?.score_change ?? null
 
+  const promoBanner = promoFreeBannerText(user)
+
   // ====== 配额文案 ======
   const quotaText = (() => {
     if (!user.quota) return ''
+    if (isPromoFreeActive(user)) return '公测期·不限次'
     if (user.is_member) return '会员·分析次数无限'
     if (user.quota.analysis_remaining < 0) return '内测期·次数无限'
     return `本月剩余 ${user.quota.analysis_remaining} / ${user.quota.analysis_total} 次`
@@ -252,7 +265,7 @@ const HomePage: FC = () => {
 
   const chatRemainingText = (() => {
     if (!user.quota) return '聊聊你的挥杆'
-    if (user.quota.chat_remaining_today < 0) return '今日无限次问答'
+    if (isPromoFreeActive(user) || user.quota.chat_remaining_today < 0) return '今日无限次问答'
     return `今日剩余 ${user.quota.chat_remaining_today} 次免费问答`
   })()
 
@@ -290,6 +303,13 @@ const HomePage: FC = () => {
           )}
         </View>
       </View>
+
+      {promoBanner ? (
+        <View className='home__promo-banner'>
+          <Text className='home__promo-banner-text'>{promoBanner}</Text>
+          <Text className='home__promo-banner-sub'>分析与 AI 对话不限次，欢迎邀请球友体验</Text>
+        </View>
+      ) : null}
 
       {/* ============ 2. 主英雄：最新得分 / 引导上传 ============ */}
       <View className='home__hero'>

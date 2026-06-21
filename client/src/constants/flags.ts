@@ -57,3 +57,9 @@ export const PHASE2_YARDAGE_BOOK_ENABLED_FLAG: boolean = PHASE2_YARDAGE_BOOK_ENA
 /** M10-05 训练计划 drill 类目匹配 */
 export const PHASE2_TRAINING_CATEGORIES_ENABLED_FLAG: boolean =
   PHASE2_TRAINING_CATEGORIES_ENABLED
+
+/**
+ * 公测免费截止日期（编译期 `TARO_APP_PROMO_FREE_UNTIL=YYYY-MM-DD`）。
+ * 登录后以 `/users/me`.promo_free 为准；未登录时用于首页访客 banner。
+ */
+export const PROMO_FREE_UNTIL_FLAG: string = PROMO_FREE_UNTIL

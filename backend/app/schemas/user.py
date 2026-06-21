@@ -72,6 +72,14 @@ class UserQuota(BaseModel):
     chat_total_today: int
 
 
+class PromoFreeStatus(BaseModel):
+    """公测免费促销（``PROMO_FREE_UNTIL``）；见 ``promo_service``."""
+
+    active: bool = False
+    until: str | None = None
+    message: str | None = None
+
+
 class UserBrief(BaseModel):
     """简化版用户信息（首页等场景用）."""
 
@@ -105,6 +113,7 @@ class UserResponse(BaseModel):
     has_completed_real_analysis: bool = False
     stats: UserStats | None = None
     quota: UserQuota | None = None
+    promo_free: PromoFreeStatus | None = None
     created_at: datetime
     # MVP §3.4 注销冷静期：非空表示将于该 UTC 时间后硬删
     account_deletion_scheduled_at: datetime | None = None

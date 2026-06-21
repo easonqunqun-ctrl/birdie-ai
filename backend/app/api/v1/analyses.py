@@ -313,11 +313,18 @@ async def list_analyses(
         date_from=date_from,
         date_to=date_to,
     )
+    from app.services import promo_service
+
+    free_cap = (
+        None
+        if promo_service.should_skip_free_history_paywall()
+        else FREE_HISTORY_VISIBLE_LIMIT
+    )
     items, total, capped_to = await analysis_service.list_analyses(
         user=user,
         query=query,
         db=db,
-        free_user_cap=FREE_HISTORY_VISIBLE_LIMIT,
+        free_user_cap=free_cap,
     )
     paywall: AnalysisListPaywall | None = None
     if capped_to is not None and total > capped_to:

@@ -23,8 +23,12 @@ UNLIMITED_REMAINING: int = -1
 
 
 def _is_unlimited_mode() -> bool:
-    """W8-T3：QUOTA_MODE=unlimited 时整个后端跳过配额限制（仅测试环境用）."""
-    return settings.QUOTA_MODE == "unlimited"
+    """W8-T3：QUOTA_MODE=unlimited 或公测 PROMO_FREE_UNTIL 时跳过配额限制."""
+    if settings.QUOTA_MODE == "unlimited":
+        return True
+    from app.services import promo_service
+
+    return promo_service.is_promo_free_active()
 
 
 def _now_month_str() -> str:

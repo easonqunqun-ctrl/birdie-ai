@@ -411,10 +411,17 @@ GET /v1/users/me
       "chat_remaining_today": 3,
       "chat_total_today": 5
     },
+    "promo_free": {
+      "active": true,
+      "until": "2026-07-30",
+      "message": "公测免费至 2026-07-30"
+    },
     "created_at": "2026-04-01T10:30:00+08:00"
   }
 }
 ```
+
+> **`promo_free`**：当服务端配置 `PROMO_FREE_UNTIL=YYYY-MM-DD` 且当前仍在该日（UTC+8 自然日 inclusive）内时为 `active=true`；此时 `quota.*_remaining` 通常为 `-1`（无限），且 `GET /v1/analyses` 对免费用户不触发历史 paywall（见 `PROMO_FREE_SKIP_HISTORY_PAYWALL`）。
 
 ---
 

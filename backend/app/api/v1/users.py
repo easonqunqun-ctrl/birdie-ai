@@ -41,6 +41,7 @@ from app.schemas.yardage_book import YardageBookResponse, YardageBookUpdateReque
 from app.services import (
     account_deletion_service,
     analysis_service,
+    promo_service,
     quota_service,
     user_clubs_service,
     user_profile_v2_service,
@@ -106,6 +107,7 @@ async def get_me(
             else quota_service.UNLIMITED_REMAINING
         ),
     )
+    resp.promo_free = promo_service.status_for_response()
     return ok(resp)
 
 

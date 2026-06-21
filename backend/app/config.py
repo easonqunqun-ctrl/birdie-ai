@@ -257,6 +257,11 @@ class Settings(BaseSettings):
     # 切换不影响付费会员（会员本来就 -1），只影响免费用户
     QUOTA_MODE: Literal["strict", "unlimited"] = "strict"
 
+    # ==================== 公测免费（至指定日 inclusive，UTC+8） ====================
+    # 例：PROMO_FREE_UNTIL=2026-07-30 → 7/30 23:59:59 前全员无限配额 + 可选关闭历史 paywall
+    PROMO_FREE_UNTIL: str = ""
+    PROMO_FREE_SKIP_HISTORY_PAYWALL: bool = True
+
     # ==================== Sentry（监控告警；PMF 阶段必装） ====================
     # DSN 为空 → ``setup_sentry()`` 直接 no-op，本地开发与 CI 不需要配置；
     # 生产环境填上 Sentry 项目 DSN 后 backend / Celery 异常会自动上报。
