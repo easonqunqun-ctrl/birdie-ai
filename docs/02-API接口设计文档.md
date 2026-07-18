@@ -2676,20 +2676,30 @@ GET /v1/health
 POST /v1/events
 ```
 
-**需认证**
+**鉴权**：可选（匿名可报 `error_report`；登录用户带 JWT）
 
-**请求体**：
+**事件名白名单**（`event_service.EVENT_NAMES`，与客户端 `track.ts` 对齐）：
+
+| name | 说明 |
+|------|------|
+| `page_view` | 关键页访问 |
+| `analysis_submit` | 提交分析任务 |
+| `analysis_done` | 报告页首次可见（PP-05） |
+| `share_report` | 分享报告 / 对比进步 |
+| `pay_success` | 支付成功 |
+| `error_report` | 前端运行期错误 |
+| `membership_view` | 进入会员中心（PP-05） |
+| `upgrade_cta_click` | 点击开通/续费 CTA（PP-05） |
+
+**请求体**（实现字段名为 `name` / `payload` / `client_ts`）：
 
 ```json
 {
   "events": [
     {
-      "event_name": "report_view",
-      "params": {
-        "analysis_id": "ana_def456",
-        "source": "home_list"
-      },
-      "timestamp": "2026-04-14T10:36:00+08:00"
+      "name": "analysis_done",
+      "payload": { "analysis_id": "ana_def456" },
+      "client_ts": 1713062160000
     }
   ]
 }
@@ -2700,7 +2710,8 @@ POST /v1/events
 ```json
 {
   "code": 0,
-  "message": "success"
+  "message": "success",
+  "data": { "accepted": 1, "rejected": 0 }
 }
 ```
 

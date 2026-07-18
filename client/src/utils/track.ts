@@ -47,6 +47,10 @@ export type EventName =
   | 'share_report'
   | 'pay_success'
   | 'error_report'
+  /** PP-05：进入会员中心 */
+  | 'membership_view'
+  /** PP-05：点击开通/续费 CTA */
+  | 'upgrade_cta_click'
 
 interface TrackPayload {
   name: EventName

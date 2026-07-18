@@ -118,7 +118,7 @@ Kickoff：[`p2-m12-08-evolution-animation-kickoff.md`](./p2-m12-08-evolution-ani
 |--------|---------|------|--------|------|------|
 | **R1** | P2-M7-R1-A | Phase A 止血 | sanity + auto-detect sanitize + 矛盾合并 + setup/top 窗口 + R2 CI | Now | ✅ repo · 待真视频 + smoke |
 | **R2** | P2-M7-R1-B1 | pose_refine + rotation_track 融合 | `pose_refine.py` + `rotation_track.py` + AC-B | Now | ✅ B1–B5 repo · AC-B1 infra · AC-B2 真视频 |
-| **R3** | P2-M7-R1-B2 | top 双证据 + preprocess_v2 灰度 | 接 M7-09 后 refine impact 窗 | Now / Trigger | ✅ B5 + B7 router · flag off |
+| **R3** | P2-M7-R1-B2 | top 双证据 + preprocess_v2 灰度 | 接 M7-09 后 refine impact 窗 | Now / Trigger | ✅ B5 + B7 router · [staging runbook](./p2-m7-b7-preprocess-v2-staging-runbook.md) |
 
 **并行**：R1 与 W24 V2 灰度可并行；**R1 必须在 R2 之前发版**（先止血再抬准度）。
 
@@ -141,24 +141,54 @@ Kickoff：[`p2-m12-08-evolution-animation-kickoff.md`](./p2-m12-08-evolution-ani
 |--------|---------|------|------|------|------|
 | — | Q-B5 | 委托扣费 / papay 签约 | 微信商户模板 | Trigger | ⏳ |
 | — | Q-D1 | RN App 里程碑 | 人力 | 并行 | 📋 |
+| — | Q-D2 | **击球弹道弧线动画**（下场拍摄→球飞行轨迹描线成片，分享向） | **Q-D1 App + 原生高帧率相机** | Trigger | 📋 |
 | — | U-2 | COS 真桶验收 | 运维 | Ops | 📋 |
+
+> **Q-D2 决策备忘（2026-07-13）**：弹道弧线动画**延后到 App 开发阶段实现**，不在小程序侧做。定位——**App 承载重体验（高帧率拍摄 + 弹道描线），小程序作分享/传播入口**（产物为 `H.264+faststart` mp4，小程序原生可播，回流分享链路天然通）。
+> - **决定性前置**：微信 `chooseMedia` 帧率不可控（~30fps），球太小太快只有 2–4 帧可追；原生 App 可开 120/240fps + 高快门，是达到「火爆观感」的关键。
+> - **物理约束（不因 App 改变）**：单目相机测不出飞行距离 → 距离只能靠 **Gofly 目标距离 / 码数本（M10-03）估算**，绝不用 CV 假装实测 carry。
+> - **启动第一步**：跑「三组帧率对照 Spike」（微信 30fps / 系统相机慢动作导入 / 原生高帧率），用数据决定原生相机要做到什么程度；渲染可复用 `ai_engine/app/pipeline/visualize.py` 的逐帧叠加 + ffmpeg 编码范式。
+> - **现在不占用**：不进 W22–W24 短杆抛光 / V2 灰度 / 公测精力。
+
+---
+
+### Batch-J · 公测窗口产品优先级（2026-07-18 · 成熟度 > 广度）
+
+> 真源：[`product-priority-memo-2026-07-18.md`](./product-priority-memo-2026-07-18.md) · PLAN-ID **PP-\*** 亦登记于 [`docs/19` §6.3](../19-产品开发迭代计划-当前队列.md#63-主表plan-id)
+
+| Sprint | PLAN-ID | 事项 | 交付物 | 可做 | 状态 |
+|--------|---------|------|--------|------|------|
+| **J0** | PP-12 / PP-13 | Phase2 真机 smoke + 体验版基线 | API 预检 ✅；§D 真机待勾；基线 1.2.36 | Ops | 🔧 预检 Done · 真机待验 |
+| **J1** | PP-01～03 | 信任校准 | eng-06-W28 周报 · pp-02 清单 · V2 纪律 | Now | 🔧 文档 Done · 样本/抽检待运营 |
+| **J2** | PP-04～06 | 公测→付费叙事与漏斗 | 价值主张 ✅ · 埋点 ✅ · 价值卡 ✅ | Now | ✅ 代码 · smoke 待验 |
+| **J3** | PP-07 / PP-09 | 练习场咬合 | 本周主攻 + 练完再拍 Modal | Now | ✅ 代码 · smoke 待验 |
+| **J3b** | PP-08 | 高频 drill 示范片 3～5 条 | MinIO + 对齐 ID | Trigger | ⏳ |
+| **J4** | PP-10 | 同机位前后对比分享海报 | compare 晒进步卡 | Now | ✅ 代码 · smoke 待验 |
+| **J5** | PP-14 | 教练工作流访谈 3～5 人 | 砍功能纪要 | 并行 | 📋（真机收口后） |
+
+**明确不抢本窗口**：Q-D1/Q-D2 App 弹道 · Gofly M14（等供应商书面回复）· 全库 30 条 drill 视频。
 
 ---
 
 ## 四、推荐执行顺序（给排期会）
 
 ```text
-W21 发版收口（体验版 + smoke + git + 文档回填）
-  → W22 短杆/多挥/yardsge 抛光（Now，引擎/UI 已在库）
-  → W23 教练/Pro 批注 smoke
-  → W24 V2 灰度 + 监控发版脚本 + ENG-06
-  → W25 M12-08 演化动画
-  → W26 drill 文案/seed（视频等拍摄 Trigger）
-  → R1–R3 M7-R1 2D 感知准确度（Batch-I，优先于 ECS 标定）
-  → W27+ ECS/追踪（样本 Trigger 并行）
+【公测窗口 · Batch-J】见 product-priority-memo-2026-07-18
+J0 真机 smoke 收口（PP-12/13）
+  → J1 信任校准（PP-01～03，含 W24 V2 观察 / ENG-06）
+  → J2 付费叙事与漏斗（PP-04～06）
+  → J3 练习咬合（PP-07/09；PP-08 有片即上）
+  → J4 对比分享海报（PP-10）
+  →（窗口后）J5 教练访谈 · Gofly · App
+
+【既有工程泳道 · 不与 J0 抢带宽时可并行】
+W21 发版收口余量 → W22/W23 短杆与教练 smoke（并入 J0）
+  → W24 V2 灰度（并入 J1）
+  → R1–R3 M7-R1（信任相关可与 J1 并行）
+  → W25+ / W27+ 按 Trigger，不优先于 Batch-J
 ```
 
-**并行泳道**（不占主 Sprint）：U-2 COS · Q-B5 papay · Q-D1 RN · 拍摄团队 W26-B · **Batch-I R1 止血**
+**并行泳道**（不占主 Sprint）：U-2 COS · Q-B5 papay · Q-D1 RN · 拍摄团队 **PP-08 / W26-B** · **Batch-I R1 止血**
 
 ---
 
@@ -179,3 +209,6 @@ W21 发版收口（体验版 + smoke + git + 文档回填）
 | v0.2 | 2026-05-30 | W21–W25 状态回填；W26-A/C 0043 drill tips+seed（29 条） |
 | v0.4 | 2026-05-30 | Batch-I R1 Phase A → ✅ repo · 待体验版 smoke |
 | v0.3 | 2026-05-30 | Batch-I P2-M7-R1 全挥杆 2D 感知准确度队列 + kickoff 互链 |
+| v0.5 | 2026-07-13 | Batch-H 新增 Q-D2 击球弹道弧线动画（延后至 App 阶段，小程序作分享入口）+ 决策备忘 |
+| v0.6 | 2026-07-18 | Batch-J 公测窗口产品优先级（PP-01～14）；推荐顺序改为 J0→J4 优先于新功能堆叠；互链 product-priority-memo |
+| v0.7 | 2026-07-18 | Batch-J 执行落地：1.2.36 代码（埋点/主攻/价值卡/再拍/晒进步）+ J0/J1 文档；真机与 PP-08 仍开放 |

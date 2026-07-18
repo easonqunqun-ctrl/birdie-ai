@@ -31,13 +31,15 @@ async def test_events_accept_core_batch(
             {"name": "share_report", "payload": {"target_id": "a1"}},
             {"name": "pay_success", "payload": {"order_id": "o1", "mode": "mock"}},
             {"name": "error_report", "payload": {"message": "boom"}},
+            {"name": "membership_view", "payload": {"source": "membership_page"}},
+            {"name": "upgrade_cta_click", "payload": {"source": "membership_cta"}},
         ]
     }
     resp = await client.post("/v1/events", headers=auth_headers, json=payload)
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["code"] == 0
-    assert body["data"]["accepted"] == 6
+    assert body["data"]["accepted"] == 8
     assert body["data"]["rejected"] == 0
 
     # 验证事件确实落库

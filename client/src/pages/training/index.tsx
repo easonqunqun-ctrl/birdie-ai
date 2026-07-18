@@ -486,10 +486,6 @@ const TrainingPage: FC = () => {
     setSubmittingTaskId(taskId)
     try {
       const res = await trainingService.completeTask(taskId, {})
-      Taro.showToast({
-        title: `打卡成功！连续 ${res.current_streak_days} 天`,
-        icon: 'success'
-      })
       // 局部更新 plan
       setPlan((prev) =>
         prev
@@ -509,6 +505,16 @@ const TrainingPage: FC = () => {
         .finally(() => {
           void loadPracticeCurve()
         })
+      // PP-09：练完再拍——同机位再拍一次看进步
+      const modal = await Taro.showModal({
+        title: `打卡成功！连续 ${res.current_streak_days} 天`,
+        content: '建议用相同机位再拍一次挥杆，对比是否改善。',
+        confirmText: '去拍摄',
+        cancelText: '稍后再说',
+      })
+      if (modal.confirm) {
+        Taro.navigateTo({ url: '/pages/analysis/capture' }).catch(() => undefined)
+      }
     } catch (e: unknown) {
       let title =
         isRequestError(e) && e.kind === 'business' && e.message?.trim()

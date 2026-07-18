@@ -48,8 +48,15 @@ import {
   type VideoPlaybackMode,
 } from '@/utils/reportPlayback'
 import { groupIssuesByConfidence, ISSUE_SEVERITY_ORDER } from '@/utils/issueConfidenceGroup'
+import { pickPrimaryFocusIssue } from '@/utils/primaryFocusIssue'
+import {
+  markPromoValueCardShown,
+  PROMO_VALUE_CARD_COPY,
+  shouldShowPromoValueCard,
+} from '@/utils/promoValueCard'
 import { linesForMeasurabilityNotice } from '@/utils/measurabilityNotice'
 import { resolveTrustTier } from '@/utils/trustLabel'
+import { track } from '@/utils/track'
 import { PHASE2_PROS_ENABLED_FLAG } from '@/constants/flags'
 import { prosService, type ProMatchItemRead } from '@/services/prosService'
 import {
@@ -299,6 +306,47 @@ const ReportPage: FC = () => {
     [report?.issues],
   )
 
+  /** PP-07：本周主攻 1 问题 */
+  const primaryFocus = useMemo(
+    () => pickPrimaryFocusIssue(confidentIssues),
+    [confidentIssues],
+  )
+
+  const primaryDrill = useMemo(() => {
+    if (!report?.recommendations?.length || !primaryFocus) return null
+    const linked = report.recommendations.find((r) => r.target_issue === primaryFocus.type)
+    const rec = linked ?? report.recommendations[0]
+    return getDrillDetail(rec.drill_id)
+  }, [report?.recommendations, primaryFocus])
+
+  const [showPromoValueCard, setShowPromoValueCard] = useState(false)
+  const trackedAnalysisDoneRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!report || report.status !== 'completed' || fromShare) return
+    if (!analysisId || analysisId === 'sample') return
+    if (trackedAnalysisDoneRef.current === analysisId) return
+    trackedAnalysisDoneRef.current = analysisId
+    track('analysis_done', {
+      analysis_id: analysisId,
+      overall_score: report.overall_score,
+      analysis_mode: report.analysis_mode,
+    })
+  }, [analysisId, report?.id, report?.status, fromShare])
+
+  useEffect(() => {
+    if (!report || fromShare || analysisId === 'sample') {
+      setShowPromoValueCard(false)
+      return
+    }
+    if (shouldShowPromoValueCard(user)) {
+      setShowPromoValueCard(true)
+      markPromoValueCardShown()
+    } else {
+      setShowPromoValueCard(false)
+    }
+  }, [report?.id, user?.promo_free?.active, analysisId, fromShare])
+
   const emptyDiagnosisCopy = useMemo(() => {
     const score = report?.overall_score
     if (score != null && score < 65) {
@@ -504,9 +552,21 @@ const ReportPage: FC = () => {
    */
   const handleShareClick = () => {
     if (!analysisId || analysisId === 'sample') return
+    track('share_report', { analysis_id: analysisId, channel: 'button' })
     shareService
       .logShare({ share_type: 'report', target_id: analysisId })
       .catch(() => undefined)
+  }
+
+  const handlePromoValueCta = () => {
+    track('upgrade_cta_click', { source: 'report_promo_value_card' })
+    Taro.navigateTo({ url: '/pages/profile/membership' }).catch(() => undefined)
+  }
+
+  const handleFocusDrill = async () => {
+    if (!primaryFocus) return
+    await handleSyncTrainingPlan()
+    Taro.switchTab({ url: '/pages/training/index' }).catch(toastTabNavigationFailure)
   }
 
   /**
@@ -812,6 +872,41 @@ const ReportPage: FC = () => {
         <Text className='report__score-guide-link'>分数说明</Text>
       </View>
 
+      {showPromoValueCard && (
+        <View className='report__promo-value'>
+          <Text className='report__promo-value-title'>{PROMO_VALUE_CARD_COPY.title}</Text>
+          <Text className='report__promo-value-body'>{PROMO_VALUE_CARD_COPY.body}</Text>
+          <Button className='report__promo-value-cta' onClick={handlePromoValueCta}>
+            {PROMO_VALUE_CARD_COPY.cta}
+          </Button>
+        </View>
+      )}
+
+      {primaryFocus && !isSample && (
+        <View className='report__focus'>
+          <Text className='report__focus-eyebrow'>本周主攻</Text>
+          <View className='report__focus-head'>
+            <Text className='report__focus-name'>{primaryFocus.name}</Text>
+            <Text className={`report__severity report__severity--${primaryFocus.severity}`}>
+              {SEVERITY_LABEL[primaryFocus.severity] || primaryFocus.severity}
+            </Text>
+          </View>
+          <Text className='report__focus-desc'>{primaryFocus.description}</Text>
+          {primaryDrill && (
+            <Text className='report__focus-drill'>推荐练习：{primaryDrill.name}</Text>
+          )}
+          <Button
+            className='report__btn report__btn--primary report__focus-cta'
+            loading={syncingPlan}
+            disabled={syncingPlan}
+            onClick={() => void handleFocusDrill()}
+          >
+            去练这个动作
+          </Button>
+          <Text className='report__focus-hint'>练完后用相同机位再拍一次，对比是否改善</Text>
+        </View>
+      )}
+
       {/*
        * P2-W10：AI 整体可信度色块（W7+W8+W9 服务端能力的最终用户触点）
        * V1 报告：analysis_confidence 兜底 1.0 → resolveTrustTier='high' → 色块仅显示「AI 高可信」无 CTA
@@ -983,7 +1078,9 @@ const ReportPage: FC = () => {
       {/* ==================== 4. 问题诊断 ==================== */}
       <View className='report__section'>
         <View className='report__section-header'>
-          <Text className='report__section-title'>问题诊断</Text>
+          <Text className='report__section-title'>
+            {primaryFocus ? '其他问题' : '问题诊断'}
+          </Text>
           <Text className='report__section-hint'>共 {sortedIssues.length} 项</Text>
         </View>
         {confidentIssues.length === 0 && hiddenIssues.length === 0 ? (
@@ -993,43 +1090,56 @@ const ReportPage: FC = () => {
             🤔 AI 对本次诊断不太有把握，下方「不太确定」区可展开查看
           </Text>
         ) : (
-          confidentIssues.map((iss) => (
-            <View
-              key={iss.type}
-              className={[
-                'report__issue',
-                iss.confidence_tier === 'leaning' ? 'report__issue--leaning' : '',
-              ]
-                .filter(Boolean)
-                .join(' ')}
-            >
-              <View className='report__issue-head'>
-                <Text className='report__issue-name'>
-                  {iss.confidence_tier === 'leaning' ? '可能存在·' : ''}{iss.name}
+          (() => {
+            const rest = confidentIssues.filter(
+              (iss) => !primaryFocus || iss.type !== primaryFocus.type,
+            )
+            if (rest.length === 0) {
+              return (
+                <Text className='report__empty'>
+                  其他问题不多，先把上面的「本周主攻」练扎实即可。
                 </Text>
-                <Text className={`report__severity report__severity--${iss.severity}`}>
-                  {SEVERITY_LABEL[iss.severity] || iss.severity}
-                </Text>
+              )
+            }
+            return rest.map((iss) => (
+              <View
+                key={iss.type}
+                className={[
+                  'report__issue',
+                  iss.confidence_tier === 'leaning' ? 'report__issue--leaning' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+              >
+                <View className='report__issue-head'>
+                  <Text className='report__issue-name'>
+                    {iss.confidence_tier === 'leaning' ? '可能存在·' : ''}
+                    {iss.name}
+                  </Text>
+                  <Text className={`report__severity report__severity--${iss.severity}`}>
+                    {SEVERITY_LABEL[iss.severity] || iss.severity}
+                  </Text>
+                </View>
+                {(iss.key_frame_url || report.thumbnail_url) && (
+                  <Image
+                    className='report__issue-frame'
+                    mode='aspectFill'
+                    src={iss.key_frame_url || report.thumbnail_url || ''}
+                  />
+                )}
+                <Text className='report__issue-desc'>{iss.description}</Text>
+                {typeof iss.key_frame_timestamp === 'number' && (
+                  <Button
+                    className='report__issue-ts-btn'
+                    plain
+                    onClick={() => tapIssue(iss.key_frame_timestamp)}
+                  >
+                    👆 点击跳转到 {iss.key_frame_timestamp.toFixed(1)}s 关键帧
+                  </Button>
+                )}
               </View>
-              {(iss.key_frame_url || report.thumbnail_url) && (
-                <Image
-                  className='report__issue-frame'
-                  mode='aspectFill'
-                  src={iss.key_frame_url || report.thumbnail_url || ''}
-                />
-              )}
-              <Text className='report__issue-desc'>{iss.description}</Text>
-              {typeof iss.key_frame_timestamp === 'number' && (
-                <Button
-                  className='report__issue-ts-btn'
-                  plain
-                  onClick={() => tapIssue(iss.key_frame_timestamp)}
-                >
-                  👆 点击跳转到 {iss.key_frame_timestamp.toFixed(1)}s 关键帧
-                </Button>
-              )}
-            </View>
-          ))
+            ))
+          })()
         )}
 
         {/* P2-W10-B3：hidden tier 折叠区——AI confidence<0.6 的诊断默认不打扰用户，

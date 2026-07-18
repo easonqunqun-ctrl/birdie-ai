@@ -26,13 +26,15 @@ from app.models.event import Event
 
 logger = get_logger("event_service")
 
-# W8-T5 核心事件白名单（见 docs/16 T5）
+# W8-T5 核心事件白名单（见 docs/16 T5）+ PP-05 公测漏斗
 #   - page_view         首页 / 关键页访问
 #   - analysis_submit   用户提交分析任务
 #   - analysis_done     报告页首次可见
 #   - share_report      用户触发分享（朋友 / 朋友圈）
 #   - pay_success       支付成功（mock / real 都打同一个事件名）
 #   - error_report      前端运行期错误（App.onError / onUnhandledRejection）
+#   - membership_view   进入会员中心（PP-05）
+#   - upgrade_cta_click 点击开通/续费 CTA（PP-05）
 EVENT_NAMES: frozenset[str] = frozenset(
     {
         "page_view",
@@ -41,6 +43,8 @@ EVENT_NAMES: frozenset[str] = frozenset(
         "share_report",
         "pay_success",
         "error_report",
+        "membership_view",
+        "upgrade_cta_click",
     }
 )
 

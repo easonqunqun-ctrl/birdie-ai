@@ -4,13 +4,14 @@
 
 import { FC, useEffect, useMemo, useState } from 'react'
 import { View, Text, Button, ScrollView } from '@tarojs/components'
-import Taro, { useRouter } from '@tarojs/taro'
+import Taro, { useRouter, useShareAppMessage } from '@tarojs/taro'
 import { analysisService } from '@/services/analysisService'
 import { describePageLoadFailure } from '@/services/request'
 import { PHASE_LABEL, PHASE_ORDER } from '@/constants/phaseLabels'
 import { SCORE_LEVEL_META, scoreLevelFromScore } from '@/constants/scoreLevel'
 import { CAMERA_ANGLE_LABEL, CLUB_TYPE_LABEL } from '@/types/analysis'
 import type { AnalysisReportResponse } from '@/types/analysis'
+import { track } from '@/utils/track'
 import './compare.scss'
 
 function reportTimestamp(r: AnalysisReportResponse): number {
@@ -108,6 +109,38 @@ const ComparePage: FC = () => {
     return { resolved, newly }
   }, [earlier, later])
 
+  const scoreDelta = useMemo(() => {
+    if (!earlier || !later) return 0
+    return (later.overall_score ?? 0) - (earlier.overall_score ?? 0)
+  }, [earlier, later])
+
+  /** PP-10：晒进步一句话 */
+  const progressShareLine = useMemo(() => {
+    const resolvedN = issueDiff.resolved.length
+    if (scoreDelta > 0 && resolvedN > 0) {
+      return `综合分 +${scoreDelta}，已缓解 ${resolvedN} 项问题`
+    }
+    if (scoreDelta > 0) return `综合分进步 +${scoreDelta}，继续保持`
+    if (resolvedN > 0) return `已缓解 ${resolvedN} 项问题，再拍一次巩固`
+    return '两次挥杆对比 · 用数据看见进步'
+  }, [scoreDelta, issueDiff.resolved.length])
+
+  useShareAppMessage(() => {
+    if (!later) {
+      return { title: '领翼golf 挥杆对比', path: '/pages/index/index' }
+    }
+    track('share_report', {
+      analysis_id: later.id,
+      channel: 'compare_progress',
+      score_delta: scoreDelta,
+    })
+    return {
+      title: `我的挥杆进步：${progressShareLine}`,
+      path: `/pages/analysis/report?id=${later.id}&from_share=1`,
+      imageUrl: later.thumbnail_url || '',
+    }
+  })
+
   if (loading) {
     return (
       <View className='compare'>
@@ -131,7 +164,6 @@ const ComparePage: FC = () => {
     )
   }
 
-  const scoreDelta = (later.overall_score ?? 0) - (earlier.overall_score ?? 0)
   const deltaLabel =
     scoreDelta === 0
       ? '较晚一次与较早一次综合分相同。'
@@ -157,6 +189,30 @@ const ComparePage: FC = () => {
       <View className='compare__head'>
         <Text className='compare__title'>历史报告对比</Text>
         <Text className='compare__hint'>按分析时间：左为较早 · 右为较晚</Text>
+      </View>
+
+      {/* PP-10：晒进步叙事卡 */}
+      <View className='compare__progress-share'>
+        <Text className='compare__progress-share-eyebrow'>晒进步</Text>
+        <Text className='compare__progress-share-line'>{progressShareLine}</Text>
+        <Text className='compare__progress-share-sub'>
+          {clubAngleLine(later)} · 建议同机位再练再拍
+        </Text>
+        <View className='compare__progress-share-actions'>
+          <Button className='compare__btn compare__btn--primary' openType='share'>
+            分享进步给球友
+          </Button>
+          <Button
+            className='compare__btn'
+            onClick={() =>
+              Taro.navigateTo({
+                url: `/pages/analysis/poster?id=${encodeURIComponent(later.id)}`,
+              }).catch(() => undefined)
+            }
+          >
+            生成较晚报告海报
+          </Button>
+        </View>
       </View>
 
       <View className={`compare__summary compare__summary--${deltaTone}`}>

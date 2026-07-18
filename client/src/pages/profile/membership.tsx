@@ -17,9 +17,9 @@ import './membership.scss'
 const BENEFITS: { label: string; free: string; member: string }[] = [
   { label: '挥杆视频分析', free: '每月 3 次', member: '无限次' },
   { label: 'AI 教练对话', free: '每天 5 轮', member: '无限次' },
-  { label: '训练计划', free: '仅查看', member: '完整个性化' },
-  { label: '进步曲线', free: '—', member: '✔（正式版开放）' },
-  { label: '历史报告对比', free: '—', member: '✔（正式版开放）' }
+  { label: '本周训练计划', free: '仅查看', member: '完整个性化' },
+  { label: '进步曲线', free: '锁定', member: '完整历史与折线' },
+  { label: '历史报告对比', free: '基础', member: '并排对比 + 晒进步' },
 ]
 
 const MembershipPage: FC = () => {
@@ -44,6 +44,7 @@ const MembershipPage: FC = () => {
   useEffect(() => {
     load()
     void refreshMembershipInfo()
+    track('membership_view', { source: 'membership_page' })
   }, [])
 
   useDidShow(() => {
@@ -315,8 +316,10 @@ const MembershipPage: FC = () => {
   const headlineSub = useMemo(() => {
     if (!user) return ''
     if (user.is_member) return '感谢你的支持，继续精进挥杆'
-    if (isPromoFreeActive(user)) return '公测期间分析与 AI 对话不限次'
-    return '升级会员解锁无限分析与完整训练计划'
+    if (isPromoFreeActive(user)) {
+      return '公测不限次体验中 · 会员把进步曲线延续到公测之后'
+    }
+    return '开通会员：无限分析 + 完整进步曲线与本周训练'
   }, [user])
 
   const promoBanner = promoFreeBannerText(user)
@@ -420,7 +423,14 @@ const MembershipPage: FC = () => {
       <View className='membership__cta'>
         <Button
           className='membership__btn'
-          onClick={handleSubscribe}
+          onClick={() => {
+            track('upgrade_cta_click', {
+              source: 'membership_cta',
+              plan_type: selected,
+              is_member: !!user?.is_member,
+            })
+            void handleSubscribe()
+          }}
           loading={submitting}
           disabled={submitting || loading}
         >

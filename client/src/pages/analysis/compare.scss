@@ -20,6 +20,44 @@
     color: var(--color-text-secondary);
   }
 
+  &__progress-share {
+    margin-bottom: 24rpx;
+    padding: 28rpx;
+    border-radius: var(--radius-md);
+    background: var(--color-bg-elevated, #fff);
+    border: 2rpx solid var(--color-gold);
+    display: flex;
+    flex-direction: column;
+  }
+
+  &__progress-share-eyebrow {
+    font-size: 22rpx;
+    font-weight: 700;
+    color: var(--color-gold);
+    letter-spacing: 0.08em;
+    margin-bottom: 10rpx;
+  }
+
+  &__progress-share-line {
+    font-size: 32rpx;
+    font-weight: 800;
+    color: var(--color-primary);
+    line-height: 1.35;
+    margin-bottom: 10rpx;
+  }
+
+  &__progress-share-sub {
+    font-size: 24rpx;
+    color: var(--color-text-tertiary);
+    margin-bottom: 20rpx;
+  }
+
+  &__progress-share-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12rpx;
+  }
+
   &__head {
     margin-bottom: 20rpx;
   }

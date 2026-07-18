@@ -207,6 +207,97 @@
     padding: 8rpx 4rpx;
   }
 
+  /* PP-06 公测价值感知 */
+  &__promo-value {
+    margin-bottom: 24rpx;
+    padding: 28rpx 28rpx 24rpx;
+    border-radius: var(--radius-md);
+    background: var(--color-gold-soft);
+    border: 2rpx solid var(--color-gold);
+    display: flex;
+    flex-direction: column;
+  }
+
+  &__promo-value-title {
+    font-size: 30rpx;
+    font-weight: 700;
+    color: var(--color-primary);
+    margin-bottom: 12rpx;
+  }
+
+  &__promo-value-body {
+    font-size: 26rpx;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+    margin-bottom: 20rpx;
+  }
+
+  &__promo-value-cta {
+    background: var(--color-primary) !important;
+    color: var(--color-on-primary) !important;
+    font-size: 28rpx;
+    border-radius: var(--radius-md);
+  }
+
+  /* PP-07 本周主攻 */
+  &__focus {
+    margin-bottom: 24rpx;
+    padding: 28rpx;
+    border-radius: var(--radius-md);
+    background: var(--color-bg-elevated, #fff);
+    border: 2rpx solid var(--color-primary);
+    display: flex;
+    flex-direction: column;
+  }
+
+  &__focus-eyebrow {
+    font-size: 22rpx;
+    font-weight: 700;
+    color: var(--color-gold);
+    letter-spacing: 0.08em;
+    margin-bottom: 12rpx;
+  }
+
+  &__focus-head {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12rpx;
+  }
+
+  &__focus-name {
+    font-size: 34rpx;
+    font-weight: 800;
+    color: var(--color-primary);
+    flex: 1;
+    min-width: 0;
+    padding-right: 16rpx;
+  }
+
+  &__focus-desc {
+    font-size: 26rpx;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+    margin-bottom: 16rpx;
+  }
+
+  &__focus-drill {
+    font-size: 26rpx;
+    color: var(--color-accent-mint);
+    margin-bottom: 20rpx;
+  }
+
+  &__focus-cta {
+    margin-bottom: 12rpx;
+  }
+
+  &__focus-hint {
+    font-size: 22rpx;
+    color: var(--color-text-tertiary);
+    line-height: 1.4;
+  }
+
   &__score-left {
     flex: 1;
     min-width: 0;
