@@ -8,7 +8,7 @@
 |----|------|------|
 | `GET https://api.birdieai.cn/v1/health` | ✅ 200 | 发版后复核 ok；`mock_mode=false` |
 | 仓库 `main` HEAD | `307fdc0` | Batch-J 1.2.36 已 push；CVM backend/worker/beat 已重建 |
-| 客户端 | **1.2.36** `client/dist` 已构建 | 待开发者工具上传体验版 |
+| 客户端 | **1.2.36** CLI 已上传（约 1.3 MB） | 待 mp 选为体验版 + 真机确认 |
 | 埋点白名单 | ✅ 容器内已含 `membership_view` / `upgrade_cta_click` | PP-05 |
 
 ## 须人工真机（阻塞 PP-12 关项）
