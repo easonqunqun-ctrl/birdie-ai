@@ -76,3 +76,20 @@
 ## 6. 微信专属 API ↔ RN 等价能力矩阵
 
 见 [release-notes/W10-weapp-apis-rn-matrix.md](./release-notes/W10-weapp-apis-rn-matrix.md)（仓库维护的可 grep 快照）。
+
+---
+
+## 7. App 多语言（第一 + 第二梯队）
+
+> **已入队 · 未开工**（2026-07-20）。小程序仍以简体中文服务大陆；多语言能力落在 **RN App**。
+
+| 项 | 说明 |
+|----|------|
+| **计划真源** | [`release-notes/app-i18n-market-plan.md`](./release-notes/app-i18n-market-plan.md) |
+| **队列 ID** | `docs/19`：**Q-D3** · **I18N-00 / T1-* / T2-*** · **PP-15** · 阶段 **E2** |
+| **第一梯队** | `zh-Hans`（App）· **`en`**（美加/英联邦）· **`zh-Hant`**（港澳台/海外华人） |
+| **第二梯队** | 日本 `ja` · 韩国 `ko` · 新马（英+中）· 泰国（英/中先发，`th` 后置） |
+| **顺序** | **I18N-00 → T1-EN → T1-HANT → T2-SG → JP/KR → TH**（不跳过第一梯队） |
+| **门禁** | RN 主链路可内测后开工 T1；**I18N-T1-EN** 过审后再排日/韩深翻 |
+
+工程落地时：客户端 locale 框架与引擎 `locales/*.json`、LLM system prompt 语言包须同步改契约（先改 `docs/02` / 引擎 locale 约定，再写代码）。
