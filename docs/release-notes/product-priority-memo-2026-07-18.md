@@ -78,7 +78,7 @@
 |----|----------------|----------|
 | P2 教练 | **PP-14**：3～5 教练一周工作流访谈 → 砍功能留「2 分钟批注闭环」 | PP-12 主路径稳定后 |
 | P3 下场 | Gofly 问卷书面回复；通则立项 M14，不通则换源/暂缓 | 见 [`p2-on-course-gofly-vendor-questionnaire.md`](./p2-on-course-gofly-vendor-questionnaire.md) |
-| P4 App | **Q-D1** → 启动时先跑「三组帧率 Spike」→ **Q-D2** 弹道 | 人力到位；App killer = 小程序做不到的能力 |
+| P4 App | **Q-D1** → **先执行** [`app-m0-m1-kickoff-checklist.md`](./app-m0-m1-kickoff-checklist.md)（M0/M1 + 三组帧率 Spike + 性能三项）→ 再 **Q-D2** 弹道 | 人力到位；主路径对等 + App 拍摄/上传优势；非纯平移 |
 | P4 App · i18n | **PP-15** · **Q-D3**：多语言**第一+第二梯队**（en/繁中 → 日韩新马泰） | 门禁：RN 主链路 + **I18N-00**；序见 [`app-i18n-market-plan.md`](./app-i18n-market-plan.md) |
 
 ---
@@ -131,3 +131,4 @@ PP-12/13 真机收口
 | v0.2 | 2026-07-18 | Batch-J 执行：文档 J0/J1/J2 + 客户端 1.2.36（埋点/主攻/价值卡/再拍/晒进步）；真机与 PP-08 仍开放 |
 | v0.3 | 2026-07-20 | **PP-15**：App 多语言入队（初版仅 T2） |
 | v0.4 | 2026-07-20 | **PP-15** 扩为第一+第二梯队；真源改 [`app-i18n-market-plan.md`](./app-i18n-market-plan.md)；序 en → 繁中 → T2 |
+| v0.5 | 2026-07-20 | P4 App：挂 [`app-m0-m1-kickoff-checklist.md`](./app-m0-m1-kickoff-checklist.md) 为 Q-D1 开工执行面 |

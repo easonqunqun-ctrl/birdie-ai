@@ -1,14 +1,17 @@
 # W10 · RN App（与小程序对齐）落地规划
 
-> 版本：v1.0  
-> 日期：2026-05-03  
-> 前置：W8 小程序闭环、W9 正式上线（可按阶段并行）；详细工程任务见下文「链接」与本仓库实现。
+> 版本：v1.1  
+> 日期：2026-05-03（v1.1 · 2026-07-20 增开工清单指针）  
+> 前置：W8 小程序闭环、W9 正式上线（可按阶段并行）；详细工程任务见下文「链接」与本仓库实现。  
+> **开工勾选真源**：[release-notes/app-m0-m1-kickoff-checklist.md](./release-notes/app-m0-m1-kickoff-checklist.md)（M0 / 帧率 Spike / M1 / 性能三项；挂 `docs/19` **Q-D1**）。
 
 ---
 
 ## 1. 文档目的
 
 在 **不改变小程序为第一载体** 的前提下，用 **同一套 `client/` 业务源码**（Taro 3 + React Native）补齐 **原生 App**，与小程序 **功能与后端契约对齐**。
+
+**执行顺序**：先按 [app-m0-m1-kickoff-checklist](./release-notes/app-m0-m1-kickoff-checklist.md) 完成 M0→M1（iOS 优先、支付降级），再开 [多语言计划](./release-notes/app-i18n-market-plan.md) 与 Q-D2 弹道。
 
 ---
 

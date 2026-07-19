@@ -1,7 +1,8 @@
 # W10 React Native App 冒烟 / 内测清单
 
 > 与小程序核心链路对齐；真机为主，模拟器为辅。  
-> 前置：后端已部署且 `POST /v1/auth/wechat-open-login` 可用；客户端 `TARO_APP_API_BASE_URL` 指向该环境；`TARO_APP_WECHAT_OPEN_APPID` 与开放平台移动应用一致。
+> 前置：后端已部署且 `POST /v1/auth/wechat-open-login` 可用；客户端 `TARO_APP_API_BASE_URL` 指向该环境；`TARO_APP_WECHAT_OPEN_APPID` 与开放平台移动应用一致。  
+> **分期开工勾选**（M0/M1/Spike/性能）：见 [**`app-m0-m1-kickoff-checklist.md`**](app-m0-m1-kickoff-checklist.md)；本文件为总冒烟表，二者互补。
 
 ## 1. 环境与包体
 
