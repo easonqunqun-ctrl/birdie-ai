@@ -1,6 +1,6 @@
 import { FC, useCallback, useEffect, useState } from 'react'
 import { View, Text, Button, Image } from '@tarojs/components'
-import Taro, { useDidShow } from '@tarojs/taro'
+import Taro, { useDidShow, useShareAppMessage, useShareTimeline } from '@tarojs/taro'
 import EnvBadge from '@/components/EnvBadge'
 import { useUserStore } from '@/store/userStore'
 import { useMembershipExpiringSoonModalOnShow } from '@/hooks/useMembershipExpiringSoonModalOnShow'
@@ -11,13 +11,16 @@ import { PAYMENT_ENABLED_FLAG } from '@/constants/flags'
 import { isPromoFreeActive, promoFreeBannerText } from '@/utils/promoFree'
 import { SCORE_LEVEL_META, scoreLevelFromScore } from '@/constants/scoreLevel'
 import { CLUB_TYPE_LABEL } from '@/types/analysis'
-import { BRAND_LOGO } from '@/constants/brandAssets'
+import { APP_SHARE_MESSAGE, APP_SHARE_TIMELINE, BRAND_LOGO } from '@/constants/brandAssets'
 import type { AnalysisListItem } from '@/types/analysis'
 import './index.scss'
 
 const HomePage: FC = () => {
   const { user, token, initialized, bootstrap, fetchMe } = useUserStore()
   const [recent, setRecent] = useState<AnalysisListItem[]>([])
+
+  useShareAppMessage(() => ({ ...APP_SHARE_MESSAGE }))
+  useShareTimeline(() => ({ ...APP_SHARE_TIMELINE }))
 
   useMembershipExpiringSoonModalOnShow(!!token)
 

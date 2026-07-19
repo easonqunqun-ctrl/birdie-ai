@@ -1,7 +1,8 @@
 import { FC, useEffect, useState } from 'react'
 import { View, Text, Button, Switch } from '@tarojs/components'
-import Taro, { useDidShow } from '@tarojs/taro'
+import Taro, { useDidShow, useShareAppMessage, useShareTimeline } from '@tarojs/taro'
 import EnvBadge from '@/components/EnvBadge'
+import { APP_SHARE_MESSAGE, APP_SHARE_TIMELINE } from '@/constants/brandAssets'
 import { useUserStore } from '@/store/userStore'
 import { switchToCoach, toastTabNavigationFailure } from '@/utils/tabNav'
 import { FREQ_LABEL, GOAL_LABEL, LEVEL_LABEL } from '@/constants/golf'
@@ -23,6 +24,9 @@ const ProfilePage: FC = () => {
     useUserStore()
   const [roleSwitchSaving, setRoleSwitchSaving] = useState(false)
   const [pendingCoachInvites, setPendingCoachInvites] = useState(0)
+
+  useShareAppMessage(() => ({ ...APP_SHARE_MESSAGE }))
+  useShareTimeline(() => ({ ...APP_SHARE_TIMELINE }))
 
   useEffect(() => {
     if (!initialized) {

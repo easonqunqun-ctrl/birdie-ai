@@ -12,8 +12,9 @@
 
 import { FC, useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, ScrollView, Text, View } from '@tarojs/components'
-import Taro, { useDidShow } from '@tarojs/taro'
+import Taro, { useDidShow, useShareAppMessage, useShareTimeline } from '@tarojs/taro'
 import EnvBadge from '@/components/EnvBadge'
+import { APP_SHARE_MESSAGE, APP_SHARE_TIMELINE } from '@/constants/brandAssets'
 import PracticeCalendar from '@/components/PracticeCalendar'
 import '@/components/PracticeCalendar.scss'
 import ProgressLineChart from '@/components/ProgressLineChart'
@@ -61,6 +62,9 @@ import './index.scss'
 
 const TrainingPage: FC = () => {
   const { user, token, initialized, bootstrap, fetchMe } = useUserStore()
+
+  useShareAppMessage(() => ({ ...APP_SHARE_MESSAGE }))
+  useShareTimeline(() => ({ ...APP_SHARE_TIMELINE }))
 
   useMembershipExpiringSoonModalOnShow(!!token)
 

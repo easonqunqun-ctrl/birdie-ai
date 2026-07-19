@@ -19,12 +19,12 @@
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Image, Input, ScrollView, Text, View } from '@tarojs/components'
 import type { BaseEventOrig } from '@tarojs/components'
-import Taro, { useDidShow, useRouter } from '@tarojs/taro'
+import Taro, { useDidShow, useRouter, useShareAppMessage, useShareTimeline } from '@tarojs/taro'
 import DrillCard from '@/components/DrillCard'
 import AnalysisCard from '@/components/AnalysisCard'
 import VideoCard from '@/components/VideoCard'
 import EnvBadge from '@/components/EnvBadge'
-import { BRAND_LOGO } from '@/constants/brandAssets'
+import { APP_SHARE_MESSAGE, APP_SHARE_TIMELINE, BRAND_LOGO } from '@/constants/brandAssets'
 import {
   consumeCoachPendingContext,
   switchToHome,
@@ -102,6 +102,9 @@ const CoachPage: FC = () => {
   const token = useUserStore((s) => s.token)
   const initialized = useUserStore((s) => s.initialized)
   const bootstrapUser = useUserStore((s) => s.bootstrap)
+
+  useShareAppMessage(() => ({ ...APP_SHARE_MESSAGE }))
+  useShareTimeline(() => ({ ...APP_SHARE_TIMELINE }))
 
   useMembershipExpiringSoonModalOnShow(!!token)
 

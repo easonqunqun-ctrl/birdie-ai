@@ -22,3 +22,17 @@ export const BRAND_LOGO = logoUrl
  *   出图后替换本常量即可。
  */
 export const BRAND_SHARE_COVER = logoAltUrl
+
+/** 首页 / Tab 页胶囊「转发给朋友」默认文案与落地页 */
+export const APP_SHARE_MESSAGE = {
+  title: '领翼golf · AI 看挥杆，发现进步空间',
+  path: '/pages/index/index',
+  imageUrl: BRAND_SHARE_COVER,
+} as const
+
+/** Tab 页「分享到朋友圈」默认文案 */
+export const APP_SHARE_TIMELINE = {
+  title: '领翼golf · AI 看挥杆，发现进步空间',
+  query: '',
+  imageUrl: BRAND_SHARE_COVER,
+} as const

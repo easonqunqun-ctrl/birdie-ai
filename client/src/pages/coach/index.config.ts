@@ -5,4 +5,6 @@ export default definePageConfig({
   // 白底导航看起来比灰底页面更聚焦
   navigationBarBackgroundColor: '#ffffff',
   navigationBarTextStyle: 'black',
+  enableShareAppMessage: true,
+  enableShareTimeline: true,
 })
