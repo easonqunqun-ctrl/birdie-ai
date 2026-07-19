@@ -113,6 +113,12 @@ class AnalyzeResult(BaseModel):
     skeleton_video_url: str | None = None
     skeleton_data_url: str | None = None
     thumbnail_url: str | None = None
+    # 骨骼异步：主分析先 completed；backend Celery 再调 /derive-skeleton
+    skeleton_pending: bool = False
+    normalized_video_url: str | None = Field(
+        default=None,
+        description="defer 骨骼时暂存的归一化视频 URL（仅供 /derive-skeleton，不暴露给 C 端）",
+    )
 
     duration_ms: int | None = None
     error_code: int | None = None
@@ -160,6 +166,29 @@ class AnalyzeResult(BaseModel):
         default_factory=list,
         description="阶段亮点肯定话术（V2；docs/20 §4.3）",
     )
+
+
+class DeriveSkeletonRequest(BaseModel):
+    """异步补渲染骨骼视频（分析主路径已 completed）。"""
+
+    analysis_id: str
+    normalized_video_url: str | None = Field(
+        default=None, description="主分析上传的归一化视频；缺省按约定 key 取"
+    )
+    skeleton_data_url: str | None = Field(
+        default=None, description="pose parquet URL；缺省按约定 key 取"
+    )
+    video_url: str | None = Field(
+        default=None, description="归一化视频缺失时的原片回退"
+    )
+
+
+class DeriveSkeletonResult(BaseModel):
+    analysis_id: str
+    status: Literal["completed", "failed"]
+    skeleton_video_url: str | None = None
+    error_message: str | None = None
+    elapsed_ms: int = 0
 
 
 class PrecheckRequest(BaseModel):

@@ -77,7 +77,7 @@ async def run_putting_analysis(req: AnalyzeRequest) -> AnalyzeResult:
     }
 
     # 8. 衍生产物（复用 full_swing；任一失败回落占位，不阻断主流程）
-    skeleton_url, thumb_url, skeleton_data_url, keyframe_urls = _produce_derived_assets(
+    derived = _produce_derived_assets(
         analysis_id=req.analysis_id,
         normalized_video_path=Path(pre.normalized_video_path),
         pose_result=pose_result,
@@ -92,7 +92,7 @@ async def run_putting_analysis(req: AnalyzeRequest) -> AnalyzeResult:
             severity=it.severity,
             description=it.description,
             key_frame_timestamp=it.key_frame_timestamp,
-            key_frame_url=keyframe_urls.get(it.type),
+            key_frame_url=derived.keyframe_urls.get(it.type),
         )
         for it in issues_raw
     ]
@@ -117,6 +117,17 @@ async def run_putting_analysis(req: AnalyzeRequest) -> AnalyzeResult:
     except Exception:  # pragma: no cover
         pass
 
+    engine_warnings = (
+        [
+            {
+                "code": "skeleton_pending",
+                "level": "info",
+                "detail": "skeleton video rendering deferred",
+            }
+        ]
+        if derived.skeleton_pending
+        else []
+    )
     return AnalyzeResult(
         analysis_id=req.analysis_id,
         status="completed",
@@ -126,9 +137,12 @@ async def run_putting_analysis(req: AnalyzeRequest) -> AnalyzeResult:
         mode_feature_scores=scores["features"],
         phase_timestamps=None,  # 推杆 4 阶段与 full_swing PhaseTimestamps 6 段不同构，置空
         issues=issues,
-        skeleton_video_url=skeleton_url,
-        skeleton_data_url=skeleton_data_url,
-        thumbnail_url=thumb_url,
+        skeleton_video_url=derived.skeleton_video_url,
+        skeleton_data_url=derived.skeleton_data_url,
+        thumbnail_url=derived.thumbnail_url,
         duration_ms=duration_ms,
         quality_warnings=quality_warnings,
+        skeleton_pending=derived.skeleton_pending,
+        normalized_video_url=derived.normalized_video_url,
+        engine_warnings=engine_warnings,
     )

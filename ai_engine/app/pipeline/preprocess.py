@@ -237,6 +237,15 @@ def preprocess_video(
             user_message=f"视频时长过长（最多 {int(max_duration)} 秒）",
         )
 
+    # 2.5 O-08 同源早检：源视频快速扫描（≤5s），硬门槛不过则跳过 ffmpeg。
+    # 取代 Celery 单独 POST /precheck 的二次下载；/precheck 端点仍保留供运维抽检。
+    early_stats = _quick_scan_quality(source_path, max_elapsed_sec=5.0)
+    enforce_quality_gates(
+        early_stats,
+        min_clarity=min_clarity,
+        max_frame_loss=max_frame_loss,
+    )
+
     # 3. ffmpeg 转码到 normalized.mp4（30fps / 720p 短边 / H.264）
     normalized_path = work_dir / "normalized.mp4"
     _ffmpeg_normalize(source_path, normalized_path, probe)

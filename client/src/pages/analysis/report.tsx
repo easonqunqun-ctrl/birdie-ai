@@ -187,7 +187,43 @@ const ReportPage: FC = () => {
             setLoading(false)
           })
       })
-  }, [analysisId, fromShare, currentUserToken])
+  }, [analysisId, currentUserToken, fromShare])
+
+  // 骨骼异步补渲染：报告已出、骨骼 URL 尚未就绪时短轮询（最多 ~30s）
+  useEffect(() => {
+    if (!report || fromShare || !analysisId || !currentUserToken) return
+    const pending = (report.engine_warnings || []).some((w) => w.code === 'skeleton_pending')
+    if (report.skeleton_video_url || !pending) return
+    let cancelled = false
+    let tries = 0
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const tick = () => {
+      if (cancelled || tries >= 12) return
+      tries += 1
+      analysisService
+        .getReport(analysisId)
+        .then((r) => {
+          if (cancelled) return
+          setReport(r)
+          if (!r.skeleton_video_url && tries < 12) {
+            timer = setTimeout(tick, 2500)
+          }
+        })
+        .catch(() => undefined)
+    }
+    timer = setTimeout(tick, 2500)
+    return () => {
+      cancelled = true
+      if (timer) clearTimeout(timer)
+    }
+  }, [
+    analysisId,
+    fromShare,
+    currentUserToken,
+    report?.id,
+    report?.skeleton_video_url,
+    report?.engine_warnings,
+  ])
 
   useEffect(() => {
     if (!analysisId || analysisId === 'sample' || !currentUserToken || fromShare) {

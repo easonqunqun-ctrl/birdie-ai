@@ -72,18 +72,24 @@ def test_produce_derived_assets_disabled_storage_uses_placeholders(
     if src is None:
         pytest.skip("bouncing_box.mp4 缺失")
 
-    skeleton, thumb, pose_data, kf_urls = _produce_derived_assets(
+    derived = _produce_derived_assets(
         analysis_id="test-disabled",
         normalized_video_path=src,
         pose_result=synthetic_pose_result,
         issues_raw=[],
         fallback_video_url="https://example.com/foo.mp4",
+        defer_skeleton=False,
     )
 
-    assert skeleton == _placeholder_suffix("https://example.com/foo.mp4", "_skeleton.mp4")
-    assert thumb == _placeholder_suffix("https://example.com/foo.mp4", "_thumb.jpg")
-    assert pose_data is None  # disabled 时没有 fallback
-    assert kf_urls == {}
+    assert derived.skeleton_video_url == _placeholder_suffix(
+        "https://example.com/foo.mp4", "_skeleton.mp4"
+    )
+    assert derived.thumbnail_url == _placeholder_suffix(
+        "https://example.com/foo.mp4", "_thumb.jpg"
+    )
+    assert derived.skeleton_data_url is None  # disabled 时没有 fallback
+    assert derived.keyframe_urls == {}
+    assert derived.skeleton_pending is False
 
 
 @needs_cv2_ffmpeg
@@ -103,24 +109,30 @@ def test_produce_derived_assets_uploads_to_minio(synthetic_pose_result) -> None:
     if not storage.enabled or storage._client is None:  # type: ignore[attr-defined]
         pytest.skip("storage disabled by env")
 
-    skeleton, thumb, pose_data, kf_urls = _produce_derived_assets(
+    derived = _produce_derived_assets(
         analysis_id=analysis_id,
         normalized_video_path=src,
         pose_result=synthetic_pose_result,
         issues_raw=[],
         fallback_video_url="https://example.com/foo.mp4",
+        defer_skeleton=False,
     )
 
     # skeleton / thumb / parquet 三类都应该是真实 minio URL（bucket 在 endpoint 后）
-    assert skeleton is not None and settings.MINIO_BUCKET in skeleton
-    assert thumb is not None and settings.MINIO_BUCKET in thumb
-    assert pose_data is not None and pose_data.endswith(".parquet")
+    assert (
+        derived.skeleton_video_url is not None
+        and settings.MINIO_BUCKET in derived.skeleton_video_url
+    )
+    assert derived.thumbnail_url is not None and settings.MINIO_BUCKET in derived.thumbnail_url
+    assert derived.skeleton_data_url is not None and derived.skeleton_data_url.endswith(
+        ".parquet"
+    )
 
     # 用 minio SDK 反查每个 key 都在 bucket 里
     for url, suffix in [
-        (skeleton, ".mp4"),
-        (thumb, ".jpg"),
-        (pose_data, ".parquet"),
+        (derived.skeleton_video_url, ".mp4"),
+        (derived.thumbnail_url, ".jpg"),
+        (derived.skeleton_data_url, ".parquet"),
     ]:
         # url 形如 http://localhost:9000/<bucket>/<key>
         # 取 bucket 之后的 key

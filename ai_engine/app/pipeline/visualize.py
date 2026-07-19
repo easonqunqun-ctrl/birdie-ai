@@ -554,6 +554,53 @@ def dump_pose_parquet(pose_result: PoseResult, output_path: Path | str) -> Path 
     return output_path
 
 
+def load_pose_from_parquet(
+    parquet_path: Path | str,
+    *,
+    fps: float = DEFAULT_SKELETON_OUTPUT_FPS,
+) -> PoseResult | None:
+    """从 ``dump_pose_parquet`` 产物还原 ``PoseResult``（供异步骨骼渲染）。"""
+    from app.pipeline.pose import NUM_LANDMARKS, PoseResult
+
+    try:
+        import pyarrow.parquet as pq
+    except ImportError:
+        log.warning("pyarrow_unavailable")
+        return None
+
+    path = Path(parquet_path)
+    if not path.exists():
+        log.warning("pose_parquet_missing", extra={"path": str(path)})
+        return None
+    try:
+        table = pq.read_table(path)
+        frame_idx = table.column("frame_idx").to_numpy()
+        num_frames = int(len(frame_idx))
+        if num_frames <= 0:
+            return None
+        keypoints = np.zeros((num_frames, NUM_LANDMARKS, 3), dtype=np.float32)
+        visibility = np.zeros((num_frames, NUM_LANDMARKS), dtype=np.float32)
+        for axis_idx, axis_name in enumerate(("x", "y", "z")):
+            for lm_idx in range(NUM_LANDMARKS):
+                keypoints[:, lm_idx, axis_idx] = (
+                    table.column(f"kp_{axis_name}_{lm_idx}").to_numpy().astype(np.float32)
+                )
+        for lm_idx in range(NUM_LANDMARKS):
+            visibility[:, lm_idx] = table.column(f"vis_{lm_idx}").to_numpy().astype(np.float32)
+        valid = table.column("valid").to_numpy().astype(bool)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("pose_parquet_read_failed", extra={"error": str(exc)})
+        return None
+
+    return PoseResult(
+        keypoints=keypoints,
+        visibility=visibility,
+        valid_mask=valid,
+        fps=float(fps) if fps > 0 else DEFAULT_SKELETON_OUTPUT_FPS,
+        num_frames=num_frames,
+    )
+
+
 # ============================================================
 # 统一工具：临时目录上下文
 # ============================================================

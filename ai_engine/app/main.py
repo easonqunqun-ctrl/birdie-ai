@@ -19,6 +19,8 @@ from app.mock_pipeline import run_mock_analysis
 from app.schemas import (
     AnalyzeRequest,
     AnalyzeResult,
+    DeriveSkeletonRequest,
+    DeriveSkeletonResult,
     DetectSwingsRequest,
     DetectSwingsResult,
     PhaseScore,
@@ -467,6 +469,33 @@ async def admin_engine_rollout(payload: _RolloutPayload) -> dict:
             "confirm_required": True,
         }
     return {"code": 0, "data": out}
+
+
+@app.post(
+    "/derive-skeleton",
+    summary="异步补渲染骨骼叠加视频",
+    response_model=DeriveSkeletonResult,
+)
+async def derive_skeleton(req: DeriveSkeletonRequest) -> DeriveSkeletonResult:
+    """主 /analyze 在 DEFER_SKELETON_VIDEO 时跳过骨骼编码；由 backend Celery 回调本接口。"""
+    log.info("derive_skeleton_start", analysis_id=req.analysis_id)
+    if settings.AI_ENGINE_MOCK_MODE:
+        return DeriveSkeletonResult(
+            analysis_id=req.analysis_id,
+            status="completed",
+            skeleton_video_url=(req.video_url or "") + "_skeleton.mp4",
+            elapsed_ms=0,
+        )
+    from app.pipeline.derive_skeleton import run_derive_skeleton
+
+    result = run_derive_skeleton(req)
+    log.info(
+        "derive_skeleton_done",
+        analysis_id=req.analysis_id,
+        status=result.status,
+        elapsed_ms=result.elapsed_ms,
+    )
+    return result
 
 
 @app.post(

@@ -130,7 +130,7 @@ Authorization: Bearer <jwt_token>
 | 50001 | 服务内部错误 | 未预期的服务端异常 |
 | 50100 | AI 引擎不可达 | Celery worker 连 AI 引擎超时/连接失败，耗尽 3 次重试后终态失败（backend 侧 transport 级失败，W6-T6 起启用） |
 | 50101 | 视频预处理失败 | ffmpeg 解码失败 / 视频文件下载失败 / 转码异常（W6-T1 真实触发；对应 `ai_engine.PreprocessError`） |
-| 50102 | 视频画质不足 | 拉普拉斯/clarity 硬门槛、低清晰度帧占比、极端抖动、综合 `quality_score`（W6-T1 + **v1.2.12 Batch-D** `POST /precheck` 早失败；对应 `ai_engine.PoorQualityError`） |
+| 50102 | 视频画质不足 | 拉普拉斯/clarity 硬门槛、低清晰度帧占比、极端抖动、综合 `quality_score`（W6-T1；**2026-07-19** 起质量早检内联到 `/analyze` 预处理，不再依赖 Celery 先调 `/precheck`；对应 `ai_engine.PoorQualityError`） |
 | 50103 | 未检测到人体 | MediaPipe 全帧未识别到人体，或有效帧占比 < 70%（W6-T1 真实触发；对应 `ai_engine.NoPersonError`） |
 | 50104 | 未检测到挥杆 | 检测到人体但关键点序列不满足挥杆速度曲线特征（静止 / 走路 / 其它运动）（W6-T2 真实触发；对应 `ai_engine.NoSwingError`） |
 | 50105 | AI 引擎内部异常 | MediaPipe 模型加载失败 / 推理异常（运维级问题，非用户可修复）（W6-T1 兜底触发；对应 `ai_engine.PoseModelError`） |
@@ -140,7 +140,8 @@ Authorization: Bearer <jwt_token>
 
 #### 1.3.1 AI Engine 内部 · `POST /precheck`（O-08，v1.2.12）
 
-> **非 C 端 REST**：由 Celery `run_swing_analysis` 在调用 `POST /analyze` 前先请求 `{AI_ENGINE_URL}/precheck`。
+> **非 C 端 REST**。**2026-07-19 起**：生产 Celery **不再**先调 `/precheck`；同源快速扫描已内联到 `/analyze` → `preprocess_*`（下载后、ffmpeg 前）。`/precheck` 端点仍保留供运维抽检。  
+> 历史行为（v1.2.12～）：Celery `run_swing_analysis` 在 `POST /analyze` 前先请求 `{AI_ENGINE_URL}/precheck`。
 
 | 字段 | 说明 |
 |------|------|
@@ -927,6 +928,7 @@ GET /v1/analyses/{analysis_id}
 **字段补充**：
 
 - **`quality_warnings`**：`string[]`，AI 引擎返回的**非阻断**拍摄质量提示（machine codes，如 `low_light`、`camera_shake`），入库列 `swing_analyses.quality_warnings`（JSONB）。与失败态 `error` 互斥存在；空数组表示无附加提示。客户端展示文案见 `client/src/constants/qualityWarnings.ts`，产品与话术真源见 [`docs/20` §4.3～§4.4](./20-AI引擎产品力迭代设计.md)。
+- **`skeleton_video_url` / `skeleton_pending`（2026-07-19）**：骨骼默认可异步。`status=completed` 时 `skeleton_video_url` 可能暂为 `null`，同时 `engine_warnings` 含 `{code:"skeleton_pending"}`；Celery 补渲染后写回 URL。客户端短轮询刷新（见 [`analysis-latency-skeleton-async-2026-07-19.md`](./release-notes/analysis-latency-skeleton-async-2026-07-19.md)）。
 - **`analysis_mode`**：`full_swing` / `putting` / `chipping`；入库 `swing_analyses.analysis_mode`（M10-01）。
 - **`putting_features`**：仅 `analysis_mode=putting` 时返回 4 维度分（`pendulum_stability` / `head_stability` / `face_alignment` / `tempo_ratio`）；来源 `swing_analyses.mode_feature_scores`（M10-01）。`phase_scores` 在同 mode 下为推杆 4 阶段（setup/backstroke/impact/follow），与全挥杆 6 阶段不同构。
 - **`chipping_features`**：仅 `analysis_mode=chipping` 时返回 3 维度分（`half_swing_amplitude` / `face_open_angle` / `contact_point_quality`）；同样来源 `mode_feature_scores`（M10-02）。

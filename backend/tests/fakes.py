@@ -110,6 +110,7 @@ class FakeAIEngine:
         video_url: str,
         camera_angle: str,
         club_type: str,
+        **_kwargs: Any,
     ) -> dict:
         self._call_count += 1
         self.calls.append(
@@ -126,7 +127,8 @@ class FakeAIEngine:
             raise httpx.TimeoutException("fake timeout")
         if self.mode == "flaky" and self._call_count < self.succeed_on_attempt:
             raise httpx.TimeoutException("fake flaky")
-        if self.mode == "engine_failed":
+        if self.mode in {"engine_failed", "precheck_blocked"}:
+            # precheck_blocked：质量失败已内联到 analyze，语义同 engine_failed
             return {
                 "analysis_id": analysis_id,
                 "status": "failed",
@@ -135,6 +137,30 @@ class FakeAIEngine:
             }
         # ok: 返回一组稳定的假结果
         return _build_ok_result(analysis_id, video_url, club_type)
+
+    async def derive_skeleton(
+        self,
+        *,
+        analysis_id: str,
+        normalized_video_url: str | None = None,
+        skeleton_data_url: str | None = None,
+        video_url: str | None = None,
+    ) -> dict:
+        self.calls.append(
+            {
+                "method": "derive_skeleton",
+                "analysis_id": analysis_id,
+                "normalized_video_url": normalized_video_url,
+                "skeleton_data_url": skeleton_data_url,
+                "video_url": video_url,
+            }
+        )
+        return {
+            "analysis_id": analysis_id,
+            "status": "completed",
+            "skeleton_video_url": f"https://example.com/skeleton/{analysis_id}.mp4",
+            "elapsed_ms": 10,
+        }
 
     async def precheck(
         self,

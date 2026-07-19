@@ -165,6 +165,16 @@ def preprocess_video_v2(
     _validate_duration(probe, min_duration=min_duration, max_duration=max_duration)
     _validate_codec(probe, engine_warnings)
 
+    # 与 V1 一致：源视频快速质量早检，避免硬门槛失败仍付出 ffmpeg 成本
+    from app.pipeline.preprocess import _quick_scan_quality, enforce_quality_gates
+
+    early_stats = _quick_scan_quality(source_path, max_elapsed_sec=5.0)
+    enforce_quality_gates(
+        early_stats,
+        min_clarity=min_clarity,
+        max_frame_loss=max_frame_loss,
+    )
+
     if probe.is_slowmo and probe.nominal_fps > 0:
         engine_warnings.append(
             EngineWarning(

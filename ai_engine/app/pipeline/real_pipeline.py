@@ -308,14 +308,18 @@ async def run_real_analysis(
         },
     )
 
-    # 8. 可视化：3 类衍生产物 → MinIO（任一失败 → 占位 URL，主流程不受影响）
-    skeleton_url, thumb_url, skeleton_data_url, keyframe_urls = _produce_derived_assets(
+    # 8. 可视化：缩略图/关键帧/parquet 同步；骨骼默认可 defer（Celery 补）
+    derived = _produce_derived_assets(
         analysis_id=req.analysis_id,
         normalized_video_path=Path(pre.normalized_video_path),
         pose_result=pose_result,
         issues_raw=issues_raw,
         fallback_video_url=req.video_url,
     )
+    skeleton_url = derived.skeleton_video_url
+    thumb_url = derived.thumbnail_url
+    skeleton_data_url = derived.skeleton_data_url
+    keyframe_urls = derived.keyframe_urls
 
     issues = [
         IssueItem(
@@ -370,11 +374,23 @@ async def run_real_analysis(
         ),
         swing_candidates=swing_candidates_out,
         selected_swing_index=selected_idx if raw_candidates else 0,
+        skeleton_pending=derived.skeleton_pending,
+        normalized_video_url=derived.normalized_video_url,
     )
-    if preprocess_engine_warnings or ms_warning is not None:
-        engine_w: list[dict] = list(preprocess_engine_warnings)
-        if ms_warning is not None:
-            engine_w.append(ms_warning)
+    engine_w: list[dict] = []
+    if preprocess_engine_warnings:
+        engine_w.extend(preprocess_engine_warnings)
+    if ms_warning is not None:
+        engine_w.append(ms_warning)
+    if derived.skeleton_pending:
+        engine_w.append(
+            {
+                "code": "skeleton_pending",
+                "level": "info",
+                "detail": "skeleton video rendering deferred",
+            }
+        )
+    if engine_w:
         result.engine_warnings = engine_w
 
     # P2-W7 ENG-B：V2 通过 enrichment_fn 把三层 confidence + engine_warnings 注入 result；
@@ -438,6 +454,18 @@ def _merge_quality_warnings(*groups: list[str]) -> list[str]:
 # ============================================================
 
 
+@dataclass
+class DerivedAssetsResult:
+    """``_produce_derived_assets`` 产物；``skeleton_pending`` 时由 Celery 补骨骼。"""
+
+    skeleton_video_url: str | None
+    thumbnail_url: str | None
+    skeleton_data_url: str | None
+    keyframe_urls: dict[str, str]
+    skeleton_pending: bool = False
+    normalized_video_url: str | None = None
+
+
 def _produce_derived_assets(
     *,
     analysis_id: str,
@@ -445,14 +473,14 @@ def _produce_derived_assets(
     pose_result,
     issues_raw,
     fallback_video_url: str,
-) -> tuple[str | None, str | None, str | None, dict[str, str]]:
-    """生成三类产物 + 上传 MinIO，返回 4 个 URL/字典。
+    defer_skeleton: bool | None = None,
+) -> DerivedAssetsResult:
+    """生成衍生产物并上传 MinIO。
 
-    任何一步失败：log warning，对应 URL 用占位（skeleton/thumb 用原视频后缀；
-    parquet/keyframe 用 None）；从不抛错，保证主分析流程不被产物失败拖垮。
+    ``DEFER_SKELETON_VIDEO``（默认 True）：主路径跳过骨骼编码，先上传归一化视频
+    + parquet/缩略图/关键帧，``skeleton_pending=True`` 交 Celery ``/derive-skeleton``。
 
-    Returns:
-        (skeleton_video_url, thumbnail_url, skeleton_data_url, {issue_type: keyframe_url})
+    任何一步失败：log warning，对应 URL 用占位或 None；从不抛错。
     """
     storage = get_storage()
     tmpdir = make_artifacts_tmpdir()
@@ -460,26 +488,55 @@ def _produce_derived_assets(
     thumb_url: str | None = None
     skeleton_data_url: str | None = None
     keyframe_urls: dict[str, str] = {}
+    skeleton_pending = False
+    normalized_video_url: str | None = None
+    defer = settings.DEFER_SKELETON_VIDEO if defer_skeleton is None else defer_skeleton
 
     try:
-        # ---------- A. 骨骼叠加视频 ----------
-        skeleton_path = render_skeleton_video(
-            normalized_video_path,
-            pose_result,
-            tmpdir / "skeleton.mp4",
-        )
-        if skeleton_path is not None:
-            skeleton_key = f"{settings.DERIVED_SKELETON_PREFIX}/{analysis_id}.mp4"
-            url = storage.put_file(skeleton_path, skeleton_key, content_type="video/mp4")
-            skeleton_url = url or _placeholder_suffix(fallback_video_url, "_skeleton.mp4")
-        else:
-            skeleton_url = _placeholder_suffix(fallback_video_url, "_skeleton.mp4")
+        # ---------- A. 骨骼叠加视频（可 defer） ----------
+        can_defer = bool(defer and storage.enabled)
+        if can_defer:
+            norm_key = f"{settings.DERIVED_NORMALIZED_PREFIX}/{analysis_id}.mp4"
+            normalized_video_url = storage.put_file(
+                normalized_video_path, norm_key, content_type="video/mp4"
+            )
+            if normalized_video_url:
+                skeleton_pending = True
+                skeleton_url = None
+                log.info(
+                    "skeleton_deferred",
+                    extra={
+                        "analysis_id": analysis_id,
+                        "normalized_video_url": normalized_video_url,
+                    },
+                )
+            else:
+                can_defer = False
+
+        if not can_defer:
+            skeleton_path = render_skeleton_video(
+                normalized_video_path,
+                pose_result,
+                tmpdir / "skeleton.mp4",
+            )
+            if skeleton_path is not None:
+                skeleton_key = f"{settings.DERIVED_SKELETON_PREFIX}/{analysis_id}.mp4"
+                url = storage.put_file(
+                    skeleton_path, skeleton_key, content_type="video/mp4"
+                )
+                skeleton_url = url or _placeholder_suffix(
+                    fallback_video_url, "_skeleton.mp4"
+                )
+            else:
+                skeleton_url = _placeholder_suffix(fallback_video_url, "_skeleton.mp4")
 
         # ---------- B. 缩略图：取视频前 1/6 处的一帧（接近 setup） ----------
         # 不叠加骨骼，避免封面图被绿色线条干扰
         from app.pipeline.visualize import extract_keyframe  # 局部 import 避免循环
 
-        thumb_frame_idx = max(0, min(pose_result.num_frames // 6, pose_result.num_frames - 1))
+        thumb_frame_idx = max(
+            0, min(pose_result.num_frames // 6, pose_result.num_frames - 1)
+        )
 
         thumb_path = extract_keyframe(
             normalized_video_path,
@@ -522,7 +579,14 @@ def _produce_derived_assets(
         except Exception:  # pragma: no cover
             pass
 
-    return skeleton_url, thumb_url, skeleton_data_url, keyframe_urls
+    return DerivedAssetsResult(
+        skeleton_video_url=skeleton_url,
+        thumbnail_url=thumb_url,
+        skeleton_data_url=skeleton_data_url,
+        keyframe_urls=keyframe_urls,
+        skeleton_pending=skeleton_pending,
+        normalized_video_url=normalized_video_url,
+    )
 
 
 def _placeholder_suffix(url: str, suffix: str) -> str:

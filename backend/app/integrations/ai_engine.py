@@ -71,6 +71,7 @@ class AIEngineClient:
         analysis_id: str,
         video_url: str,
     ) -> dict:
+        """保留供运维/脚本抽检；生产 Celery 主路径已内联到 /analyze 早检，不再调用。"""
         payload = {
             "analysis_id": analysis_id,
             "video_url": video_url,
@@ -86,6 +87,40 @@ class AIEngineClient:
                 analysis_id=analysis_id,
                 status=data.get("status"),
                 scan_elapsed_ms=data.get("scan_elapsed_ms"),
+            )
+            return data
+
+    async def derive_skeleton(
+        self,
+        *,
+        analysis_id: str,
+        normalized_video_url: str | None = None,
+        skeleton_data_url: str | None = None,
+        video_url: str | None = None,
+    ) -> dict:
+        payload: dict = {"analysis_id": analysis_id}
+        if normalized_video_url:
+            payload["normalized_video_url"] = normalized_video_url
+        if skeleton_data_url:
+            payload["skeleton_data_url"] = skeleton_data_url
+        if video_url:
+            payload["video_url"] = video_url
+        log.info(
+            "ai_engine_derive_skeleton_start",
+            analysis_id=analysis_id,
+            base_url=self.base_url,
+        )
+        timeout = float(
+            getattr(settings, "AI_ENGINE_DERIVE_SKELETON_TIMEOUT", 90) or 90
+        )
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(f"{self.base_url}/derive-skeleton", json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+            log.info(
+                "ai_engine_derive_skeleton_done",
+                analysis_id=analysis_id,
+                status=data.get("status"),
             )
             return data
 

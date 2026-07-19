@@ -127,26 +127,13 @@ async def _run_swing_analysis_async(analysis_id: str) -> None:
     stage_task = asyncio.create_task(_progress_stages_loop(analysis_id))
 
     # 3) 调 ai_engine，带重试
+    # 质量早检已内联到 ai_engine preprocess（同源下载一次），不再单独 POST /precheck。
     engine_result: dict | None = None
     last_exc: Exception | None = None
     try:
         for attempt in range(MAX_AI_ENGINE_RETRIES + 1):
             try:
                 client = get_ai_engine()
-                precheck = await client.precheck(
-                    analysis_id=analysis_id,
-                    video_url=meta["video_url"],
-                )
-                if precheck.get("status") == "blocked":
-                    raw_code = precheck.get("error_code")
-                    engine_result = {
-                        "status": "failed",
-                        "error_code": raw_code
-                        if isinstance(raw_code, int) and 50100 <= raw_code <= 50199
-                        else 50102,
-                        "error_message": precheck.get("error_message") or "视频质量不足",
-                    }
-                    break
                 engine_result = await client.analyze(
                     analysis_id=analysis_id,
                     video_url=meta["video_url"],
@@ -205,8 +192,106 @@ async def _run_swing_analysis_async(analysis_id: str) -> None:
         )
         return
 
-    # 4) 正常落库
+    # 4) 正常落库（分数先可见）
     await _mark_completed(analysis_id, engine_result)
+
+    # 5) 骨骼异步补渲染：不阻塞 waiting→报告
+    if engine_result.get("skeleton_pending") or (
+        not engine_result.get("skeleton_video_url")
+        and engine_result.get("skeleton_data_url")
+    ):
+        try:
+            render_analysis_skeleton.delay(
+                analysis_id,
+                engine_result.get("normalized_video_url"),
+                engine_result.get("skeleton_data_url"),
+                meta.get("video_url"),
+            )
+        except Exception as exc:  # noqa: BLE001
+            log.warning(
+                "skeleton_task_dispatch_failed",
+                analysis_id=analysis_id,
+                err=repr(exc),
+            )
+
+
+@celery_app.task(name="xiaoniao.render_analysis_skeleton", bind=True)
+def render_analysis_skeleton(
+    self,
+    analysis_id: str,
+    normalized_video_url: str | None = None,
+    skeleton_data_url: str | None = None,
+    video_url: str | None = None,
+) -> None:
+    """补渲染骨骼视频并回写 ``skeleton_video_url``（失败不影响已完成报告）。"""
+    _run_coro_in_thread(
+        _render_analysis_skeleton_async(
+            analysis_id,
+            normalized_video_url=normalized_video_url,
+            skeleton_data_url=skeleton_data_url,
+            video_url=video_url,
+        )
+    )
+
+
+async def _render_analysis_skeleton_async(
+    analysis_id: str,
+    *,
+    normalized_video_url: str | None,
+    skeleton_data_url: str | None,
+    video_url: str | None,
+) -> None:
+    async with AsyncSessionLocal() as db:
+        analysis = await db.get(SwingAnalysis, analysis_id)
+        if analysis is None or analysis.status != "completed":
+            return
+        if analysis.skeleton_video_url:
+            return
+        data_url = skeleton_data_url or analysis.skeleton_data_url
+        src_url = video_url or analysis.video_url
+
+    try:
+        client = get_ai_engine()
+        result = await client.derive_skeleton(
+            analysis_id=analysis_id,
+            normalized_video_url=normalized_video_url,
+            skeleton_data_url=data_url,
+            video_url=src_url,
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "derive_skeleton_call_failed",
+            analysis_id=analysis_id,
+            err=repr(exc),
+        )
+        return
+
+    if result.get("status") != "completed" or not result.get("skeleton_video_url"):
+        log.warning(
+            "derive_skeleton_engine_failed",
+            analysis_id=analysis_id,
+            err=result.get("error_message"),
+        )
+        return
+
+    async with AsyncSessionLocal() as db:
+        analysis = await db.get(SwingAnalysis, analysis_id)
+        if analysis is None or analysis.status != "completed":
+            return
+        analysis.skeleton_video_url = result["skeleton_video_url"]
+        # 去掉 pending 提示，避免报告页一直显示「生成中」
+        warnings = list(analysis.engine_warnings or [])
+        analysis.engine_warnings = [
+            w
+            for w in warnings
+            if not (isinstance(w, dict) and w.get("code") == "skeleton_pending")
+        ] or None
+        await db.commit()
+        log.info(
+            "skeleton_video_attached",
+            analysis_id=analysis_id,
+            skeleton_video_url=analysis.skeleton_video_url,
+        )
 
 
 # =====================================================================

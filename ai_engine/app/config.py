@@ -66,6 +66,12 @@ class Settings(BaseSettings):
     DERIVED_SKELETON_PREFIX: str = "skeleton"
     DERIVED_KEYFRAME_PREFIX: str = "keyframes"
     DERIVED_POSE_DATA_PREFIX: str = "skeleton_data"
+    # 异步骨骼：分析主路径先上传归一化视频，供 /derive-skeleton 复用（避免再跑 Pose）
+    DERIVED_NORMALIZED_PREFIX: str = "normalized"
+
+    # 骨骼叠加视频改异步：主 /analyze 先出分，Celery 再调 /derive-skeleton。
+    # 紧急回滚：设 false 恢复同步出骨骼（墙钟更长，但一次请求内完整）。
+    DEFER_SKELETON_VIDEO: bool = True
 
     # ==================== P2-M7-02：视频读取增强 V2 ====================
     # V2 路径默认关闭；与 P2-M7-14 灰度框架联动（`engine_version == "v2"` 桶才走 V2）。

@@ -135,13 +135,13 @@ async def test_e2e_engine_failed_refunds_quota(
 
 
 @pytest.mark.asyncio
-async def test_e2e_precheck_blocked_skips_full_analyze(
+async def test_e2e_quality_failed_via_inline_precheck_in_analyze(
     client: AsyncClient,
     auth_headers: dict[str, str],
     fake_minio: FakeMinioStorage,
     use_fake_ai_engine: FakeAIEngine,
 ):
-    """O-08：precheck blocked → failed + 退配额，且不调用 /analyze。"""
+    """O-08：质量硬门槛失败已内联到 /analyze → failed + 退配额；不再单独 /precheck。"""
     me_before = (await client.get("/v1/users/me", headers=auth_headers)).json()["data"]
     before = me_before["quota"]["analysis_remaining"]
 
@@ -161,9 +161,9 @@ async def test_e2e_precheck_blocked_skips_full_analyze(
 
     me_after = (await client.get("/v1/users/me", headers=auth_headers)).json()["data"]
     assert me_after["quota"]["analysis_remaining"] == before
-    assert use_fake_ai_engine.call_count == 0
-    assert any(c.get("method") == "precheck" for c in use_fake_ai_engine.calls)
-    assert not any(c.get("method") == "analyze" for c in use_fake_ai_engine.calls)
+    assert use_fake_ai_engine.call_count == 1
+    assert not any(c.get("method") == "precheck" for c in use_fake_ai_engine.calls)
+    assert any(c.get("method") == "analyze" for c in use_fake_ai_engine.calls)
 
 
 @pytest.mark.asyncio
