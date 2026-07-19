@@ -195,11 +195,8 @@ async def _run_swing_analysis_async(analysis_id: str) -> None:
     # 4) 正常落库（分数先可见）
     await _mark_completed(analysis_id, engine_result)
 
-    # 5) 骨骼异步补渲染：不阻塞 waiting→报告
-    if engine_result.get("skeleton_pending") or (
-        not engine_result.get("skeleton_video_url")
-        and engine_result.get("skeleton_data_url")
-    ):
+    # 5) 骨骼异步补渲染：仅当引擎显式标记 skeleton_pending（避免异常占位路径误派发）
+    if engine_result.get("skeleton_pending"):
         try:
             render_analysis_skeleton.delay(
                 analysis_id,

@@ -179,7 +179,8 @@ class DeriveSkeletonRequest(BaseModel):
         default=None, description="pose parquet URL；缺省按约定 key 取"
     )
     video_url: str | None = Field(
-        default=None, description="归一化视频缺失时的原片回退"
+        default=None,
+        description="保留字段；不再用于原片重转码回退（防与 parquet 帧错位）",
     )
 
 

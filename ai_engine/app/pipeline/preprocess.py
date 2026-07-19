@@ -156,8 +156,13 @@ def enforce_quality_gates(
     min_clarity: float = MIN_CLARITY_SCORE,
     max_frame_loss: float = MAX_FRAME_LOSS_RATIO,
     min_quality_score: float = MIN_QUALITY_SCORE,
+    skip_stability: bool = False,
 ) -> None:
-    """硬门槛：不过关抛 PoorQualityError（50102）。precheck 与 preprocess 共用。"""
+    """硬门槛：不过关抛 PoorQualityError（50102）。precheck 与 preprocess 共用。
+
+    ``skip_stability=True``：源片早检用。高 fps/压缩源片的帧间位移常偏大，
+    转码归一化后再判抖动，避免误拦；清晰度/丢帧仍在源片阶段硬拦。
+    """
     if stats.clarity_score < min_clarity:
         raise PoorQualityError(
             f"clarity_score={stats.clarity_score:.1f} < {min_clarity}",
@@ -173,11 +178,14 @@ def enforce_quality_gates(
             f"low_clarity_frame_ratio={stats.low_clarity_frame_ratio:.1%}",
             user_message="视频清晰度不稳定，请在光线充足、对焦清晰的环境下重拍",
         )
-    if stats.stability_score < MIN_STABILITY_HARD_BLOCK:
+    if not skip_stability and stats.stability_score < MIN_STABILITY_HARD_BLOCK:
         raise PoorQualityError(
             f"stability_score={stats.stability_score:.2f}",
             user_message="画面抖动过大，请固定机位或使用三脚架后重拍",
         )
+    # 综合分含 stability 权重；源片早检跳过，避免「抖动拖垮综合分」误拦
+    if skip_stability:
+        return
     quality_score = composite_quality_score(
         stats,
         min_clarity=min_clarity,
@@ -244,6 +252,7 @@ def preprocess_video(
         early_stats,
         min_clarity=min_clarity,
         max_frame_loss=max_frame_loss,
+        skip_stability=True,
     )
 
     # 3. ffmpeg 转码到 normalized.mp4（30fps / 720p 短边 / H.264）

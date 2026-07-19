@@ -11,10 +11,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from app.config import settings
-from app.pipeline.preprocess import (
-    _prefer_internal_minio_download_url,
-    preprocess_video,
-)
+from app.pipeline.preprocess import _prefer_internal_minio_download_url
 from app.pipeline.visualize import (
     DEFAULT_SKELETON_OUTPUT_FPS,
     load_pose_from_parquet,
@@ -47,15 +44,18 @@ def _download_url(url: str, dest: Path) -> Path:
 
 
 def run_derive_skeleton(req: DeriveSkeletonRequest) -> DeriveSkeletonResult:
-    """用已上传的归一化视频 + pose parquet 渲染骨骼 mp4。"""
+    """用已上传的归一化视频 + pose parquet 渲染骨骼 mp4。
+
+    **不做**原片重转码回退：重转码帧数可能与 parquet 不一致，会导致骨骼错位。
+    归一化视频缺失时直接 failed，由主分析路径保证已上传 ``normalized/{id}.mp4``。
+    """
     t0 = time.perf_counter()
     storage = get_storage()
     work_dir = Path(tempfile.mkdtemp(prefix="ai_engine_derive_skel_"))
     tmpdir = make_artifacts_tmpdir(prefix="ai_engine_derive_out_")
+    norm_key = f"{settings.DERIVED_NORMALIZED_PREFIX}/{req.analysis_id}.mp4"
     try:
-        normalized_url = req.normalized_video_url or storage.build_public_url(
-            f"{settings.DERIVED_NORMALIZED_PREFIX}/{req.analysis_id}.mp4"
-        )
+        normalized_url = req.normalized_video_url or storage.build_public_url(norm_key)
         parquet_url = req.skeleton_data_url or storage.build_public_url(
             f"{settings.DERIVED_POSE_DATA_PREFIX}/{req.analysis_id}.parquet"
         )
@@ -64,19 +64,12 @@ def run_derive_skeleton(req: DeriveSkeletonRequest) -> DeriveSkeletonResult:
         try:
             _download_url(normalized_url, normalized_path)
         except Exception as exc:  # noqa: BLE001
-            if not req.video_url:
-                return DeriveSkeletonResult(
-                    analysis_id=req.analysis_id,
-                    status="failed",
-                    error_message=f"归一化视频不可用: {exc}",
-                    elapsed_ms=int((time.perf_counter() - t0) * 1000),
-                )
-            log.warning(
-                "derive_skeleton_normalized_fallback",
-                extra={"analysis_id": req.analysis_id, "err": repr(exc)},
+            return DeriveSkeletonResult(
+                analysis_id=req.analysis_id,
+                status="failed",
+                error_message=f"归一化视频不可用（拒绝原片重转码以防帧错位）: {exc}",
+                elapsed_ms=int((time.perf_counter() - t0) * 1000),
             )
-            pre = preprocess_video(req.video_url, work_dir=work_dir / "re_pre")
-            normalized_path = Path(pre.normalized_video_path)
 
         parquet_local = work_dir / "pose.parquet"
         try:
@@ -119,6 +112,9 @@ def run_derive_skeleton(req: DeriveSkeletonRequest) -> DeriveSkeletonResult:
                 error_message="骨骼视频上传失败",
                 elapsed_ms=int((time.perf_counter() - t0) * 1000),
             )
+
+        # 骨骼已就绪：清掉临时归一化片，避免桶膨胀
+        storage.delete_object(norm_key)
 
         elapsed_ms = int((time.perf_counter() - t0) * 1000)
         log.info(

@@ -47,6 +47,12 @@ import {
   resolveReportPlaybackSrc,
   type VideoPlaybackMode,
 } from '@/utils/reportPlayback'
+import {
+  shouldContinueSkeletonPoll,
+  shouldPollSkeletonPending,
+  SKELETON_POLL_INTERVAL_MS,
+  SKELETON_POLL_MAX_TRIES,
+} from '@/utils/skeletonPendingPoll'
 import { groupIssuesByConfidence, ISSUE_SEVERITY_ORDER } from '@/utils/issueConfidenceGroup'
 import { pickPrimaryFocusIssue } from '@/utils/primaryFocusIssue'
 import {
@@ -189,40 +195,40 @@ const ReportPage: FC = () => {
       })
   }, [analysisId, currentUserToken, fromShare])
 
-  // 骨骼异步补渲染：报告已出、骨骼 URL 尚未就绪时短轮询（最多 ~30s）
+  // 骨骼异步补渲染：短轮询（tries 用 ref，避免 setReport 重置计数）
   useEffect(() => {
     if (!report || fromShare || !analysisId || !currentUserToken) return
-    const pending = (report.engine_warnings || []).some((w) => w.code === 'skeleton_pending')
-    if (report.skeleton_video_url || !pending) return
+    if (!shouldPollSkeletonPending(report)) return
     let cancelled = false
-    let tries = 0
     let timer: ReturnType<typeof setTimeout> | null = null
+    const triesRef = { current: 0 }
     const tick = () => {
-      if (cancelled || tries >= 12) return
-      tries += 1
+      if (cancelled || triesRef.current >= SKELETON_POLL_MAX_TRIES) return
+      triesRef.current += 1
       analysisService
         .getReport(analysisId)
         .then((r) => {
           if (cancelled) return
           setReport(r)
-          if (!r.skeleton_video_url && tries < 12) {
-            timer = setTimeout(tick, 2500)
+          if (shouldContinueSkeletonPoll(r, triesRef.current)) {
+            timer = setTimeout(tick, SKELETON_POLL_INTERVAL_MS)
           }
         })
         .catch(() => undefined)
     }
-    timer = setTimeout(tick, 2500)
+    timer = setTimeout(tick, SKELETON_POLL_INTERVAL_MS)
     return () => {
       cancelled = true
       if (timer) clearTimeout(timer)
     }
+    // 仅在进入「待补骨骼」报告时启一轮；不把 engine_warnings 放进 deps 以免重置 tries
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: one poll session per analysis id while pending
   }, [
     analysisId,
     fromShare,
     currentUserToken,
     report?.id,
-    report?.skeleton_video_url,
-    report?.engine_warnings,
+    Boolean(report && shouldPollSkeletonPending(report)),
   ])
 
   useEffect(() => {

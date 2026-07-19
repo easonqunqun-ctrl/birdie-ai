@@ -153,6 +153,24 @@ class DerivedAssetsStorage:
         """
         return f"{self._public_endpoint}/{self.bucket}/{object_key}"
 
+    def delete_object(self, object_key: str) -> bool:
+        """删除对象；失败只打日志，不抛错（用于骨骼完成后清 normalized 临时片）。"""
+        if not self.enabled or self._client is None or not object_key:
+            return False
+        try:
+            self._client.remove_object(self.bucket, object_key)
+        except Exception as exc:  # noqa: BLE001
+            log.warning(
+                "minio_delete_failed",
+                extra={"bucket": self.bucket, "object_key": object_key, "error": str(exc)},
+            )
+            return False
+        log.info(
+            "minio_delete_ok",
+            extra={"bucket": self.bucket, "object_key": object_key},
+        )
+        return True
+
 
 # -------------------- 单例（避免每次分析都重建连接池） --------------------
 

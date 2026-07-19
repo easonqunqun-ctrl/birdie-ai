@@ -20,5 +20,17 @@
 
 ## 自测
 
-- backend：`tests/test_analyses_e2e.py::test_e2e_quality_failed_via_inline_precheck_in_analyze`  
-- ai_engine：`tests/test_pose_parquet_roundtrip.py` + `test_produce_derived_assets_*`（`defer_skeleton=False`）
+- backend：`tests/test_analyses_e2e.py::test_e2e_quality_failed_via_inline_precheck_in_analyze` · `tests/test_skeleton_async_dispatch.py`  
+- ai_engine：`tests/test_pose_parquet_roundtrip.py` · `tests/test_derive_skeleton.py` · `tests/test_early_quality_skip_stability.py`  
+- client：`src/utils/__tests__/skeletonPendingPoll.test.ts`
+
+## 修复（review 收口）
+
+| 项 | 处理 |
+|----|------|
+| derive 原片重转码帧错位 | **已禁**：归一化缺失直接 failed |
+| normalized 桶膨胀 | 骨骼上传成功后 `delete_object(normalized/{id}.mp4)` |
+| 源片早检误拦抖动 | 早检 `skip_stability=True`；抖动仍在转码后硬拦 |
+| 误派发骨骼任务 | 仅 `skeleton_pending=true` 时 `delay` |
+| 报告轮询重置 tries | `skeletonPendingPoll` + effect 不依赖 warnings 数组 |
+| CVM 热更回退风险 | 须正式 `compose build` backend/worker/beat（见发版） |

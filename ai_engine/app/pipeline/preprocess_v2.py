@@ -173,6 +173,7 @@ def preprocess_video_v2(
         early_stats,
         min_clarity=min_clarity,
         max_frame_loss=max_frame_loss,
+        skip_stability=True,
     )
 
     if probe.is_slowmo and probe.nominal_fps > 0:
