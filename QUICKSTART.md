@@ -118,16 +118,13 @@ pnpm build:weapp                 # 或 pnpm dev:weapp（监听模式）
 
 > ⚠️ **注意**：本地开发时小程序需要访问 `localhost:8000`，需要在微信开发者工具的"详情 → 本地设置"里勾选"不校验合法域名"。
 
-### React Native（可选自检）
+### App 端（Flutter）
 
-在仓库根目录执行：
+原 Taro-RN App 端已下线，App 改用独立 Flutter 工程 `app/`（见 [`docs/22-App-Flutter独立重写落地计划.md`](docs/22-App-Flutter独立重写落地计划.md)）。客户端 `client/` 现只出微信小程序，类型自检：
 
 ```bash
-make client-bootstrap-rn-shell   # 首次：克隆 taro-native-shell 至 client/rn-shell
-make client-check-rn              # RN bundle + 日志门禁 + type-check（不启动模拟器）
+make client-tsc                  # 客户端 TS 类型检查（已并入 make test）
 ```
-
-真机与 Pods 详见 [`client/RN_SHELL.md`](client/RN_SHELL.md)。
 
 ## 步骤 6（可选）：跑后端测试
 

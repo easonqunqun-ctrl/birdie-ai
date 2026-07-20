@@ -16,7 +16,8 @@
 ```
 backend/       FastAPI + PostgreSQL + Redis（业务后端）
 ai_engine/     独立 AI 视觉分析服务（mock 模式默认开启）
-client/        Taro 3 + React 18 + TS（编译 微信小程序 / React Native）
+client/        Taro 3 + React 18 + TS（编译 微信小程序；原 React Native 端已下线）
+app/           Flutter（App 端独立工程，见 docs/22；替代原 Taro-RN）
 docs/          产品、API、数据库、规范、测试、知识库、运营文档
 UI/            UI 原型 HTML 与生成图（仅参考，勿当源码）
 灵鸟golf-产品设计白皮书.md   产品与视觉规范权威文档
@@ -66,7 +67,7 @@ UI/            UI 原型 HTML 与生成图（仅参考，勿当源码）
   - 修改 `src/services` / `src/utils` / `src/store` / `src/components/*.tsx`（非 `.rn.tsx`）**必须同步加 / 更新**对应 `__tests__/*.test.ts`。
   - 新增 Taro API 调用前，**先**到 `src/__mocks__/tarojs.ts` 里补 `jest.fn` 桩，再写测试，避免每个测试文件手工 mock 同一 API。
   - 不要在测试里直接 import 真实 `@tarojs/taro` / `@tarojs/components`：jsdom 下会触发小程序运行时初始化失败。
-  - 端分叉 `*.rn.tsx` / `adapters/*.{weapp,rn}.ts` 不纳入 Jest，由 `make client-check-rn` + 真机 smoke 兜底。
+  - 原 Taro-RN 端分叉（`*.rn.tsx` / RN 适配分支）已随 App 端迁移 Flutter 而移除；`client/` 现只出微信小程序。
 
 ---
 
@@ -99,8 +100,7 @@ make init && make up && make check
 # 客户端
 cd client && pnpm install && pnpm dev:weapp
 cd client && pnpm type-check && pnpm lint
-make client-bootstrap-rn-shell       # RN：首次克隆 taro-native-shell 至 client/rn-shell（幂等）
-make client-check-rn                  # RN：bundle 门禁 + type-check（已并入 make test；CI：.github/workflows/client-rn-check.yml）
+make client-tsc                       # 客户端 TS 类型检查（已并入 make test）
 make client-test                      # Jest 单测（services/utils/store/components 端无关层；首次需先 pnpm install）
 make client-test-coverage             # 带覆盖率阈值；CI 走 client-test-ci，见 .github/workflows/client-jest.yml；详 docs/07
 make client-build-weapp-prod          # 微信小程序正式包：先填 client/.env.production，见 docs/release-notes/go-live-weapp-fool-checklist.md

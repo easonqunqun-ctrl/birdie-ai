@@ -147,21 +147,6 @@ const config: UserConfigExport = {
     '@types': path.resolve(__dirname, '..', 'src/types')
   },
   mini: {
-    /** weapp：勿解析 RN 依赖（内含 TS/RN 源码，会导致 webpack loader 报错） */
-    webpackChain(chain: unknown) {
-      if (process.env.TARO_ENV === 'weapp') {
-        const c = chain as {
-          resolve: { alias: { set: (k: string, v: string) => void } }
-        }
-        const stubDir = path.resolve(__dirname, '..', 'src/stubs')
-        c.resolve.alias.set(
-          'react-native-image-picker',
-          path.join(stubDir, 'react-native-image-picker-weapp.js'),
-        )
-        c.resolve.alias.set('react-native-wechat-lib', path.join(stubDir, 'react-native-wechat-lib-weapp.js'))
-        c.resolve.alias.set('react-native', path.join(stubDir, 'react-native-weapp.js'))
-      }
-    },
     postcss: {
       pxtransform: {
         enable: true,
@@ -180,26 +165,6 @@ const config: UserConfigExport = {
           generateScopedName: '[name]__[local]___[hash:base64:5]'
         }
       }
-    }
-  },
-  rn: {
-    appName: 'xiaoniaoai',
-    output: {
-      iosSourceMapUrl: undefined,
-      iosBundleOutput: undefined,
-      iosAssetsDest: undefined,
-      androidSourceMapUrl: undefined,
-      androidBundleOutput: undefined,
-      androidAssetsDest: undefined
-    },
-    postcss: {
-      cssModules: {
-        enable: false
-      },
-      /**
-       * RN：sanitize 样式后交给 css-to-react-native（见 postcss-rn-sanitize.cjs）
-       */
-      './config/postcss-rn-sanitize.cjs': { enable: true },
     }
   },
   h5: {
@@ -222,12 +187,8 @@ const config: UserConfigExport = {
 }
 
 export default function (merge: any) {
-  const rn =
-    process.env.TARO_ENV === 'rn'
-      ? (require('./rn').default as Record<string, unknown>)
-      : {}
   if (process.env.NODE_ENV === 'development') {
-    return merge({}, config, rn, require('./dev').default)
+    return merge({}, config, require('./dev').default)
   }
-  return merge({}, config, rn, require('./prod').default)
+  return merge({}, config, require('./prod').default)
 }

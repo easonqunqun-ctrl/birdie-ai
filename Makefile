@@ -3,8 +3,8 @@
         backend-celery-logs backend-celery-shell \
         ai-shell ai-logs ai-engine-test ai-engine-test-local ai-engine-lint ai-engine-smoke \
         ai-engine-ecs-regression ai-engine-synth-fixtures \
-        client-install client-bootstrap-rn-shell client-dev-weapp client-dev-rn-ios client-dev-rn-android \
-        client-build-weapp client-build-weapp-prod client-build-rn client-tsc client-check-rn \
+        client-install client-dev-weapp \
+        client-build-weapp client-build-weapp-prod client-tsc \
         client-test client-test-watch client-test-coverage client-test-ci \
         check test ci \
         deploy-check-env deploy-check-cvm-pay \
@@ -49,26 +49,22 @@ help:
 	@echo "  make ai-engine-synth-fixtures 生成合成测试视频（需要本机装 ffmpeg）"
 	@echo "  make ai-engine-ecs-regression   ENG-04 ECS v1 CI 回归单测（宿主机 uv）"
 	@echo ""
-	@echo "  ===== 客户端（Taro 双端） ====="
+	@echo "  ===== 客户端（Taro 微信小程序） ====="
 	@echo "  make client-install         安装客户端依赖"
 	@echo "  make client-test            Jest 单测（默认本地交互）"
 	@echo "  make client-test-watch      Jest 监听模式"
 	@echo "  make client-test-coverage   Jest 覆盖率（带阈值检查）"
 	@echo "  make client-test-ci         Jest CI 模式（单 worker + silent）"
-	@echo "  make client-bootstrap-rn-shell 克隆 taro-native-shell 到 client/rn-shell（幂等）"
 	@echo "  make client-dev-weapp       开发：编译微信小程序（用 微信开发者工具 打开 client/dist）"
-	@echo "  make client-dev-rn-ios      开发：iOS App"
-	@echo "  make client-dev-rn-android  开发：Android App"
 	@echo "  make client-build-weapp     微信小程序构建（默认 dev 变量）"
 	@echo "  make client-build-weapp-prod  正式小程序包（校验 .env.production 后 production 构建）"
-	@echo "  make client-build-rn        RN：taro build + 日志门禁（reject error src / Unable）"
-	@echo "  make client-check-rn        RN bundle 门禁 + client type-check（已并入 make test）"
+	@echo "  make client-tsc             客户端 TS 类型检查（已并入 make test）"
 	@echo ""
 	@echo "  ===== 健康检查 ====="
 	@echo "  make check             检查后端 /v1/health"
 	@echo ""
 	@echo "  ===== 质量门（T5） ====="
-	@echo "  make test              rollup：后端 + AI 引擎 + 客户端（RN bundle + tsc）"
+	@echo "  make test              rollup：后端 + AI 引擎 + 客户端（tsc + Jest）"
 	@echo "  make ci                test + 真实引擎 smoke（bouncing_box → 50103）"
 	@echo ""
 	@echo "  ===== W8-T4：云发版（最简单）======"
@@ -250,17 +246,8 @@ ai-engine-smoke:
 client-install:
 	cd client && pnpm install
 
-client-bootstrap-rn-shell:
-	cd client && bash scripts/bootstrap-rn-shell.sh
-
 client-dev-weapp:
 	cd client && pnpm dev:weapp
-
-client-dev-rn-ios:
-	cd client && pnpm dev:rn:ios
-
-client-dev-rn-android:
-	cd client && pnpm dev:rn:android
 
 client-build-weapp:
 	cd client && pnpm build:weapp
@@ -269,23 +256,9 @@ client-build-weapp:
 client-build-weapp-prod:
 	cd client && pnpm build:weapp:prod:check
 
-# RN：Metro/taro-css 报错时 CLI 偶尔仍 exit 0，故对 rn-build.log 做强校验。
-client-build-rn:
-	cd client && bash -c '\
-		set -o pipefail; \
-		pnpm build:rn 2>&1 | tee rn-build.log; \
-		ev=$$?; \
-		if grep -Eq "^error src/|^error Unable" rn-build.log 2>/dev/null; then \
-			echo ""; echo "✗ RN 构建日志含硬错误（见 client/rn-build.log）"; exit 1; \
-		fi; \
-		exit $$ev'
-
 # W6-T5：客户端 TS 类型检查（不出 bundle，单纯类型门）
 client-tsc:
 	cd client && pnpm type-check
-
-# RN bundle + 类型（已并入 make test）
-client-check-rn: client-build-rn client-tsc
 
 # 客户端 Jest 单测（services + utils + store + components 端无关层）
 # 首次需先 `cd client && pnpm install` 拉 jest / @testing-library/* / babel-jest 等
@@ -309,9 +282,9 @@ check:
 # ==================== 质量门 rollup（W6-T5） ====================
 # make test：常规 PR/commit 前的全量单测 + lint + tsc
 # make ci：在 test 基础上再跑 smoke（需 make up 已起真实 ai_engine）
-test: backend-lint backend-test ai-engine-lint ai-engine-test client-check-rn client-test-ci
+test: backend-lint backend-test ai-engine-lint ai-engine-test client-tsc client-test-ci
 	@echo ""
-	@echo "✓ backend + ai_engine + client（含 RN/tsc + Jest）全部绿"
+	@echo "✓ backend + ai_engine + client（tsc + Jest）全部绿"
 
 ci: test ai-engine-smoke
 	@echo ""

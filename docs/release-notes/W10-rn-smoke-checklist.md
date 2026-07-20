@@ -1,5 +1,7 @@
 # W10 React Native App 冒烟 / 内测清单
 
+> ⚠️ **已废弃（2026-07-20）**：Taro-RN 路线已放弃，App 端改用独立 Flutter 工程 `app/`（见 [`docs/22`](../22-App-Flutter独立重写落地计划.md)）。本文档仅作历史归档。
+
 > 与小程序核心链路对齐；真机为主，模拟器为辅。  
 > 前置：后端已部署且 `POST /v1/auth/wechat-open-login` 可用；客户端 `TARO_APP_API_BASE_URL` 指向该环境；`TARO_APP_WECHAT_OPEN_APPID` 与开放平台移动应用一致。  
 > **分期开工勾选**（M0/M1/Spike/性能）：见 [**`app-m0-m1-kickoff-checklist.md`**](app-m0-m1-kickoff-checklist.md)；本文件为总冒烟表，二者互补。

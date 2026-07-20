@@ -37,9 +37,7 @@ module.exports = {
     '\\.(scss|css)$': 'identity-obj-proxy',
     // Taro 组件 / 运行时：用本地 stub
     '^@tarojs/components$': '<rootDir>/src/__mocks__/tarojs-components.tsx',
-    '^@tarojs/components-rn$': '<rootDir>/src/__mocks__/tarojs-components.tsx',
     '^@tarojs/taro$': '<rootDir>/src/__mocks__/tarojs.ts',
-    '^@tarojs/taro-rn$': '<rootDir>/src/__mocks__/tarojs.ts',
     // 与 tsconfig.json paths 对齐
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@components/(.*)$': '<rootDir>/src/components/$1',
@@ -58,8 +56,6 @@ module.exports = {
     '!src/**/*.d.ts',
     '!src/**/__tests__/**',
     '!src/**/__mocks__/**',
-    // RN 分叉文件由 W10 单独覆盖
-    '!src/components/**/*.rn.{ts,tsx}',
   ],
   coverageThreshold: {
     /**

@@ -14,7 +14,7 @@
 ## 影响范围
 <!-- 勾选所有受影响的模块/端。 -->
 - [ ] 客户端（微信小程序）
-- [ ] 客户端（React Native）
+- [ ] App 端（Flutter · `app/`）
 - [ ] Backend API
 - [ ] AI Engine
 - [ ] 数据库 schema（Alembic revision：`__________`）

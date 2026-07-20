@@ -2,20 +2,14 @@
   "name": "xiaoniao-client",
   "version": "1.2.41",
   "private": true,
-  "description": "领翼golf 客户端 - Taro 3（微信小程序 + React Native 双端）",
+  "description": "领翼golf 客户端 - Taro 3（微信小程序）",
   "scripts": {
     "build:weapp": "taro build --type weapp",
     "build:weapp:test": "taro build --type weapp --mode test",
     "build:weapp:prod": "taro build --type weapp --mode production",
     "build:weapp:prod:check": "bash scripts/check-weapp-prod-env.sh && pnpm build:weapp:prod",
-    "build:rn": "taro build --type rn",
-    "setup:rn-shell": "bash scripts/bootstrap-rn-shell.sh",
-    "rn-shell:deps-hint": "bash scripts/rn-shell-native-deps-hint.sh",
     "dev:weapp": "pnpm run build:weapp -- --watch",
     "dev:weapp:test": "taro build --type weapp --mode test --watch",
-    "dev:rn": "taro build --type rn --watch",
-    "dev:rn:ios": "cd rn-shell && npx react-native run-ios",
-    "dev:rn:android": "cd rn-shell && npx react-native run-android",
     "lint": "eslint --ext .js,.ts,.tsx src/",
     "type-check": "tsc --noEmit",
     "test": "jest",
@@ -31,35 +25,22 @@
   "dependencies": {
     "@babel/core": "^7.29.0",
     "@babel/runtime": "^7.24.0",
-    "@react-native-picker/picker": "~2.4.10",
     "@tarojs/components": "3.6.32",
-    "@tarojs/components-rn": "3.6.32",
     "@tarojs/helper": "3.6.32",
     "@tarojs/plugin-framework-react": "3.6.32",
     "@tarojs/plugin-platform-weapp": "3.6.32",
     "@tarojs/react": "3.6.32",
-    "@tarojs/rn-runner": "3.6.32",
-    "@tarojs/rn-supporter": "3.6.32",
-    "@tarojs/router-rn": "3.6.32",
     "@tarojs/runtime": "3.6.32",
-    "@tarojs/runtime-rn": "3.6.32",
     "@tarojs/shared": "3.6.32",
     "@tarojs/taro": "3.6.32",
-    "@tarojs/taro-rn": "3.6.32",
-    "expo": "~47.0.3",
     "react": "18.2.0",
     "react-dom": "18.2.0",
-    "react-native": "0.70.15",
-    "react-native-gesture-handler": "~2.9.0",
-    "react-native-image-picker": "^8.2.1",
-    "react-native-wechat-lib": "^1.1.27",
     "zustand": "^4.5.0"
   },
   "pnpm": {
-    "comment": "Taro 3.6.32 内置的 ProgressPlugin 用了老 schema，不兼容 webpack 5.90+；钉回 5.88.x。stylelint-taro-rn@3.6 依赖 stylelint 14（16+ 移除了 declarationValueIndex）。",
+    "comment": "Taro 3.6.32 内置的 ProgressPlugin 用了老 schema，不兼容 webpack 5.90+；钉回 5.88.x。",
     "overrides": {
-      "webpack": "5.88.2",
-      "stylelint": "14.16.1"
+      "webpack": "5.88.2"
     }
   },
   "devDependencies": {
@@ -88,8 +69,6 @@
     "jest-environment-jsdom": "^29.7.0",
     "postcss": "^8.4.35",
     "react-refresh": "^0.14.0",
-    "stylelint": "14.16.1",
-    "stylelint-config-taro-rn": "3.6.32",
     "typescript": "^5.3.0"
   }
 }

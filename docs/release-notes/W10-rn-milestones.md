@@ -1,5 +1,7 @@
 # W10 React Native · 里程碑拆分（支付与订阅降级优先）
 
+> ⚠️ **已废弃（2026-07-20）**：Taro-RN 路线已放弃，App 端改用独立 Flutter 工程 `app/`（见 [`docs/22`](../22-App-Flutter独立重写落地计划.md)）。本文档仅作历史归档。
+
 > 总览能力矩阵：[**`W10-weapp-apis-rn-matrix.md`**](W10-weapp-apis-rn-matrix.md) · 规划正文：[**`docs/18-W10-RN-App端规划.md`**](../18-W10-RN-App端规划.md)。  
 > [`docs/19-产品开发迭代计划-当前队列.md`](../19-产品开发迭代计划-当前队列.md) **Q-D1**。  
 > **开工执行面（勾选真源）**：[**`app-m0-m1-kickoff-checklist.md`**](app-m0-m1-kickoff-checklist.md)（M0 / 帧率 Spike / M1 / 性能三项）。
@@ -14,11 +16,12 @@
 | （Q-D2 前置） | **SP-1 / SP-2** | 三组帧率 Spike；不做弹道成片 |
 | （体验优势） | **P-1～P-3** | 拍摄 / 弱网上传 / scrub，与 M1 重叠验 |
 
-## Milestone RN-1 · 运行时与网络（P0）
+## Milestone RN-1 · 运行时与网络（P0）· **进行中**（M0 工程门禁已绿；真机登录/SSE 补签中）
 
 - Taro RN shell 与本仓库 `pnpm`/`make client-check-rn` 对齐；`request.ts` / SSE 通路 smoke。
 - 媒体 adapter：`capture`/`upload`/`download` 等价路径在无微信 API 下可降级。
-- 勾选：开工清单 **M0-1～M0-5**。
+- App 联调环境：`client/.env.app` + `pnpm build:rn:app` / `dev:rn:app`（API=`https://api.birdieai.cn/v1`，支付关闭）。
+- 勾选：开工清单 **M0-1～M0-5**（PLAN-ID **APP-M0-***）。
 
 ## Milestone RN-2 · 商业（P0）
 

@@ -1,12 +1,19 @@
 /**
- * 跨端视频拍摄/选择 adapter
+ * 视频拍摄/选择 adapter（微信小程序：Taro.chooseMedia）。
  *
- * 微信小程序：Taro.chooseMedia
- * React Native App：react-native-image-picker
+ * 页面禁止写 `TARO_ENV === 'weapp'`；差异只进本文件（AGENTS §4）。
+ * （原 React Native 分支已移除，App 端改用独立 Flutter 工程。）
  */
 
 import Taro from '@tarojs/taro'
 import { ensurePrivacyAuthorized } from '@/utils/privacy'
+import {
+  type CapturePresetId,
+  formatVideoPickSummary,
+} from '@/utils/videoPickNormalize'
+
+export type { CapturePresetId }
+export { CAPTURE_PRESET_LABEL, formatVideoPickSummary } from '@/utils/videoPickNormalize'
 
 export interface ChosenVideo {
   filePath: string
@@ -20,16 +27,32 @@ export interface ChosenVideo {
    * 做微信内容合规预检（imgSecCheck）。
    */
   thumbTempFilePath?: string
+  /** 本次选用的拍摄预设（RN；weapp 忽略） */
+  preset?: CapturePresetId
 }
 
-export async function chooseVideo(opts?: {
+export interface ChooseVideoOptions {
   source?: 'camera' | 'album' | 'both'
   maxDurationSeconds?: number
-}): Promise<ChosenVideo> {
+  /**
+   * App 拍摄预设。相册导入时仅作记录；相机路径会映射 `videoQuality`。
+   * 真正 120/240fps 需系统慢动作导入或后续原生模块（见 SP-1 runbook）。
+   */
+  preset?: CapturePresetId
+}
+
+/** 拍摄页平台 tip（小程序无追加 tip）。 */
+export function getCapturePlatformTips(): string[] {
+  return []
+}
+
+export async function chooseVideo(opts?: ChooseVideoOptions): Promise<ChosenVideo> {
   const sourceType: ('album' | 'camera')[] =
-    opts?.source === 'camera' ? ['camera']
-      : opts?.source === 'album' ? ['album']
-      : ['album', 'camera']
+    opts?.source === 'camera'
+      ? ['camera']
+      : opts?.source === 'album'
+        ? ['album']
+        : ['album', 'camera']
 
   if (process.env.TARO_ENV === 'weapp') {
     // W8-T1：chooseMedia 属于隐私 API，调用前必须过微信隐私授权弹窗。
@@ -39,9 +62,11 @@ export async function chooseVideo(opts?: {
       mediaType: ['video'],
       sourceType,
       maxDuration: opts?.maxDurationSeconds || 30,
-      camera: 'back'
+      camera: 'back',
     })
-    const f = res.tempFiles[0] as typeof res.tempFiles[number] & { thumbTempFilePath?: string }
+    const f = res.tempFiles[0] as typeof res.tempFiles[number] & {
+      thumbTempFilePath?: string
+    }
     return {
       filePath: f.tempFilePath,
       size: f.size,
@@ -49,67 +74,25 @@ export async function chooseVideo(opts?: {
       width: f.width || 0,
       height: f.height || 0,
       thumbTempFilePath: f.thumbTempFilePath,
-    }
-  }
-
-  if (process.env.TARO_ENV === 'rn') {
-    type RNPicker = typeof import('react-native-image-picker')
-    let launchImageLibrary: RNPicker['launchImageLibrary']
-    let launchCamera: RNPicker['launchCamera']
-
-    try {
-      const mod = (await import(
-        /* webpackIgnore: true */
-        'react-native-image-picker'
-      )) as RNPicker
-      launchImageLibrary = mod.launchImageLibrary
-      launchCamera = mod.launchCamera
-    } catch {
-      throw new Error('未安装 react-native-image-picker（仅 RN 打包需要）')
-    }
-
-    const durationLimit = opts?.maxDurationSeconds ?? 30
-
-    const baseLib = {
-      mediaType: 'video' as const,
-      selectionLimit: 1,
-      videoQuality: 'high' as const,
-      durationLimit,
-      ...(opts?.source === 'album'
-        ? {}
-        : { presentationStyle: 'pageSheet' as const }),
-    }
-
-    const pick =
-      opts?.source === 'camera'
-        ? await launchCamera({
-            mediaType: 'video',
-            videoQuality: 'high',
-            durationLimit,
-            cameraType: 'back',
-            saveToPhotos: false,
-          })
-        : await launchImageLibrary(baseLib)
-
-    if (pick.didCancel || !pick.assets?.[0]?.uri) {
-      throw new Error('已取消选择视频')
-    }
-    const a = pick.assets[0]
-    const uri = a.uri!
-    const durationRaw = typeof a.duration === 'number' ? a.duration : 0
-    /** iOS 常见为毫秒，Android 常为秒 —— >1000 时按毫秒转秒 */
-    const durationSeconds =
-      durationRaw > 1000 ? durationRaw / 1000 : durationRaw
-    return {
-      filePath: uri,
-      size: a.fileSize || 0,
-      duration: durationSeconds,
-      width: a.width || 0,
-      height: a.height || 0,
-      // 首帧预检可走后续缩略工具；暂无则后端 media-check fail-open。
-      thumbTempFilePath: undefined,
+      preset: 'standard',
     }
   }
 
   throw new Error(`不支持的平台: ${process.env.TARO_ENV}`)
+}
+
+/** 调试 / SP-1：把选片结果打成一行摘要 */
+export function summarizeChosenVideo(
+  source: string,
+  video: ChosenVideo,
+): string {
+  return formatVideoPickSummary({
+    source,
+    preset: video.preset,
+    width: video.width,
+    height: video.height,
+    duration: video.duration,
+    size: video.size,
+    filePath: video.filePath,
+  })
 }

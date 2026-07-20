@@ -1,12 +1,14 @@
 # W10 微信小程序能力 vs RN（Taro）对照
 
+> ⚠️ **已废弃（2026-07-20）**：Taro-RN 路线已放弃，App 端改用独立 Flutter 工程 `app/`（见 [`docs/22`](../22-App-Flutter独立重写落地计划.md)）。本文档仅作历史归档。
+
 > 范围：`client/src` 内实际用到的能力 + 注释中的 `wx.*` 语义。  
 > **策略**：RN 优先用 `adapters/*`、同构 `Taro.*`（若 Taro RN 已实现）、或产品降级（支付/订阅消息等）。
 
 | 能力 / API（小程序侧） | 代码入口或说明 | RN 处理方式 |
 |------------------------|----------------|-------------|
 | `wx.login` / `Taro.login` | `adapters/login.ts` | `react-native-wechat-lib` + `POST /v1/auth/wechat-open-login` |
-| `wx.chooseMedia`（视频） | `adapters/media.ts`，`capture.tsx` 经 adapter | `react-native-image-picker` |
+| `wx.chooseMedia`（视频） | `adapters/media.ts`，`capture.tsx` 经 adapter | `react-native-image-picker`；`preset` standard/high_quality（无强制 fps）；高帧靠系统慢动作+相册（SP-1） |
 | 隐私：`getPrivacySetting` / `requirePrivacyAuthorize` | `utils/privacy.ts` | 仅 weapp；RN 无操作（no-op） |
 | `Taro.request`（含 401、toast） | `services/request.ts` | 同构；域名换 RN 网络配置 |
 | `Taro.request` + `enableChunked`（SSE） | `utils/sseClient.ts` | RN 使用 `XMLHttpRequest` + `onprogress` 分支 |

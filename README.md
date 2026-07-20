@@ -11,7 +11,8 @@ xiaoniao-ai/
 ├── docs/                     产品/技术文档
 ├── backend/                  FastAPI 后端服务
 ├── ai_engine/                AI 视觉分析引擎（独立服务）
-├── client/                   Taro 3 客户端（小程序 + RN App 双端共用代码）
+├── client/                   Taro 3 客户端（微信小程序；原 RN 端已下线）
+├── app/                      Flutter App 端独立工程（替代原 Taro-RN，见 docs/22）
 ├── infra/                    基础设施配置（Dockerfile / k8s）
 ├── docker-compose.yml        本地一键启动
 ├── Makefile                  常用命令快捷方式
@@ -24,7 +25,7 @@ xiaoniao-ai/
 
 | 层 | 技术 |
 |----|------|
-| 客户端 | Taro 3 + React 18 + TypeScript（同时编译 微信小程序 + React Native） |
+| 客户端 | Taro 3 + React 18 + TypeScript（微信小程序）；App 端为独立 Flutter 工程（`app/`） |
 | 后端 | Python 3.11 + FastAPI + SQLAlchemy 2 + Pydantic v2 + Celery |
 | 数据库 | PostgreSQL 16 + Redis 7 |
 | 对象存储 | 本地 MinIO / 生产 腾讯云 COS |
@@ -92,14 +93,13 @@ make client-dev-weapp            # 编译到 client/dist（Taro outputRoot）
 
 打开**微信开发者工具** → 导入项目 → 选择 **`client` 目录**（根目录含 `project.config.json`，其中 `miniprogramRoot` 为 `dist/`）。**不要**只选 `client/dist`，否则容易找不到工程配置。
 
-### 5. 启动客户端（React Native App）
+### 5. 启动 App 端（Flutter，独立工程）
+
+原 Taro-RN App 端已下线，App 改用独立 Flutter 工程 `app/`（落地计划见 [`docs/22-App-Flutter独立重写落地计划.md`](docs/22-App-Flutter独立重写落地计划.md)）：
 
 ```bash
-# iOS（需要 Mac + Xcode）
-make client-dev-rn-ios
-
-# Android（需要 Android Studio + 模拟器）
-make client-dev-rn-android
+cd app && flutter pub get
+flutter run --dart-define=APP_ENV=test    # 连体验版后端 + mock 登录
 ```
 
 ### 6. CVM / 云上测试栈（微信小程序内测 HTTPS）

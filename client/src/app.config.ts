@@ -139,9 +139,8 @@ export default defineAppConfig({
    */
   /**
    * M9-05 常去球馆「添加附近球馆」使用 wx.getLocation；须在公众平台隐私指引同步勾选。
-   * Taro 3.6 的 AppConfig 类型未收录 requiredPrivateInfos，运行时以微信校验为准。
+   * 运行时以微信校验为准（类型已逐步收录该字段时勿再加 @ts-expect-error）。
    */
-  // @ts-expect-error 微信官方字段，Taro defineAppConfig 类型过窄
   requiredPrivateInfos: ['getLocation'],
   permission: {
     /** Q-C1 分享海报：保存到相册时弹的授权说明文案 */
