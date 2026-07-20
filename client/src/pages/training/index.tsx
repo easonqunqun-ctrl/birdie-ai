@@ -675,10 +675,17 @@ const TrainingPage: FC = () => {
   }
 
   if (!plan) {
+    // 会员但既无进步数据也无本月打卡时，隐藏空的进步曲线/月历，让空态 CTA 唱主角；
+    // 有数据的会员（如计划已过期）仍展示历史曲线，非会员保留「了解会员」卡。
+    const showEmptyStateProgress = !(
+      user?.is_member &&
+      progressPoints.length === 0 &&
+      practiceMonthTotal === 0
+    )
     return (
       <View className='training training--empty'>
         <EnvBadge />
-        {memberProgressSection}
+        {showEmptyStateProgress ? memberProgressSection : null}
         <Text className='training__empty-icon'>🏋️</Text>
         <Text className='training__empty-title'>还没有训练计划</Text>
         <Text className='training__empty-sub'>

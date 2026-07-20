@@ -26,6 +26,9 @@ $page-block-gap: 16rpx;
     .training__curve-lock {
       width: 100%;
       align-self: stretch;
+      /* 这几个区块本身是左对齐设计；不能被空态容器的 text-align:center 污染，
+         否则「进步曲线/打卡月历」标题会居中、而「近90天/全部」胶囊仍靠左，整体看着歪。 */
+      text-align: left;
     }
   }
 
