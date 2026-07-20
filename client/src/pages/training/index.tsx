@@ -675,17 +675,12 @@ const TrainingPage: FC = () => {
   }
 
   if (!plan) {
-    // 会员但既无进步数据也无本月打卡时，隐藏空的进步曲线/月历，让空态 CTA 唱主角；
-    // 有数据的会员（如计划已过期）仍展示历史曲线，非会员保留「了解会员」卡。
-    const showEmptyStateProgress = !(
-      user?.is_member &&
-      progressPoints.length === 0 &&
-      practiceMonthTotal === 0
-    )
+    // 无训练计划时空态只留「还没有训练计划 + 去上传视频」CTA；不再在顶部叠加
+    // 进步曲线/打卡月历（会员）或「了解会员」卡（非会员）——那会喧宾夺主，且卡片
+    // 自身 margin 与空态容器 padding 叠加会左右不对称（看着偏）。进步曲线在有计划页展示。
     return (
       <View className='training training--empty'>
         <EnvBadge />
-        {showEmptyStateProgress ? memberProgressSection : null}
         <Text className='training__empty-icon'>🏋️</Text>
         <Text className='training__empty-title'>还没有训练计划</Text>
         <Text className='training__empty-sub'>
