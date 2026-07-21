@@ -16,7 +16,7 @@
   flex-direction: column;
   /* tabBar 页可视高度由客户端裁剪；勿 min-height:100vh + margin-top:auto，会把退出按钮撑到巨型留白下方 */
   min-height: 100%;
-  padding: 0 0 24rpx;
+  padding: 0 0 calc(24rpx + 112rpx + env(safe-area-inset-bottom));
   background: var(--color-bg-page);
 
   &--empty {

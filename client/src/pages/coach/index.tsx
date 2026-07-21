@@ -32,6 +32,7 @@ import {
   toastTabNavigationFailure,
   type CoachPendingContext,
 } from '@/utils/tabNav'
+import { syncCustomTabBarSelected } from '@/utils/syncCustomTabBar'
 import { PAYMENT_ENABLED_FLAG } from '@/constants/flags'
 import { useMembershipExpiringSoonModalOnShow } from '@/hooks/useMembershipExpiringSoonModalOnShow'
 import { useUserStore } from '@/store/userStore'
@@ -184,6 +185,7 @@ const CoachPage: FC = () => {
   )
 
   useDidShow(() => {
+    syncCustomTabBarSelected(1)
     if (!token) {
       if (bootstrappedKeyRef.current !== 'guest-preview') {
         bootstrappedKeyRef.current = 'guest-preview'

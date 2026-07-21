@@ -8,7 +8,7 @@ $page-block-gap: 16rpx;
 .training {
   box-sizing: border-box;
   min-height: 100%;
-  padding: 0 0 $page-gutter;
+  padding: 0 0 calc(#{$page-gutter} + 112rpx + env(safe-area-inset-bottom));
   background: var(--color-bg-page);
 
   /* ================= 空态 ================= */

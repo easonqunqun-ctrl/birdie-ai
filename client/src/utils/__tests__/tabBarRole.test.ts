@@ -1,11 +1,20 @@
 import Taro from '@tarojs/taro'
 import { applyTabBarRole } from '@/utils/tabBarRole'
+import { syncCustomTabBarRole } from '@/utils/syncCustomTabBar'
+
+jest.mock('@/utils/syncCustomTabBar', () => ({
+  syncCustomTabBarRole: jest.fn(() => false),
+  syncCustomTabBarSelected: jest.fn(),
+}))
 
 describe('applyTabBarRole', () => {
   const setTabBarItem = Taro.setTabBarItem as jest.Mock
+  const syncRole = syncCustomTabBarRole as jest.Mock
 
   beforeEach(() => {
     setTabBarItem.mockClear()
+    syncRole.mockClear()
+    syncRole.mockReturnValue(false)
     process.env.TARO_ENV = 'weapp'
   })
 
@@ -27,9 +36,17 @@ describe('applyTabBarRole', () => {
     expect(setTabBarItem).toHaveBeenNthCalledWith(4, { index: 3, text: '我的' })
   })
 
+  test('自定义 tabBar 已挂载 → setRole，不再调 setTabBarItem', () => {
+    syncRole.mockReturnValue(true)
+    applyTabBarRole('coach')
+    expect(syncRole).toHaveBeenCalledWith('coach')
+    expect(setTabBarItem).not.toHaveBeenCalled()
+  })
+
   test('RN 环境 no-op', () => {
     process.env.TARO_ENV = 'rn'
     applyTabBarRole('coach')
     expect(setTabBarItem).not.toHaveBeenCalled()
+    expect(syncRole).not.toHaveBeenCalled()
   })
 })

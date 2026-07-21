@@ -6,6 +6,7 @@ import EnvBadge from '@/components/EnvBadge'
 import { APP_SHARE_MESSAGE, APP_SHARE_TIMELINE } from '@/constants/brandAssets'
 import { useUserStore } from '@/store/userStore'
 import { switchToCoach, toastTabNavigationFailure } from '@/utils/tabNav'
+import { syncCustomTabBarSelected } from '@/utils/syncCustomTabBar'
 import { FREQ_LABEL, GOAL_LABEL, LEVEL_LABEL } from '@/constants/golf'
 import {
   PAYMENT_ENABLED_FLAG,
@@ -37,6 +38,7 @@ const ProfilePage: FC = () => {
 
   // 从"编辑档案"返回时自动刷新，保证卡片展示是最新的。
   useDidShow(() => {
+    syncCustomTabBarSelected(3)
     if (token) fetchMe().catch(() => undefined)
     if (token && PHASE2_COACH_ENABLED_FLAG) {
       coachStudentsService

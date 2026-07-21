@@ -10,6 +10,9 @@ page {
   height: 100%;
   min-height: 0;
   background: var(--color-bg-page);
+  /* 自定义 tabBar 预留 */
+  padding-bottom: calc(112rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
 
   /* ================= loading / error ================= */
   &--loading,

@@ -6,6 +6,7 @@ import EnvBadge from '@/components/EnvBadge'
 import { useUserStore } from '@/store/userStore'
 import { useMembershipExpiringSoonModalOnShow } from '@/hooks/useMembershipExpiringSoonModalOnShow'
 import { switchToCoach, switchToProfile, toastTabNavigationFailure } from '@/utils/tabNav'
+import { syncCustomTabBarSelected } from '@/utils/syncCustomTabBar'
 import { analysisService } from '@/services/analysisService'
 import { deferReLaunch } from '@/utils/deferNavigation'
 import { PAYMENT_ENABLED_FLAG } from '@/constants/flags'
@@ -42,6 +43,7 @@ const HomePage: FC = () => {
   }, [initialized, bootstrap])
 
   useDidShow(() => {
+    syncCustomTabBarSelected(0)
     if (token) {
       fetchMe().catch(() => undefined)
       loadRecent()

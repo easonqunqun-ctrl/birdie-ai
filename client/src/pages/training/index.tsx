@@ -43,6 +43,7 @@ import type {
   TrainingTaskItem
 } from '@/types/training'
 import { switchToHome, toastTabNavigationFailure } from '@/utils/tabNav'
+import { syncCustomTabBarSelected } from '@/utils/syncCustomTabBar'
 import {
   computeProgressStatCards,
   formatDelta,
@@ -218,6 +219,7 @@ const TrainingPage: FC = () => {
   }, [token, load])
 
   useDidShow(() => {
+    syncCustomTabBarSelected(2)
     if (!token) return
     load()
     void fetchMe()

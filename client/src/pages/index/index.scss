@@ -18,14 +18,15 @@
 
 .home {
   position: relative;
-  padding: 0 0 24rpx;
+  /* 自定义 tabBar 遮罩底部，需自留高度（原生 tabBar 会自动留白） */
+  padding: 0 0 calc(24rpx + 112rpx + env(safe-area-inset-bottom));
   background: var(--color-bg-page);
   /* tabBar 页：高度由客户端裁剪，100vh 易长于可视区导致底部莫名留白 */
   min-height: 100%;
   box-sizing: border-box;
 
   &--guest {
-    padding-bottom: 48rpx;
+    padding-bottom: calc(48rpx + 112rpx + env(safe-area-inset-bottom));
   }
 
   &__promo-banner {

@@ -146,8 +146,8 @@ page {
  *     - .safe-area-pb-md    // 在已有内容 padding 之上额外加 home-indicator
  *     - 或 SCSS 内手写 `padding-bottom: calc(<原值> + env(safe-area-inset-bottom));`
  *
- *   微信小程序 tabBar 由系统接管 home-indicator，**tabBar 页本身不要再加**，
- *   只在「非 tabBar 页 + 贴底固定按钮 / 输入栏」上用。
+ *   启用自定义 tabBar 后，tab 页需自行预留底栏高度（见各 tab 页 padding-bottom）。
+ *   非 tabBar 页 + 贴底固定按钮 / 输入栏：继续用 .safe-area-pb*。
  * ==================================================================== */
 .safe-area-pb {
   padding-bottom: 34px;
