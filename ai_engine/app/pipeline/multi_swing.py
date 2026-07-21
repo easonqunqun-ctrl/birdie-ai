@@ -37,6 +37,20 @@ MIN_INTER_SWING_IDLE_FRAMES = 20
 PRACTICE_SPEED_RATIO = 0.55
 # follow 段长度 < backswing × 此比例 → follow 不完整，倾向试挥
 PRACTICE_FOLLOW_RATIO = 0.30
+# 候选时长过短（秒）→ 噪声段（常被误标试挥且 UI 显示 0:00–0:00），丢弃
+MIN_CANDIDATE_DURATION_SEC = 0.6
+
+
+def filter_short_candidates(
+    candidates: list[SwingCandidate],
+    fps: float,
+    *,
+    min_duration_sec: float = MIN_CANDIDATE_DURATION_SEC,
+) -> list[SwingCandidate]:
+    """丢掉时长不足的伪段（find_swing_windows 的帧下限在高 fps 下仍可能 < 0.6s）。"""
+    rate = float(fps) if fps and fps > 1e-6 else 30.0
+    min_frames = max(MIN_SWING_FRAMES, int(min_duration_sec * rate))
+    return [c for c in candidates if (c.end_frame - c.start_frame) >= min_frames]
 
 
 @dataclass
@@ -179,6 +193,14 @@ def detect_swing_candidates(pose: PoseResult) -> list[SwingCandidate]:
     candidates = [
         _analyze_window(speeds, keypoints, w, lead_wrist_idx, global_peak) for w in windows
     ]
+    fps = float(getattr(pose, "fps", 0) or 0) or 30.0
+    before = len(candidates)
+    candidates = filter_short_candidates(candidates, fps)
+    if before != len(candidates):
+        log.info(
+            "multi_swing_dropped_short",
+            extra={"before": before, "after": len(candidates), "fps": fps},
+        )
     log.info(
         "multi_swing_detected",
         extra={"count": len(candidates), "practice": sum(c.is_practice for c in candidates)},

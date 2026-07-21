@@ -4,6 +4,7 @@ import {
   prepareBackgroundStatusHint,
   shouldBlockSubmitWhilePreparing,
   shouldShowPrepareSlowPathHint,
+  shouldSkipDetectWaitOnSubmit,
   shouldStartPrepareFullSwingUpload,
 } from '../prepareFullSwingUpload'
 
@@ -83,5 +84,14 @@ describe('prepare background hints (B)', () => {
   test('idle phases return null hint', () => {
     expect(prepareBackgroundStatusHint('ready', null, false)).toBeNull()
     expect(prepareBackgroundStatusHint('idle', null, false)).toBeNull()
+  })
+})
+
+describe('shouldSkipDetectWaitOnSubmit', () => {
+  test('only when detecting with upload token ready', () => {
+    expect(shouldSkipDetectWaitOnSubmit('detecting', true)).toBe(true)
+    expect(shouldSkipDetectWaitOnSubmit('detecting', false)).toBe(false)
+    expect(shouldSkipDetectWaitOnSubmit('uploading', true)).toBe(false)
+    expect(shouldSkipDetectWaitOnSubmit('ready', true)).toBe(false)
   })
 })

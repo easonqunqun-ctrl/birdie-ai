@@ -45,7 +45,9 @@ import {
   canReusePreparedUpload,
   isPrepareInFlight,
   PREPARE_BACKGROUND_HINT_TIMEOUT_MS,
+  PREPARE_DETECT_SUBMIT_WAIT_MS,
   prepareBackgroundStatusHint,
+  shouldSkipDetectWaitOnSubmit,
   shouldStartPrepareFullSwingUpload,
   type PrepareFullSwingPhase,
 } from '@/utils/prepareFullSwingUpload'
@@ -56,6 +58,7 @@ import {
   shouldBlockSubmitOnDetectPrepareFailure,
   type DetectSwingsFailureInfo,
 } from '@/utils/detectSwingsFailure'
+import { sanitizeSwingCandidates } from '@/utils/sanitizeSwingCandidates'
 import type { CameraAngle, ClubType } from '@/types/api'
 import { PHASE2_CHIPPING_MODE_ENABLED_FLAG, PHASE2_PUTTING_MODE_ENABLED_FLAG, PHASE2_YARDAGE_BOOK_ENABLED_FLAG } from '@/constants/flags'
 import { CHIPPING_CLUB_HINT } from '@/constants/chippingLabels'
@@ -270,7 +273,13 @@ const AnalysisParamsPage: FC = () => {
         })
         if (cancelled) return { ok: false, failure: null }
 
-        setPreparePhase('detecting')
+        // 上传完成后立刻记下 token，提交时可跳过漫长的 detect-swings 等待。
+        if (!cancelled) {
+          setPreparedToken(token)
+          setPrepareUploadProgress(100)
+          setPreparePhase('detecting')
+        }
+
         const detected = await analysisService.detectSwings(token.upload_id)
         if (cancelled) return { ok: false, failure: null }
 
@@ -428,6 +437,8 @@ const AnalysisParamsPage: FC = () => {
 
       let token: UploadTokenResponse | undefined
       let preDetected: DetectSwingsResponse | null = null
+      /** 上传已完成、用户催促提交：跳过 detect-swings，直进 waiting */
+      let skipSwingDetect = false
 
       if (
         analysisMode === 'full_swing' &&
@@ -439,32 +450,56 @@ const AnalysisParamsPage: FC = () => {
         preDetected = preparedDetect
       } else if (
         analysisMode === 'full_swing' &&
+        shouldSkipDetectWaitOnSubmit(preparePhase, !!preparedToken) &&
+        preparedToken
+      ) {
+        // 上传已完成：不再卡在「等待机位识别」+「处理中」双遮罩，直接创建任务。
+        token = preparedToken
+        preDetected = preparedDetect
+        if (!preDetected) skipSwingDetect = true
+      } else if (
+        analysisMode === 'full_swing' &&
         isPrepareInFlight(preparePhase) &&
         prepareRunRef.current
       ) {
+        const waitDetectBudget =
+          preparePhase === 'detecting' ? PREPARE_DETECT_SUBMIT_WAIT_MS : 60_000
         Taro.showLoading({
-          title: preparePhase === 'uploading' ? '等待上传完成…' : '等待机位识别…',
+          title: preparePhase === 'uploading' ? '等待上传完成…' : '即将开始…',
         })
-        const result = await prepareRunRef.current
+        const raced = await Promise.race([
+          prepareRunRef.current.then((r) => ({ kind: 'done' as const, r })),
+          new Promise<{ kind: 'timeout' }>((resolve) => {
+            setTimeout(() => resolve({ kind: 'timeout' }), waitDetectBudget)
+          }),
+        ])
         Taro.hideLoading()
-        if (result.ok) {
-          token = result.token
-          preDetected = result.detected
-        } else if (
-          result.failure &&
-          shouldBlockSubmitOnDetectPrepareFailure(result.failure)
-        ) {
-          const lines = detectPrepareFailureBannerLines(result.failure)
-          await Taro.showModal({
-            title: result.failure.title,
-            content: lines.join('\n'),
-            showCancel: false,
-            confirmText: result.failure.reshootRecommended ? '重新拍摄' : '我知道了',
-          })
-          if (result.failure.reshootRecommended) {
-            Taro.redirectTo({ url: '/pages/analysis/capture' })
+        if (raced.kind === 'done') {
+          const result = raced.r
+          if (result.ok) {
+            token = result.token
+            preDetected = result.detected
+          } else if (
+            result.failure &&
+            shouldBlockSubmitOnDetectPrepareFailure(result.failure)
+          ) {
+            const lines = detectPrepareFailureBannerLines(result.failure)
+            await Taro.showModal({
+              title: result.failure.title,
+              content: lines.join('\n'),
+              showCancel: false,
+              confirmText: result.failure.reshootRecommended ? '重新拍摄' : '我知道了',
+            })
+            if (result.failure.reshootRecommended) {
+              Taro.redirectTo({ url: '/pages/analysis/capture' })
+            }
+            return
           }
-          return
+        } else if (preparedToken) {
+          // detect 超时：用已上传凭证直进创建，避免长时间卡在机位识别。
+          token = preparedToken
+          preDetected = preparedDetect
+          if (!preDetected) skipSwingDetect = true
         }
       }
 
@@ -552,6 +587,12 @@ const AnalysisParamsPage: FC = () => {
 
       if (analysisMode === 'full_swing') {
         try {
+          if (skipSwingDetect && !preDetected) {
+            setPhase('creating')
+            Taro.showLoading({ title: '创建分析任务' })
+            await goWaiting()
+            return
+          }
           let detected = preDetected
           if (!detected) {
             setPhase('detecting')
@@ -564,7 +605,11 @@ const AnalysisParamsPage: FC = () => {
           if (!preDetected) {
             Taro.hideLoading()
           }
-          if (detected.swing_candidates.length > 1) {
+          const sanitized = sanitizeSwingCandidates(
+            detected.swing_candidates,
+            detected.default_selected_index,
+          )
+          if (sanitized.swing_candidates.length > 1) {
             setPendingSwingSelection({
               uploadId: token.upload_id,
               cameraAngle: angleForAnalysis,
@@ -573,8 +618,8 @@ const AnalysisParamsPage: FC = () => {
               targetYardage: yardagePayload,
               duration,
               size,
-              swingCandidates: detected.swing_candidates,
-              defaultSelectedIndex: detected.default_selected_index,
+              swingCandidates: sanitized.swing_candidates,
+              defaultSelectedIndex: sanitized.default_selected_index,
             })
             Taro.navigateTo({
               url: `/pages/analysis/select-swing?uploadId=${encodeURIComponent(token.upload_id)}`,
@@ -584,8 +629,8 @@ const AnalysisParamsPage: FC = () => {
           setPhase('creating')
           Taro.showLoading({ title: '创建分析任务' })
           const autoIndex =
-            detected.swing_candidates.length === 1
-              ? detected.default_selected_index
+            sanitized.swing_candidates.length === 1
+              ? sanitized.default_selected_index
               : undefined
           await goWaiting(autoIndex)
           return

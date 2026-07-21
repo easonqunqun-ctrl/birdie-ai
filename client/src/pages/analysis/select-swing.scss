@@ -114,10 +114,11 @@
   }
 
   &__footer {
-    position: absolute;
+    position: fixed;
     left: 0;
     right: 0;
     bottom: 0;
+    z-index: 100;
     padding: 24rpx 32rpx calc(24rpx + env(safe-area-inset-bottom));
     background: var(--color-bg-page);
     box-shadow: 0 -4rpx 16rpx rgba(26, 35, 126, 0.06);

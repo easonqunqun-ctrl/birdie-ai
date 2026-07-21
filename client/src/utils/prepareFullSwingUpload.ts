@@ -14,6 +14,20 @@ export type PrepareFullSwingPhase =
 /** 后台 prepare 超过此时长后，提示用户可先选手动机位并提交。 */
 export const PREPARE_BACKGROUND_HINT_TIMEOUT_MS = 5000
 
+/**
+ * 用户点击「开始分析」时：若上传已完成、仍卡在机位/选段识别，
+ * 最多再等此时长；超时则跳过 detect，直接创建任务进 waiting。
+ */
+export const PREPARE_DETECT_SUBMIT_WAIT_MS = 1500
+
+/** 上传已完成、仅在 detecting：提交时是否应跳过继续等待 detect。 */
+export function shouldSkipDetectWaitOnSubmit(
+  phase: PrepareFullSwingPhase,
+  hasUploadToken: boolean,
+): boolean {
+  return phase === 'detecting' && hasUploadToken
+}
+
 /** 是否应启动后台上传 + detect-swings（机位预选）。 */
 export function shouldStartPrepareFullSwingUpload(input: {
   tempFilePath: string

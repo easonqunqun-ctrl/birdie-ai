@@ -11,16 +11,19 @@ import { useAnalysisStore } from '@/store/analysisStore'
 import { useUserStore } from '@/store/userStore'
 import { track } from '@/utils/track'
 import type { SwingCandidateItem } from '@/types/analysis'
+import { sanitizeSwingCandidates } from '@/utils/sanitizeSwingCandidates'
 import './select-swing.scss'
 
 function formatTimeSec(sec: number): string {
-  const total = Math.max(0, Math.floor(sec))
+  const safe = Math.max(0, sec)
+  // 不足 10 秒用一位小数，避免 0.3s 被显示成「0:00」误导用户
+  if (safe < 10) {
+    return `${safe.toFixed(1)}s`
+  }
+  const total = Math.floor(safe)
   const m = Math.floor(total / 60)
   const s = total % 60
-  if (m > 0) {
-    return `${m}:${String(s).padStart(2, '0')}`
-  }
-  return `0:${String(s).padStart(2, '0')}`
+  return `${m}:${String(s).padStart(2, '0')}`
 }
 
 function formatCandidateRange(item: SwingCandidateItem): string {
@@ -45,10 +48,18 @@ const SelectSwingPage: FC = () => {
       setTimeout(() => Taro.redirectTo({ url: '/pages/analysis/capture' }), 800)
       return
     }
-    setSelectedIndex(pending.defaultSelectedIndex)
+    const sanitized = sanitizeSwingCandidates(
+      pending.swingCandidates,
+      pending.defaultSelectedIndex,
+    )
+    setSelectedIndex(sanitized.default_selected_index)
   }, [uploadId, pending])
 
-  const candidates = pending?.swingCandidates ?? []
+  const candidates = useMemo(() => {
+    const raw = pending?.swingCandidates ?? []
+    if (!pending) return []
+    return sanitizeSwingCandidates(raw, pending.defaultSelectedIndex).swing_candidates
+  }, [pending])
 
   const selectedItem = useMemo(
     () => candidates[selectedIndex] ?? null,

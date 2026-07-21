@@ -217,15 +217,16 @@
     border: 1rpx solid var(--color-border);
   }
 
-  /* 底部提交 */
+  /* 底部提交：须 fixed 贴视口底；absolute 会相对页面流定位导致叠在球杆区中间 */
   &__footer {
-    position: absolute;
+    position: fixed;
     left: 0;
     right: 0;
     bottom: 0;
+    z-index: 100;
     background: var(--color-bg-card);
     padding: 20rpx 24rpx;
-    padding-bottom: 20rpx;
+    padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
     box-shadow: 0 -4px 12rpx rgba(26, 35, 126, 0.08);
   }
 

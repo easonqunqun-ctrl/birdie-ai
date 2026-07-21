@@ -153,6 +153,19 @@ def test_practice_swing_classified_by_low_peak() -> None:
     assert not cands[default_swing_index(cands)].is_practice
 
 
+def test_short_noise_window_dropped() -> None:
+    """近零时长噪声段不进入候选（避免 UI 出现 0:00–0:00 伪试挥）。"""
+    from app.pipeline.multi_swing import filter_short_candidates
+
+    cands = [
+        SwingCandidate(0, 8, True, 0.5, 0.01, 4, 6),  # ~0.27s @30fps
+        SwingCandidate(40, 100, False, 0.9, 0.05, 70, 85),
+    ]
+    kept = filter_short_candidates(cands, 30.0)
+    assert len(kept) == 1
+    assert kept[0].start_frame == 40
+
+
 def test_default_swing_index_picks_first_non_practice() -> None:
     cands = [
         SwingCandidate(0, 30, True, 0.8, 0.01, 15, 25),
