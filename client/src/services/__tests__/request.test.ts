@@ -90,7 +90,7 @@ describe('request · JWT 注入', () => {
 })
 
 describe('request · 401 处理', () => {
-  test('普通 401 → http_unauthorized + 清 token + reLaunch', async () => {
+  test('普通 401 → http_unauthorized + 清 token + reLaunch 首页访客态', async () => {
     storage.setToken('expired_token')
     T.request.mockResolvedValueOnce({
       statusCode: 401,
@@ -101,7 +101,7 @@ describe('request · 401 处理', () => {
       status: 401,
     })
     expect(storage.getToken()).toBe('')
-    expect(T.reLaunch).toHaveBeenCalledWith({ url: '/pages/login/index' })
+    expect(T.reLaunch).toHaveBeenCalledWith({ url: '/pages/index/index' })
   })
 
   test('401 + bizCode=40104 → business（不清 token，不跳登录）', async () => {

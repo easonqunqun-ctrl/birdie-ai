@@ -7,6 +7,7 @@ import { storage } from '@/utils/storage'
 import type { User } from '@/types/api'
 import { BRAND_LOGO } from '@/constants/brandAssets'
 import { describeIntermittentRequestFailure } from '@/services/request'
+import { switchToHome, toastTabNavigationFailure } from '@/utils/tabNav'
 import './index.scss'
 
 /** 微信要求：带 open-type=agreePrivacyAuthorization 的 button 须设置 id（供隐私回调校验） */
@@ -107,6 +108,23 @@ const LoginPage: FC = () => {
     } as CSSProperties
   }, [])
 
+  /**
+   * 微信审核：登录阶段须提供显著「取消 / 拒绝 / 返回」，禁止强制登录后才能体验。
+   * - 有上一页（从首页访客态 navigateTo 进来）→ 返回
+   * - 栈底（401 reLaunch 等）→ 切到首页访客态，可继续浏览
+   */
+  const skipLogin = useCallback(() => {
+    if (loading) return
+    const pages = Taro.getCurrentPages()
+    if (pages.length > 1) {
+      Taro.navigateBack().catch(() => {
+        void switchToHome().catch(toastTabNavigationFailure)
+      })
+      return
+    }
+    void switchToHome().catch(toastTabNavigationFailure)
+  }, [loading])
+
   return (
     <View className='login' style={pagePad}>
       <View className='login__main'>
@@ -192,6 +210,15 @@ const LoginPage: FC = () => {
           <Text className='login__btn-label'>
             {loading ? '登录中...' : '微信一键登录'}
           </Text>
+        </Button>
+
+        {/* 审核硬性要求：显著有效的取消/拒绝/返回，禁止强制登录才能体验 */}
+        <Button
+          className='login__skip'
+          disabled={loading}
+          onClick={skipLogin}
+        >
+          <Text className='login__skip-label'>暂不登录，先逛逛</Text>
         </Button>
 
         <View className='login__invite'>

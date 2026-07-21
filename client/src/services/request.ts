@@ -454,8 +454,10 @@ export function describePageLoadFailure(e: unknown): string {
 }
 
 /**
- * 401 兜底：清 token 并 reLaunch 登录页。
- * 用 reLaunchedRef 简单防抖，避免多请求同时 401 触发多次 reLaunch。
+ * 401 兜底：清 token 并回首页访客态（勿强跳登录页）。
+ * 微信审核禁止「身份失效后反复弹登录、强制登录才能体验」；
+ * 用户可在首页主动点登录。登录页本身另有「暂不登录，先逛逛」。
+ * 用防抖避免多请求同时 401 触发多次 reLaunch。
  */
 let _unauthorizedHandling = false
 function handleUnauthorized() {
@@ -463,7 +465,7 @@ function handleUnauthorized() {
   if (_unauthorizedHandling) return
   _unauthorizedHandling = true
   try {
-    Taro.reLaunch({ url: '/pages/login/index' })
+    Taro.reLaunch({ url: '/pages/index/index' })
   } finally {
     // 给跳转留出时间窗，避免短时间内重复触发；reLaunch 不会回到本页，所以不必复位
     setTimeout(() => {

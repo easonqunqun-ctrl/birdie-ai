@@ -109,6 +109,24 @@
     text-align: center;
   }
 
+  /* 微信审核：与主 CTA 同宽、同高量级，文案明确「拒绝登录 / 可返回浏览」 */
+  &__skip {
+    background: var(--color-bg-card) !important;
+    border: 2rpx solid var(--color-primary) !important;
+    border-radius: var(--radius-xl) !important;
+    height: 88rpx !important;
+    margin-bottom: 16rpx;
+    padding: 0 !important;
+    box-sizing: border-box;
+  }
+
+  &__skip-label {
+    font-size: 34rpx;
+    font-weight: 600;
+    color: var(--color-primary);
+    text-align: center;
+  }
+
   &__agreement {
     display: flex;
     align-items: center;
