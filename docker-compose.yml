@@ -178,6 +178,8 @@ services:
     environment:
       # 未写进 .env.local 时仍默认真实引擎（骨骼/评分走 MediaPipe）；本地改 true 可秒回 mock
       AI_ENGINE_MOCK_MODE: ${AI_ENGINE_MOCK_MODE:-false}
+      # P2-M7-R1-B7：V2 桶 analyze 是否走 preprocess_v2（60fps）；默认 false，见 docs/release-notes/p2-m7-b7-preprocess-v2-staging-runbook.md
+      M7_VIDEO_READER_V2_ENABLED: ${M7_VIDEO_READER_V2_ENABLED:-false}
     # W6-T4：mock vs real 以环境变量为准（见上）；.env.local 可覆盖
     # W6-T5：单视频 MediaPipe 推理峰值 ~800MB（含 ffmpeg + opencv 缓冲），
     # 2G 留 ~2.5x buffer，防止 OOM kill；生产多路并行时要线性抬高。
