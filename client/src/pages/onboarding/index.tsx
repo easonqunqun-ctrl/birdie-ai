@@ -1,6 +1,7 @@
-import { FC, useState } from 'react'
+import { CSSProperties, FC, useMemo, useState } from 'react'
 import { View, Text, Button } from '@tarojs/components'
 import Taro from '@tarojs/taro'
+import { getSafeAreaInsets } from '@/adapters/safeArea'
 import { PHASE2_PROFILE_V2_ENABLED_FLAG } from '@/constants/flags'
 import { describeIntermittentRequestFailure, isRequestError } from '@/services/request'
 import { useUserStore } from '@/store/userStore'
@@ -105,12 +106,46 @@ const OnboardingPage: FC = () => {
     })
   }
 
+  const pagePad = useMemo(() => {
+    if (process.env.TARO_ENV !== 'rn') return undefined
+    const inset = getSafeAreaInsets()
+    return {
+      paddingTop: inset.top + 14,
+      paddingBottom: inset.bottom + 24,
+    } as CSSProperties
+  }, [])
+
   if (PHASE2_PROFILE_V2_ENABLED_FLAG) {
     return <OnboardingV2Flow onSkip={handleSkip} skipping={skipping} />
   }
 
+  const nextDisabled = !canGoNext
+  const submitDisabled = !canGoNext || submitting
+
+  const renderOption = (
+    key: string,
+    label: string,
+    active: boolean,
+    onClick: () => void,
+    desc?: string,
+  ) => (
+    <View
+      key={key}
+      className={`onboarding__option ${active ? 'onboarding__option--active' : ''}`}
+      onClick={onClick}
+    >
+      <View
+        className={`onboarding__option-bar ${active ? 'onboarding__option-bar--active' : ''}`}
+      />
+      <View className='onboarding__option-body'>
+        <Text className='onboarding__option-label'>{label}</Text>
+        {desc ? <Text className='onboarding__option-desc'>{desc}</Text> : null}
+      </View>
+    </View>
+  )
+
   return (
-    <View className='onboarding'>
+    <View className='onboarding' style={pagePad}>
       {/* 顶部：进度条 + 跳过 */}
       <View className='onboarding__header'>
         <View className='onboarding__progress'>
@@ -136,16 +171,9 @@ const OnboardingPage: FC = () => {
         <View className='onboarding__step'>
           <Text className='onboarding__title'>你的高尔夫水平？</Text>
           <View className='onboarding__options'>
-            {LEVELS.map((l) => (
-              <View
-                key={l.value}
-                className={`onboarding__option ${level === l.value ? 'onboarding__option--active' : ''}`}
-                onClick={() => setLevel(l.value)}
-              >
-                <Text className='onboarding__option-label'>{l.label}</Text>
-                <Text className='onboarding__option-desc'>{l.desc}</Text>
-              </View>
-            ))}
+            {LEVELS.map((l) =>
+              renderOption(l.value, l.label, level === l.value, () => setLevel(l.value), l.desc),
+            )}
           </View>
         </View>
       )}
@@ -154,15 +182,9 @@ const OnboardingPage: FC = () => {
         <View className='onboarding__step'>
           <Text className='onboarding__title'>主要目标？（最多 {MAX_GOALS} 个）</Text>
           <View className='onboarding__options'>
-            {GOALS.map((g) => (
-              <View
-                key={g.value}
-                className={`onboarding__option ${goals.includes(g.value) ? 'onboarding__option--active' : ''}`}
-                onClick={() => toggleGoal(g.value)}
-              >
-                <Text className='onboarding__option-label'>{g.label}</Text>
-              </View>
-            ))}
+            {GOALS.map((g) =>
+              renderOption(g.value, g.label, goals.includes(g.value), () => toggleGoal(g.value)),
+            )}
           </View>
         </View>
       )}
@@ -171,15 +193,9 @@ const OnboardingPage: FC = () => {
         <View className='onboarding__step'>
           <Text className='onboarding__title'>练习频率？</Text>
           <View className='onboarding__options'>
-            {FREQS.map((f) => (
-              <View
-                key={f.value}
-                className={`onboarding__option ${freq === f.value ? 'onboarding__option--active' : ''}`}
-                onClick={() => setFreq(f.value)}
-              >
-                <Text className='onboarding__option-label'>{f.label}</Text>
-              </View>
-            ))}
+            {FREQS.map((f) =>
+              renderOption(f.value, f.label, freq === f.value, () => setFreq(f.value)),
+            )}
           </View>
         </View>
       )}
@@ -191,25 +207,33 @@ const OnboardingPage: FC = () => {
             onClick={handlePrev}
             disabled={submitting}
           >
-            上一步
+            <Text className='onboarding__btn-label onboarding__btn-label--ghost'>上一步</Text>
           </Button>
         )}
         {step < TOTAL_STEPS ? (
           <Button
-            className='onboarding__btn'
-            disabled={!canGoNext}
+            className={`onboarding__btn ${nextDisabled ? 'onboarding__btn--disabled' : ''}`}
+            disabled={nextDisabled}
             onClick={handleNext}
           >
-            下一步
+            <Text
+              className={`onboarding__btn-label ${nextDisabled ? 'onboarding__btn-label--disabled' : ''}`}
+            >
+              下一步
+            </Text>
           </Button>
         ) : (
           <Button
-            className='onboarding__btn'
+            className={`onboarding__btn ${submitDisabled ? 'onboarding__btn--disabled' : ''}`}
             loading={submitting}
-            disabled={!canGoNext || submitting}
+            disabled={submitDisabled}
             onClick={handleSubmit}
           >
-            完成
+            <Text
+              className={`onboarding__btn-label ${submitDisabled ? 'onboarding__btn-label--disabled' : ''}`}
+            >
+              完成
+            </Text>
           </Button>
         )}
       </View>

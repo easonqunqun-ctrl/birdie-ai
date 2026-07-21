@@ -11,43 +11,23 @@
  * 用户点任一 CTA 后即标记已看过，后续只保留简洁 tips。
  */
 
-import { FC, useEffect, useState } from 'react'
+import { FC, useEffect, useMemo, useState } from 'react'
 import { View, Text, Button } from '@tarojs/components'
 import Taro from '@tarojs/taro'
-import { chooseVideo } from '@/adapters/media'
+import {
+  chooseVideo,
+  getCapturePlatformTips,
+  summarizeChosenVideo,
+} from '@/adapters/media'
 import { describeIntermittentRequestFailure } from '@/services/request'
 import { storage } from '@/utils/storage'
 import { VIDEO_CONSTRAINTS } from '@/types/analysis'
-import { validateVideoDurationForUpload } from '@/utils/videoDurationValidation'
+import { validatePickedVideo } from '@/utils/videoPickNormalize'
 import './capture.scss'
 
 type MediaSource = 'camera' | 'album'
 
-interface ChosenVideo {
-  tempFilePath: string
-  size: number
-  duration: number
-  /** 视频首帧缩略图路径（weapp 原生字段；W8-T5 用于合规预检） */
-  thumbTempFilePath?: string
-}
-
-/**
- * 从文件名 / tempFilePath 推出扩展名；小程序里 tempFilePath 一般长这样：
- *   wxfile://tmp_xxx.mp4 或 http://tmp/xxx.MOV
- */
-function extractExt(path: string): string {
-  const dotIdx = path.lastIndexOf('.')
-  if (dotIdx === -1) return ''
-  return path.slice(dotIdx + 1).toLowerCase().split('?')[0]
-}
-
-/** 把字节转成人类可读，仅用于 toast */
-function formatSize(bytes: number): string {
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)}KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
-}
-
-const TIPS = [
+const BASE_TIPS = [
   { icon: '📐', text: '将球员放在画面中央，脚到头部全部露出' },
   { icon: '🎬', text: '拍满至少 2 秒（建议 3–5 秒），只录 1 次完整挥杆' },
   { icon: '💡', text: '优选自然光，避免强背光和严重抖动' },
@@ -55,6 +35,10 @@ const TIPS = [
 
 const CaptureAnalysisPage: FC = () => {
   const [showGuide, setShowGuide] = useState(false)
+  const tips = useMemo(() => {
+    const extra = getCapturePlatformTips().map((text) => ({ icon: '📱', text }))
+    return [...BASE_TIPS, ...extra]
+  }, [])
 
   useEffect(() => {
     setShowGuide(!storage.hasSeenAnalysisGuide())
@@ -62,35 +46,35 @@ const CaptureAnalysisPage: FC = () => {
 
   const handleChoose = async (source: MediaSource) => {
     try {
-      // weapp：`chooseVideo` → Taro.chooseMedia + 隐私授权；RN：`react-native-image-picker`
+      // weapp：`chooseVideo` → Taro.chooseMedia；RN：image-picker（差异仅在 adapter）
       const raw = await chooseVideo({
         source,
         maxDurationSeconds: VIDEO_CONSTRAINTS.MAX_DURATION_SECONDS,
+        // App 相机臂：高质量 best-effort；相册臂用于系统慢动作导入（SP-1）
+        preset: source === 'camera' ? 'high_quality' : 'standard',
       })
-      const picked: ChosenVideo = {
-        tempFilePath: raw.filePath,
+      const err = validatePickedVideo({
+        filePath: raw.filePath,
         size: raw.size,
         duration: raw.duration,
-        thumbTempFilePath: raw.thumbTempFilePath,
-      }
-      const err = validateVideo(picked, raw.filePath)
+      })
       if (err) {
         Taro.showToast({ title: err, icon: 'none', duration: 2500 })
         return
       }
 
       storage.markAnalysisGuideSeen()
+      // SP-1：Metro / 远程调试可搜 SP1-pick，对照探针表
+      console.info('[SP1-pick]', summarizeChosenVideo(source, raw))
 
-      // 通过 URL 传参；tempFilePath 一般很短，但稳妥起见做 encode
-      // W8-T5：thumbTempFilePath 可为空（RN / 部分机型）；下一页按存在与否决定是否做合规预检
-      const thumbParam = picked.thumbTempFilePath
-        ? `&thumbTempFilePath=${encodeURIComponent(picked.thumbTempFilePath)}`
+      const thumbParam = raw.thumbTempFilePath
+        ? `&thumbTempFilePath=${encodeURIComponent(raw.thumbTempFilePath)}`
         : ''
       Taro.navigateTo({
         url:
-          `/pages/analysis/params?tempFilePath=${encodeURIComponent(picked.tempFilePath)}` +
-          `&size=${picked.size}` +
-          `&duration=${picked.duration.toFixed(2)}` +
+          `/pages/analysis/params?tempFilePath=${encodeURIComponent(raw.filePath)}` +
+          `&size=${raw.size}` +
+          `&duration=${raw.duration.toFixed(2)}` +
           `&source=${source}` +
           thumbParam,
       })
@@ -133,7 +117,7 @@ const CaptureAnalysisPage: FC = () => {
       </View>
 
       <View className='capture__tips'>
-        {TIPS.map((t) => (
+        {tips.map((t) => (
           <View key={t.text} className='capture__tip'>
             <Text className='capture__tip-icon'>{t.icon}</Text>
             <Text className='capture__tip-text'>{t.text}</Text>
@@ -158,23 +142,6 @@ const CaptureAnalysisPage: FC = () => {
       </View>
     </View>
   )
-}
-
-/** 返回 null 表示合规；返回字符串是面向用户的错误提示 */
-function validateVideo(v: ChosenVideo, originalPath: string): string | null {
-  const { MAX_SIZE_BYTES, ACCEPTED_EXTENSIONS } = VIDEO_CONSTRAINTS
-
-  const durationErr = validateVideoDurationForUpload(v.duration)
-  if (durationErr) return durationErr
-  if (v.size > MAX_SIZE_BYTES) {
-    return `文件过大（${formatSize(v.size)}），限 ${Math.round(MAX_SIZE_BYTES / 1024 / 1024)}MB 以内`
-  }
-  const ext = extractExt(originalPath)
-  // 相册来源的部分机型 tempFilePath 可能带奇怪后缀；允许 ext 为空时放行，由后端兜底拒绝
-  if (ext && !ACCEPTED_EXTENSIONS.includes(ext as (typeof ACCEPTED_EXTENSIONS)[number])) {
-    return `暂不支持 .${ext} 格式，请选择 ${ACCEPTED_EXTENSIONS.join('/').toUpperCase()}`
-  }
-  return null
 }
 
 export default CaptureAnalysisPage

@@ -1,6 +1,7 @@
-import { FC, useCallback, useEffect, useRef, useState } from 'react'
+import { CSSProperties, FC, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, Button, Input, Image } from '@tarojs/components'
 import Taro, { useDidShow, useRouter } from '@tarojs/taro'
+import { getSafeAreaInsets } from '@/adapters/safeArea'
 import { useUserStore } from '@/store/userStore'
 import { storage } from '@/utils/storage'
 import type { User } from '@/types/api'
@@ -97,8 +98,17 @@ const LoginPage: FC = () => {
         } as Record<string, unknown>)
       : {}
 
+  const pagePad = useMemo(() => {
+    if (process.env.TARO_ENV !== 'rn') return undefined
+    const inset = getSafeAreaInsets()
+    return {
+      paddingTop: inset.top + 28,
+      paddingBottom: inset.bottom + 16,
+    } as CSSProperties
+  }, [])
+
   return (
-    <View className='login'>
+    <View className='login' style={pagePad}>
       <View className='login__main'>
         <View className='login__brand'>
           <Image
@@ -143,7 +153,7 @@ const LoginPage: FC = () => {
             className='login__agreement-text'
             onClick={() => setAgreed(!agreed)}
           >
-            登录即表示同意
+            我已阅读并同意
           </Text>
           <Text
             className='login__agreement-link'
@@ -152,7 +162,7 @@ const LoginPage: FC = () => {
               Taro.navigateTo({ url: '/pages/legal/terms' })
             }}
           >
-            《用户协议》
+            《用户服务协议》
           </Text>
           <Text
             className='login__agreement-text'
@@ -172,14 +182,16 @@ const LoginPage: FC = () => {
         </View>
 
         <Button
-          className='login__btn'
+          className={`login__btn${!agreed ? ' login__btn--disabled' : ''}`}
           loading={loading}
-          disabled={loading}
+          disabled={!agreed || loading}
           {...(process.env.TARO_ENV === 'weapp'
             ? weappLoginButtonProps
             : { onClick: () => void performLogin() })}
         >
-          {loading ? '登录中...' : '微信一键登录'}
+          <Text className='login__btn-label'>
+            {loading ? '登录中...' : '微信一键登录'}
+          </Text>
         </Button>
 
         <View className='login__invite'>

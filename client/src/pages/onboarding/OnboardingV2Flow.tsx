@@ -2,9 +2,10 @@
  * P2-M9-03 · Onboarding 2.0（6 步问卷 → profile-v2 + v1 onboarding 双写）
  */
 
-import { FC, useState } from 'react'
+import { CSSProperties, FC, useMemo, useState } from 'react'
 import { View, Text, Button, Input } from '@tarojs/components'
 import Taro from '@tarojs/taro'
+import { getSafeAreaInsets } from '@/adapters/safeArea'
 import { GOALS, GOAL_LABEL, MAX_GOALS } from '@/constants/golf'
 import {
   HANDICAP_RANGES,
@@ -122,6 +123,15 @@ export const OnboardingV2Flow: FC<OnboardingV2FlowProps> = ({ onSkip, skipping }
     if (step > 1) setStep(((step - 1) as Step))
   }
 
+  const pagePad = useMemo(() => {
+    if (process.env.TARO_ENV !== 'rn') return undefined
+    const inset = getSafeAreaInsets()
+    return {
+      paddingTop: inset.top + 14,
+      paddingBottom: inset.bottom + 24,
+    } as CSSProperties
+  }, [])
+
   const handleSubmit = async () => {
     if (!canGoNext()) return
     const range = HANDICAP_RANGES.find((r) => r.id === handicapRangeId)
@@ -157,8 +167,33 @@ export const OnboardingV2Flow: FC<OnboardingV2FlowProps> = ({ onSkip, skipping }
     }
   }
 
+  const renderOption = (
+    key: string,
+    label: string,
+    active: boolean,
+    onClick: () => void,
+    desc?: string,
+  ) => (
+    <View
+      key={key}
+      className={`onboarding__option ${active ? 'onboarding__option--active' : ''}`}
+      onClick={onClick}
+    >
+      <View
+        className={`onboarding__option-bar ${active ? 'onboarding__option-bar--active' : ''}`}
+      />
+      <View className='onboarding__option-body'>
+        <Text className='onboarding__option-label'>{label}</Text>
+        {desc ? <Text className='onboarding__option-desc'>{desc}</Text> : null}
+      </View>
+    </View>
+  )
+
+  const nextDisabled = !canGoNext()
+  const submitDisabled = !canGoNext() || submitting
+
   return (
-    <View className='onboarding'>
+    <View className='onboarding' style={pagePad}>
       <View className='onboarding__header'>
         <View className='onboarding__progress'>
           <View className='onboarding__progress-bar'>
@@ -183,27 +218,15 @@ export const OnboardingV2Flow: FC<OnboardingV2FlowProps> = ({ onSkip, skipping }
         <View className='onboarding__step'>
           <Text className='onboarding__title'>你的差点水平？</Text>
           <View className='onboarding__options'>
-            {HANDICAP_RANGES.map((r) => (
-              <View
-                key={r.id}
-                className={`onboarding__option ${handicapRangeId === r.id ? 'onboarding__option--active' : ''}`}
-                onClick={() => setHandicapRangeId(r.id)}
-              >
-                <Text className='onboarding__option-label'>{r.label}</Text>
-              </View>
-            ))}
+            {HANDICAP_RANGES.map((r) =>
+              renderOption(r.id, r.label, handicapRangeId === r.id, () => setHandicapRangeId(r.id)),
+            )}
           </View>
           <Text className='onboarding__sub-title'>差点来源</Text>
           <View className='onboarding__options onboarding__options--compact'>
-            {HANDICAP_SOURCES.map((s) => (
-              <View
-                key={s.id}
-                className={`onboarding__option ${handicapSource === s.id ? 'onboarding__option--active' : ''}`}
-                onClick={() => setHandicapSource(s.id)}
-              >
-                <Text className='onboarding__option-label'>{s.label}</Text>
-              </View>
-            ))}
+            {HANDICAP_SOURCES.map((s) =>
+              renderOption(s.id, s.label, handicapSource === s.id, () => setHandicapSource(s.id)),
+            )}
           </View>
         </View>
       )}
@@ -212,15 +235,9 @@ export const OnboardingV2Flow: FC<OnboardingV2FlowProps> = ({ onSkip, skipping }
         <View className='onboarding__step'>
           <Text className='onboarding__title'>惯用手？</Text>
           <View className='onboarding__options'>
-            {HANDEDNESS_OPTIONS.map((h) => (
-              <View
-                key={h.id}
-                className={`onboarding__option ${handedness === h.id ? 'onboarding__option--active' : ''}`}
-                onClick={() => setHandedness(h.id)}
-              >
-                <Text className='onboarding__option-label'>{h.label}</Text>
-              </View>
-            ))}
+            {HANDEDNESS_OPTIONS.map((h) =>
+              renderOption(h.id, h.label, handedness === h.id, () => setHandedness(h.id)),
+            )}
           </View>
         </View>
       )}
@@ -255,15 +272,9 @@ export const OnboardingV2Flow: FC<OnboardingV2FlowProps> = ({ onSkip, skipping }
           <Text className='onboarding__title'>有需要注意的伤病吗？</Text>
           <Text className='onboarding__hint'>可多选；没有则直接下一步</Text>
           <View className='onboarding__options'>
-            {INJURY_OPTIONS.map((opt) => (
-              <View
-                key={opt.id}
-                className={`onboarding__option ${injuries.includes(opt.id) ? 'onboarding__option--active' : ''}`}
-                onClick={() => toggleInjury(opt.id)}
-              >
-                <Text className='onboarding__option-label'>{opt.label}</Text>
-              </View>
-            ))}
+            {INJURY_OPTIONS.map((opt) =>
+              renderOption(opt.id, opt.label, injuries.includes(opt.id), () => toggleInjury(opt.id)),
+            )}
           </View>
         </View>
       )}
@@ -272,15 +283,9 @@ export const OnboardingV2Flow: FC<OnboardingV2FlowProps> = ({ onSkip, skipping }
         <View className='onboarding__step'>
           <Text className='onboarding__title'>中长期目标？（最多 {MAX_GOALS} 个）</Text>
           <View className='onboarding__options'>
-            {GOALS.map((g) => (
-              <View
-                key={g.value}
-                className={`onboarding__option ${goals.includes(g.value) ? 'onboarding__option--active' : ''}`}
-                onClick={() => toggleGoal(g.value)}
-              >
-                <Text className='onboarding__option-label'>{g.label}</Text>
-              </View>
-            ))}
+            {GOALS.map((g) =>
+              renderOption(g.value, g.label, goals.includes(g.value), () => toggleGoal(g.value)),
+            )}
           </View>
         </View>
       )}
@@ -289,27 +294,20 @@ export const OnboardingV2Flow: FC<OnboardingV2FlowProps> = ({ onSkip, skipping }
         <View className='onboarding__step'>
           <Text className='onboarding__title'>训练偏好</Text>
           <View className='onboarding__options'>
-            {TRAINING_PREFERENCE_OPTIONS.map((opt) => (
-              <View
-                key={opt.id}
-                className={`onboarding__option ${trainingPref === opt.id ? 'onboarding__option--active' : ''}`}
-                onClick={() => setTrainingPref(opt.id)}
-              >
-                <Text className='onboarding__option-label'>{opt.label}</Text>
-              </View>
-            ))}
+            {TRAINING_PREFERENCE_OPTIONS.map((opt) =>
+              renderOption(opt.id, opt.label, trainingPref === opt.id, () => setTrainingPref(opt.id)),
+            )}
           </View>
           <Text className='onboarding__sub-title'>每周目标练习次数</Text>
           <View className='onboarding__options'>
-            {WEEKLY_TARGET_OPTIONS.map((opt) => (
-              <View
-                key={opt.value}
-                className={`onboarding__option ${weeklySessions === opt.value ? 'onboarding__option--active' : ''}`}
-                onClick={() => setWeeklySessions(opt.value)}
-              >
-                <Text className='onboarding__option-label'>{opt.label}</Text>
-              </View>
-            ))}
+            {WEEKLY_TARGET_OPTIONS.map((opt) =>
+              renderOption(
+                String(opt.value),
+                opt.label,
+                weeklySessions === opt.value,
+                () => setWeeklySessions(opt.value),
+              ),
+            )}
           </View>
         </View>
       )}
@@ -321,25 +319,33 @@ export const OnboardingV2Flow: FC<OnboardingV2FlowProps> = ({ onSkip, skipping }
             onClick={handlePrev}
             disabled={submitting}
           >
-            上一步
+            <Text className='onboarding__btn-label onboarding__btn-label--ghost'>上一步</Text>
           </Button>
         )}
         {step < ONBOARDING_V2_TOTAL_STEPS ? (
           <Button
-            className='onboarding__btn'
-            disabled={!canGoNext()}
+            className={`onboarding__btn ${nextDisabled ? 'onboarding__btn--disabled' : ''}`}
+            disabled={nextDisabled}
             onClick={() => void handleNext()}
           >
-            下一步
+            <Text
+              className={`onboarding__btn-label ${nextDisabled ? 'onboarding__btn-label--disabled' : ''}`}
+            >
+              下一步
+            </Text>
           </Button>
         ) : (
           <Button
-            className='onboarding__btn'
+            className={`onboarding__btn ${submitDisabled ? 'onboarding__btn--disabled' : ''}`}
             loading={submitting}
-            disabled={!canGoNext() || submitting}
+            disabled={submitDisabled}
             onClick={() => void handleSubmit()}
           >
-            完成
+            <Text
+              className={`onboarding__btn-label ${submitDisabled ? 'onboarding__btn-label--disabled' : ''}`}
+            >
+              完成
+            </Text>
           </Button>
         )}
       </View>

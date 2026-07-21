@@ -1,9 +1,9 @@
 /**
  * Onboarding 问卷页样式（W9 视觉对齐）
  *
- * 注：稿中 onboarding 是单屏 splash + 微信登录。
- *     当前业务做的是 3 步问卷（水平/目标/频率），不动 tsx；
- *     视觉上把按钮、选项、进度条按品牌语言重写。
+ * RN 约束（见 config/postcss-rn-sanitize.cjs）：
+ * - gap / ::before / :active / [disabled] / env(safe-area) 会被丢掉
+ * - 间距用 margin；选中条用真实 View；禁用用 class；安全区用 adapters/safeArea
  */
 
 .onboarding {
@@ -11,7 +11,8 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding: calc(28rpx + env(safe-area-inset-top)) 32rpx calc(48rpx + env(safe-area-inset-bottom));
+  /* 顶部/底部安全区由 TS 内联 style 叠加，这里只留基础 padding */
+  padding: 28rpx 32rpx 48rpx;
   background: var(--color-bg-page);
   box-sizing: border-box;
 
@@ -19,7 +20,6 @@
   &__header {
     display: flex;
     align-items: center;
-    gap: 20rpx;
     margin-bottom: 56rpx;
     padding: 16rpx 0;
   }
@@ -28,7 +28,7 @@
     flex: 1;
     display: flex;
     align-items: center;
-    gap: 14rpx;
+    margin-right: 14rpx;
   }
 
   &__progress-bar {
@@ -37,14 +37,13 @@
     background: var(--color-border);
     border-radius: 999rpx;
     overflow: hidden;
+    margin-right: 14rpx;
   }
 
   &__progress-fill {
     height: 100%;
-    background: var(--gradient-progress);
-    border-radius: inherit;
-    transition: width 0.3s ease-out;
-    box-shadow: 0 0 6rpx rgba(0, 208, 132, 0.3);
+    background: var(--color-accent-mint);
+    border-radius: 20rpx;
   }
 
   &__progress-text {
@@ -53,7 +52,6 @@
     min-width: 60rpx;
     text-align: right;
     font-weight: 600;
-    letter-spacing: 0.5rpx;
   }
 
   &__skip {
@@ -64,92 +62,84 @@
     background: var(--color-bg-card);
     border: 1rpx solid var(--color-border);
 
-    &:active {
-      opacity: 0.75;
-    }
-
     &--disabled {
       opacity: 0.45;
     }
   }
 
-  /* ================= 步骤容器（勿 flex:1 吸满纵向空间） ================= */
+  /* ================= 步骤容器 ================= */
   &__step {
-    flex: 0 1 auto;
-    min-height: 0;
+    flex-grow: 0;
+    flex-shrink: 1;
   }
 
   &__title {
     font-size: 46rpx;
     font-weight: 800;
     color: var(--color-primary);
-    display: block;
     margin-bottom: 40rpx;
     line-height: 1.3;
-    letter-spacing: -0.5rpx;
   }
 
   &__options {
     display: flex;
     flex-direction: column;
-    gap: 14rpx;
   }
 
-  /* 选项卡：白底胶囊 + 选中态浅靛蓝高亮 + 左侧 mint 色条 */
+  /* 选项卡：白底 + 选中态浅靛蓝；左侧色条用 __option-bar View */
   &__option {
     position: relative;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
     background: var(--color-bg-card);
     border: 2rpx solid var(--color-border);
     border-radius: 20rpx;
     padding: 22rpx 26rpx;
-    transition: all 0.18s ease;
-    box-shadow: var(--shadow-xs);
+    margin-bottom: 14rpx;
     overflow: hidden;
-
-    &::before {
-      content: '';
-      position: absolute;
-      left: 0;
-      top: 0;
-      bottom: 0;
-      width: 0;
-      background: linear-gradient(180deg, var(--color-primary), var(--color-accent-mint));
-      transition: width 0.18s ease;
-    }
 
     &--active {
       border-color: var(--color-primary);
       background: var(--color-primary-tint);
-      box-shadow: 0 4rpx 16rpx rgba(26, 35, 126, 0.16);
-
-      &::before {
-        width: 6rpx;
-      }
     }
 
-    &:active {
-      opacity: 0.92;
+    &:last-child {
+      margin-bottom: 0;
     }
+  }
+
+  &__option-bar {
+    width: 6rpx;
+    min-height: 36rpx;
+    align-self: stretch;
+    margin-right: 16rpx;
+    border-radius: 999rpx;
+    background: var(--color-border);
+
+    &--active {
+      background: var(--color-accent-mint);
+    }
+  }
+
+  &__option-body {
+    flex: 1;
   }
 
   &__option-label {
     font-size: 30rpx;
     font-weight: 700;
-    display: block;
     color: var(--color-primary);
-    letter-spacing: -0.3rpx;
   }
 
   &__option-desc {
     font-size: 30rpx;
     color: var(--color-text-tertiary);
-    display: block;
     margin-top: 6rpx;
     line-height: 1.5;
   }
 
   &__sub-title {
-    display: block;
     font-size: var(--font-size-sm);
     font-weight: 600;
     color: var(--color-text-secondary);
@@ -157,7 +147,6 @@
   }
 
   &__hint {
-    display: block;
     font-size: var(--font-size-xs);
     color: var(--color-text-tertiary);
     margin: -24rpx 0 24rpx;
@@ -169,7 +158,6 @@
   }
 
   &__field-label {
-    display: block;
     font-size: var(--font-size-sm);
     color: var(--color-text-secondary);
     margin-bottom: 12rpx;
@@ -183,21 +171,18 @@
     font-size: var(--font-size-base);
   }
 
-  &__options--compact {
-    gap: 10rpx;
-  }
-
   /* ================= 底部按钮 ================= */
   &__footer {
     margin-top: 48rpx;
     display: flex;
-    gap: 14rpx;
+    flex-direction: row;
+    align-items: stretch;
   }
 
   &__btn {
     flex: 1;
     background: var(--color-primary) !important;
-    color: var(--color-on-primary) !important;
+    /* color 在 View 上对 Taro RN Button 文字无效，见 __btn-label */
     font-size: 32rpx !important;
     font-weight: 800 !important;
     border-radius: 20rpx !important;
@@ -205,24 +190,33 @@
     line-height: 96rpx !important;
     padding: 0 !important;
     margin: 0 !important;
-    box-shadow: 0 6rpx 18rpx rgba(26, 35, 126, 0.28);
-
-    &::after {
-      border: none !important;
-    }
-
-    &[disabled] {
-      background: var(--color-bg-subtle) !important;
-      color: var(--color-text-tertiary) !important;
-      box-shadow: none !important;
-    }
 
     &--ghost {
       background: var(--color-bg-card) !important;
-      color: var(--color-primary) !important;
       border: 2rpx solid var(--color-primary) !important;
-      flex: 0 0 38% !important;
-      box-shadow: none !important;
+      flex-grow: 0;
+      flex-shrink: 0;
+      width: 38%;
+      margin-right: 14rpx;
+    }
+
+    &--disabled {
+      background: var(--color-bg-subtle) !important;
+    }
+  }
+
+  &__btn-label {
+    font-size: 32rpx;
+    font-weight: 800;
+    color: var(--color-on-primary);
+    text-align: center;
+
+    &--ghost {
+      color: var(--color-primary);
+    }
+
+    &--disabled {
+      color: var(--color-text-tertiary);
     }
   }
 }
