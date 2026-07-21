@@ -2,7 +2,7 @@
  * PP-06：公测期价值感知卡——每日最多展示一次。
  */
 
-import Taro from '@tarojs/taro'
+import { getStorageSync, setStorageSync } from '@/adapters/kvStorage'
 import { isPromoFreeActive } from '@/utils/promoFree'
 import { toShanghaiDateKey } from '@/hooks/useMembershipExpiringSoonModal'
 import type { User } from '@/types/api'
@@ -29,7 +29,7 @@ export function shouldShowPromoValueCard(user?: User | null): boolean {
   const today = toShanghaiDateKey(Date.now())
   let last: string | null = null
   try {
-    const raw = Taro.getStorageSync(STORAGE_KEY)
+    const raw = getStorageSync(STORAGE_KEY)
     last = typeof raw === 'string' && raw.length > 0 ? raw : null
   } catch {
     last = null
@@ -43,7 +43,7 @@ export function shouldShowPromoValueCard(user?: User | null): boolean {
 
 export function markPromoValueCardShown(): void {
   try {
-    Taro.setStorageSync(STORAGE_KEY, toShanghaiDateKey(Date.now()))
+    setStorageSync(STORAGE_KEY, toShanghaiDateKey(Date.now()))
   } catch {
     // ignore
   }

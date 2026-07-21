@@ -14,6 +14,7 @@
  */
 
 import Taro from '@tarojs/taro'
+import { getStorageSync, removeStorageSync, setStorageSync } from '@/adapters/kvStorage'
 import { describeIntermittentRequestFailure } from '@/services/request'
 
 const COACH_CTX_KEY = 'tab_pending_coach_context'
@@ -43,7 +44,7 @@ export interface CoachPendingContext {
  */
 export function switchToCoach(ctx?: CoachPendingContext) {
   if (ctx && (ctx.analysisId || ctx.prefill || ctx.sessionId)) {
-    Taro.setStorageSync(COACH_CTX_KEY, ctx)
+    setStorageSync(COACH_CTX_KEY, ctx)
   }
   return Taro.switchTab({ url: '/pages/coach/index' })
 }
@@ -53,9 +54,9 @@ export function switchToCoach(ctx?: CoachPendingContext) {
  * tabBar 页的 `useDidShow` / `onShow` 里调用。
  */
 export function consumeCoachPendingContext(): CoachPendingContext | null {
-  const raw = Taro.getStorageSync(COACH_CTX_KEY)
+  const raw = getStorageSync(COACH_CTX_KEY)
   if (!raw || typeof raw !== 'object') return null
-  Taro.removeStorageSync(COACH_CTX_KEY)
+  removeStorageSync(COACH_CTX_KEY)
   return raw as CoachPendingContext
 }
 
@@ -77,7 +78,7 @@ export function switchToCoachWithSession(
   sessionId: string,
   contextAnalysisId?: string | null,
 ) {
-  Taro.setStorageSync(COACH_CTX_KEY, {
+  setStorageSync(COACH_CTX_KEY, {
     sessionId,
     contextAnalysisId: contextAnalysisId ?? undefined,
   } as CoachPendingContext)

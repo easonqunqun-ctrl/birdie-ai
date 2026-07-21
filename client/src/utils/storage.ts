@@ -1,4 +1,9 @@
-import Taro from '@tarojs/taro'
+import {
+  clearStorageSync,
+  getStorageSync,
+  removeStorageSync,
+  setStorageSync,
+} from '@/adapters/kvStorage'
 
 const TOKEN_KEY = 'auth_token'
 const USER_KEY = 'auth_user'
@@ -23,44 +28,44 @@ export interface AgreedTermsRecord {
 
 export const storage = {
   setToken(token: string): void {
-    Taro.setStorageSync(TOKEN_KEY, token)
+    setStorageSync(TOKEN_KEY, token)
   },
   getToken(): string {
-    return Taro.getStorageSync(TOKEN_KEY) || ''
+    return (getStorageSync(TOKEN_KEY) as string) || ''
   },
   clearToken(): void {
-    Taro.removeStorageSync(TOKEN_KEY)
+    removeStorageSync(TOKEN_KEY)
   },
   setRole(role: 'user' | 'coach'): void {
-    Taro.setStorageSync(ROLE_KEY, role)
+    setStorageSync(ROLE_KEY, role)
   },
   getRole(): 'user' | 'coach' {
-    const role = Taro.getStorageSync(ROLE_KEY)
+    const role = getStorageSync(ROLE_KEY)
     return role === 'coach' ? 'coach' : 'user'
   },
   clearRole(): void {
-    Taro.removeStorageSync(ROLE_KEY)
+    removeStorageSync(ROLE_KEY)
   },
   setUser<T>(user: T): void {
-    Taro.setStorageSync(USER_KEY, user)
+    setStorageSync(USER_KEY, user)
   },
   getUser<T = unknown>(): T | null {
-    const u = Taro.getStorageSync(USER_KEY)
-    return u || null
+    const u = getStorageSync(USER_KEY)
+    return (u as T) || null
   },
   clearUser(): void {
-    Taro.removeStorageSync(USER_KEY)
+    removeStorageSync(USER_KEY)
   },
 
   /** 拍摄引导页是否已看过（首次进 capture 页会展示完整指南） */
   hasSeenAnalysisGuide(): boolean {
-    return !!Taro.getStorageSync(ANALYSIS_GUIDE_SEEN_KEY)
+    return !!getStorageSync(ANALYSIS_GUIDE_SEEN_KEY)
   },
   markAnalysisGuideSeen(): void {
-    Taro.setStorageSync(ANALYSIS_GUIDE_SEEN_KEY, '1')
+    setStorageSync(ANALYSIS_GUIDE_SEEN_KEY, '1')
   },
   clearAnalysisGuideSeen(): void {
-    Taro.removeStorageSync(ANALYSIS_GUIDE_SEEN_KEY)
+    removeStorageSync(ANALYSIS_GUIDE_SEEN_KEY)
   },
 
   /**
@@ -69,7 +74,7 @@ export const storage = {
    * 也应视为"未同意"并重新拦截（版本升级场景）。
    */
   getAgreedTerms(): AgreedTermsRecord | null {
-    const raw = Taro.getStorageSync(AGREED_TERMS_KEY)
+    const raw = getStorageSync(AGREED_TERMS_KEY)
     if (!raw || typeof raw !== 'object') return null
     const rec = raw as AgreedTermsRecord
     if (typeof rec.version !== 'string' || typeof rec.agreedAt !== 'number') {
@@ -79,10 +84,10 @@ export const storage = {
   },
   setAgreedTerms(version: string): void {
     const rec: AgreedTermsRecord = { version, agreedAt: Date.now() }
-    Taro.setStorageSync(AGREED_TERMS_KEY, rec)
+    setStorageSync(AGREED_TERMS_KEY, rec)
   },
   clearAgreedTerms(): void {
-    Taro.removeStorageSync(AGREED_TERMS_KEY)
+    removeStorageSync(AGREED_TERMS_KEY)
   },
   /** 是否已同意当前版本协议；拦截页用这个统一判断 */
   hasAgreedCurrentTerms(): boolean {
@@ -101,7 +106,7 @@ export const storage = {
    * `agreed_terms`（清掉后老用户每次重启都被合规弹窗拦截，是合规体验灾难）。
    */
   clearAll(): void {
-    Taro.clearStorageSync()
+    clearStorageSync()
   },
 
   /**
@@ -110,8 +115,8 @@ export const storage = {
    * "本机/本人"维度的状态，与切换微信账号无关。
    */
   clearAuthSession(): void {
-    Taro.removeStorageSync(TOKEN_KEY)
-    Taro.removeStorageSync(USER_KEY)
-    Taro.removeStorageSync(ROLE_KEY)
+    removeStorageSync(TOKEN_KEY)
+    removeStorageSync(USER_KEY)
+    removeStorageSync(ROLE_KEY)
   }
 }

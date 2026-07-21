@@ -22,7 +22,8 @@
 
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, Video, Image, Button, ScrollView } from '@tarojs/components'
-import Taro, { useReady, useRouter, useShareAppMessage, useShareTimeline } from '@tarojs/taro'
+import Taro, { useReady, useRouter } from '@tarojs/taro'
+import { useShareAppMessage, useShareTimeline } from '@/adapters/share'
 import { analysisService } from '@/services/analysisService'
 import { describePageLoadFailure, isRequestError } from '@/services/request'
 import { shareService, type PublicReport } from '@/services/shareService'

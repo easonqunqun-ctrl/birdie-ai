@@ -1,6 +1,7 @@
 import { FC, useEffect, useState } from 'react'
 import { View, Text, Button } from '@tarojs/components'
-import Taro, { useShareAppMessage, useShareTimeline } from '@tarojs/taro'
+import Taro from '@tarojs/taro'
+import { useShareAppMessage, useShareTimeline } from '@/adapters/share'
 import {
   invitationService,
   type InvitationItem,

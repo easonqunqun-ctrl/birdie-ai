@@ -16,7 +16,8 @@
 
 import { FC, useCallback, useEffect, useRef, useState } from 'react'
 import { Button, Canvas, Image, Text, View } from '@tarojs/components'
-import Taro, { useReady, useRouter, useShareAppMessage, useShareTimeline } from '@tarojs/taro'
+import Taro, { useReady, useRouter } from '@tarojs/taro'
+import { useShareAppMessage, useShareTimeline } from '@/adapters/share'
 import { analysisService } from '@/services/analysisService'
 import { shareService } from '@/services/shareService'
 import { describePageLoadFailure } from '@/services/request'

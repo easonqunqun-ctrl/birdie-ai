@@ -1,6 +1,7 @@
 import { FC, useCallback, useEffect, useState } from 'react'
 import { View, Text, Button, Image } from '@tarojs/components'
-import Taro, { useDidShow, useShareAppMessage, useShareTimeline } from '@tarojs/taro'
+import Taro, { useDidShow } from '@tarojs/taro'
+import { useShareAppMessage, useShareTimeline } from '@/adapters/share'
 import EnvBadge from '@/components/EnvBadge'
 import { useUserStore } from '@/store/userStore'
 import { useMembershipExpiringSoonModalOnShow } from '@/hooks/useMembershipExpiringSoonModalOnShow'

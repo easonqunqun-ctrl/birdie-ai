@@ -12,6 +12,7 @@
 
 import { useEffect, useRef } from 'react'
 import Taro from '@tarojs/taro'
+import { getStorageSync, setStorageSync } from '@/adapters/kvStorage'
 import type { MembershipInfo } from '@/types/payment'
 
 const STORAGE_KEY_PREFIX = 'mem_expiring_modal_shown:'
@@ -98,7 +99,7 @@ export function daysBetweenDateKeys(from: string, to: string): number {
 
 function readShownKeys(): Set<string> {
   try {
-    const raw = Taro.getStorageSync(STORAGE_KEY_PREFIX + 'set')
+    const raw = getStorageSync(STORAGE_KEY_PREFIX + 'set')
     if (Array.isArray(raw)) return new Set(raw.filter((x) => typeof x === 'string'))
   } catch {
     // ignore
@@ -112,7 +113,7 @@ function persistShownKey(key: string): void {
     cur.add(key)
     // 只保留最近 4 个 key（每月最多 4 个不同 expire_date），防止 storage 无限增长
     const arr = Array.from(cur).slice(-4)
-    Taro.setStorageSync(STORAGE_KEY_PREFIX + 'set', arr)
+    setStorageSync(STORAGE_KEY_PREFIX + 'set', arr)
   } catch {
     // ignore
   }

@@ -4,7 +4,8 @@
 
 import { FC, useEffect, useMemo, useState } from 'react'
 import { View, Text, Button, ScrollView } from '@tarojs/components'
-import Taro, { useRouter, useShareAppMessage } from '@tarojs/taro'
+import Taro, { useRouter } from '@tarojs/taro'
+import { useShareAppMessage } from '@/adapters/share'
 import { analysisService } from '@/services/analysisService'
 import { describePageLoadFailure } from '@/services/request'
 import { PHASE_LABEL, PHASE_ORDER } from '@/constants/phaseLabels'
