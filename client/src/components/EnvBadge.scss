@@ -1,5 +1,6 @@
 .env-badge {
-  position: fixed;
+  /* RN Yoga 无 fixed；absolute + 页根定位。小程序下角标仍贴右上（页内首屏）。 */
+  position: absolute;
   top: 4px;
   right: 4px;
   z-index: 9999;

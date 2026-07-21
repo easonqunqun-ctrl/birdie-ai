@@ -171,6 +171,59 @@ describe('streamSSE · 端分叉', () => {
 
     delete (globalThis as unknown as { wx?: typeof wxStub }).wx
   })
+
+  test('rn 走 XMLHttpRequest（不是 Taro.request / fetch）', async () => {
+    process.env.TARO_ENV = 'rn'
+    const fetchMock = jest.fn()
+    global.fetch = fetchMock as unknown as typeof global.fetch
+    ;(Taro.request as jest.Mock).mockClear()
+
+    type XhrHandler = (() => void) | null
+    const events: { type: string; data: unknown }[] = []
+    let responseText = ''
+    const xhr = {
+      responseType: '',
+      status: 200,
+      get responseText() {
+        return responseText
+      },
+      open: jest.fn(),
+      setRequestHeader: jest.fn(),
+      send: jest.fn(() => {
+        queueMicrotask(() => {
+          responseText = 'event: delta\ndata: "hi"\n\n'
+          xhr.onprogress?.()
+          xhr.onload?.()
+        })
+      }),
+      abort: jest.fn(),
+      onprogress: null as XhrHandler,
+      onload: null as XhrHandler,
+      onerror: null as XhrHandler,
+      onabort: null as XhrHandler,
+    }
+    const XHR = jest.fn(() => xhr) as unknown as typeof XMLHttpRequest
+    global.XMLHttpRequest = XHR
+
+    const { streamSSE } = await import('@/utils/sseClient')
+    await new Promise<void>((resolve) => {
+      streamSSE(
+        { url: '/chat/sessions/rn/messages/stream', body: { q: 1 } },
+        {
+          onEvent: (e) => events.push(e),
+          onDone: () => resolve(),
+          onError: (err) => {
+            throw new Error(`unexpected: ${err.message}`)
+          },
+        },
+      )
+    })
+
+    expect(XHR).toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(Taro.request).not.toHaveBeenCalled()
+    expect(events).toEqual([{ type: 'delta', data: 'hi' }])
+  })
 })
 
 // ----------------------------------------------------------------------------

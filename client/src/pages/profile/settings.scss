@@ -46,7 +46,7 @@
     color: var(--color-text-secondary);
 
     &--mono {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-family: monospace;
       font-size: 24rpx;
       max-width: 360rpx;
       white-space: nowrap;

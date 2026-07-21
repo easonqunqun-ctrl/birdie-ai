@@ -17,6 +17,7 @@
 }
 
 .home {
+  position: relative;
   padding: 0 0 24rpx;
   background: var(--color-bg-page);
   /* tabBar 页：高度由客户端裁剪，100vh 易长于可视区导致底部莫名留白 */

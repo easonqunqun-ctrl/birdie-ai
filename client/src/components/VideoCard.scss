@@ -1,7 +1,7 @@
 .video-card {
   margin-top: 16rpx;
   padding: 24rpx;
-  border-radius: var(--radius-md, 20rpx);
+  border-radius: 20rpx;
   background: var(--color-bg-card, #fff);
   border: 2rpx solid var(--color-border, #e5e7eb);
   box-shadow: 0 4rpx 12rpx rgba(26, 35, 126, 0.06);
@@ -55,7 +55,10 @@
 
   &__play-mask {
     position: absolute;
-    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -90,7 +93,10 @@
 
   &__buffering {
     position: absolute;
-    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     display: flex;
     align-items: center;
     justify-content: center;

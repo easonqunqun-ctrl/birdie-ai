@@ -1,6 +1,7 @@
 .practice-calendar {
   background: var(--color-bg-card, #fff);
-  border-radius: var(--radius-lg, 24rpx);
+  /* RN css-to-rn 不支持 border-radius: var(..., fallback) */
+  border-radius: 24rpx;
   padding: 24rpx 20rpx 20rpx;
   box-shadow: 0 4rpx 16rpx rgba(26, 35, 126, 0.06);
 

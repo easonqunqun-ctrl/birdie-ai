@@ -408,17 +408,22 @@ page {
     background: #ffffff;
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-sm);
+    /* RN：chip 以行内胶囊换行排布（替代 inline-flex 流式）；title 用 width:100% 独占一行 */
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
   }
 
   &__quick-title {
-    display: block;
+    width: 100%;
     font-size: 26rpx;
     color: var(--color-text-secondary);
     margin-bottom: 16rpx;
   }
 
   &__quick-chip {
-    display: inline-flex;
+    /* inline-flex 会被 RN 管线删除→退化成整行竖排；显式 row 让文字+标签同行、内容宽度成胶囊 */
+    flex-direction: row;
     align-items: center;
     padding: 12rpx 24rpx;
     margin: 0 12rpx 12rpx 0;
@@ -518,6 +523,8 @@ page {
 
   &__send-btn {
     flex-shrink: 0;
+    /* RN 0.70 无 flex gap：用左外边距补回 input↔按钮间距 */
+    margin-left: 16rpx;
     background: var(--gradient-streak) !important;
     color: var(--color-on-primary) !important;
     border: none !important;

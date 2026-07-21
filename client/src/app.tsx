@@ -1,4 +1,5 @@
 import { Component, PropsWithChildren } from 'react'
+import { Text, View } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import EnvBadge from '@/components/EnvBadge'
 import { storage } from '@/utils/storage'
@@ -10,8 +11,19 @@ import './app.scss'
 declare const API_BASE_URL: string
 declare const BUILD_MARKER: string
 
-class App extends Component<PropsWithChildren> {
+type AppState = { kvReady: boolean }
+
+class App extends Component<PropsWithChildren, AppState> {
+  state: AppState = {
+    // 小程序 sync API 可立即用（原 RN hydrate 分支已移除）。
+    kvReady: true,
+  }
+
   componentDidMount() {
+    void this.bootstrap()
+  }
+
+  private async bootstrap() {
     // 由 client/config/index.ts 在 build 时注入，格式: `<env>@<git-short-hash> built <UTC>`。
     // 体验版控制台看到的是真实那次构建的标识；若与当前预期不符，请重新 build:weapp + 上传。
     console.log(
@@ -47,6 +59,7 @@ class App extends Component<PropsWithChildren> {
     //   未同意当前版本协议 → reLaunch 到 consent 页。
     //   注意 reLaunch 会清空页面栈（分享/消息唤起带的 query 会丢失），
     //   这是合规必付的代价，不在合规流程里做 query 透传。
+    //   App 与小程序同路径，便于对照复刻。
     if (!storage.hasAgreedCurrentTerms()) {
       deferReLaunch('/pages/consent/index')
     }
@@ -89,13 +102,20 @@ class App extends Component<PropsWithChildren> {
   componentDidCatchError() {}
 
   render() {
+    if (!this.state.kvReady) {
+      return (
+        <View className='page-loading'>
+          <Text>加载中...</Text>
+        </View>
+      )
+    }
     // W8-T2：EnvBadge 仅对 H5/RN 生效（App render 在小程序里会被忽略）；
     //   小程序侧角标通过各 tabBar 页（pages/index | coach | training | profile）
     //   手动挂一次 <EnvBadge />，覆盖主要入口即可。
     return (
       <>
         {this.props.children}
-        <EnvBadge />
+        <EnvBadge appRoot />
       </>
     )
   }
