@@ -121,6 +121,16 @@ class AnalysisRepository {
     return CreateAnalysisResult.fromJson(data);
   }
 
+  /// M7-13 · 多挥检测（上传完成后调用；失败由调用方降级直创任务）
+  Future<DetectSwingsResult> detectSwings(String uploadId) async {
+    final data = await _api.post<Map<String, dynamic>>(
+      '/analyses/uploads/$uploadId/detect-swings',
+      data: const {},
+      timeout: _apiTimeout,
+    );
+    return DetectSwingsResult.fromJson(data);
+  }
+
   Future<AnalysisStatusInfo> getStatus(String analysisId) async {
     final data = await _api.get<Map<String, dynamic>>(
       '/analyses/$analysisId/status',

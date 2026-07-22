@@ -20,7 +20,9 @@ class EnvBadge extends StatelessWidget {
             borderRadius: BorderRadius.circular(6),
           ),
           child: Text(
-            Env.envLabel,
+            Env.envLabel == 'staging' || Env.envLabel == 'development'
+                ? '${Env.envLabel} · ${Uri.tryParse(Env.apiBase)?.host ?? ''}'
+                : Env.envLabel,
             style: const TextStyle(color: Colors.white, fontSize: 10),
           ),
         ),

@@ -149,24 +149,18 @@
   }
 
   /*
-   * 顶栏品牌 mark：直接展示 LOGO 图（替代旧的 emoji 🐦）。
-   * - 尺寸 72×72rpx 比原来的 56 更"饱满"，与右侧文字的视觉权重匹配
-   * - border-radius 20rpx 与首页内容卡片同语言（hero 32rpx 偏大、过去的 16rpx 偏锐）
+   * 顶栏品牌 mark：深色版 LOGO（黑底 Birdie AI）。
    * - overflow:hidden 是 Image 圆角的硬性条件（小程序 <Image> 自身不会自动裁剪）
-   * - 白底 + 内描边代替原来的渐变填色，让 LOGO 自身的图形成为主角；
-   *   阴影加深一档以保住浮起感
    */
   &__brand-mark {
     width: 72rpx;
     height: 72rpx;
     border-radius: 20rpx;
     overflow: hidden;
-    background: var(--color-bg-card);
-    border: 1rpx solid rgba(26, 35, 126, 0.08);
+    background: transparent;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 6rpx 16rpx rgba(26, 35, 126, 0.16);
   }
 
   &__brand-mark-img {

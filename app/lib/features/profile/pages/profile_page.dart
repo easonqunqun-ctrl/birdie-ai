@@ -8,7 +8,11 @@ import '../../../theme/brand_colors.dart';
 import '../../../theme/dimens.dart';
 import '../../analysis/pages/history_page.dart';
 import '../../auth/auth_controller.dart';
+import '../../auth/pages/login_page.dart';
 import '../../coach/pages/coach_page.dart';
+import '../../discover/pages/courses_page.dart';
+import '../../discover/pages/meetup_page.dart';
+import '../../discover/pages/pros_page.dart';
 import 'about_page.dart';
 import 'account_deletion_page.dart';
 import 'clubs_page.dart';
@@ -22,7 +26,62 @@ class ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = context.watch<AuthController>().user;
+    final auth = context.watch<AuthController>();
+    if (!auth.isLoggedIn) {
+      final inset = MediaQuery.of(context).padding;
+      return Container(
+        color: BrandColors.bgPage,
+        padding: EdgeInsets.fromLTRB(rpx(32), inset.top + rpx(48), rpx(32), rpx(48)),
+        child: Column(
+          children: [
+            Text('我的',
+                style: TextStyle(
+                    fontSize: rpx(40),
+                    fontWeight: FontWeight.w800,
+                    color: BrandColors.primary)),
+            SizedBox(height: rpx(48)),
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(rpx(40)),
+              decoration: BoxDecoration(
+                gradient: BrandColors.gradientHero,
+                borderRadius: BorderRadius.circular(Radii.lg),
+              ),
+              child: Column(
+                children: [
+                  Text('登录后同步个人资料与分析记录',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontSize: rpx(30),
+                          fontWeight: FontWeight.w600,
+                          color: BrandColors.onPrimary)),
+                  SizedBox(height: rpx(28)),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                              builder: (_) => const LoginPage())),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: BrandColors.gold,
+                        foregroundColor: Colors.black,
+                      ),
+                      child: const Text('去登录'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: rpx(24)),
+            _menuGroup([
+              _MenuItem(Icons.info_outline, '关于领翼golf',
+                  () => _go(context, const AboutPage())),
+            ]),
+          ],
+        ),
+      );
+    }
+    final user = auth.user;
     final inset = MediaQuery.of(context).padding;
     return Container(
       color: BrandColors.bgPage,
@@ -53,6 +112,15 @@ class ProfilePage extends StatelessWidget {
                 () => _go(context, const MembershipPage())),
             _MenuItem(Icons.golf_course, '我的装备',
                 () => _go(context, const ClubsPage())),
+          ]),
+          SizedBox(height: rpx(24)),
+          _menuGroup([
+            _MenuItem(Icons.school_outlined, '课程学习',
+                () => _go(context, const CoursesPage())),
+            _MenuItem(Icons.sports_golf, '球手对比库',
+                () => _go(context, const ProsPage())),
+            _MenuItem(Icons.groups_outlined, '约球邀请',
+                () => _go(context, const MeetupPage())),
           ]),
           SizedBox(height: rpx(24)),
           _menuGroup([

@@ -142,6 +142,15 @@ class WechatLoginResponse(BaseModel):
     user: UserResponse
 
 
+class AppleLoginRequest(BaseModel):
+    """App Sign in with Apple：identity_token 必填；full_name 仅首次授权可能有值."""
+
+    identity_token: str = Field(..., min_length=8, description="Apple identityToken")
+    authorization_code: str | None = Field(default=None, description="可选，预留服务端换 refresh")
+    full_name: str | None = Field(default=None, max_length=48, description="首次授权昵称")
+    invite_code: str | None = Field(default=None, description="邀请码（可选）")
+
+
 class TokenRefreshResponse(BaseModel):
     token: str
     expires_in: int

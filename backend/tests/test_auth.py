@@ -235,3 +235,28 @@ async def test_wechat_open_login_invalid_code_returns_401(
     resp = await client.post("/v1/auth/wechat-open-login", json={"code": "bad"})
     assert resp.status_code == 401, resp.text
     assert resp.json()["code"] == 40104
+
+
+@pytest.mark.asyncio
+async def test_apple_login_mock_creates_user(client: AsyncClient, fresh_code: str):
+    """APPLE_MOCK_LOGIN 下 mock- token 应创建用户并返回 JWT."""
+    if not settings.APPLE_MOCK_LOGIN:
+        pytest.skip("APPLE_MOCK_LOGIN disabled")
+    token = f"mock-apple-{fresh_code}"
+    resp = await client.post(
+        "/v1/auth/apple-login",
+        json={"identity_token": token, "full_name": "Apple球友"},
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()["data"]
+    assert data["is_new_user"] is True
+    assert data["token"]
+    assert data["user"]["nickname"] == "Apple球友"
+
+    again = await client.post(
+        "/v1/auth/apple-login",
+        json={"identity_token": token},
+    )
+    assert again.status_code == 200, again.text
+    assert again.json()["data"]["user"]["id"] == data["user"]["id"]
+    assert again.json()["data"]["is_new_user"] is False

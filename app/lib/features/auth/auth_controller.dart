@@ -1,8 +1,10 @@
 import 'package:flutter/foundation.dart';
 
 import '../../core/api_client.dart';
+import '../../core/apple_auth.dart';
 import '../../core/env.dart';
 import '../../core/storage.dart';
+import '../../core/wechat_auth.dart';
 import '../../data/models/user.dart';
 import '../../data/repositories/user_repository.dart';
 
@@ -27,6 +29,13 @@ class AuthController extends ChangeNotifier {
   /// 启动：从缓存恢复 token/user，并尝试拉最新用户信息。
   Future<void> bootstrap() async {
     final s = AppStorage.instance;
+    // API 环境切换（如 localhost → 线上）时清掉旧会话，避免带着失效 token 卡在引导页
+    final base = Env.apiBase;
+    if (s.lastApiBase.isNotEmpty && s.lastApiBase != base) {
+      await s.clearAuthSession();
+    }
+    await s.setLastApiBase(base);
+
     _token = s.token;
     _currentRole = s.role;
     if (_token.isEmpty) {
@@ -49,8 +58,9 @@ class AuthController extends ChangeNotifier {
       _loading = false;
       _initialized = true;
     } on ApiException catch (e) {
-      if (e.kind == ApiErrorKind.httpUnauthorized) {
-        await s.clearToken();
+      if (e.kind == ApiErrorKind.httpUnauthorized ||
+          e.kind == ApiErrorKind.network) {
+        await s.clearAuthSession();
         _token = '';
         _user = null;
       }
@@ -65,36 +75,60 @@ class AuthController extends ChangeNotifier {
 
   /// 微信一键登录。
   /// Env.mockLogin 时走后端 mock 登录端点（WECHAT_MOCK_LOGIN=true），
-  /// 用稳定 code 换取**真 JWT**，从而后续上传/分析/教练都能真跑。
+  /// 用稳定 code 换取**真 JWT**；否则拉起 fluwx OAuth。
   Future<({bool isNewUser, User user})> loginWithWechat(
       {String? inviteCode}) async {
     _loading = true;
     notifyListeners();
     try {
       if (Env.mockLogin) {
-        return await _mockLogin(inviteCode: inviteCode);
+        return await _applyLoginResult(
+            await _repo.wechatLogin(
+                code: await _stableMockCode(), inviteCode: inviteCode));
       }
-      // TODO：接入 fluwx 拿真微信 code 后调 _repo.wechatLogin
-      throw ApiException(
-          ApiErrorKind.business, '微信登录待接入（当前仅 mock 环境可登录）');
+      final code = await WechatAuth.requestAuthCode();
+      return await _applyLoginResult(
+          await _repo.wechatLogin(code: code, inviteCode: inviteCode));
     } finally {
       _loading = false;
       notifyListeners();
     }
   }
 
-  /// 后端 mock 登录：用设备稳定 code 调 /auth/wechat-open-login 拿真 JWT。
-  Future<({bool isNewUser, User user})> _mockLogin({String? inviteCode}) async {
+  /// Sign in with Apple（iOS）。
+  Future<({bool isNewUser, User user})> loginWithApple(
+      {String? inviteCode}) async {
+    _loading = true;
+    notifyListeners();
+    try {
+      final cred = await AppleAuth.requestCredential();
+      return await _applyLoginResult(await _repo.appleLogin(
+        identityToken: cred.identityToken,
+        fullName: cred.fullName,
+        inviteCode: inviteCode,
+      ));
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<String> _stableMockCode() async {
     final s = AppStorage.instance;
     var code = s.mockCode;
     if (code.isEmpty) {
       code = 'mock-app-${DateTime.now().millisecondsSinceEpoch}';
       await s.setMockCode(code);
     }
-    final res = await _repo.wechatLogin(code: code, inviteCode: inviteCode);
+    return code;
+  }
+
+  Future<({bool isNewUser, User user})> _applyLoginResult(
+      WechatLoginResult res) async {
     _token = res.token;
     _user = res.user;
     _currentRole = 'user';
+    final s = AppStorage.instance;
     await s.setToken(_token);
     await s.setUser(res.user.toJson());
     await s.setRole('user');

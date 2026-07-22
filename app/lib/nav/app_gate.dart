@@ -6,12 +6,11 @@ import '../theme/brand_colors.dart';
 import '../widgets/brand_logo.dart';
 import '../features/auth/auth_controller.dart';
 import '../features/auth/pages/consent_page.dart';
-import '../features/auth/pages/login_page.dart';
 import '../features/onboarding/pages/onboarding_page.dart';
 import 'tab_shell.dart';
 
-/// 启动分流：consent → login → onboarding → 首页（TabShell）。
-/// 依据 AuthController 状态与本地协议同意标记响应式切换，无需显式 Navigator。
+/// 启动分流：consent →（已登录且未引导）onboarding → TabShell。
+/// 未登录也可进 TabShell 访客浏览（对齐小程序审核：禁止强制登录）。
 class AppGate extends StatefulWidget {
   const AppGate({super.key});
 
@@ -31,9 +30,8 @@ class _AppGateState extends State<AppGate> {
       child = const _Splash();
     } else if (!_agreed) {
       child = ConsentPage(onAgree: () => setState(() => _agreed = true));
-    } else if (!auth.isLoggedIn) {
-      child = const LoginPage();
-    } else if (auth.user == null || !auth.user!.onboardingCompleted) {
+    } else if (auth.isLoggedIn &&
+        (auth.user == null || !auth.user!.onboardingCompleted)) {
       child = const OnboardingPage();
     } else {
       child = const TabShell();
@@ -58,9 +56,8 @@ class _Splash extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             BrandLogo(size: 96),
-            SizedBox(height: 24),
+            SizedBox(height: 16),
             CircularProgressIndicator(
-              strokeWidth: 2,
               valueColor: AlwaysStoppedAnimation<Color>(BrandColors.primary),
             ),
           ],

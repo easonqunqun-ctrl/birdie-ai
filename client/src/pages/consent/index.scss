@@ -34,10 +34,8 @@
     margin-bottom: 20rpx;
     border-radius: 24rpx;
     overflow: hidden;
-    background: var(--color-bg-card);
-    border-width: 1rpx;
-    border-color: rgba(26, 35, 126, 0.08);
-    border-style: solid;
+    /* 深色版 LOGO 自带黑底，不再垫白卡 */
+    background: transparent;
   }
 
   &__title {

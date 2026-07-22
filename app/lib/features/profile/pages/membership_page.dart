@@ -1,15 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/api_client.dart';
+import '../../../data/repositories/payment_repository.dart';
 import '../../../theme/brand_colors.dart';
 import '../../../theme/dimens.dart';
 import '../../auth/auth_controller.dart';
 
-/// 会员中心：对照 client/src/pages/profile/membership。权益对比 + 状态。
-/// 支付接入在后续里程碑（需微信支付资质），当前 CTA 占位。
-class MembershipPage extends StatelessWidget {
+/// 会员中心：对照 client membership — 套餐列表 + mock 开通。
+class MembershipPage extends StatefulWidget {
   const MembershipPage({super.key});
 
+  @override
+  State<MembershipPage> createState() => _MembershipPageState();
+}
+
+class _MembershipPageState extends State<MembershipPage> {
   static const _benefits = <(String, String, String)>[
     ('挥杆视频分析', '每月 3 次', '无限次'),
     ('AI 教练对话', '每天 5 轮', '无限次'),
@@ -18,12 +24,74 @@ class MembershipPage extends StatelessWidget {
     ('历史报告对比', '基础', '并排对比 + 晒进步'),
   ];
 
+  PaymentRepository? _pay;
+  List<PlanOption> _plans = const [];
+  String? _selected;
+  bool _loadingPlans = true;
+  bool _buying = false;
+  bool _plansRequested = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _pay ??= PaymentRepository(context.read<ApiClient>());
+    if (!_plansRequested) {
+      _plansRequested = true;
+      _loadPlans();
+    }
+  }
+
+  Future<void> _loadPlans() async {
+    final pay = _pay;
+    if (pay == null) return;
+    try {
+      final plans = await pay.listPlans();
+      if (!mounted) return;
+      setState(() {
+        _plans = plans;
+        _selected = plans.isNotEmpty ? plans.first.planType : null;
+        _loadingPlans = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingPlans = false);
+    }
+  }
+
+  Future<void> _buy() async {
+    final plan = _selected;
+    final pay = _pay;
+    if (plan == null || _buying || pay == null) return;
+    setState(() => _buying = true);
+    try {
+      final order = await pay.createOrder(plan);
+      if (order.mockMode) {
+        await pay.mockConfirm(order.orderId);
+        if (!mounted) return;
+        await context.read<AuthController>().refresh();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('开通成功（模拟支付）')));
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('真实支付通道即将在 App 内开通，请暂用小程序完成支付')));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      final msg = describeRequestFailure(e).toastTitle;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } finally {
+      if (mounted) setState(() => _buying = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthController>().user;
     final isMember = user?.isMember == true;
     final typeLabel = switch (user?.membershipType) {
-      'annual' => '年度会员',
+      'yearly' || 'annual' => '年度会员',
       'monthly' => '月度会员',
       _ => '会员',
     };
@@ -32,17 +100,6 @@ class MembershipPage extends StatelessWidget {
       body: ListView(
         padding: EdgeInsets.all(rpx(32)),
         children: [
-          Container(
-            padding: EdgeInsets.all(rpx(24)),
-            decoration: BoxDecoration(
-              color: BrandColors.primaryTint,
-              borderRadius: BorderRadius.circular(Radii.md),
-            ),
-            child: Text('内测阶段 · 付费功能未开放，所有用户均按「无限」配额体验',
-                style: TextStyle(
-                    fontSize: rpx(24), color: BrandColors.primaryDark)),
-          ),
-          SizedBox(height: rpx(24)),
           Container(
             padding: EdgeInsets.all(rpx(40)),
             decoration: BoxDecoration(
@@ -56,19 +113,12 @@ class MembershipPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Text(isMember ? '👑' : '🎯',
-                        style: TextStyle(fontSize: rpx(44))),
-                    SizedBox(width: rpx(12)),
-                    Text(isMember ? '$typeLabel · 还剩 ${user?.membershipDaysRemaining ?? 0} 天' : '免费用户',
-                        style: TextStyle(
-                            fontSize: rpx(38),
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white)),
-                  ],
-                ),
-                SizedBox(height: rpx(16)),
+                Text(isMember ? '👑 $typeLabel · 还剩 ${user?.membershipDaysRemaining ?? 0} 天' : '🎯 免费用户',
+                    style: TextStyle(
+                        fontSize: rpx(36),
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white)),
+                SizedBox(height: rpx(12)),
                 Text(
                   isMember ? '感谢支持，尽情享受全部会员权益' : '解锁无限次挥杆分析与 AI 教练对话',
                   style: TextStyle(fontSize: rpx(28), color: Colors.white70),
@@ -78,20 +128,78 @@ class MembershipPage extends StatelessWidget {
           ),
           SizedBox(height: rpx(32)),
           _benefitTable(),
-          SizedBox(height: rpx(48)),
-          if (!isMember)
+          if (!isMember) ...[
+            SizedBox(height: rpx(32)),
+            Text('选择套餐',
+                style: TextStyle(
+                    fontSize: rpx(32),
+                    fontWeight: FontWeight.w700,
+                    color: BrandColors.primary)),
+            SizedBox(height: rpx(16)),
+            if (_loadingPlans)
+              const Center(child: CircularProgressIndicator())
+            else if (_plans.isEmpty)
+              Text('暂无可用套餐',
+                  style: TextStyle(
+                      fontSize: rpx(26), color: BrandColors.textSecondary))
+            else
+              ..._plans.map(_planTile),
+            SizedBox(height: rpx(32)),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('支付功能即将上线')),
-                ),
+                onPressed: _buying || _selected == null ? null : _buy,
                 style: ElevatedButton.styleFrom(
                     padding: EdgeInsets.symmetric(vertical: rpx(24))),
-                child: const Text('立即开通'),
+                child: Text(_buying ? '开通中…' : '立即开通'),
               ),
             ),
+          ],
         ],
+      ),
+    );
+  }
+
+  Widget _planTile(PlanOption p) {
+    final selected = _selected == p.planType;
+    return GestureDetector(
+      onTap: () => setState(() => _selected = p.planType),
+      child: Container(
+        margin: EdgeInsets.only(bottom: rpx(12)),
+        padding: EdgeInsets.all(rpx(24)),
+        decoration: BoxDecoration(
+          color: selected ? BrandColors.goldSoft : BrandColors.bgCard,
+          borderRadius: BorderRadius.circular(Radii.md),
+          border: Border.all(
+              color: selected ? BrandColors.gold : BrandColors.border,
+              width: selected ? 2 : 1),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(p.name,
+                      style: TextStyle(
+                          fontSize: rpx(30),
+                          fontWeight: FontWeight.w700,
+                          color: BrandColors.textPrimary)),
+                  if (p.hint != null)
+                    Text(p.hint!,
+                        style: TextStyle(
+                            fontSize: rpx(24),
+                            color: BrandColors.textTertiary)),
+                ],
+              ),
+            ),
+            Text(p.amountYuanDisplay,
+                style: TextStyle(
+                    fontSize: rpx(32),
+                    fontWeight: FontWeight.w800,
+                    color: BrandColors.goldDark)),
+          ],
+        ),
       ),
     );
   }
@@ -105,44 +213,63 @@ class MembershipPage extends StatelessWidget {
       ),
       child: Column(
         children: [
-          _tableRow('功能', '免费', '会员', header: true),
+          Padding(
+            padding: EdgeInsets.all(rpx(24)),
+            child: Row(
+              children: [
+                Expanded(
+                    child: Text('权益',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: rpx(26),
+                            color: BrandColors.textSecondary))),
+                SizedBox(
+                    width: rpx(140),
+                    child: Text('免费',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: rpx(26),
+                            color: BrandColors.textSecondary))),
+                SizedBox(
+                    width: rpx(160),
+                    child: Text('会员',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: rpx(26),
+                            color: BrandColors.goldDark))),
+              ],
+            ),
+          ),
           for (final b in _benefits)
-            _tableRow(b.$1, b.$2, b.$3),
-        ],
-      ),
-    );
-  }
-
-  Widget _tableRow(String a, String b, String c, {bool header = false}) {
-    final style = TextStyle(
-      fontSize: rpx(26),
-      fontWeight: header ? FontWeight.w700 : FontWeight.w400,
-      color: header ? BrandColors.textPrimary : BrandColors.textSecondary,
-    );
-    final memberStyle = TextStyle(
-      fontSize: rpx(26),
-      fontWeight: FontWeight.w700,
-      color: header ? BrandColors.textPrimary : BrandColors.goldDark,
-    );
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: rpx(28), vertical: rpx(24)),
-      decoration: BoxDecoration(
-        border: header
-            ? const Border(
-                bottom: BorderSide(color: BrandColors.border, width: 1))
-            : const Border(
-                bottom: BorderSide(color: BrandColors.divider, width: 0.5)),
-      ),
-      child: Row(
-        children: [
-          Expanded(flex: 4, child: Text(a, style: style)),
-          Expanded(
-              flex: 3,
-              child: Text(b, textAlign: TextAlign.center, style: style)),
-          Expanded(
-              flex: 3,
-              child:
-                  Text(c, textAlign: TextAlign.center, style: memberStyle)),
+            Padding(
+              padding: EdgeInsets.fromLTRB(rpx(24), 0, rpx(24), rpx(20)),
+              child: Row(
+                children: [
+                  Expanded(
+                      child: Text(b.$1,
+                          style: TextStyle(
+                              fontSize: rpx(26),
+                              color: BrandColors.textPrimary))),
+                  SizedBox(
+                      width: rpx(140),
+                      child: Text(b.$2,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              fontSize: rpx(24),
+                              color: BrandColors.textTertiary))),
+                  SizedBox(
+                      width: rpx(160),
+                      child: Text(b.$3,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              fontSize: rpx(24),
+                              fontWeight: FontWeight.w600,
+                              color: BrandColors.primary))),
+                ],
+              ),
+            ),
         ],
       ),
     );

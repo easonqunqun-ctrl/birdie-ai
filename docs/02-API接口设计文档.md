@@ -227,6 +227,41 @@ POST /v1/auth/wechat-login
 }
 ```
 
+---
+
+### 2.1a 微信开放平台移动应用登录（Flutter / 原生 App）
+
+```
+POST /v1/auth/wechat-open-login
+```
+
+**无需认证**。请求/响应体与 §2.1 相同（`code` 为移动应用 OAuth 授权码，非小程序 `wx.login`）。服务端用 `WECHAT_OPEN_APPID` / `WECHAT_OPEN_SECRET` 换取 openid/unionid；与小程序同开放平台主体时按 `unionid` 合并账号。
+
+---
+
+### 2.1b Sign in with Apple（Flutter App）
+
+```
+POST /v1/auth/apple-login
+```
+
+**无需认证**
+
+**请求体**：
+
+```json
+{
+  "identity_token": "string（必填，Apple identityToken JWT）",
+  "authorization_code": "string（选填）",
+  "full_name": "string（选填，首次授权可能有）",
+  "invite_code": "string（选填）"
+}
+```
+
+**成功响应**：与 §2.1 同形（`token` / `expires_in` / `is_new_user` / `user`）。
+
+**处理逻辑**：校验 Apple JWKS（`aud` = `APPLE_BUNDLE_ID`，可另配 `APPLE_SERVICES_ID`）→ 按 `sub` 查找/创建用户（`users.apple_sub`）→ 签发 JWT。联调：`APPLE_MOCK_LOGIN=true` 时可用 `mock-…` 前缀 token。
+
 **成功响应**：
 
 ```json

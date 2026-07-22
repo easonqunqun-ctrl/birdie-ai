@@ -17,6 +17,7 @@ class AppStorage {
   static const _agreedTermsKey = 'agreed_terms';
   static const _analysisGuideSeenKey = 'analysis_guide_seen';
   static const _mockCodeKey = 'mock_login_code';
+  static const _apiBaseKey = 'last_api_base';
 
   /// 协议版本，对齐 storage.ts CURRENT_TERMS_VERSION，修订须 bump。
   static const currentTermsVersion = 'v1.3';
@@ -31,6 +32,11 @@ class AppStorage {
     _prefs = await SharedPreferences.getInstance();
     _token = (await _secure.read(key: _tokenKey)) ?? '';
   }
+
+  /// 上次成功使用的 API_BASE；切换环境时用于清掉旧 token。
+  String get lastApiBase => _prefs.getString(_apiBaseKey) ?? '';
+  Future<void> setLastApiBase(String base) =>
+      _prefs.setString(_apiBaseKey, base);
 
   // ---- token（同步读，写异步落盘）----
   String get token => _token;

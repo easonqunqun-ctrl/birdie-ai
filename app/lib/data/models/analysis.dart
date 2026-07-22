@@ -311,3 +311,88 @@ class AnalysisListItem {
         createdAt: j['created_at'] as String?,
       );
 }
+
+/// M7-13 · 单段挥杆候选
+class SwingCandidate {
+  final int startFrame;
+  final int endFrame;
+  final bool isPractice;
+  final double confidence;
+  final double startTimeSec;
+  final double endTimeSec;
+  final String? previewFrameUrl;
+
+  const SwingCandidate({
+    required this.startFrame,
+    required this.endFrame,
+    required this.isPractice,
+    required this.confidence,
+    required this.startTimeSec,
+    required this.endTimeSec,
+    this.previewFrameUrl,
+  });
+
+  double get durationSec =>
+      (endTimeSec - startTimeSec).clamp(0, double.infinity);
+
+  factory SwingCandidate.fromJson(Map<String, dynamic> j) => SwingCandidate(
+        startFrame: (j['start_frame'] as num?)?.toInt() ?? 0,
+        endFrame: (j['end_frame'] as num?)?.toInt() ?? 0,
+        isPractice: j['is_practice'] == true,
+        confidence: (j['confidence'] as num?)?.toDouble() ?? 0,
+        startTimeSec: (j['start_time_sec'] as num?)?.toDouble() ?? 0,
+        endTimeSec: (j['end_time_sec'] as num?)?.toDouble() ?? 0,
+        previewFrameUrl: j['preview_frame_url'] as String?,
+      );
+}
+
+class DetectSwingsResult {
+  final String uploadId;
+  final List<SwingCandidate> swingCandidates;
+  final int defaultSelectedIndex;
+  final String? suggestedCameraAngle;
+
+  const DetectSwingsResult({
+    required this.uploadId,
+    required this.swingCandidates,
+    required this.defaultSelectedIndex,
+    this.suggestedCameraAngle,
+  });
+
+  factory DetectSwingsResult.fromJson(Map<String, dynamic> j) =>
+      DetectSwingsResult(
+        uploadId: j['upload_id']?.toString() ?? '',
+        swingCandidates: (j['swing_candidates'] as List?)
+                ?.map((e) => SwingCandidate.fromJson(e as Map<String, dynamic>))
+                .toList() ??
+            const [],
+        defaultSelectedIndex:
+            (j['default_selected_index'] as num?)?.toInt() ?? 0,
+        suggestedCameraAngle: j['suggested_camera_angle'] as String?,
+      );
+}
+
+/// 选段页入参（对齐小程序 pendingSwingSelection）
+class PendingSwingSelection {
+  final String uploadId;
+  final String cameraAngle;
+  final String clubType;
+  final String mode;
+  final int? targetYardage;
+  final double duration;
+  final int size;
+  final List<SwingCandidate> swingCandidates;
+  final int defaultSelectedIndex;
+
+  const PendingSwingSelection({
+    required this.uploadId,
+    required this.cameraAngle,
+    required this.clubType,
+    required this.mode,
+    required this.duration,
+    required this.size,
+    required this.swingCandidates,
+    required this.defaultSelectedIndex,
+    this.targetYardage,
+  });
+}

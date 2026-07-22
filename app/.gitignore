@@ -43,3 +43,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# 本地微信开放平台配置（勿提交）
+ios/Flutter/WeChat.xcconfig
+.wechat_open_appid
+.dart_defines.json

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../theme/brand_colors.dart';
 import '../../../theme/dimens.dart';
 import '../../../widgets/placeholder_tab.dart';
+import '../../analysis/pages/history_page.dart';
 import '../../help/pages/help_page.dart';
 import 'courses_page.dart';
 import 'meetup_page.dart';
@@ -32,10 +33,8 @@ class DiscoverPage extends StatelessWidget {
               style: TextStyle(
                   fontSize: rpx(26), color: BrandColors.textTertiary)),
           SizedBox(height: rpx(16)),
-          _card(context, Icons.compare, '挥杆对比', '前后两次挥杆对照',
-              const PlaceholderTab(title: '挥杆对比', milestone: '后续版本')),
-          _card(context, Icons.image, '成绩海报', '生成分享海报',
-              const PlaceholderTab(title: '成绩海报', milestone: '后续版本')),
+          _card(context, Icons.compare, '挥杆对比', '在历史报告里选两份并排对照',
+              const HistoryPage()),
           _card(context, Icons.sports, '教练工作台', '教练端学员管理',
               const PlaceholderTab(title: '教练工作台', milestone: '后续版本')),
         ],

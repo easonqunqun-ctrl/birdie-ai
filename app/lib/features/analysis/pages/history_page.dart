@@ -9,6 +9,7 @@ import '../../../data/repositories/analysis_repository.dart';
 import '../../../theme/brand_colors.dart';
 import '../../../theme/dimens.dart';
 import 'capture_page.dart';
+import 'compare_page.dart';
 import 'report_page.dart';
 
 /// 历史报告列表：对照 client/src/pages/analysis/history。
@@ -29,6 +30,8 @@ class _HistoryPageState extends State<HistoryPage> {
   bool _loading = true;
   bool _loadingMore = false;
   Object? _error;
+  bool _compareMode = false;
+  final Set<String> _comparePick = {};
 
   bool get _hasMore => _items.length < _total;
 
@@ -139,10 +142,56 @@ class _HistoryPageState extends State<HistoryPage> {
     }
   }
 
+  void _toggleCompare(AnalysisListItem it) {
+    if (it.status != 'completed' || it.id == 'sample') {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('仅可选择已完成的正式报告')));
+      return;
+    }
+    setState(() {
+      if (_comparePick.contains(it.id)) {
+        _comparePick.remove(it.id);
+      } else if (_comparePick.length >= 2) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('最多选两份报告')));
+      } else {
+        _comparePick.add(it.id);
+      }
+    });
+  }
+
+  void _goCompare() {
+    if (_comparePick.length != 2) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('请选择两份报告进行对比')));
+      return;
+    }
+    final ids = _comparePick.toList();
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ComparePage(leftId: ids[0], rightId: ids[1]),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('我的分析报告')),
+      appBar: AppBar(
+        title: Text(_compareMode ? '选择两份对比' : '我的分析报告'),
+        actions: [
+          TextButton(
+            onPressed: () => setState(() {
+              _compareMode = !_compareMode;
+              _comparePick.clear();
+            }),
+            child: Text(_compareMode ? '取消' : '对比'),
+          ),
+          if (_compareMode)
+            TextButton(
+              onPressed: _comparePick.length == 2 ? _goCompare : null,
+              child: Text('开始(${_comparePick.length}/2)'),
+            ),
+        ],
+      ),
       body: _loading
           ? const Center(
               child: CircularProgressIndicator(
@@ -200,25 +249,28 @@ class _HistoryPageState extends State<HistoryPage> {
     return const SizedBox.shrink();
   }
 
-  Widget _swipeItem(AnalysisListItem it) => Dismissible(
-        key: ValueKey(it.id),
-        direction: DismissDirection.endToStart,
-        confirmDismiss: (_) async {
-          await _delete(it);
-          return false;
-        },
-        background: Container(
-          alignment: Alignment.centerRight,
-          padding: EdgeInsets.only(right: rpx(40)),
-          decoration: BoxDecoration(
-            color: BrandColors.error,
-            borderRadius: BorderRadius.circular(Radii.lg),
-          ),
-          child: const Text('删除',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+  Widget _swipeItem(AnalysisListItem it) {
+    if (_compareMode) return _item(it);
+    return Dismissible(
+      key: ValueKey(it.id),
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (_) async {
+        await _delete(it);
+        return false;
+      },
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: EdgeInsets.only(right: rpx(40)),
+        decoration: BoxDecoration(
+          color: BrandColors.error,
+          borderRadius: BorderRadius.circular(Radii.lg),
         ),
-        child: _item(it),
-      );
+        child: const Text('删除',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+      ),
+      child: _item(it),
+    );
+  }
 
   Widget _errorView() => Center(
         child: Column(
@@ -268,15 +320,24 @@ class _HistoryPageState extends State<HistoryPage> {
     final level = it.scoreLevel ?? scoreLevelFromScore(it.overallScore);
     final meta = level != null ? kScoreLevelMeta[level] : null;
     final completed = it.status == 'completed';
+    final picked = _comparePick.contains(it.id);
     return GestureDetector(
-      onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => ReportPage(analysisId: it.id))),
+      onTap: () {
+        if (_compareMode) {
+          _toggleCompare(it);
+          return;
+        }
+        Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => ReportPage(analysisId: it.id)));
+      },
       child: Container(
         padding: EdgeInsets.all(rpx(20)),
         decoration: BoxDecoration(
           color: BrandColors.bgCard,
           borderRadius: BorderRadius.circular(Radii.lg),
-          border: Border.all(color: BrandColors.border),
+          border: Border.all(
+              color: picked ? BrandColors.primary : BrandColors.border,
+              width: picked ? 2 : 1),
         ),
         child: Row(
           children: [

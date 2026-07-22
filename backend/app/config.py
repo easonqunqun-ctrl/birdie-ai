@@ -140,9 +140,13 @@ class Settings(BaseSettings):
     WECHAT_MP_PUSH_ENCODING_AES_KEY: str = ""
 
     # ==================== 苹果内购 ====================
-    APPLE_BUNDLE_ID: str = "com.xiaoniaoai.app"
+    APPLE_BUNDLE_ID: str = "cn.birdieai.birdieApp"
     APPLE_SHARED_SECRET: str = ""
     APPLE_VERIFY_RECEIPT_URL: str = "https://sandbox.itunes.apple.com/verifyReceipt"
+    # Sign in with Apple（与 IAP 分离；Services ID 可空，仅用 Bundle ID 作 aud）
+    APPLE_SERVICES_ID: str = ""
+    # True 时允许 identity_token 以 mock- 开头走联调登录（生产必须 false）
+    APPLE_MOCK_LOGIN: bool = True
 
     # ==================== LLM ====================
     LLM_PROVIDER: Literal["deepseek", "qwen", "glm", "openai"] = "deepseek"

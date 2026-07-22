@@ -1,19 +1,16 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../../core/analysis_options.dart';
 import '../../../theme/brand_colors.dart';
 import '../../../theme/dimens.dart';
 import '../../../widgets/primary_button.dart';
-import '../analysis_controller.dart';
-import 'waiting_page.dart';
+import 'params_page.dart';
 import 'report_page.dart';
 
-/// 拍摄/选片页：对照 client/src/pages/analysis/capture。
-/// M1 视频预检简化：只校验时长(2-30s)/大小(≤100MB)/扩展名。
+/// 拍摄/选片页：对照 client capture → 选好视频后进 params。
 class CapturePage extends StatefulWidget {
   const CapturePage({super.key});
 
@@ -23,8 +20,6 @@ class CapturePage extends StatefulWidget {
 
 class _CapturePageState extends State<CapturePage> {
   final _picker = ImagePicker();
-  String _clubType = 'iron_7';
-  String _cameraAngle = 'face_on';
   XFile? _video;
   double _duration = 0;
   int _size = 0;
@@ -82,33 +77,22 @@ class _CapturePageState extends State<CapturePage> {
     }
   }
 
-  Future<void> _start() async {
+  void _next() {
     if (_video == null) {
       _toast('请先拍摄或选择挥杆视频');
       return;
     }
-    final ctl = context.read<AnalysisController>();
-    ctl.reset();
-    try {
-      final id = await ctl.startAnalysis(
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ParamsPage(
         filePath: _video!.path,
         fileSize: _size,
         duration: _duration,
-        cameraAngle: _cameraAngle,
-        clubType: _clubType,
-      );
-      if (!mounted) return;
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => WaitingPage(analysisId: id)),
-      );
-    } catch (e) {
-      _toast(ctl.error ?? '发起分析失败');
-    }
+      ),
+    ));
   }
 
   @override
   Widget build(BuildContext context) {
-    final busy = context.watch<AnalysisController>().busy;
     return Scaffold(
       appBar: AppBar(title: const Text('挥杆分析')),
       body: SingleChildScrollView(
@@ -127,20 +111,11 @@ class _CapturePageState extends State<CapturePage> {
               style: TextStyle(
                   fontSize: rpx(22), color: BrandColors.textTertiary),
             ),
-            SizedBox(height: rpx(32)),
-            _sectionTitle('球杆'),
-            SizedBox(height: rpx(16)),
-            _clubSelector(),
-            SizedBox(height: rpx(32)),
-            _sectionTitle('拍摄机位'),
-            SizedBox(height: rpx(16)),
-            _angleSelector(),
             SizedBox(height: rpx(48)),
             PrimaryButton(
-              label: '开始分析',
-              loading: busy,
+              label: '下一步：选择参数',
               disabled: _video == null,
-              onTap: _start,
+              onTap: _next,
             ),
             SizedBox(height: rpx(20)),
             Center(
@@ -159,12 +134,6 @@ class _CapturePageState extends State<CapturePage> {
       ),
     );
   }
-
-  Widget _sectionTitle(String t) => Text(t,
-      style: TextStyle(
-          fontSize: rpx(32),
-          fontWeight: FontWeight.w700,
-          color: BrandColors.textPrimary));
 
   Widget _guideHero() => Container(
         width: double.infinity,
@@ -310,99 +279,6 @@ class _CapturePageState extends State<CapturePage> {
                     fontWeight: FontWeight.w600)),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _clubSelector() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (final group in clubTypeGroups) ...[
-          Padding(
-            padding: EdgeInsets.only(bottom: rpx(12)),
-            child: Text(group.title,
-                style: TextStyle(
-                    fontSize: rpx(26), color: BrandColors.textSecondary)),
-          ),
-          Wrap(
-            spacing: rpx(16),
-            runSpacing: rpx(16),
-            children: [
-              for (final c in group.items)
-                _chip(clubTypeLabels[c] ?? c, _clubType == c,
-                    () => setState(() => _clubType = c)),
-            ],
-          ),
-          SizedBox(height: rpx(20)),
-        ],
-      ],
-    );
-  }
-
-  Widget _angleSelector() {
-    return Row(
-      children: [
-        for (final a in cameraAngleLabels.keys)
-          Expanded(
-            child: Padding(
-              padding: EdgeInsets.only(right: a == 'face_on' ? rpx(16) : 0),
-              child: GestureDetector(
-                onTap: () => setState(() => _cameraAngle = a),
-                child: Container(
-                  padding: EdgeInsets.symmetric(vertical: rpx(24)),
-                  decoration: BoxDecoration(
-                    color: _cameraAngle == a
-                        ? BrandColors.primaryTint
-                        : BrandColors.bgCard,
-                    borderRadius: BorderRadius.circular(Radii.md),
-                    border: Border.all(
-                        color: _cameraAngle == a
-                            ? BrandColors.primary
-                            : BrandColors.border,
-                        width: _cameraAngle == a ? 2 : 1),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(cameraAngleLabels[a]!,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                              fontSize: rpx(28),
-                              fontWeight: FontWeight.w600,
-                              color: _cameraAngle == a
-                                  ? BrandColors.primary
-                                  : BrandColors.textPrimary)),
-                      SizedBox(height: rpx(6)),
-                      Text(cameraAngleDesc[a]!,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                              fontSize: rpx(22),
-                              color: BrandColors.textSecondary)),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _chip(String label, bool active, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: rpx(28), vertical: rpx(16)),
-        decoration: BoxDecoration(
-          color: active ? BrandColors.primary : BrandColors.bgCard,
-          borderRadius: BorderRadius.circular(rpx(32)),
-          border: Border.all(
-              color: active ? BrandColors.primary : BrandColors.border),
-        ),
-        child: Text(label,
-            style: TextStyle(
-                fontSize: rpx(28),
-                color: active ? BrandColors.onPrimary : BrandColors.textPrimary)),
       ),
     );
   }

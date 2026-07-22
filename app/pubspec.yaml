@@ -53,6 +53,8 @@ dependencies:
   image_picker: ^1.1.2
   video_player: ^2.9.2
   permission_handler: ^11.3.1
+  fluwx: ^6.0.2
+  sign_in_with_apple: ^8.1.0
   # 微信登录 fluwx / 视频压缩 video_compress 在对应里程碑再加（需原生配置）
 
 dev_dependencies:
@@ -79,6 +81,7 @@ flutter:
 
   assets:
     - assets/brand/
+    - assets/tab/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

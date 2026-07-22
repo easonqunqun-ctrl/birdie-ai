@@ -1,19 +1,24 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../../core/analysis_options.dart';
 import '../../../core/drill_library.dart';
+import '../../../core/env.dart';
 import '../../../core/swing_constants.dart';
 import '../../../data/models/analysis.dart';
 import '../../../data/repositories/training_repository.dart';
 import '../../../theme/brand_colors.dart';
 import '../../../theme/dimens.dart';
+import '../../../widgets/trust_badge.dart';
 import '../../coach/pages/coach_page.dart';
+import '../../help/pages/score_guide_page.dart';
 import '../analysis_controller.dart';
 import 'capture_page.dart';
+import 'poster_page.dart';
 
 /// 报告页：对照 client/src/pages/analysis/report。
 /// 视频回放（阶段色条 + 倍速）+ 分级评分卡 + 六维雷达 + 问题诊断 + 训练建议 + 底部动作。
@@ -143,10 +148,21 @@ class _ReportPageState extends State<ReportPage> {
             '${clubTypeLabels[_report?.clubType] ?? '挥杆'}分析报告'),
       ),
       body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(
-                  valueColor:
-                      AlwaysStoppedAnimation<Color>(BrandColors.primary)))
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                          BrandColors.primary)),
+                  SizedBox(height: rpx(24)),
+                  Text('加载报告中…',
+                      style: TextStyle(
+                          fontSize: rpx(28),
+                          color: BrandColors.textSecondary)),
+                ],
+              ),
+            )
           : (_error != null || _report == null)
               ? _errorView()
               : _reportView(_report!),
@@ -184,9 +200,22 @@ class _ReportPageState extends State<ReportPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _scoreCard(r),
+              SizedBox(height: rpx(12)),
+              GestureDetector(
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const ScoreGuidePage())),
+                child: Text('分数说明 ›',
+                    style: TextStyle(
+                        fontSize: rpx(26),
+                        fontWeight: FontWeight.w600,
+                        color: BrandColors.primary)),
+              ),
               if (r.analysisConfidence != null) ...[
                 SizedBox(height: rpx(24)),
-                _trustBadge(r),
+                TrustBadge(
+                  confidence: r.analysisConfidence,
+                  onRetake: _isSample ? null : _shootAgain,
+                ),
               ],
               if (r.phaseHighlights.isNotEmpty) ...[
                 SizedBox(height: rpx(24)),
@@ -444,42 +473,6 @@ class _ReportPageState extends State<ReportPage> {
                         color: fg.withValues(alpha: 0.7))),
             ],
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _trustBadge(AnalysisReport r) {
-    final c = r.analysisConfidence!.toDouble();
-    final (label, color) = c >= 0.75
-        ? ('AI 高可信', BrandColors.success)
-        : c >= 0.5
-            ? ('AI 中等可信', BrandColors.warning)
-            : ('AI 可信度较低', BrandColors.error);
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(rpx(24)),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(Radii.md),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.verified_outlined, color: color, size: rpx(36)),
-          SizedBox(width: rpx(16)),
-          Expanded(
-            child: Text('$label · 置信度 ${(c * 100).round()}%',
-                style: TextStyle(
-                    fontSize: rpx(26),
-                    fontWeight: FontWeight.w600,
-                    color: BrandColors.textPrimary)),
-          ),
-          if (c < 0.5 && !_isSample)
-            TextButton(
-              onPressed: _shootAgain,
-              child: const Text('重拍一段'),
-            ),
         ],
       ),
     );
@@ -1039,6 +1032,36 @@ class _ReportPageState extends State<ReportPage> {
               ),
             ],
           ),
+          if (!_isSample) ...[
+            SizedBox(height: rpx(16)),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                            builder: (_) => PosterPage(report: r))),
+                    icon: const Icon(Icons.image_outlined, size: 18),
+                    label: const Text('成绩海报'),
+                  ),
+                ),
+                SizedBox(width: rpx(16)),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final url = Env.publicReportUrl(r.id);
+                      final score = r.overallScore?.round() ?? '—';
+                      await Share.share(
+                          '我在领翼golf 打出了 $score 分\n$url',
+                          subject: '领翼golf 挥杆报告');
+                    },
+                    icon: const Icon(Icons.ios_share, size: 18),
+                    label: const Text('分享'),
+                  ),
+                ),
+              ],
+            ),
+          ],
           SizedBox(height: rpx(16)),
           Row(
             children: [

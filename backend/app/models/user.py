@@ -19,6 +19,8 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
     wechat_openid: Mapped[str | None] = mapped_column(String(64), nullable=True)
     wechat_app_openid: Mapped[str | None] = mapped_column(String(64), nullable=True)
     wechat_unionid: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Sign in with Apple 稳定用户标识（JWT `sub`）
+    apple_sub: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     # 资料
     nickname: Mapped[str | None] = mapped_column(String(48), nullable=True)
@@ -123,12 +125,19 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
     )
 
     def __repr__(self) -> str:
-        oid = self.nickname or self.wechat_openid or self.wechat_app_openid
+        oid = (
+            self.nickname
+            or self.wechat_openid
+            or self.wechat_app_openid
+            or self.apple_sub
+        )
         return f"<User {self.id} {oid}>"
 
     def wechat_subject_for_jwt(self) -> str:
-        """JWT `openid` 声明：小程序 openid 优先，否则回落到 App openid."""
+        """JWT `openid` 声明：小程序 / App 微信 openid 优先，否则 Apple sub."""
         oid = self.wechat_openid or self.wechat_app_openid
-        if not oid:
-            raise RuntimeError("user identity missing both wechat identifiers")
-        return oid
+        if oid:
+            return oid
+        if self.apple_sub:
+            return f"apple:{self.apple_sub}"
+        raise RuntimeError("user identity missing wechat/apple identifiers")

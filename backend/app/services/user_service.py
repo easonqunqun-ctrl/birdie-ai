@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import NotFoundError
 from app.core.logging import get_logger
 from app.core.security import new_id, new_invite_code
+from app.integrations.apple_auth import AppleIdentity
 from app.integrations.wechat import WechatAppOAuthSession, WechatSession
 from app.models.user import User
 
@@ -44,6 +45,11 @@ async def get_user_by_app_openid(db: AsyncSession, app_openid: str) -> User | No
     stmt = select(User).where(
         User.wechat_app_openid == app_openid, User.deleted_at.is_(None)
     )
+    return (await db.execute(stmt)).scalar_one_or_none()
+
+
+async def get_user_by_apple_sub(db: AsyncSession, apple_sub: str) -> User | None:
+    stmt = select(User).where(User.apple_sub == apple_sub, User.deleted_at.is_(None))
     return (await db.execute(stmt)).scalar_one_or_none()
 
 
@@ -172,6 +178,49 @@ async def login_or_create_user_app_oauth(
         wechat_app_openid=oauth.app_openid,
         wechat_unionid=oauth.unionid,
         nickname=None,
+        avatar_url=None,
+        invite_code=await _gen_unique_invite_code(db),
+        invited_by_user_id=inviter_id,
+        membership_type="free",
+        last_login_at=datetime.now(UTC),
+    )
+    db.add(user)
+    await db.flush()
+    await _sync_bind_invitations(db, user, invite_code, inviter_id)
+    return user, True
+
+
+async def login_or_create_user_apple(
+    db: AsyncSession,
+    identity: AppleIdentity,
+    invite_code: str | None = None,
+    *,
+    full_name: str | None = None,
+) -> tuple[User, bool]:
+    """Sign in with Apple：按 `sub` 查找或创建；可选写入首次授权昵称."""
+    user = await get_user_by_apple_sub(db, identity.sub)
+
+    inviter_id: str | None = None
+    if invite_code:
+        inviter = await get_user_by_invite_code(db, invite_code)
+        if inviter is not None:
+            inviter_id = inviter.id
+
+    if user is not None:
+        user.last_login_at = datetime.now(UTC)
+        if full_name and not user.nickname:
+            user.nickname = full_name[:48]
+        await db.flush()
+        return user, False
+
+    nickname = (full_name or "").strip()[:48] or None
+    user = User(
+        id=new_id("usr"),
+        wechat_openid=None,
+        wechat_app_openid=None,
+        wechat_unionid=None,
+        apple_sub=identity.sub,
+        nickname=nickname,
         avatar_url=None,
         invite_code=await _gen_unique_invite_code(db),
         invited_by_user_id=inviter_id,

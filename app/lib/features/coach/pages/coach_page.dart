@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../data/models/chat.dart';
+import '../../../nav/require_login.dart';
 import '../../../theme/brand_colors.dart';
 import '../../../theme/dimens.dart';
 import '../../analysis/pages/report_page.dart';
@@ -41,8 +42,10 @@ class _CoachPageState extends State<CoachPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_bootstrapped) return;
       _bootstrapped = true;
+      final auth = context.read<AuthController>();
+      if (!auth.isLoggedIn) return;
       final ctl = context.read<ChatController>();
-      final q = context.read<AuthController>().user?.quota;
+      final q = auth.user?.quota;
       if (q != null) ctl.hydrateQuota(q.chatRemainingToday, q.chatTotalToday);
       ctl.bootstrapSession(contextAnalysisId: widget.contextAnalysisId);
     });
@@ -117,6 +120,51 @@ class _CoachPageState extends State<CoachPage> {
 
   @override
   Widget build(BuildContext context) {
+    final loggedIn = context.watch<AuthController>().isLoggedIn;
+    if (!loggedIn) {
+      return Scaffold(
+        backgroundColor: BrandColors.bgPage,
+        appBar: AppBar(title: const Text('AI 教练')),
+        body: Padding(
+          padding: EdgeInsets.all(rpx(48)),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('💬', style: TextStyle(fontSize: rpx(72))),
+              SizedBox(height: rpx(20)),
+              Text('登录后与 AI 教练对话',
+                  style: TextStyle(
+                      fontSize: rpx(34),
+                      fontWeight: FontWeight.w700,
+                      color: BrandColors.textPrimary)),
+              SizedBox(height: rpx(12)),
+              Text(_kWelcomeText,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: rpx(26),
+                      height: 1.45,
+                      color: BrandColors.textSecondary)),
+              SizedBox(height: rpx(32)),
+              ElevatedButton(
+                onPressed: () async {
+                  final chat = context.read<ChatController>();
+                  final auth = context.read<AuthController>();
+                  final ok = await requireLogin(context);
+                  if (!ok || !mounted) return;
+                  final q = auth.user?.quota;
+                  if (q != null) {
+                    chat.hydrateQuota(q.chatRemainingToday, q.chatTotalToday);
+                  }
+                  await chat.bootstrapSession(
+                      contextAnalysisId: widget.contextAnalysisId);
+                },
+                child: const Text('去登录'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     final ctl = context.watch<ChatController>();
     return Scaffold(
       backgroundColor: BrandColors.bgPage,

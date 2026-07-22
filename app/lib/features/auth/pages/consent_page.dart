@@ -47,42 +47,46 @@ class _ConsentPageState extends State<ConsentPage> {
   Widget build(BuildContext context) {
     final inset = MediaQuery.of(context).padding;
     return Scaffold(
-      backgroundColor: BrandColors.bgPage,
-      body: Padding(
-        padding: EdgeInsets.only(
-          top: inset.top + rpx(48),
-          bottom: inset.bottom + rpx(32),
-          left: rpx(48),
-          right: rpx(48),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: BrandColors.gradientAuthAtmosphere,
         ),
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SizedBox(height: rpx(20)),
-                    const BrandLogo(size: 100),
-                    SizedBox(height: rpx(20)),
-                    Text('欢迎使用领翼golf',
-                        style: TextStyle(
-                            fontSize: rpx(50),
-                            fontWeight: FontWeight.w700,
-                            color: BrandColors.primary)),
-                    SizedBox(height: rpx(12)),
-                    Text('你的随身高尔夫智能教练',
-                        style: TextStyle(
-                            fontSize: rpx(32),
-                            color: BrandColors.textSecondary)),
-                    SizedBox(height: rpx(36)),
-                    _card(),
-                  ],
+        child: Padding(
+          padding: EdgeInsets.only(
+            top: inset.top + rpx(48),
+            bottom: inset.bottom + rpx(32),
+            left: rpx(48),
+            right: rpx(48),
+          ),
+          child: Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(height: rpx(20)),
+                      const BrandLogo(size: 100),
+                      SizedBox(height: rpx(20)),
+                      Text('欢迎使用领翼golf',
+                          style: TextStyle(
+                              fontSize: rpx(50),
+                              fontWeight: FontWeight.w700,
+                              color: BrandColors.primary)),
+                      SizedBox(height: rpx(12)),
+                      Text('你的随身高尔夫智能教练',
+                          style: TextStyle(
+                              fontSize: rpx(32),
+                              color: BrandColors.textSecondary)),
+                      SizedBox(height: rpx(36)),
+                      _card(),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            _bottom(),
-          ],
+              _bottom(),
+            ],
+          ),
         ),
       ),
     );

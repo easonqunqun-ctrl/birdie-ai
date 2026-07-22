@@ -26,6 +26,24 @@ class UserRepository {
     return WechatLoginResult.fromJson(data);
   }
 
+  Future<WechatLoginResult> appleLogin({
+    required String identityToken,
+    String? fullName,
+    String? inviteCode,
+  }) async {
+    final data = await _api.post<Map<String, dynamic>>(
+      '/auth/apple-login',
+      data: {
+        'identity_token': identityToken,
+        if (fullName != null && fullName.isNotEmpty) 'full_name': fullName,
+        if (inviteCode != null && inviteCode.isNotEmpty) 'invite_code': inviteCode,
+      },
+      noAuth: true,
+      timeout: _authTimeout,
+    );
+    return WechatLoginResult.fromJson(data);
+  }
+
   Future<User> getMe() async {
     final data =
         await _api.get<Map<String, dynamic>>('/users/me', timeout: _authTimeout);
@@ -77,4 +95,19 @@ class UserRepository {
   }
 
   Future<void> deleteClub(String clubId) => _api.del('/users/me/clubs/$clubId');
+
+  /// 进步曲线点：对照 userService.getAnalysisProgress
+  Future<List<AnalysisProgressPoint>> getAnalysisProgress(
+      {int? windowDays}) async {
+    final qs = (windowDays != null && windowDays > 0)
+        ? '?window_days=$windowDays'
+        : '';
+    final data = await _api
+        .get<Map<String, dynamic>>('/users/me/analysis-progress$qs');
+    return (data['points'] as List?)
+            ?.map((e) =>
+                AnalysisProgressPoint.fromJson(e as Map<String, dynamic>))
+            .toList() ??
+        const [];
+  }
 }

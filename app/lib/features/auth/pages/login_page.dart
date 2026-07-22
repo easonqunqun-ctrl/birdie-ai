@@ -1,7 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../../core/api_client.dart';
+import '../../../core/apple_auth.dart';
 import '../../../theme/brand_colors.dart';
 import '../../../theme/dimens.dart';
 import '../../../widgets/brand_logo.dart';
@@ -61,68 +65,132 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  Future<void> _loginApple() async {
+    if (!_agreed) {
+      _toast('请先勾选协议');
+      return;
+    }
+    if (_loading) return;
+    setState(() => _loading = true);
+    try {
+      final invite = _inviteCtl.text.trim().toUpperCase();
+      await context
+          .read<AuthController>()
+          .loginWithApple(inviteCode: invite.isEmpty ? null : invite);
+    } catch (e) {
+      final msg = describeRequestFailure(e).toastTitle;
+      _toast(msg);
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final inset = MediaQuery.of(context).padding;
     return Scaffold(
-      backgroundColor: BrandColors.bgPage,
-      body: Padding(
-        padding: EdgeInsets.only(
-          top: inset.top + rpx(56),
-          bottom: inset.bottom + rpx(32),
-          left: rpx(48),
-          right: rpx(48),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: BrandColors.gradientAuthAtmosphere,
         ),
-        child: Column(
-          children: [
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  const BrandLogo(size: 100),
-                  SizedBox(height: rpx(16)),
-                  Text('领翼golf',
-                      style: TextStyle(
-                          fontSize: rpx(54),
-                          fontWeight: FontWeight.w700,
-                          color: BrandColors.primary)),
-                  SizedBox(height: rpx(8)),
-                  Text('你的随身高尔夫智能教练',
-                      style: TextStyle(
-                          fontSize: rpx(30),
-                          color: BrandColors.textSecondary)),
-                  SizedBox(height: rpx(48)),
-                  ..._features.map(_featureRow),
-                  SizedBox(height: rpx(28)),
-                ],
-              ),
-            ),
-            _agreement(),
-            SizedBox(height: rpx(20)),
-            SizedBox(
-              width: double.infinity,
-              child: GestureDetector(
-                onTap: (!_agreed || _loading) ? null : _login,
-                child: Opacity(
-                  opacity: (!_agreed || _loading) ? 0.45 : 1,
-                  child: Container(
-                    height: rpx(88),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                        color: BrandColors.primary,
-                        borderRadius: BorderRadius.circular(Radii.md)),
-                    child: Text(_loading ? '登录中...' : '微信一键登录',
+        child: Padding(
+          padding: EdgeInsets.only(
+            top: inset.top + rpx(56),
+            bottom: inset.bottom + rpx(32),
+            left: rpx(48),
+            right: rpx(48),
+          ),
+          child: Column(
+            children: [
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    const BrandLogo(size: 100),
+                    SizedBox(height: rpx(16)),
+                    Text('领翼golf',
                         style: TextStyle(
-                            fontSize: rpx(36),
-                            fontWeight: FontWeight.w600,
-                            color: BrandColors.onPrimary)),
+                            fontSize: rpx(54),
+                            fontWeight: FontWeight.w700,
+                            color: BrandColors.primary)),
+                    SizedBox(height: rpx(8)),
+                    Text('你的随身高尔夫智能教练',
+                        style: TextStyle(
+                            fontSize: rpx(30),
+                            color: BrandColors.textSecondary)),
+                    SizedBox(height: rpx(48)),
+                    ..._features.map(_featureRow),
+                    SizedBox(height: rpx(28)),
+                  ],
+                ),
+              ),
+              _agreement(),
+              SizedBox(height: rpx(20)),
+              SizedBox(
+                width: double.infinity,
+                child: GestureDetector(
+                  onTap: (!_agreed || _loading) ? null : _login,
+                  child: Opacity(
+                    opacity: (!_agreed || _loading) ? 0.45 : 1,
+                    child: Container(
+                      height: rpx(88),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                          color: BrandColors.primary,
+                          borderRadius: BorderRadius.circular(Radii.md)),
+                      child: Text(_loading ? '登录中...' : '微信一键登录',
+                          style: TextStyle(
+                              fontSize: rpx(36),
+                              fontWeight: FontWeight.w600,
+                              color: BrandColors.onPrimary)),
+                    ),
                   ),
                 ),
               ),
-            ),
-            SizedBox(height: rpx(16)),
-            _invite(),
-          ],
+              if (Platform.isIOS) ...[
+                SizedBox(height: rpx(16)),
+                FutureBuilder<bool>(
+                  future: AppleAuth.isAvailable,
+                  builder: (context, snap) {
+                    if (snap.data != true) return const SizedBox.shrink();
+                    return SignInWithAppleButton(
+                      onPressed: (!_agreed || _loading) ? () {} : _loginApple,
+                      style: SignInWithAppleButtonStyle.black,
+                      borderRadius: BorderRadius.circular(Radii.md),
+                      height: rpx(88),
+                    );
+                  },
+                ),
+              ],
+              SizedBox(height: rpx(16)),
+              // 审核：显著「取消/拒绝」——暂不登录可返回访客浏览
+              GestureDetector(
+                onTap: _loading
+                    ? null
+                    : () {
+                        if (Navigator.of(context).canPop()) {
+                          Navigator.of(context).pop();
+                        }
+                      },
+                child: Container(
+                  width: double.infinity,
+                  height: rpx(80),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: BrandColors.bgCard,
+                    borderRadius: BorderRadius.circular(Radii.md),
+                    border: Border.all(color: BrandColors.border),
+                  ),
+                  child: Text('暂不登录，先逛逛',
+                      style: TextStyle(
+                          fontSize: rpx(30),
+                          fontWeight: FontWeight.w600,
+                          color: BrandColors.primary)),
+                ),
+              ),
+              SizedBox(height: rpx(16)),
+              _invite(),
+            ],
+          ),
         ),
       ),
     );

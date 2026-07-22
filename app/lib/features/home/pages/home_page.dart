@@ -9,16 +9,19 @@ import '../../../data/models/user.dart';
 import '../../../data/repositories/analysis_repository.dart';
 import '../../../theme/brand_colors.dart';
 import '../../../theme/dimens.dart';
+import '../../../nav/require_login.dart';
+import '../../../widgets/brand_logo.dart';
 import '../../analysis/pages/capture_page.dart';
 import '../../analysis/pages/history_page.dart';
 import '../../analysis/pages/report_page.dart';
 import '../../auth/auth_controller.dart';
+import '../../auth/pages/login_page.dart';
 import '../../coach/pages/coach_page.dart';
+import '../../legal/pages/legal_page.dart';
 import '../../profile/pages/membership_page.dart';
 import '../../profile/pages/profile_page.dart';
 
-/// 首页：对照 client/src/pages/index/index.tsx（登录态）。
-/// 顶栏 → hero（评分/问候双态）→ 三项统计 → 快捷入口 → 最近分析。
+/// 首页：对照 client/src/pages/index（登录态 + 访客态）。
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -38,6 +41,14 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _refresh() async {
     final auth = context.read<AuthController>();
+    if (!auth.isLoggedIn) {
+      if (!mounted) return;
+      setState(() {
+        _recent = const [];
+        _loadingRecent = false;
+      });
+      return;
+    }
     final repo = context.read<AnalysisRepository>();
     await auth.refresh();
     try {
@@ -53,9 +64,17 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  void _goLogin() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const LoginPage()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final user = context.watch<AuthController>().user;
+    final auth = context.watch<AuthController>();
+    final user = auth.user;
+    final loggedIn = auth.isLoggedIn;
     final inset = MediaQuery.of(context).padding;
     return Container(
       color: BrandColors.bgPage,
@@ -69,37 +88,245 @@ class _HomePageState extends State<HomePage> {
             right: rpx(32),
             bottom: rpx(48),
           ),
-          children: [
-            _topBar(user),
-            SizedBox(height: rpx(24)),
-            _hero(user),
-            SizedBox(height: rpx(24)),
-            _statsRow(user),
-            SizedBox(height: rpx(24)),
-            _quickRow(user),
-            SizedBox(height: rpx(32)),
-            _recentSection(),
-          ],
+          children: loggedIn
+              ? [
+                  _topBar(user),
+                  SizedBox(height: rpx(24)),
+                  _hero(user),
+                  SizedBox(height: rpx(24)),
+                  _statsRow(user),
+                  SizedBox(height: rpx(24)),
+                  _quickRow(user),
+                  SizedBox(height: rpx(32)),
+                  _recentSection(),
+                ]
+              : [
+                  _guestTopBar(),
+                  SizedBox(height: rpx(24)),
+                  _guestHero(),
+                  SizedBox(height: rpx(24)),
+                  _guestFeatures(),
+                  SizedBox(height: rpx(24)),
+                  _guestQuicks(),
+                  SizedBox(height: rpx(32)),
+                  _guestLegal(),
+                ],
         ),
       ),
     );
   }
 
+  Widget _guestTopBar() => Row(
+        children: [
+          _brandMark(),
+          SizedBox(width: rpx(16)),
+          Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                    text: '领翼',
+                    style: TextStyle(
+                        fontSize: rpx(38),
+                        fontWeight: FontWeight.w900,
+                        color: BrandColors.primary)),
+                TextSpan(
+                    text: 'golf',
+                    style: TextStyle(
+                        fontSize: rpx(38),
+                        fontWeight: FontWeight.w900,
+                        color: BrandColors.accentMint)),
+              ],
+            ),
+          ),
+          const Spacer(),
+          GestureDetector(
+            onTap: _goLogin,
+            child: Container(
+              padding:
+                  EdgeInsets.symmetric(horizontal: rpx(28), vertical: rpx(12)),
+              decoration: BoxDecoration(
+                color: BrandColors.primaryTint,
+                borderRadius: BorderRadius.circular(rpx(32)),
+              ),
+              child: Text('登录',
+                  style: TextStyle(
+                      fontSize: rpx(28),
+                      fontWeight: FontWeight.w600,
+                      color: BrandColors.primary)),
+            ),
+          ),
+        ],
+      );
+
+  Widget _brandMark() => BrandLogo(size: rpx(72));
+
+  Widget _guestHero() => Container(
+        width: double.infinity,
+        padding: EdgeInsets.all(rpx(40)),
+        decoration: BoxDecoration(
+          gradient: BrandColors.gradientHero,
+          borderRadius: BorderRadius.circular(Radii.lg),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('欢迎使用',
+                style: TextStyle(
+                    fontSize: rpx(26), color: BrandColors.onPrimaryMuted)),
+            SizedBox(height: rpx(12)),
+            Text('可先了解产品与功能',
+                style: TextStyle(
+                    fontSize: rpx(40),
+                    fontWeight: FontWeight.w800,
+                    color: BrandColors.onPrimary)),
+            Text('再选择是否登录',
+                style: TextStyle(
+                    fontSize: rpx(40),
+                    fontWeight: FontWeight.w800,
+                    color: BrandColors.onPrimary)),
+            SizedBox(height: rpx(16)),
+            Text('挥杆分析与 AI 对话需登录后使用。下方可查看示例报告与协议。',
+                style: TextStyle(
+                    fontSize: rpx(26),
+                    height: 1.45,
+                    color: BrandColors.onPrimaryMuted)),
+            SizedBox(height: rpx(28)),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _goLogin,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: BrandColors.gold,
+                  foregroundColor: Colors.black,
+                  padding: EdgeInsets.symmetric(vertical: rpx(24)),
+                ),
+                child: Text('登录后开始分析',
+                    style: TextStyle(
+                        fontSize: rpx(30), fontWeight: FontWeight.w700)),
+              ),
+            ),
+          ],
+        ),
+      );
+
+  Widget _guestFeatures() => Container(
+        width: double.infinity,
+        padding: EdgeInsets.all(rpx(32)),
+        decoration: BoxDecoration(
+          color: BrandColors.bgCard,
+          borderRadius: BorderRadius.circular(Radii.lg),
+          border: Border.all(color: BrandColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('本产品提供',
+                style: TextStyle(
+                    fontSize: rpx(30),
+                    fontWeight: FontWeight.w700,
+                    color: BrandColors.textPrimary)),
+            SizedBox(height: rpx(16)),
+            _guestFeature('📹', 'AI 挥杆分析，短视频出报告'),
+            _guestFeature('💬', 'AI 教练在线答疑（生成式内容，仅供参考）'),
+            _guestFeature('📈', '基于分析的训练计划与打卡'),
+          ],
+        ),
+      );
+
+  Widget _guestFeature(String icon, String text) => Padding(
+        padding: EdgeInsets.symmetric(vertical: rpx(10)),
+        child: Row(
+          children: [
+            Text(icon, style: TextStyle(fontSize: rpx(36))),
+            SizedBox(width: rpx(16)),
+            Expanded(
+              child: Text(text,
+                  style: TextStyle(
+                      fontSize: rpx(28), color: BrandColors.textSecondary)),
+            ),
+          ],
+        ),
+      );
+
+  Widget _guestQuicks() => Column(
+        children: [
+          _quickRowCard(
+            emoji: '🎬',
+            title: '先看一份示例报告',
+            sub: '无需登录 · 不消耗次数',
+            iconTint: BrandColors.accentMintDim,
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => const ReportPage(analysisId: 'sample'))),
+          ),
+          SizedBox(height: rpx(12)),
+          _quickRowCard(
+            emoji: '💬',
+            title: 'AI 教练 · 了解能力',
+            sub: '进入页内说明，对话前需登录',
+            iconTint: BrandColors.primaryTint,
+            onTap: () => Navigator.of(context)
+                .push(MaterialPageRoute(builder: (_) => const CoachPage())),
+          ),
+        ],
+      );
+
+  Widget _guestLegal() => Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => const LegalPage(kind: LegalKind.terms))),
+            child: Text('《用户协议》',
+                style: TextStyle(
+                    fontSize: rpx(26),
+                    color: BrandColors.primary,
+                    fontWeight: FontWeight.w600)),
+          ),
+          Text(' · ',
+              style: TextStyle(
+                  fontSize: rpx(26), color: BrandColors.textTertiary)),
+          GestureDetector(
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => const LegalPage(kind: LegalKind.privacy))),
+            child: Text('《隐私政策》',
+                style: TextStyle(
+                    fontSize: rpx(26),
+                    color: BrandColors.primary,
+                    fontWeight: FontWeight.w600)),
+          ),
+        ],
+      );
+
   // -------------------- 顶栏 --------------------
   Widget _topBar(User? user) {
     return Row(
       children: [
-        Text('领翼golf',
-            style: TextStyle(
-                fontSize: rpx(40),
-                fontWeight: FontWeight.w800,
-                color: BrandColors.primary)),
+        _brandMark(),
+        SizedBox(width: rpx(16)),
+        Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(
+                  text: '领翼',
+                  style: TextStyle(
+                      fontSize: rpx(38),
+                      fontWeight: FontWeight.w900,
+                      color: BrandColors.primary)),
+              TextSpan(
+                  text: 'golf',
+                  style: TextStyle(
+                      fontSize: rpx(38),
+                      fontWeight: FontWeight.w900,
+                      color: BrandColors.accentMint)),
+            ],
+          ),
+        ),
         const Spacer(),
         GestureDetector(
           onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const ProfilePage())),
           child: CircleAvatar(
-            radius: rpx(40),
+            radius: rpx(32),
             backgroundColor: BrandColors.primaryTint,
             backgroundImage: (user?.avatarUrl?.isNotEmpty ?? false)
                 ? CachedNetworkImageProvider(user!.avatarUrl!)
@@ -285,70 +512,91 @@ class _HomePageState extends State<HomePage> {
         ),
       );
 
-  // -------------------- 快捷入口 --------------------
+  // -------------------- 快捷入口（对照小程序纵向 quick 行） --------------------
   Widget _quickRow(User? user) {
     final showSample = !(user?.hasCompletedRealAnalysis ?? false);
     final chatText = (user?.isMember ?? false) ||
             (user?.quota?.chatRemainingToday ?? 0) < 0
         ? '会员无限次'
         : '今日剩余 ${user?.quota?.chatRemainingToday ?? 0} 次';
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: _quickCard(
-            icon: Icons.chat_bubble_outline,
-            title: '问 AI 教练',
-            sub: chatText,
-            onTap: () => Navigator.of(context)
-                .push(MaterialPageRoute(builder: (_) => const CoachPage())),
-          ),
+        _quickRowCard(
+          emoji: '💬',
+          title: '问 AI 教练',
+          sub: chatText,
+          iconTint: BrandColors.primaryTint,
+          onTap: () => Navigator.of(context)
+              .push(MaterialPageRoute(builder: (_) => const CoachPage())),
         ),
         if (showSample) ...[
-          SizedBox(width: rpx(20)),
-          Expanded(
-            child: _quickCard(
-              icon: Icons.play_circle_outline,
-              title: '示例报告',
-              sub: '先看看 AI 能发现什么',
-              onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => const ReportPage(analysisId: 'sample'))),
-            ),
+          SizedBox(height: rpx(12)),
+          _quickRowCard(
+            emoji: '🎬',
+            title: '先看一份示例报告',
+            sub: '了解 AI 能给你什么 · 不消耗次数',
+            iconTint: BrandColors.accentMintDim,
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => const ReportPage(analysisId: 'sample'))),
           ),
         ],
       ],
     );
   }
 
-  Widget _quickCard(
-          {required IconData icon,
-          required String title,
-          required String sub,
-          required VoidCallback onTap}) =>
+  Widget _quickRowCard({
+    required String emoji,
+    required String title,
+    required String sub,
+    required Color iconTint,
+    required VoidCallback onTap,
+  }) =>
       GestureDetector(
         onTap: onTap,
         child: Container(
-          padding: EdgeInsets.all(rpx(28)),
+          padding: EdgeInsets.symmetric(horizontal: rpx(24), vertical: rpx(20)),
           decoration: BoxDecoration(
             color: BrandColors.bgCard,
-            borderRadius: BorderRadius.circular(Radii.lg),
+            borderRadius: BorderRadius.circular(Radii.md),
             border: Border.all(color: BrandColors.border),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              Icon(icon, color: BrandColors.primary, size: rpx(44)),
-              SizedBox(height: rpx(16)),
-              Text(title,
+              Container(
+                width: rpx(64),
+                height: rpx(64),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: iconTint,
+                  borderRadius: BorderRadius.circular(rpx(16)),
+                ),
+                child: Text(emoji, style: TextStyle(fontSize: rpx(32))),
+              ),
+              SizedBox(width: rpx(20)),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: TextStyle(
+                            fontSize: rpx(30),
+                            fontWeight: FontWeight.w700,
+                            color: BrandColors.primary)),
+                    SizedBox(height: rpx(4)),
+                    Text(sub,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: rpx(26),
+                            color: BrandColors.textTertiary)),
+                  ],
+                ),
+              ),
+              Text('›',
                   style: TextStyle(
-                      fontSize: rpx(30),
-                      fontWeight: FontWeight.w700,
-                      color: BrandColors.textPrimary)),
-              SizedBox(height: rpx(6)),
-              Text(sub,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      fontSize: rpx(22), color: BrandColors.textSecondary)),
+                      fontSize: rpx(38),
+                      fontWeight: FontWeight.w300,
+                      color: BrandColors.textTertiary)),
             ],
           ),
         ),
@@ -493,12 +741,18 @@ class _HomePageState extends State<HomePage> {
       );
 
   // -------------------- 动作 --------------------
-  void _startAnalysis(User? user) {
-    final q = user?.quota;
+  Future<void> _startAnalysis(User? user) async {
+    if (!context.read<AuthController>().isLoggedIn) {
+      final ok = await requireLogin(context);
+      if (!ok || !mounted) return;
+    }
+    final q = user?.quota ?? context.read<AuthController>().user?.quota;
+    final u = user ?? context.read<AuthController>().user;
     final exhausted = q != null &&
-        !(user?.isMember ?? false) &&
+        !(u?.isMember ?? false) &&
         q.analysisRemaining == 0;
     if (exhausted) {
+      if (!mounted) return;
       showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -521,6 +775,7 @@ class _HomePageState extends State<HomePage> {
       );
       return;
     }
+    if (!mounted) return;
     Navigator.of(context)
         .push(MaterialPageRoute(builder: (_) => const CapturePage()));
   }

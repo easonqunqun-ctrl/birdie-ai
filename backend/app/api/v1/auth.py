@@ -8,11 +8,17 @@ from app.config import settings
 from app.core.database import get_db
 from app.core.exceptions import CoachRoleSwitchError, NotFoundError
 from app.core.security import create_access_token, token_role
+from app.integrations.apple_auth import verify_apple_identity_token
 from app.integrations.wechat import code2session, oauth2_access_token_app
 from app.models.user import User
 from app.schemas.auth import RoleSwitchRequest, RoleSwitchResponse
 from app.schemas.base import APIResponse, ok
-from app.schemas.user import TokenRefreshResponse, WechatLoginRequest, WechatLoginResponse
+from app.schemas.user import (
+    AppleLoginRequest,
+    TokenRefreshResponse,
+    WechatLoginRequest,
+    WechatLoginResponse,
+)
 from app.services import coach_profile_service as coach_prof_svc
 from app.services import user_service
 from app.services.user_presenter import build_user_response
@@ -77,6 +83,45 @@ async def wechat_open_login(
         db,
         oauth,
         invite_code=payload.invite_code,
+    )
+    await db.commit()
+
+    token, expires_in = create_access_token(
+        user_id=user.id,
+        openid=user.wechat_subject_for_jwt(),
+        membership=user.membership_type,
+        role="user",
+    )
+
+    return ok(
+        WechatLoginResponse(
+            token=token,
+            expires_in=expires_in,
+            is_new_user=is_new_user,
+            user=build_user_response(user),
+        )
+    )
+
+
+@router.post(
+    "/apple-login",
+    summary="Sign in with Apple（Flutter App）",
+    response_model=APIResponse[WechatLoginResponse],
+)
+async def apple_login(
+    payload: AppleLoginRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """校验 Apple `identity_token` 后签发与微信登录同形 JWT.
+
+    本地 / 测试：`APPLE_MOCK_LOGIN=true` 时可用 `mock-…` 前缀 token 联调。
+    """
+    identity = await verify_apple_identity_token(payload.identity_token)
+    user, is_new_user = await user_service.login_or_create_user_apple(
+        db,
+        identity,
+        invite_code=payload.invite_code,
+        full_name=payload.full_name,
     )
     await db.commit()
 

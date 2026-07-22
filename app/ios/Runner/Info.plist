@@ -5,11 +5,11 @@
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>用于拍摄你的挥杆视频以进行 AI 分析</string>
+	<string>领翼golf 需要使用相机拍摄挥杆视频，以便 AI 分析动作并生成训练建议</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>录制挥杆视频时需要采集声音</string>
+	<string>录制挥杆视频时可能需要使用麦克风采集环境音（可选）</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>用于从相册选择挥杆视频进行 AI 分析</string>
+	<string>领翼golf 需要访问相册以选择已有的挥杆视频进行分析</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>用于内测阶段连接同一局域网内的开发服务器</string>
 	<key>NSAppTransportSecurity</key>
@@ -20,7 +20,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Birdie App</string>
+	<string>领翼golf</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -28,7 +28,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>birdie_app</string>
+	<string>领翼golf</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -39,6 +39,27 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>weixin</string>
+		<string>weixinULAPI</string>
+		<string>weixinURLParamsAPI</string>
+	</array>
+	<!-- 微信回调 URL Scheme：须填微信开放平台移动应用 AppID（wx…）。
+	     构建时用 WECHAT_OPEN_APPID 覆盖；未配置时真微信登录无法回跳。 -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>weixin</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>$(WECHAT_OPEN_APPID)</string>
+			</array>
+		</dict>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

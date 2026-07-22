@@ -88,3 +88,36 @@ class UserClub {
         isActive: j['is_active'] != false,
       );
 }
+
+class PracticeLogItem {
+  final String? practiceDate;
+  const PracticeLogItem({this.practiceDate});
+
+  factory PracticeLogItem.fromJson(Map<String, dynamic> j) => PracticeLogItem(
+        practiceDate: j['practice_date'] as String?,
+      );
+}
+
+class AnalysisProgressPoint {
+  final String analysisId;
+  final String analyzedAt;
+  final double overallScore;
+  final Map<String, num>? phaseScores;
+
+  const AnalysisProgressPoint({
+    required this.analysisId,
+    required this.analyzedAt,
+    required this.overallScore,
+    this.phaseScores,
+  });
+
+  factory AnalysisProgressPoint.fromJson(Map<String, dynamic> j) =>
+      AnalysisProgressPoint(
+        analysisId: j['analysis_id']?.toString() ?? '',
+        analyzedAt: j['analyzed_at']?.toString() ?? '',
+        overallScore: (j['overall_score'] as num?)?.toDouble() ?? 0,
+        phaseScores: (j['phase_scores'] as Map?)?.map(
+          (k, v) => MapEntry(k.toString(), v as num),
+        ),
+      );
+}

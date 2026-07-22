@@ -26,9 +26,7 @@
   }
 
   /*
-   * 登录页主 LOGO：尺寸 200×200rpx，带白底卡片 + 浅描边 + 浮起阴影，
-   * 视觉语言与首页顶栏 brand-mark 同源，强化"主角感 / 饱满感"。
-   * 圆角 24rpx 比内容卡（20）大一档，符合"主视觉 LOGO 比常规卡片更圆润"的层级。
+   * 登录页主 LOGO：深色版（黑底 Birdie AI），圆角裁切。
    */
   &__logo {
     display: block;
@@ -37,9 +35,7 @@
     margin: 0 auto 16rpx;
     border-radius: 24rpx;
     overflow: hidden;
-    background: var(--color-bg-card);
-    border: 1rpx solid rgba(26, 35, 126, 0.08);
-    box-shadow: 0 12rpx 28rpx rgba(26, 35, 126, 0.18);
+    background: transparent;
   }
 
   &__title {

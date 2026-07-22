@@ -57,4 +57,11 @@ class BrandColors {
     end: Alignment.bottomRight,
     colors: [Color(0xFF1A237E), Color(0xFF0A3A6E)],
   );
+  /// 登录 / 合规页氛围：对照 login/consent SCSS `primary-tint → bg-card`。
+  static const gradientAuthAtmosphere = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [primaryTint, bgCard],
+    stops: [0.0, 0.55],
+  );
 }

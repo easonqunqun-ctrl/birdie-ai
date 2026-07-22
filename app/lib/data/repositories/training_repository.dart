@@ -30,4 +30,22 @@ class TrainingRepository {
   Future<void> addFromAnalysis(String analysisId) async {
     await _api.post<dynamic>('/training-plan/from-analysis/$analysisId');
   }
+
+  /// 月度打卡日志：month=YYYY-MM
+  Future<List<PracticeLogItem>> getPracticeLogs(String month) async {
+    final data =
+        await _api.get<dynamic>('/users/me/practice-logs?month=$month');
+    if (data is List) {
+      return data
+          .map((e) => PracticeLogItem.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    if (data is Map<String, dynamic>) {
+      return (data['items'] as List?)
+              ?.map((e) => PracticeLogItem.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const [];
+    }
+    return const [];
+  }
 }
