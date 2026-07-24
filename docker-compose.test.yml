@@ -83,6 +83,7 @@ services:
       - ./infra/test/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./infra/test/certs:/etc/nginx/certs:ro
       - ./infra/test/acme-webroot:/var/www/html:rw
+      - ./infra/test/static:/etc/nginx/static:ro
     depends_on:
       backend:
         condition: service_healthy

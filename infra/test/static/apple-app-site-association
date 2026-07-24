@@ -1,0 +1,11 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "N3BHR75YYN.cn.birdieai.birdieApp",
+        "paths": ["/app/*", "/app/"]
+      }
+    ]
+  }
+}

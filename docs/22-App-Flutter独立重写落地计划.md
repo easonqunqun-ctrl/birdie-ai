@@ -156,6 +156,15 @@ app/lib/
 - 后端 `backend/`、`ai_engine/` **不受影响**；小程序继续发版。
 - 双份 UI 长期维护成本（已知并接受，向野而生同款代价）。
 
+### 7.1 登录 / 支付 / UL 收口状态（App）
+
+| 项 | 状态 | 说明 |
+|---|---|---|
+| Universal Links / AASA | 仓库已配 | `infra/test/static/apple-app-site-association` + nginx；详见 `infra/deploy/README.md`「App Universal Links」。微信开放平台需登记 `https://api.birdieai.cn/app/`；付费 Team 才可启用 Associated Domains entitlement。 |
+| Sign in with Apple | 代码就绪 | 个人免费 Team 无法签发；付费 Team 后复制 `app/ios/Runner/Runner.entitlements.paid.example` → `Runner.entitlements`。 |
+| App 正式支付 | 引导小程序 | 会员页 mock 可联调；真实通道引导微信小程序开通（IAP 另排期）。 |
+| `pro-compare` | App 已对齐 | 报告页「职业对比」→ `ProComparePage`；依赖后端 `PHASE2_PROS_ENABLED`。 |
+
 ---
 
 ## 8. 开工第一步（M0，待前置项确认后执行）

@@ -57,6 +57,81 @@ class ProPlayer {
       );
 }
 
+/// M12-04 · 职业镜头（pro-matches 内嵌）
+class ProSwingClip {
+  final String id;
+  final String proPlayerId;
+  final String clubType;
+  final String cameraAngle;
+  final String videoUrl;
+  final String? thumbnailUrl;
+  final num? overallScore;
+  final Map<String, dynamic> featuresSnapshot;
+  final String sourceCredit;
+
+  const ProSwingClip({
+    required this.id,
+    required this.proPlayerId,
+    required this.clubType,
+    required this.cameraAngle,
+    required this.videoUrl,
+    this.thumbnailUrl,
+    this.overallScore,
+    this.featuresSnapshot = const {},
+    this.sourceCredit = '',
+  });
+
+  factory ProSwingClip.fromJson(Map<String, dynamic> j) => ProSwingClip(
+        id: j['id']?.toString() ?? '',
+        proPlayerId: j['pro_player_id']?.toString() ?? '',
+        clubType: j['club_type']?.toString() ?? '',
+        cameraAngle: j['camera_angle']?.toString() ?? '',
+        videoUrl: j['video_url']?.toString() ?? '',
+        thumbnailUrl: j['thumbnail_url'] as String?,
+        overallScore: j['overall_score'] as num?,
+        featuresSnapshot: (j['features_snapshot'] as Map?)
+                ?.map((k, v) => MapEntry(k.toString(), v)) ??
+            const {},
+        sourceCredit: j['source_credit']?.toString() ?? '',
+      );
+}
+
+class ProMatchItem {
+  final num matchScore;
+  final ProSwingClip clip;
+  final ProPlayer player;
+
+  const ProMatchItem({
+    required this.matchScore,
+    required this.clip,
+    required this.player,
+  });
+
+  factory ProMatchItem.fromJson(Map<String, dynamic> j) => ProMatchItem(
+        matchScore: (j['match_score'] as num?) ?? 0,
+        clip: ProSwingClip.fromJson(
+            (j['clip'] as Map?)?.cast<String, dynamic>() ?? const {}),
+        player: ProPlayer.fromJson(
+            (j['player'] as Map?)?.cast<String, dynamic>() ?? const {}),
+      );
+}
+
+class ProMatchResult {
+  final String analysisId;
+  final List<ProMatchItem> matches;
+
+  const ProMatchResult({required this.analysisId, this.matches = const []});
+
+  factory ProMatchResult.fromJson(Map<String, dynamic> j) => ProMatchResult(
+        analysisId: j['analysis_id']?.toString() ?? '',
+        matches: (j['matches'] as List?)
+                ?.whereType<Map>()
+                .map((e) => ProMatchItem.fromJson(e.cast<String, dynamic>()))
+                .toList() ??
+            const [],
+      );
+}
+
 class MeetupEvent {
   final String id;
   final String title;

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  付费 Apple Developer Team 开通能力后，复制为 Runner.entitlements：
+  1) App ID cn.birdieai.birdieApp → Associated Domains + Sign in with Apple
+  2) 微信开放平台移动应用 Universal Links = https://api.birdieai.cn/app/
+  3) 重新签发描述文件后再打真机包
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:api.birdieai.cn</string>
+	</array>
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
+</dict>
+</plist>

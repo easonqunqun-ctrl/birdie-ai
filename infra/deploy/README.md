@@ -17,6 +17,27 @@ Makefile 上还常用：**`make cvm-stable-from-mac ENV_FILE=~/secrets/…`**（
 
 小程序代码里的 **`TARO_APP_API_BASE_URL`** 仍是接口根路径：`https://api.birdieai.cn/v1`。
 
+## App Universal Links（微信 OpenSDK / Apple Associated Domains）
+
+真机微信登录依赖：
+
+1. **AASA**（本仓库 `infra/test/static/apple-app-site-association`）经 nginx 暴露为：
+   - `https://api.birdieai.cn/.well-known/apple-app-site-association`
+   - `https://api.birdieai.cn/apple-app-site-association`
+2. **落地路径** `https://api.birdieai.cn/app/`（与 Flutter `Env.wechatUniversalLink` 一致）
+3. **Apple Developer**：App ID `cn.birdieai.birdieApp` 勾选 Associated Domains；付费 Team 下把 `Runner.entitlements.paid.example` 复制为 `Runner.entitlements`
+4. **微信开放平台 → 移动应用**：Universal Links 填 `https://api.birdieai.cn/app/`；iOS URL Scheme = Open AppID
+
+发版后自检：
+
+```bash
+curl -sSI https://api.birdieai.cn/.well-known/apple-app-site-association | head -20
+curl -sfS https://api.birdieai.cn/.well-known/apple-app-site-association
+curl -sfS -o /dev/null -w '%{http_code}\n' https://api.birdieai.cn/app/
+```
+
+`Content-Type` 须为 `application/json`，且 **不要** 被 301/302 跳转。
+
 ## 为什么要换 Let's Encrypt
 
 自签证书（`issuer` = 你自己）在 **微信真机 / 体验版** 上会触发 `request:fail errcode:-207`（Cronet 校验证书失败）。  

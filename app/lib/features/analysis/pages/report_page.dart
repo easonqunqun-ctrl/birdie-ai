@@ -19,6 +19,7 @@ import '../../help/pages/score_guide_page.dart';
 import '../analysis_controller.dart';
 import 'capture_page.dart';
 import 'poster_page.dart';
+import 'pro_compare_page.dart';
 
 /// 报告页：对照 client/src/pages/analysis/report。
 /// 视频回放（阶段色条 + 倍速）+ 分级评分卡 + 六维雷达 + 问题诊断 + 训练建议 + 底部动作。
@@ -89,14 +90,22 @@ class _ReportPageState extends State<ReportPage> {
     final src = _resolveSrc(r);
     if (src.isEmpty) return;
     final old = _video;
+    old?.removeListener(_onVideoTick);
     _video = null;
     _videoReady = false;
+    if (mounted) setState(() {});
     await old?.dispose();
-    final ctl = VideoPlayerController.networkUrl(Uri.parse(src));
+    final ctl = VideoPlayerController.networkUrl(
+      Uri.parse(src),
+      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+    );
     try {
       await ctl.initialize();
+      await ctl.setLooping(true);
       await ctl.setPlaybackSpeed(_rate);
+      ctl.addListener(_onVideoTick);
       if (!mounted) {
+        ctl.removeListener(_onVideoTick);
         await ctl.dispose();
         return;
       }
@@ -114,6 +123,20 @@ class _ReportPageState extends State<ReportPage> {
     }
   }
 
+  bool _wasPlaying = false;
+  bool _wasBuffering = false;
+
+  void _onVideoTick() {
+    final v = _video;
+    if (!mounted || v == null) return;
+    final playing = v.value.isPlaying;
+    final buffering = v.value.isBuffering;
+    if (playing == _wasPlaying && buffering == _wasBuffering) return;
+    _wasPlaying = playing;
+    _wasBuffering = buffering;
+    setState(() {});
+  }
+
   Future<void> _switchSource(String s) async {
     if (s == _playbackSource) return;
     _playbackSource = s;
@@ -125,7 +148,6 @@ class _ReportPageState extends State<ReportPage> {
     if (v == null || !_videoReady) return;
     v.seekTo(Duration(milliseconds: (seconds * 1000).round()));
     v.play();
-    setState(() {});
   }
 
   Future<void> _setRate(double r) async {
@@ -133,8 +155,19 @@ class _ReportPageState extends State<ReportPage> {
     await _video?.setPlaybackSpeed(r);
   }
 
+  void _togglePlay() {
+    final v = _video;
+    if (v == null || !_videoReady) return;
+    if (v.value.isPlaying) {
+      v.pause();
+    } else {
+      v.play();
+    }
+  }
+
   @override
   void dispose() {
+    _video?.removeListener(_onVideoTick);
     _video?.dispose();
     super.dispose();
   }
@@ -188,16 +221,15 @@ class _ReportPageState extends State<ReportPage> {
       );
 
   // -------------------- 主体 --------------------
+  // 视频固定在滚动区外（对齐小程序 report：避免嵌在 ListView 里纹理跟着滚导致卡顿）
   Widget _reportView(AnalysisReport r) {
-    return ListView(
-      padding: EdgeInsets.zero,
+    return Column(
       children: [
         if (_isSample) _sampleBanner(),
         _videoBlock(r),
-        Padding(
-          padding: EdgeInsets.all(rpx(32)),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        Expanded(
+          child: ListView(
+            padding: EdgeInsets.all(rpx(32)),
             children: [
               _scoreCard(r),
               SizedBox(height: rpx(12)),
@@ -263,30 +295,49 @@ class _ReportPageState extends State<ReportPage> {
   // -------------------- 视频区 --------------------
   Widget _videoBlock(AnalysisReport r) {
     final v = _video;
-    return Container(
+    final ready = v != null && _videoReady;
+    final buffering = ready && v.value.isBuffering;
+    final playing = ready && v.value.isPlaying;
+    return ColoredBox(
       color: Colors.black,
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           AspectRatio(
-            aspectRatio: (v != null && _videoReady && v.value.aspectRatio > 0)
+            aspectRatio: (ready && v.value.aspectRatio > 0)
                 ? v.value.aspectRatio
                 : 16 / 9,
-            child: (v != null && _videoReady)
+            child: ready
                 ? GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        v.value.isPlaying ? v.pause() : v.play();
-                      });
-                    },
+                    onTap: _togglePlay,
                     child: Stack(
+                      fit: StackFit.expand,
                       alignment: Alignment.center,
                       children: [
-                        VideoPlayer(v),
-                        if (!v.value.isPlaying)
+                        // RepaintBoundary：与下方滚动报告隔离，减少滚动时纹理重绘卡顿
+                        RepaintBoundary(
+                          child: FittedBox(
+                            fit: BoxFit.contain,
+                            child: SizedBox(
+                              width: v.value.size.width,
+                              height: v.value.size.height,
+                              child: VideoPlayer(v),
+                            ),
+                          ),
+                        ),
+                        if (buffering)
+                          const Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white70),
+                            ),
+                          )
+                        else if (!playing)
                           Container(
                             width: rpx(96),
                             height: rpx(96),
-                            decoration: BoxDecoration(
+                            decoration: const BoxDecoration(
                               color: Colors.black45,
                               shape: BoxShape.circle,
                             ),
@@ -313,7 +364,8 @@ class _ReportPageState extends State<ReportPage> {
                 : (r.thumbnailUrl?.isNotEmpty ?? false)
                     ? Image.network(r.thumbnailUrl!, fit: BoxFit.contain)
                     : const Center(
-                        child: Icon(Icons.videocam_off, color: Colors.white38)),
+                        child:
+                            Icon(Icons.videocam_off, color: Colors.white38)),
           ),
           if (r.phaseTimestamps.isNotEmpty) _phaseBar(r),
           _controlsRow(r),
@@ -1040,12 +1092,27 @@ class _ReportPageState extends State<ReportPage> {
                   child: OutlinedButton.icon(
                     onPressed: () => Navigator.of(context).push(
                         MaterialPageRoute(
+                            builder: (_) =>
+                                ProComparePage(analysisId: widget.analysisId))),
+                    icon: const Icon(Icons.compare_arrows, size: 18),
+                    label: const Text('职业对比'),
+                  ),
+                ),
+                SizedBox(width: rpx(16)),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
                             builder: (_) => PosterPage(report: r))),
                     icon: const Icon(Icons.image_outlined, size: 18),
                     label: const Text('成绩海报'),
                   ),
                 ),
-                SizedBox(width: rpx(16)),
+              ],
+            ),
+            SizedBox(height: rpx(16)),
+            Row(
+              children: [
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () async {

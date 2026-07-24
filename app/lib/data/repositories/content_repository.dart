@@ -25,6 +25,18 @@ class ContentRepository {
         .toList();
   }
 
+  /// M12-04 · 为分析报告匹配职业镜头。灰度关闭时后端 404。
+  Future<ProMatchResult> matchForAnalysis(
+    String analysisId, {
+    int limit = 5,
+    bool record = false,
+  }) async {
+    final path =
+        '/analyses/$analysisId/pro-matches?limit=$limit&record=${record ? 'true' : 'false'}';
+    final data = await _api.get<Map<String, dynamic>>(path);
+    return ProMatchResult.fromJson(data);
+  }
+
   Future<List<MeetupEvent>> listMeetups() async {
     final data = await _api.get<Map<String, dynamic>>('/meetups/events');
     return (data['items'] as List?)

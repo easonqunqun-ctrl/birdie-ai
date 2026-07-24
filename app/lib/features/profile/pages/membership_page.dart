@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/api_client.dart';
 import '../../../data/repositories/payment_repository.dart';
@@ -74,8 +76,7 @@ class _MembershipPageState extends State<MembershipPage> {
             .showSnackBar(const SnackBar(content: Text('开通成功（模拟支付）')));
       } else {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('真实支付通道即将在 App 内开通，请暂用小程序完成支付')));
+        await _guideWeappPay();
       }
     } catch (e) {
       if (!mounted) return;
@@ -83,6 +84,46 @@ class _MembershipPageState extends State<MembershipPage> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } finally {
       if (mounted) setState(() => _buying = false);
+    }
+  }
+
+  /// App 内 IAP / 微信 App 支付未上线：引导去微信小程序开通（与 docs/18 边界一致）。
+  Future<void> _guideWeappPay() async {
+    const tip =
+        '正式支付请在微信小程序「领翼golf」会员中心完成。App 内目前仅支持联调模拟支付。';
+    final open = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('去小程序开通'),
+        content: const Text(tip),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('复制说明'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('尝试打开微信'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    if (open == false) {
+      await Clipboard.setData(const ClipboardData(text: tip));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('已复制开通说明')));
+      return;
+    }
+    if (open == true) {
+      final uri = Uri.parse('weixin://');
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('未检测到微信，请手动打开小程序开通')));
+      }
     }
   }
 
@@ -153,6 +194,13 @@ class _MembershipPageState extends State<MembershipPage> {
                     padding: EdgeInsets.symmetric(vertical: rpx(24))),
                 child: Text(_buying ? '开通中…' : '立即开通'),
               ),
+            ),
+            SizedBox(height: rpx(16)),
+            TextButton(
+              onPressed: _guideWeappPay,
+              child: Text('正式支付请用小程序开通',
+                  style: TextStyle(
+                      fontSize: rpx(24), color: BrandColors.textTertiary)),
             ),
           ],
         ],
