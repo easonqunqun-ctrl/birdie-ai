@@ -25,7 +25,7 @@ Makefile 上还常用：**`make cvm-stable-from-mac ENV_FILE=~/secrets/…`**（
    - `https://api.birdieai.cn/.well-known/apple-app-site-association`
    - `https://api.birdieai.cn/apple-app-site-association`
 2. **落地路径** `https://api.birdieai.cn/app/`（与 Flutter `Env.wechatUniversalLink` 一致）
-3. **Apple Developer**：App ID `cn.birdieai.birdieApp` 勾选 Associated Domains；付费 Team 下把 `Runner.entitlements.paid.example` 复制为 `Runner.entitlements`
+3. **Apple Developer（组织 Team `H5ZY5QNKRW`，与向野而生同公司）**：为 App ID `cn.birdieai.birdieApp` 勾选 Associated Domains + Sign in with Apple；工程 `DEVELOPMENT_TEAM` 与 AASA `appID` 已对齐该 Team
 4. **微信开放平台 → 移动应用**：Universal Links 填 `https://api.birdieai.cn/app/`；iOS URL Scheme = Open AppID
 
 发版后自检：

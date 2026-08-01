@@ -7,10 +7,9 @@ import 'env.dart';
 
 /// Sign in with Apple 封装。
 ///
-/// 真机正式登录需：付费 Apple Developer Team + App ID 勾选 Sign in with Apple，
-/// 并将 `Runner.entitlements.paid.example` 复制为 `Runner.entitlements`。
-/// 个人免费 Team 无法签发该 entitlement；此时 SDK 会失败，联调可用
-/// `--dart-define=MOCK_LOGIN=true --dart-define=APPLE_MOCK_TOKEN=…`。
+/// 组织账号 Team `H5ZY5QNKRW`（与向野而生同公司）+ App ID `cn.birdieai.birdieApp`
+/// 勾选 Sign in with Apple；`Runner.entitlements` 已含对应能力。
+/// 联调仍可用 `--dart-define=MOCK_LOGIN=true --dart-define=APPLE_MOCK_TOKEN=…`。
 class AppleAuth {
   AppleAuth._();
 

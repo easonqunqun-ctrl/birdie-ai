@@ -1,8 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  与向野而生同一组织账号：Beijing Siwujie Holdings · Team H5ZY5QNKRW
+  Developer 后台须为 cn.birdieai.birdieApp 勾选 Sign in with Apple + Associated Domains
+-->
 <plist version="1.0">
 <dict>
-	<!-- 个人免费 Team 勿加 Associated Domains / Sign in with Apple。
-	     付费 Team 开通后：复制 Runner.entitlements.paid.example 为本文件。 -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:api.birdieai.cn</string>
+	</array>
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
 </dict>
 </plist>

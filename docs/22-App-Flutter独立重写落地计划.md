@@ -160,8 +160,8 @@ app/lib/
 
 | 项 | 状态 | 说明 |
 |---|---|---|
-| Universal Links / AASA | 仓库已配 | `infra/test/static/apple-app-site-association` + nginx；详见 `infra/deploy/README.md`「App Universal Links」。微信开放平台需登记 `https://api.birdieai.cn/app/`；付费 Team 才可启用 Associated Domains entitlement。 |
-| Sign in with Apple | 代码就绪 | 个人免费 Team 无法签发；付费 Team 后复制 `app/ios/Runner/Runner.entitlements.paid.example` → `Runner.entitlements`。 |
+| Universal Links / AASA | 已对齐组织 Team | AASA `appID` = `H5ZY5QNKRW.cn.birdieai.birdieApp`；详见 `infra/deploy/README.md`。微信开放平台仍须登记 `https://api.birdieai.cn/app/`。 |
+| Sign in with Apple | 工程已开 | 与向野而生同组织 Team `H5ZY5QNKRW`；`Runner.entitlements` 已含能力。Developer 后台须为 `cn.birdieai.birdieApp` 勾选 Sign in with Apple。 |
 | App 正式支付 | 引导小程序 | 会员页 mock 可联调；真实通道引导微信小程序开通（IAP 另排期）。 |
 | `pro-compare` | App 已对齐 | 报告页「职业对比」→ `ProComparePage`；依赖后端 `PHASE2_PROS_ENABLED`。 |
 
