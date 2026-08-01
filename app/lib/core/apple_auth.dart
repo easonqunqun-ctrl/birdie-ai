@@ -20,8 +20,12 @@ class AppleAuth {
 
   /// 返回 identityToken + 可选全名。
   static Future<({String identityToken, String? fullName})> requestCredential() async {
-    if (Env.mockLogin && Env.appleMockToken.isNotEmpty) {
-      return (identityToken: Env.appleMockToken, fullName: 'Apple球友');
+    // mockLogin 时默认走 mock- token（服务端 APPLE_MOCK_LOGIN）；真机正式包勿开 mockLogin。
+    if (Env.mockLogin) {
+      final token = Env.appleMockToken.isNotEmpty
+          ? Env.appleMockToken
+          : 'mock-app-apple';
+      return (identityToken: token, fullName: 'Apple球友');
     }
     try {
       final cred = await SignInWithApple.getAppleIDCredential(

@@ -39,7 +39,10 @@ class _TrainingPageState extends State<TrainingPage> {
   @override
   void initState() {
     super.initState();
-    _reload();
+    // 避免在 initState 同步读 Provider；且配合 Tab 懒加载，仅进入训练页才请求
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _reload();
+    });
   }
 
   Future<void> _reload() async {

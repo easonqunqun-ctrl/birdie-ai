@@ -8,6 +8,8 @@ import '../features/training/pages/training_page.dart';
 import '../features/profile/pages/profile_page.dart';
 
 /// 底部自定义 TabBar：对齐小程序 custom-tab-bar（56rpx 图标 / 28rpx 文案）。
+///
+/// 懒加载各 Tab：登录进首页时不再同时拉起教练/训练的网络请求（IndexedStack 会四页一起 init）。
 class TabShell extends StatefulWidget {
   const TabShell({super.key});
 
@@ -17,13 +19,7 @@ class TabShell extends StatefulWidget {
 
 class _TabShellState extends State<TabShell> {
   int _index = 0;
-
-  static const _pages = [
-    HomePage(),
-    CoachPage(),
-    TrainingPage(),
-    ProfilePage(),
-  ];
+  final Map<int, Widget> _pages = {};
 
   static const _labels = ['首页', 'AI 教练', '训练', '我的'];
   static const _icons = [
@@ -34,11 +30,46 @@ class _TabShellState extends State<TabShell> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _ensurePage(0);
+  }
+
+  void _ensurePage(int i) {
+    _pages.putIfAbsent(i, () {
+      switch (i) {
+        case 1:
+          return const CoachPage();
+        case 2:
+          return const TrainingPage();
+        case 3:
+          return const ProfilePage();
+        case 0:
+        default:
+          return const HomePage();
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).padding.bottom;
+    // 已访问过的 Tab 用 Stack+Offstage 保活；未访问的不创建，避免冷启动四路 API。
+    final visited = _pages.keys.toList()..sort();
     return Scaffold(
       backgroundColor: BrandColors.bgPage,
-      body: IndexedStack(index: _index, children: _pages),
+      body: Stack(
+        children: [
+          for (final i in visited)
+            Offstage(
+              offstage: i != _index,
+              child: TickerMode(
+                enabled: i == _index,
+                child: _pages[i]!,
+              ),
+            ),
+        ],
+      ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: BrandColors.bgCard,
@@ -70,7 +101,13 @@ class _TabShellState extends State<TabShell> {
     final icons = _icons[i];
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => setState(() => _index = i),
+      onTap: () {
+        if (_index == i) return;
+        setState(() {
+          _ensurePage(i);
+          _index = i;
+        });
+      },
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -79,16 +116,14 @@ class _TabShellState extends State<TabShell> {
             active ? icons.$2 : icons.$1,
             width: rpx(56),
             height: rpx(56),
-            fit: BoxFit.contain,
           ),
-          SizedBox(height: rpx(6)),
+          SizedBox(height: rpx(4)),
           Text(
             _labels[i],
             style: TextStyle(
-              fontSize: rpx(28),
-              height: 1.2,
-              fontWeight: active ? FontWeight.w600 : FontWeight.w500,
-              color: active ? BrandColors.primary : BrandColors.textMuted,
+              fontSize: rpx(22),
+              fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+              color: active ? BrandColors.primary : BrandColors.textTertiary,
             ),
           ),
         ],

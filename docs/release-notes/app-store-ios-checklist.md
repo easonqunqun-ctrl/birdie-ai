@@ -14,6 +14,7 @@
 | `DEVELOPMENT_TEAM` | `H5ZY5QNKRW` |
 | Sign in with Apple + Associated Domains | `app/ios/Runner/Runner.entitlements` |
 | AASA | `H5ZY5QNKRW.cn.birdieai.birdieApp` → `https://api.birdieai.cn/.well-known/apple-app-site-association` |
+| 服务端 `APPLE_BUNDLE_ID` | 须为 `cn.birdieai.birdieApp`（勿用旧 `com.xiaoniaoai.app`） |
 
 ---
 
@@ -26,14 +27,15 @@
 ### 2. 创建 App ID（若尚未有）
 
 1. [Identifiers](https://developer.apple.com/account/resources/identifiers/list) → **+** → App IDs → App  
-2. Description：`领翼golf` / `Birdie Golf`  
+2. Description：`Birdie AI`（勿用中文）  
 3. Bundle ID（Explicit）：`cn.birdieai.birdieApp`  
 4. Capabilities 勾选：
    - **Sign In with Apple**
    - **Associated Domains**
 5. Register  
 
-> 向野而生是 `cn.wildism.xiangyeApp`，本 App 是另一条 Identifier，互不覆盖。
+> 向野而生是 `cn.wildism.xiangyeApp`，本 App 是另一条 Identifier，互不覆盖。  
+> **2026-08-01**：已在组织 Team `H5ZY5QNKRW` 下创建（Description=`Birdie AI`）。
 
 ### 3. Xcode 签名
 

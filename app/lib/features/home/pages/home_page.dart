@@ -50,18 +50,17 @@ class _HomePageState extends State<HomePage> {
       return;
     }
     final repo = context.read<AnalysisRepository>();
-    await auth.refresh();
-    try {
-      final list = await repo.listAnalyses(page: 1, pageSize: 3);
-      if (!mounted) return;
-      setState(() {
-        _recent = list;
-        _loadingRecent = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _loadingRecent = false);
-    }
+    // 并行拉用户态 + 最近报告，避免串行等满 2×RTT 像卡住
+    final results = await Future.wait<Object?>([
+      auth.refresh().then((_) => null).catchError((_) => null),
+      repo.listAnalyses(page: 1, pageSize: 3).then<Object?>((v) => v).catchError((_) => null),
+    ]);
+    if (!mounted) return;
+    final list = results[1];
+    setState(() {
+      if (list is List<AnalysisListItem>) _recent = list;
+      _loadingRecent = false;
+    });
   }
 
   void _goLogin() {

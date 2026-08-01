@@ -57,10 +57,14 @@ class _LoginPageState extends State<LoginPage> {
       await context
           .read<AuthController>()
           .loginWithWechat(inviteCode: invite.isEmpty ? null : invite);
-      // 成功：AppGate 会自动切到 onboarding / 首页
+      // LoginPage 多为 push 叠在访客首页上；成功后必须 pop，否则会卡在「登录中」
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
     } catch (e) {
       final msg = describeRequestFailure(e).toastTitle;
       _toast(msg);
+    } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
@@ -77,9 +81,13 @@ class _LoginPageState extends State<LoginPage> {
       await context
           .read<AuthController>()
           .loginWithApple(inviteCode: invite.isEmpty ? null : invite);
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
     } catch (e) {
       final msg = describeRequestFailure(e).toastTitle;
       _toast(msg);
+    } finally {
       if (mounted) setState(() => _loading = false);
     }
   }

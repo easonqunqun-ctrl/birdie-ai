@@ -38,17 +38,26 @@ class _ReportPageState extends State<ReportPage> {
 
   VideoPlayerController? _video;
   bool _videoReady = false;
+  bool _videoLoading = false;
   double _rate = 1.0;
   String _playbackSource = 'skeleton'; // skeleton | original
   bool _showHidden = false;
   bool _syncing = false;
+
+  /// 防止切换源 / 回退原片时旧 initialize 回调抢写状态
+  int _videoGen = 0;
+
+  bool _wasPlaying = false;
+  bool _wasBuffering = false;
 
   bool get _isSample => widget.analysisId == 'sample';
 
   @override
   void initState() {
     super.initState();
-    _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _load();
+    });
   }
 
   Future<void> _load() async {
@@ -64,7 +73,7 @@ class _ReportPageState extends State<ReportPage> {
         _report = r;
         _loading = false;
       });
-      _initVideo(r);
+      await _initVideo(r);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -86,51 +95,74 @@ class _ReportPageState extends State<ReportPage> {
     return r.videoUrl;
   }
 
-  Future<void> _initVideo(AnalysisReport r) async {
+  Future<void> _disposeVideo(VideoPlayerController? ctl) async {
+    if (ctl == null) return;
+    ctl.removeListener(_onVideoTick);
+    try {
+      await ctl.pause();
+    } catch (_) {}
+    await ctl.dispose();
+  }
+
+  Future<void> _initVideo(AnalysisReport r, {bool allowFallback = true}) async {
     final src = _resolveSrc(r);
     if (src.isEmpty) return;
+    final gen = ++_videoGen;
     final old = _video;
-    old?.removeListener(_onVideoTick);
     _video = null;
     _videoReady = false;
+    _videoLoading = true;
+    _wasPlaying = false;
+    _wasBuffering = false;
     if (mounted) setState(() {});
-    await old?.dispose();
+    await _disposeVideo(old);
+    if (!mounted || gen != _videoGen) return;
+
     final ctl = VideoPlayerController.networkUrl(
       Uri.parse(src),
       videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
     );
     try {
       await ctl.initialize();
+      if (!mounted || gen != _videoGen) {
+        await _disposeVideo(ctl);
+        return;
+      }
       await ctl.setLooping(true);
       await ctl.setPlaybackSpeed(_rate);
       ctl.addListener(_onVideoTick);
-      if (!mounted) {
-        ctl.removeListener(_onVideoTick);
-        await ctl.dispose();
+      if (!mounted || gen != _videoGen) {
+        await _disposeVideo(ctl);
         return;
       }
       setState(() {
         _video = ctl;
         _videoReady = true;
+        _videoLoading = false;
       });
     } catch (_) {
-      // 骨骼片放不了则回退原片
-      if (_playbackSource == 'skeleton' && r.videoUrl.isNotEmpty) {
+      await _disposeVideo(ctl);
+      if (!mounted || gen != _videoGen) return;
+      // 骨骼片放不了则回退原片（只允许一次，避免死循环）
+      if (allowFallback &&
+          _playbackSource == 'skeleton' &&
+          r.videoUrl.isNotEmpty) {
         _playbackSource = 'original';
-        await ctl.dispose();
-        await _initVideo(r);
+        await _initVideo(r, allowFallback: false);
+        return;
+      }
+      if (mounted && gen == _videoGen) {
+        setState(() => _videoLoading = false);
       }
     }
   }
-
-  bool _wasPlaying = false;
-  bool _wasBuffering = false;
 
   void _onVideoTick() {
     final v = _video;
     if (!mounted || v == null) return;
     final playing = v.value.isPlaying;
     final buffering = v.value.isBuffering;
+    // 仅 play/buffer 变化时重建；进度条由 VideoProgressIndicator 自己听 controller
     if (playing == _wasPlaying && buffering == _wasBuffering) return;
     _wasPlaying = playing;
     _wasBuffering = buffering;
@@ -138,9 +170,9 @@ class _ReportPageState extends State<ReportPage> {
   }
 
   Future<void> _switchSource(String s) async {
-    if (s == _playbackSource) return;
-    _playbackSource = s;
-    if (_report != null) await _initVideo(_report!);
+    if (s == _playbackSource || _report == null) return;
+    setState(() => _playbackSource = s);
+    await _initVideo(_report!);
   }
 
   void _seekTo(num seconds) {
@@ -152,7 +184,9 @@ class _ReportPageState extends State<ReportPage> {
 
   Future<void> _setRate(double r) async {
     setState(() => _rate = r);
-    await _video?.setPlaybackSpeed(r);
+    try {
+      await _video?.setPlaybackSpeed(r);
+    } catch (_) {}
   }
 
   void _togglePlay() {
@@ -167,8 +201,12 @@ class _ReportPageState extends State<ReportPage> {
 
   @override
   void dispose() {
-    _video?.removeListener(_onVideoTick);
-    _video?.dispose();
+    final ctl = _video;
+    _video = null;
+    _videoGen++;
+    ctl?.removeListener(_onVideoTick);
+    // 异步释放，避免 dispose 同步卡主线程；gen 已递增防回调写回
+    ctl?.dispose();
     super.dispose();
   }
 
@@ -295,77 +333,102 @@ class _ReportPageState extends State<ReportPage> {
   // -------------------- 视频区 --------------------
   Widget _videoBlock(AnalysisReport r) {
     final v = _video;
-    final ready = v != null && _videoReady;
+    final ready = v != null && _videoReady && v.value.isInitialized;
     final buffering = ready && v.value.isBuffering;
     final playing = ready && v.value.isPlaying;
+    final thumb = r.thumbnailUrl;
+    final videoAr = ready && v.value.aspectRatio > 0.1
+        ? v.value.aspectRatio
+        : 16 / 9;
     return ColoredBox(
       color: Colors.black,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // 固定外框 16:9；就绪后只画一层 VideoPlayer（封面必须卸掉，否则半透明帧会「重影」）
           AspectRatio(
-            aspectRatio: (ready && v.value.aspectRatio > 0)
-                ? v.value.aspectRatio
-                : 16 / 9,
-            child: ready
-                ? GestureDetector(
-                    onTap: _togglePlay,
-                    child: Stack(
+            aspectRatio: 16 / 9,
+            child: ColoredBox(
+              color: Colors.black,
+              child: ready
+                  ? GestureDetector(
+                      onTap: _togglePlay,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        alignment: Alignment.center,
+                        children: [
+                          RepaintBoundary(
+                            child: Center(
+                              child: AspectRatio(
+                                aspectRatio: videoAr,
+                                child: VideoPlayer(v),
+                              ),
+                            ),
+                          ),
+                          if (buffering)
+                            const Center(
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white70),
+                              ),
+                            )
+                          else if (!playing)
+                            Container(
+                              width: rpx(96),
+                              height: rpx(96),
+                              decoration: const BoxDecoration(
+                                color: Colors.black45,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.play_arrow,
+                                  color: Colors.white, size: 44),
+                            ),
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            child: VideoProgressIndicator(
+                              v,
+                              allowScrubbing: true,
+                              padding: EdgeInsets.zero,
+                              colors: const VideoProgressColors(
+                                playedColor: BrandColors.gold,
+                                bufferedColor: Colors.white24,
+                                backgroundColor: Colors.white10,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : Stack(
                       fit: StackFit.expand,
                       alignment: Alignment.center,
                       children: [
-                        // RepaintBoundary：与下方滚动报告隔离，减少滚动时纹理重绘卡顿
-                        RepaintBoundary(
-                          child: FittedBox(
+                        if (thumb != null && thumb.isNotEmpty)
+                          CachedNetworkImage(
+                            imageUrl: thumb,
                             fit: BoxFit.contain,
-                            child: SizedBox(
-                              width: v.value.size.width,
-                              height: v.value.size.height,
-                              child: VideoPlayer(v),
-                            ),
+                            fadeInDuration: Duration.zero,
+                            errorWidget: (_, _, _) => const SizedBox.shrink(),
                           ),
-                        ),
-                        if (buffering)
+                        if (_videoLoading)
                           const Center(
                             child: CircularProgressIndicator(
                               strokeWidth: 2.5,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.white70),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white70),
                             ),
                           )
-                        else if (!playing)
-                          Container(
-                            width: rpx(96),
-                            height: rpx(96),
-                            decoration: const BoxDecoration(
-                              color: Colors.black45,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.play_arrow,
-                                color: Colors.white, size: 44),
+                        else
+                          const Center(
+                            child: Icon(Icons.videocam_off,
+                                color: Colors.white38),
                           ),
-                        Positioned(
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          child: VideoProgressIndicator(
-                            v,
-                            allowScrubbing: true,
-                            colors: const VideoProgressColors(
-                              playedColor: BrandColors.gold,
-                              bufferedColor: Colors.white24,
-                              backgroundColor: Colors.white10,
-                            ),
-                          ),
-                        ),
                       ],
                     ),
-                  )
-                : (r.thumbnailUrl?.isNotEmpty ?? false)
-                    ? Image.network(r.thumbnailUrl!, fit: BoxFit.contain)
-                    : const Center(
-                        child:
-                            Icon(Icons.videocam_off, color: Colors.white38)),
+            ),
           ),
           if (r.phaseTimestamps.isNotEmpty) _phaseBar(r),
           _controlsRow(r),
