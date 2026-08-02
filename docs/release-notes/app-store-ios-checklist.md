@@ -46,14 +46,42 @@
 
 ### 4. App Store Connect（上架时）
 
-1. [App Store Connect](https://appstoreconnect.apple.com/) → 我的 App → **+**  
-2. 名称：`领翼golf`  
-3. Bundle ID：选 `cn.birdieai.birdieApp`  
-4. SKU 建议：`birdie-ios-001`
+1. [App Store Connect](https://appstoreconnect.apple.com/) → 我的 App → **+** → **新建 App**  
+2. 平台：勾选 **iOS**  
+3. 名称：`领翼golf`  
+4. 主要语言：**简体中文**  
+5. Bundle ID：选 `cn.birdieai.birdieApp`（若列表没有，等 Identifier 同步几分钟后再试）  
+6. SKU：`birdie-ios-001`  
+7. 用户访问权限：**完全访问**  
+8. 创建  
 
-### 5. 微信开放平台（真微信登录）
+> 真机闭环验收：2026-08-02 通过（登录 / 首页 / 拍摄出报告 / 原片播放 / 教练 / 训练）。
 
-移动应用 Universal Links：`https://api.birdieai.cn/app/`（与 AASA paths 一致）。
+### 5. 微信开放平台（真微信登录）— **上线后做**
+
+移动应用 Universal Links：`https://api.birdieai.cn/app/`（与 AASA paths 一致）。  
+当前策略：先 TestFlight / 上架，用 **Sign in with Apple**；微信登录后补。
+
+### 6. 打 IPA → TestFlight（当前主线）
+
+前置：§4 App Store Connect 应用已创建。  
+**2026-08-02**：ASC 已有应用；IPA **1.0.0+2** 已用 Transporter 上传（含 WechatOpenSDK 90208 修复）。  
+下一步见 [`app-store-testflight-next.md`](./app-store-testflight-next.md)。
+
+```bash
+cd app
+bash scripts/ios-archive.sh
+```
+
+或 Xcode：`app/ios/Runner.xcworkspace` → Product → Archive → Distribute App → App Store Connect。
+
+**上传**：用 **Transporter** 拖入 `.ipa`，或 Xcode Organizer → Distribute。  
+上传后 ASC → TestFlight 等 Processing（约 5–30 分钟），再加内部测试员。
+
+审核备注可写：登录使用 **Sign in with Apple**；微信登录后续版本提供。
+
+隐私政策 URL（ASC 正式提审必填）：`https://api.birdieai.cn/legal/privacy.html`（仓库 `infra/test/static/legal/privacy.html`，随 CVM nginx 发布）。  
+启动图仍是 Flutter 默认占位，建议上架前换成品牌 Launch Image（非阻塞 TestFlight）。
 
 ---
 
