@@ -1,5 +1,7 @@
 // 高尔夫档案选项常量：对照 client/src/constants/golf.ts。
-// 由 onboarding 与「编辑档案」共用，字面量/排序/文案须与小程序一致。
+// 由 onboarding 与「编辑档案」共用，value 与小程序一致；展示文案走 l10n。
+
+import '../l10n/app_localizations.dart';
 
 class LevelOption {
   final String value;
@@ -59,3 +61,56 @@ const freqLabels = <String, String>{
   'frequent': '每周 2-3 次',
   'daily': '几乎每天',
 };
+
+String localizedLevel(AppLocalizations l10n, String? value) {
+  return switch (value) {
+    'beginner' => l10n.levelBeginner,
+    'elementary' => l10n.levelElementary,
+    'intermediate' => l10n.levelIntermediate,
+    'advanced' => l10n.levelAdvanced,
+    _ => l10n.notSet,
+  };
+}
+
+String localizedGoal(AppLocalizations l10n, String value) {
+  return switch (value) {
+    'distance' => l10n.goalDistance,
+    'accuracy' => l10n.goalAccuracy,
+    'short_game' => l10n.goalShortGame,
+    'putting' => l10n.goalPutting,
+    'consistency' => l10n.goalConsistency,
+    _ => value,
+  };
+}
+
+String localizedFreq(AppLocalizations l10n, String? value) {
+  return switch (value) {
+    'occasional' => l10n.freqOccasional,
+    'once' => l10n.freqOnce,
+    'frequent' => l10n.freqFrequent,
+    'daily' => l10n.freqDaily,
+    _ => l10n.notSet,
+  };
+}
+
+String localizedWeekday(AppLocalizations l10n, int weekday) {
+  return switch (weekday) {
+    1 => l10n.weekdayMon,
+    2 => l10n.weekdayTue,
+    3 => l10n.weekdayWed,
+    4 => l10n.weekdayThu,
+    5 => l10n.weekdayFri,
+    6 => l10n.weekdaySat,
+    _ => l10n.weekdaySun,
+  };
+}
+
+String localizedLevelDesc(AppLocalizations l10n, String value) {
+  return switch (value) {
+    'beginner' => l10n.levelBeginnerDesc,
+    'elementary' => l10n.levelElementaryDesc,
+    'intermediate' => l10n.levelIntermediateDesc,
+    'advanced' => l10n.levelAdvancedDesc,
+    _ => '',
+  };
+}

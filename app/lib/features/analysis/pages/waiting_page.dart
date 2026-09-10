@@ -9,20 +9,15 @@ import '../../../theme/dimens.dart';
 import '../analysis_controller.dart';
 import 'capture_page.dart';
 import 'report_page.dart';
+import '../../../l10n/l10n.dart';
 
 /// 等待页用户可见的 5 个阶段（对照小程序 waiting.tsx STAGES）。
-class _UiStage {
-  final String key;
-  final String label;
-  const _UiStage(this.key, this.label);
-}
-
-const _uiStages = <_UiStage>[
-  _UiStage('received', '视频已接收'),
-  _UiStage('pose', '识别人体姿态'),
-  _UiStage('swing', '分析挥杆动作'),
-  _UiStage('diagnose', '生成诊断建议'),
-  _UiStage('render', '渲染分析报告'),
+const _uiStageKeys = <String>[
+  'received',
+  'pose',
+  'swing',
+  'diagnose',
+  'render',
 ];
 
 // 后端 stage → UI 阶段索引
@@ -107,7 +102,9 @@ class _WaitingPageState extends State<WaitingPage> {
     return Scaffold(
       backgroundColor: BrandColors.primary,
       body: SafeArea(
-        child: failed ? _failedView(ctl.error ?? '分析失败，请重试') : _loadingView(ctl),
+        child: failed
+            ? _failedView(ctl.error ?? context.l10n.waitingFailed)
+            : _loadingView(ctl),
       ),
     );
   }
@@ -125,7 +122,7 @@ class _WaitingPageState extends State<WaitingPage> {
           SizedBox(height: rpx(24)),
           _spinner(),
           SizedBox(height: rpx(48)),
-          Text(completed ? '分析完成' : 'AI 正在分析你的挥杆',
+          Text(completed ? context.l10n.waitingDone : context.l10n.waitingInProgress,
               style: TextStyle(
                   fontSize: rpx(44),
                   fontWeight: FontWeight.w800,
@@ -133,10 +130,10 @@ class _WaitingPageState extends State<WaitingPage> {
           SizedBox(height: rpx(16)),
           Text(
               completed
-                  ? '即将为你打开报告…'
+                  ? context.l10n.waitingOpening
                   : (_displaySeconds != null && _displaySeconds! > 0
-                      ? '预计还需 $_displaySeconds 秒'
-                      : '预计还需不到 30 秒'),
+                      ? context.l10n.waitingEtaSeconds(_displaySeconds!)
+                      : context.l10n.waitingEtaSoon),
               style: TextStyle(fontSize: rpx(28), color: Colors.white70)),
           if (_elapsed >= 60 && _elapsed < 120) ...[
             SizedBox(height: rpx(28)),
@@ -180,11 +177,23 @@ class _WaitingPageState extends State<WaitingPage> {
         ),
       );
 
+  String _stageLabel(String key) {
+    final l = context.l10n;
+    return switch (key) {
+      'received' => l.waitingReceived,
+      'pose' => l.waitingPose,
+      'swing' => l.waitingSwing,
+      'diagnose' => l.waitingDiagnose,
+      'render' => l.waitingRender,
+      _ => key,
+    };
+  }
+
   Widget _checklist(int activeIdx, bool completed) {
     return Column(
       children: [
-        for (var i = 0; i < _uiStages.length; i++)
-          _stageRow(_uiStages[i].label,
+        for (var i = 0; i < _uiStageKeys.length; i++)
+          _stageRow(_stageLabel(_uiStageKeys[i]),
               done: completed || i < activeIdx,
               active: !completed && i == activeIdx),
       ],
@@ -246,7 +255,7 @@ class _WaitingPageState extends State<WaitingPage> {
           color: Colors.white.withValues(alpha: 0.10),
           borderRadius: BorderRadius.circular(Radii.md),
         ),
-        child: Text('分析可能比预期稍久，请耐心等待；仍可留在本页或稍后在「我的分析报告」查看结果。',
+        child: Text(context.l10n.waitingSlowHint,
             style: TextStyle(
                 fontSize: rpx(24), height: 1.5, color: Colors.white70)),
       );
@@ -261,13 +270,13 @@ class _WaitingPageState extends State<WaitingPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('⏳ 分析时间比预期长',
+            Text(context.l10n.waitingSlowTitle,
                 style: TextStyle(
                     fontSize: rpx(30),
                     fontWeight: FontWeight.w700,
                     color: Colors.white)),
             SizedBox(height: rpx(12)),
-            Text('别担心，任务还在后台跑。完成后你可以在「我的分析报告」里查看结果。你也可以先去首页做点别的。',
+            Text(context.l10n.waitingSlowBody,
                 style: TextStyle(
                     fontSize: rpx(24), height: 1.5, color: Colors.white70)),
             SizedBox(height: rpx(20)),
@@ -278,7 +287,7 @@ class _WaitingPageState extends State<WaitingPage> {
                 foregroundColor: Colors.white,
                 side: const BorderSide(color: Colors.white54),
               ),
-              child: const Text('先回首页'),
+              child: Text(context.l10n.waitingBackHome),
             ),
           ],
         ),
@@ -294,7 +303,7 @@ class _WaitingPageState extends State<WaitingPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${tip.category}  ·  你知道吗？',
+            Text(context.l10n.waitingDidYouKnow(tip.category),
                 style: TextStyle(
                     fontSize: rpx(24),
                     color: BrandColors.gold,
@@ -317,7 +326,7 @@ class _WaitingPageState extends State<WaitingPage> {
           children: [
             Text('😣', style: TextStyle(fontSize: rpx(96))),
             SizedBox(height: rpx(24)),
-            Text('分析失败',
+            Text(context.l10n.waitingFailed,
                 style: TextStyle(
                     fontSize: rpx(44),
                     fontWeight: FontWeight.w800,
@@ -338,7 +347,7 @@ class _WaitingPageState extends State<WaitingPage> {
                   foregroundColor: Colors.black,
                   padding: EdgeInsets.symmetric(vertical: rpx(24)),
                 ),
-                child: const Text('重新拍摄'),
+                child: Text(context.l10n.waitingReshoot),
               ),
             ),
             SizedBox(height: rpx(20)),
@@ -352,7 +361,7 @@ class _WaitingPageState extends State<WaitingPage> {
                   side: const BorderSide(color: Colors.white54),
                   padding: EdgeInsets.symmetric(vertical: rpx(24)),
                 ),
-                child: const Text('去首页'),
+                child: Text(context.l10n.waitingGoHome),
               ),
             ),
           ],

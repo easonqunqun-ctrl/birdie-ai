@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
 import 'core/api_client.dart';
+import 'core/locale_controller.dart';
 import 'core/storage.dart';
 import 'data/repositories/analysis_repository.dart';
 import 'data/repositories/chat_repository.dart';
@@ -11,6 +13,7 @@ import 'data/repositories/user_repository.dart';
 import 'features/analysis/analysis_controller.dart';
 import 'features/auth/auth_controller.dart';
 import 'features/coach/chat_controller.dart';
+import 'l10n/app_localizations.dart';
 import 'nav/app_gate.dart';
 import 'theme/app_theme.dart';
 import 'widgets/env_badge.dart';
@@ -30,6 +33,7 @@ Future<void> main() async {
   auth = AuthController(userRepo);
   // 冷启动恢复登录态
   auth.bootstrap();
+  final localeCtl = LocaleController(AppStorage.instance);
 
   runApp(BirdieApp(
     auth: auth,
@@ -39,6 +43,7 @@ Future<void> main() async {
     chatRepo: chatRepo,
     trainingRepo: trainingRepo,
     contentRepo: contentRepo,
+    localeCtl: localeCtl,
   ));
 }
 
@@ -52,6 +57,7 @@ class BirdieApp extends StatelessWidget {
     required this.chatRepo,
     required this.trainingRepo,
     required this.contentRepo,
+    required this.localeCtl,
   });
 
   final AuthController auth;
@@ -61,6 +67,7 @@ class BirdieApp extends StatelessWidget {
   final ChatRepository chatRepo;
   final TrainingRepository trainingRepo;
   final ContentRepository contentRepo;
+  final LocaleController localeCtl;
 
   @override
   Widget build(BuildContext context) {
@@ -78,18 +85,39 @@ class BirdieApp extends StatelessWidget {
         ChangeNotifierProvider<ChatController>(
           create: (_) => ChatController(chatRepo),
         ),
+        ChangeNotifierProvider<LocaleController>.value(value: localeCtl),
       ],
-      child: MaterialApp(
-        title: '领翼golf',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.light,
-        home: const AppGate(),
-        builder: (context, child) => Stack(
-          children: [
-            ?child,
-            const EnvBadge(),
-          ],
-        ),
+      child: Consumer<LocaleController>(
+        builder: (context, localeCtl, _) {
+          return MaterialApp(
+            title: localeCtl.preference == 'en'
+                ? 'Lingyi Golf'
+                : (localeCtl.preference == 'zh'
+                    ? '领翼golf'
+                    : (WidgetsBinding.instance.platformDispatcher.locale
+                                .languageCode ==
+                            'en'
+                        ? 'Lingyi Golf'
+                        : '领翼golf')),
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.light,
+            locale: localeCtl.localeOverride,
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            home: const AppGate(),
+            builder: (context, child) => Stack(
+              children: [
+                ?child,
+                const EnvBadge(),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

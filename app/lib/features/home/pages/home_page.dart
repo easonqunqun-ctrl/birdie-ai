@@ -20,6 +20,7 @@ import '../../coach/pages/coach_page.dart';
 import '../../legal/pages/legal_page.dart';
 import '../../profile/pages/membership_page.dart';
 import '../../profile/pages/profile_page.dart';
+import '../../../l10n/l10n.dart';
 
 /// 首页：对照 client/src/pages/index（登录态 + 访客态）。
 class HomePage extends StatefulWidget {
@@ -123,7 +124,7 @@ class _HomePageState extends State<HomePage> {
             TextSpan(
               children: [
                 TextSpan(
-                    text: '领翼',
+                    text: context.l10n.appNameShort,
                     style: TextStyle(
                         fontSize: rpx(38),
                         fontWeight: FontWeight.w900,
@@ -147,7 +148,7 @@ class _HomePageState extends State<HomePage> {
                 color: BrandColors.primaryTint,
                 borderRadius: BorderRadius.circular(rpx(32)),
               ),
-              child: Text('登录',
+              child: Text(context.l10n.login,
                   style: TextStyle(
                       fontSize: rpx(28),
                       fontWeight: FontWeight.w600,
@@ -169,22 +170,22 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('欢迎使用',
+            Text(context.l10n.welcomeUse,
                 style: TextStyle(
                     fontSize: rpx(26), color: BrandColors.onPrimaryMuted)),
             SizedBox(height: rpx(12)),
-            Text('可先了解产品与功能',
+            Text(context.l10n.guestSubtitle1,
                 style: TextStyle(
                     fontSize: rpx(40),
                     fontWeight: FontWeight.w800,
                     color: BrandColors.onPrimary)),
-            Text('再选择是否登录',
+            Text(context.l10n.guestSubtitle2,
                 style: TextStyle(
                     fontSize: rpx(40),
                     fontWeight: FontWeight.w800,
                     color: BrandColors.onPrimary)),
             SizedBox(height: rpx(16)),
-            Text('挥杆分析与 AI 对话需登录后使用。下方可查看示例报告与协议。',
+            Text(context.l10n.guestLegalHint,
                 style: TextStyle(
                     fontSize: rpx(26),
                     height: 1.45,
@@ -199,7 +200,7 @@ class _HomePageState extends State<HomePage> {
                   foregroundColor: Colors.black,
                   padding: EdgeInsets.symmetric(vertical: rpx(24)),
                 ),
-                child: Text('登录后开始分析',
+                child: Text(context.l10n.loginToAnalyze,
                     style: TextStyle(
                         fontSize: rpx(30), fontWeight: FontWeight.w700)),
               ),
@@ -219,15 +220,15 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('本产品提供',
+            Text(context.l10n.productOffers,
                 style: TextStyle(
                     fontSize: rpx(30),
                     fontWeight: FontWeight.w700,
                     color: BrandColors.textPrimary)),
             SizedBox(height: rpx(16)),
-            _guestFeature('📹', 'AI 挥杆分析，短视频出报告'),
-            _guestFeature('💬', 'AI 教练在线答疑（生成式内容，仅供参考）'),
-            _guestFeature('📈', '基于分析的训练计划与打卡'),
+            _guestFeature('📹', context.l10n.guestFeatSwing),
+            _guestFeature('💬', context.l10n.guestFeatCoach),
+            _guestFeature('📈', context.l10n.guestFeatPlan),
           ],
         ),
       );
@@ -251,8 +252,8 @@ class _HomePageState extends State<HomePage> {
         children: [
           _quickRowCard(
             emoji: '🎬',
-            title: '先看一份示例报告',
-            sub: '无需登录 · 不消耗次数',
+            title: context.l10n.sampleReportTitle,
+            sub: context.l10n.sampleReportSubGuest,
             iconTint: BrandColors.accentMintDim,
             onTap: () => Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => const ReportPage(analysisId: 'sample'))),
@@ -260,8 +261,8 @@ class _HomePageState extends State<HomePage> {
           SizedBox(height: rpx(12)),
           _quickRowCard(
             emoji: '💬',
-            title: 'AI 教练 · 了解能力',
-            sub: '进入页内说明，对话前需登录',
+            title: context.l10n.coachIntroTitle,
+            sub: context.l10n.coachIntroSub,
             iconTint: BrandColors.primaryTint,
             onTap: () => Navigator.of(context)
                 .push(MaterialPageRoute(builder: (_) => const CoachPage())),
@@ -275,7 +276,7 @@ class _HomePageState extends State<HomePage> {
           GestureDetector(
             onTap: () => Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => const LegalPage(kind: LegalKind.terms))),
-            child: Text('《用户协议》',
+            child: Text(context.l10n.userAgreement,
                 style: TextStyle(
                     fontSize: rpx(26),
                     color: BrandColors.primary,
@@ -287,7 +288,7 @@ class _HomePageState extends State<HomePage> {
           GestureDetector(
             onTap: () => Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => const LegalPage(kind: LegalKind.privacy))),
-            child: Text('《隐私政策》',
+            child: Text(context.l10n.privacyPolicy,
                 style: TextStyle(
                     fontSize: rpx(26),
                     color: BrandColors.primary,
@@ -306,7 +307,7 @@ class _HomePageState extends State<HomePage> {
           TextSpan(
             children: [
               TextSpan(
-                  text: '领翼',
+                  text: context.l10n.appNameShort,
                   style: TextStyle(
                       fontSize: rpx(38),
                       fontWeight: FontWeight.w900,
@@ -335,7 +336,7 @@ class _HomePageState extends State<HomePage> {
                 : Text(
                     (user?.nickname?.isNotEmpty ?? false)
                         ? user!.nickname!.characters.first
-                        : '球',
+                        : context.l10n.golferFallback.characters.first,
                     style: const TextStyle(color: BrandColors.primary)),
           ),
         ),
@@ -373,7 +374,7 @@ class _HomePageState extends State<HomePage> {
                 foregroundColor: Colors.black,
                 padding: EdgeInsets.symmetric(vertical: rpx(24)),
               ),
-              child: Text(scoreMode ? '+ 上传新挥杆' : '🎬 开始第一次分析',
+              child: Text(scoreMode ? context.l10n.uploadNewSwing : context.l10n.startFirstAnalysis,
                   style: TextStyle(
                       fontSize: rpx(30), fontWeight: FontWeight.w700)),
             ),
@@ -390,13 +391,13 @@ class _HomePageState extends State<HomePage> {
   Widget _heroGreeting(User? user) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('你好，${user?.nickname ?? '球友'} 👋',
+          Text(context.l10n.helloGolfer(user?.nickname ?? context.l10n.golferFallback),
               style: TextStyle(
                   fontSize: rpx(44),
                   fontWeight: FontWeight.w800,
                   color: BrandColors.onPrimary)),
           SizedBox(height: rpx(12)),
-          Text('拍一段挥杆，30 秒拿到 AI 专属报告',
+          Text(context.l10n.heroCta,
               style: TextStyle(
                   fontSize: rpx(28), color: BrandColors.onPrimaryMuted)),
         ],
@@ -411,11 +412,11 @@ class _HomePageState extends State<HomePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('${meta?.emoji ?? '⛳️'} 最近一杆',
+              Text('${meta?.emoji ?? '⛳️'} ${context.l10n.latestShot}',
                   style: TextStyle(
                       fontSize: rpx(26), color: BrandColors.onPrimaryMuted)),
               SizedBox(height: rpx(8)),
-              Text(meta?.label ?? '已完成分析',
+              Text(meta?.label ?? context.l10n.analysisDone,
                   style: TextStyle(
                       fontSize: rpx(38),
                       fontWeight: FontWeight.w800,
@@ -440,7 +441,7 @@ class _HomePageState extends State<HomePage> {
                         height: 1,
                         fontWeight: FontWeight.w800,
                         color: BrandColors.onPrimary)),
-                Text(' 分',
+                Text(context.l10n.scoreUnit,
                     style: TextStyle(
                         fontSize: rpx(24),
                         color: BrandColors.onPrimaryMuted)),
@@ -464,9 +465,9 @@ class _HomePageState extends State<HomePage> {
     final q = user?.quota;
     if (q == null) return '';
     if ((user?.isMember ?? false) || q.analysisRemaining < 0) {
-      return '会员 · 挥杆分析无限次';
+      return context.l10n.quotaMemberUnlimited;
     }
-    return '本月剩余分析 ${q.analysisRemaining}/${q.analysisTotal} 次';
+    return context.l10n.quotaMonthRemaining(q.analysisRemaining, q.analysisTotal);
   }
 
   // -------------------- 统计 --------------------
@@ -481,12 +482,12 @@ class _HomePageState extends State<HomePage> {
       ),
       child: Row(
         children: [
-          _stat('累计分析', '${s?.totalAnalyses ?? 0}'),
+          _stat(context.l10n.statTotalAnalyses, '${s?.totalAnalyses ?? 0}'),
           _divider(),
-          _stat('最佳得分',
+          _stat(context.l10n.statBestScore,
               (s != null && s.bestScore > 0) ? '${s.bestScore.round()}' : '—'),
           _divider(),
-          _stat('连续天数', '${s?.streakDays ?? 0}'),
+          _stat(context.l10n.statStreak, '${s?.streakDays ?? 0}'),
         ],
       ),
     );
@@ -516,13 +517,13 @@ class _HomePageState extends State<HomePage> {
     final showSample = !(user?.hasCompletedRealAnalysis ?? false);
     final chatText = (user?.isMember ?? false) ||
             (user?.quota?.chatRemainingToday ?? 0) < 0
-        ? '会员无限次'
-        : '今日剩余 ${user?.quota?.chatRemainingToday ?? 0} 次';
+        ? context.l10n.memberUnlimited
+        : context.l10n.chatRemainingToday(user?.quota?.chatRemainingToday ?? 0);
     return Column(
       children: [
         _quickRowCard(
           emoji: '💬',
-          title: '问 AI 教练',
+          title: context.l10n.askCoach,
           sub: chatText,
           iconTint: BrandColors.primaryTint,
           onTap: () => Navigator.of(context)
@@ -532,8 +533,8 @@ class _HomePageState extends State<HomePage> {
           SizedBox(height: rpx(12)),
           _quickRowCard(
             emoji: '🎬',
-            title: '先看一份示例报告',
-            sub: '了解 AI 能给你什么 · 不消耗次数',
+            title: context.l10n.sampleReportTitle,
+            sub: context.l10n.sampleReportSubUser,
             iconTint: BrandColors.accentMintDim,
             onTap: () => Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => const ReportPage(analysisId: 'sample'))),
@@ -609,7 +610,7 @@ class _HomePageState extends State<HomePage> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('最近分析',
+            Text(context.l10n.recentAnalyses,
                 style: TextStyle(
                     fontSize: rpx(34),
                     fontWeight: FontWeight.w700,
@@ -618,7 +619,7 @@ class _HomePageState extends State<HomePage> {
               GestureDetector(
                 onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const HistoryPage())),
-                child: Text('查看全部 ›',
+                child: Text(context.l10n.viewAll,
                     style: TextStyle(
                         fontSize: rpx(26), color: BrandColors.primary)),
               ),
@@ -645,7 +646,7 @@ class _HomePageState extends State<HomePage> {
               children: [
                 Text('⛳️', style: TextStyle(fontSize: rpx(56))),
                 SizedBox(height: rpx(12)),
-                Text('还没有分析记录，上传第一段挥杆吧',
+                Text(context.l10n.noAnalysesYet,
                     style: TextStyle(
                         fontSize: rpx(26), color: BrandColors.textSecondary)),
               ],
@@ -719,7 +720,7 @@ class _HomePageState extends State<HomePage> {
                 ],
               )
             else
-              Text(it.status == 'failed' ? '失败' : '分析中',
+              Text(it.status == 'failed' ? context.l10n.statusFailed : context.l10n.statusAnalyzing,
                   style: TextStyle(
                       fontSize: rpx(24),
                       color: it.status == 'failed'
@@ -755,19 +756,19 @@ class _HomePageState extends State<HomePage> {
       showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('本月分析次数已用完'),
-          content: const Text('升级会员即可享受无限次挥杆分析。'),
+          title: Text(context.l10n.quotaExhaustedTitle),
+          content: Text(context.l10n.quotaExhaustedBody),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('我知道了')),
+                child: Text(context.l10n.gotIt)),
             TextButton(
               onPressed: () {
                 Navigator.pop(ctx);
                 Navigator.of(context).push(MaterialPageRoute(
                     builder: (_) => const MembershipPage()));
               },
-              child: const Text('开通会员'),
+              child: Text(context.l10n.viewBenefits),
             ),
           ],
         ),
@@ -786,7 +787,7 @@ class _HomePageState extends State<HomePage> {
     final now = DateTime.now();
     String two(int n) => n.toString().padLeft(2, '0');
     if (d.year == now.year && d.month == now.month && d.day == now.day) {
-      return '今天 ${two(d.hour)}:${two(d.minute)}';
+      return context.l10n.todayAt('${two(d.hour)}:${two(d.minute)}');
     }
     if (d.year == now.year) {
       return '${two(d.month)}-${two(d.day)} ${two(d.hour)}:${two(d.minute)}';

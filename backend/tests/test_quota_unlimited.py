@@ -105,3 +105,21 @@ async def test_unlimited_does_not_overwrite_existing_strict_quota(
     # 既有记录 total=3 没动，所以 remaining 仍是 3（不是 -1）
     # 这是 W8-T3 已知约束：内测期请确保部署时初始化的是空库
     assert me2["quota"]["analysis_remaining"] == 3
+
+
+@pytest.mark.asyncio
+async def test_concurrent_me_does_not_500_on_quota_create(
+    client: AsyncClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """同一用户并发 GET /me 首次建配额行时不得 500（uq_analysis_quota 竞态）。"""
+    import asyncio
+
+    monkeypatch.setattr(settings, "QUOTA_MODE", "strict")
+    results = await asyncio.gather(
+        *[client.get("/v1/users/me", headers=auth_headers) for _ in range(8)]
+    )
+    assert all(r.status_code == 200 for r in results), [r.status_code for r in results]
+    remaining = {r.json()["data"]["quota"]["analysis_remaining"] for r in results}
+    assert remaining == {3}

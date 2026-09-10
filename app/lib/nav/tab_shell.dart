@@ -6,6 +6,7 @@ import '../features/home/pages/home_page.dart';
 import '../features/coach/pages/coach_page.dart';
 import '../features/training/pages/training_page.dart';
 import '../features/profile/pages/profile_page.dart';
+import '../l10n/l10n.dart';
 
 /// 底部自定义 TabBar：对齐小程序 custom-tab-bar（56rpx 图标 / 28rpx 文案）。
 ///
@@ -21,7 +22,6 @@ class _TabShellState extends State<TabShell> {
   int _index = 0;
   final Map<int, Widget> _pages = {};
 
-  static const _labels = ['首页', 'AI 教练', '训练', '我的'];
   static const _icons = [
     ('assets/tab/home.png', 'assets/tab/home_active.png'),
     ('assets/tab/coach.png', 'assets/tab/coach_active.png'),
@@ -53,6 +53,8 @@ class _TabShellState extends State<TabShell> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final labels = [l10n.tabHome, l10n.tabCoach, l10n.tabTraining, l10n.tabProfile];
     final bottom = MediaQuery.of(context).padding.bottom;
     // 已访问过的 Tab 用 Stack+Offstage 保活；未访问的不创建，避免冷启动四路 API。
     final visited = _pages.keys.toList()..sort();
@@ -88,15 +90,15 @@ class _TabShellState extends State<TabShell> {
         height: rpx(112) + bottom,
         child: Row(
           children: [
-            for (var i = 0; i < _labels.length; i++)
-              Expanded(child: _tabItem(i)),
+            for (var i = 0; i < labels.length; i++)
+              Expanded(child: _tabItem(i, labels[i])),
           ],
         ),
       ),
     );
   }
 
-  Widget _tabItem(int i) {
+  Widget _tabItem(int i, String label) {
     final active = _index == i;
     final icons = _icons[i];
     return GestureDetector(
@@ -119,7 +121,7 @@ class _TabShellState extends State<TabShell> {
           ),
           SizedBox(height: rpx(4)),
           Text(
-            _labels[i],
+            label,
             style: TextStyle(
               fontSize: rpx(22),
               fontWeight: active ? FontWeight.w700 : FontWeight.w500,

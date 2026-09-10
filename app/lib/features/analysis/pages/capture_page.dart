@@ -7,6 +7,7 @@ import '../../../core/analysis_options.dart';
 import '../../../theme/brand_colors.dart';
 import '../../../theme/dimens.dart';
 import '../../../widgets/primary_button.dart';
+import '../../../l10n/l10n.dart';
 import 'params_page.dart';
 import 'report_page.dart';
 
@@ -29,6 +30,7 @@ class _CapturePageState extends State<CapturePage> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
 
   Future<void> _pick(ImageSource source) async {
+    final l10n = context.l10n;
     setState(() => _preparing = true);
     try {
       final x = await _picker.pickVideo(
@@ -38,21 +40,21 @@ class _CapturePageState extends State<CapturePage> {
       if (x == null) return;
       final ext = x.path.split('.').last.toLowerCase();
       if (!kAcceptedExtensions.contains(ext)) {
-        _toast('仅支持 mp4 / mov 视频');
+        _toast(l10n.captureOnlyMp4Mov);
         return;
       }
       final size = await File(x.path).length();
       if (size > kMaxSizeBytes) {
-        _toast('视频不能超过 100MB');
+        _toast(l10n.captureTooLarge);
         return;
       }
       final dur = await _readDuration(x.path);
       if (dur < kMinDurationSeconds) {
-        _toast('视频太短（需 ≥ ${kMinDurationSeconds}s）');
+        _toast(l10n.captureTooShort(kMinDurationSeconds));
         return;
       }
       if (dur > kMaxDurationSeconds + 1) {
-        _toast('视频太长（需 ≤ ${kMaxDurationSeconds}s）');
+        _toast(l10n.captureTooLong(kMaxDurationSeconds));
         return;
       }
       setState(() {
@@ -61,7 +63,7 @@ class _CapturePageState extends State<CapturePage> {
         _size = size;
       });
     } catch (e) {
-      _toast('选取视频失败：$e');
+      _toast(l10n.capturePickFailed('$e'));
     } finally {
       if (mounted) setState(() => _preparing = false);
     }
@@ -79,7 +81,7 @@ class _CapturePageState extends State<CapturePage> {
 
   void _next() {
     if (_video == null) {
-      _toast('请先拍摄或选择挥杆视频');
+      _toast(context.l10n.captureNeedVideo);
       return;
     }
     Navigator.of(context).push(MaterialPageRoute(
@@ -94,7 +96,7 @@ class _CapturePageState extends State<CapturePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('挥杆分析')),
+      appBar: AppBar(title: Text(context.l10n.captureTitle)),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(rpx(32)),
         child: Column(
@@ -107,13 +109,18 @@ class _CapturePageState extends State<CapturePage> {
             _videoCard(),
             SizedBox(height: rpx(16)),
             Text(
-              '时长 $kMinDurationSeconds-$kMaxDurationSeconds s · 大小 ≤ ${(kMaxSizeBytes / 1024 / 1024).round()}MB · 支持 ${kAcceptedExtensions.join(' / ').toUpperCase()}',
+              context.l10n.captureLimits(
+                kMinDurationSeconds,
+                kMaxDurationSeconds,
+                (kMaxSizeBytes / 1024 / 1024).round(),
+                kAcceptedExtensions.join(' / ').toUpperCase(),
+              ),
               style: TextStyle(
                   fontSize: rpx(22), color: BrandColors.textTertiary),
             ),
             SizedBox(height: rpx(48)),
             PrimaryButton(
-              label: '下一步：选择参数',
+              label: context.l10n.captureNextParams,
               disabled: _video == null,
               onTap: _next,
             ),
@@ -122,7 +129,7 @@ class _CapturePageState extends State<CapturePage> {
               child: GestureDetector(
                 onTap: () => Navigator.of(context).push(MaterialPageRoute(
                     builder: (_) => const ReportPage(analysisId: 'sample'))),
-                child: Text('先用示例视频体验一下',
+                child: Text(context.l10n.captureTrySample,
                     style: TextStyle(
                         fontSize: rpx(28),
                         color: BrandColors.primary,
@@ -155,18 +162,18 @@ class _CapturePageState extends State<CapturePage> {
               child: Text('🏌️', style: TextStyle(fontSize: rpx(72))),
             ),
             SizedBox(height: rpx(16)),
-            Text('对准人物 · 居中入画',
+            Text(context.l10n.captureCenterSubject,
                 style: TextStyle(
                     fontSize: rpx(26), color: BrandColors.onPrimaryMuted)),
           ],
         ),
       );
 
-  static const _captureTips = [
-    ('📐', '将球员放在画面中央，脚到头部全部露出'),
-    ('🎬', '拍满至少 2 秒（建议 3–5 秒），只录 1 次完整挥杆'),
-    ('💡', '优选自然光，避免强背光和严重抖动'),
-  ];
+  List<(String, String)> get _captureTips => [
+        ('📐', context.l10n.captureTipFraming),
+        ('🎬', context.l10n.captureTipLength),
+        ('💡', context.l10n.captureTipLight),
+      ];
 
   Widget _tips() => Container(
         width: double.infinity,
@@ -218,7 +225,7 @@ class _CapturePageState extends State<CapturePage> {
                 Icon(Icons.videocam_outlined,
                     size: rpx(96), color: BrandColors.textTertiary),
                 SizedBox(height: rpx(16)),
-                Text('拍摄或选择一段挥杆视频（2-30 秒）',
+                Text(context.l10n.capturePrompt,
                     style: TextStyle(
                         fontSize: rpx(28), color: BrandColors.textSecondary)),
               ],
@@ -231,7 +238,10 @@ class _CapturePageState extends State<CapturePage> {
                 SizedBox(width: rpx(16)),
                 Expanded(
                   child: Text(
-                    '已选择 · ${_duration.toStringAsFixed(1)}s · ${(_size / 1024 / 1024).toStringAsFixed(1)}MB',
+                    context.l10n.captureSelected(
+                      _duration.toStringAsFixed(1),
+                      (_size / 1024 / 1024).toStringAsFixed(1),
+                    ),
                     style: TextStyle(
                         fontSize: rpx(28), color: BrandColors.textPrimary),
                   ),
@@ -243,11 +253,11 @@ class _CapturePageState extends State<CapturePage> {
             children: [
               Expanded(
                 child: _pickBtn(
-                    Icons.videocam, '录制', () => _pick(ImageSource.camera)),
+                    Icons.videocam, context.l10n.record, () => _pick(ImageSource.camera)),
               ),
               SizedBox(width: rpx(20)),
               Expanded(
-                child: _pickBtn(Icons.photo_library_outlined, '相册',
+                child: _pickBtn(Icons.photo_library_outlined, context.l10n.album,
                     () => _pick(ImageSource.gallery)),
               ),
             ],

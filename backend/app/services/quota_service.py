@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 from redis.asyncio import Redis
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, PendingRollbackError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -58,6 +58,30 @@ def _is_member(user: User) -> bool:
 def _is_unlimited_user(user: User) -> bool:
     """该用户是否享有无限配额（会员 / QUOTA_MODE=unlimited）."""
     return _is_unlimited_mode() or _is_member(user)
+
+
+async def _flush_unique_or_fetch(db: AsyncSession, stmt, row):
+    """插入带 UNIQUE 约束的配额行；并发冲突时返回已有行，避免毒化外层事务.
+
+    SAVEPOINT（begin_nested）在部分 asyncpg 会话里无法隔离 IntegrityError，
+    随后 SELECT 会变成 PendingRollbackError 并让 /users/me 变 500。
+    冲突后若会话已失效，回滚再读即可（调用方此时通常尚无其它未提交写入）。
+    """
+    db.add(row)
+    try:
+        async with db.begin_nested():
+            await db.flush()
+        return row
+    except IntegrityError:
+        pass
+    try:
+        existing = (await db.execute(stmt)).scalar_one_or_none()
+    except PendingRollbackError:
+        await db.rollback()
+        existing = (await db.execute(stmt)).scalar_one_or_none()
+    if existing is None:
+        raise
+    return existing
 
 
 async def _coach_quota_bypass_eligible(
@@ -130,17 +154,7 @@ async def get_or_create_analysis_quota(
         total=total,
         bonus=0,
     )
-    db.add(quota)
-    # 并发首次写入会触发 (user_id, quota_month) UNIQUE 冲突；
-    # 用 SAVEPOINT 包裹 flush，冲突时只回滚 SAVEPOINT、保留外层事务，
-    # 然后把别人写好的行 SELECT 回来返回给调用方。
-    try:
-        async with db.begin_nested():
-            await db.flush()
-    except IntegrityError:
-        existing = (await db.execute(stmt)).scalar_one()
-        return existing
-    return quota
+    return await _flush_unique_or_fetch(db, stmt, quota)
 
 
 def analysis_remaining(quota: AnalysisQuota) -> int:
@@ -290,15 +304,7 @@ async def get_or_create_chat_quota(
         used=0,
         total=total,
     )
-    db.add(quota)
-    # SAVEPOINT 同上：并发首次写入冲突时只回滚 nested，把已存在行返回
-    try:
-        async with db.begin_nested():
-            await db.flush()
-    except IntegrityError:
-        existing = (await db.execute(stmt)).scalar_one()
-        return existing
-    return quota
+    return await _flush_unique_or_fetch(db, stmt, quota)
 
 
 def chat_remaining(quota: ChatQuota) -> int:

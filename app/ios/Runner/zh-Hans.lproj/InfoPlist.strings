@@ -1,0 +1,6 @@
+CFBundleDisplayName = "领翼golf";
+CFBundleName = "领翼golf";
+NSCameraUsageDescription = "领翼golf 需要使用相机拍摄挥杆视频，以便 AI 分析动作并生成训练建议";
+NSMicrophoneUsageDescription = "录制挥杆视频时可能需要使用麦克风采集环境音（可选）";
+NSPhotoLibraryUsageDescription = "领翼golf 需要访问相册以选择已有的挥杆视频进行分析";
+NSLocalNetworkUsageDescription = "用于内测阶段连接同一局域网内的开发服务器";

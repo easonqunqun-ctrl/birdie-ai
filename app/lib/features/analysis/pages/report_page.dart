@@ -18,6 +18,7 @@ import '../../coach/pages/coach_page.dart';
 import '../../help/pages/score_guide_page.dart';
 import '../analysis_controller.dart';
 import 'capture_page.dart';
+import '../../../l10n/l10n.dart';
 import 'poster_page.dart';
 import 'pro_compare_page.dart';
 
@@ -216,7 +217,7 @@ class _ReportPageState extends State<ReportPage> {
       backgroundColor: BrandColors.bgPage,
       appBar: AppBar(
         title: Text(
-            '${clubTypeLabels[_report?.clubType] ?? '挥杆'}分析报告'),
+            clubTypeLabels[_report?.clubType] ?? context.l10n.captureTitle),
       ),
       body: _loading
           ? Center(
@@ -227,7 +228,7 @@ class _ReportPageState extends State<ReportPage> {
                       valueColor: AlwaysStoppedAnimation<Color>(
                           BrandColors.primary)),
                   SizedBox(height: rpx(24)),
-                  Text('加载报告中…',
+                  Text(context.l10n.reportLoading,
                       style: TextStyle(
                           fontSize: rpx(28),
                           color: BrandColors.textSecondary)),
@@ -248,11 +249,11 @@ class _ReportPageState extends State<ReportPage> {
             children: [
               Icon(Icons.error_outline, size: rpx(80), color: BrandColors.error),
               SizedBox(height: rpx(24)),
-              Text('报告加载失败',
+              Text(context.l10n.reportLoadFailed,
                   style: TextStyle(
                       fontSize: rpx(32), color: BrandColors.textPrimary)),
               SizedBox(height: rpx(24)),
-              TextButton(onPressed: _load, child: const Text('重试')),
+              TextButton(onPressed: _load, child: Text(context.l10n.retry)),
             ],
           ),
         ),
@@ -274,7 +275,7 @@ class _ReportPageState extends State<ReportPage> {
               GestureDetector(
                 onTap: () => Navigator.of(context).push(MaterialPageRoute(
                     builder: (_) => const ScoreGuidePage())),
-                child: Text('分数说明 ›',
+                child: Text(context.l10n.scoreGuideLink,
                     style: TextStyle(
                         fontSize: rpx(26),
                         fontWeight: FontWeight.w600,
@@ -322,7 +323,7 @@ class _ReportPageState extends State<ReportPage> {
             const Text('🎬'),
             SizedBox(width: rpx(16)),
             Expanded(
-              child: Text('这是演示报告，用真实数据展示 AI 能发现的问题；不消耗你的分析次数。',
+              child: Text(context.l10n.sampleReportBanner,
                   style: TextStyle(
                       fontSize: rpx(24), color: BrandColors.textSecondary)),
             ),
@@ -479,15 +480,15 @@ class _ReportPageState extends State<ReportPage> {
       child: Row(
         children: [
           if (_canToggleSource) ...[
-            _pill('原片', _playbackSource == 'original',
+            _pill(context.l10n.clipOriginal, _playbackSource == 'original',
                 () => _switchSource('original')),
             SizedBox(width: rpx(12)),
-            _pill('骨骼', _playbackSource == 'skeleton',
+            _pill(context.l10n.clipSkeleton, _playbackSource == 'skeleton',
                 () => _switchSource('skeleton')),
             const Spacer(),
           ] else
             const Spacer(),
-          Text('倍速',
+          Text(context.l10n.playbackSpeed,
               style: TextStyle(fontSize: rpx(22), color: Colors.white54)),
           SizedBox(width: rpx(12)),
           for (final rate in const [0.5, 1.0, 1.5, 2.0]) ...[
@@ -654,8 +655,8 @@ class _ReportPageState extends State<ReportPage> {
         ? entries
         : r.phaseScores.entries.toList();
     return _sectionCard(
-      title: '六维评分',
-      hint: '点击阶段跳到对应画面',
+      title: context.l10n.sixDimScores,
+      hint: context.l10n.tapPhaseToJump,
       child: Column(
         children: [
           SizedBox(
@@ -734,7 +735,7 @@ class _ReportPageState extends State<ReportPage> {
                     color: BrandColors.error.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(rpx(8)),
                   ),
-                  child: Text('最需改进',
+                  child: Text(context.l10n.mostNeedImprove,
                       style: TextStyle(
                           fontSize: rpx(20), color: BrandColors.error)),
                 ),
@@ -815,7 +816,7 @@ class _ReportPageState extends State<ReportPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('本周主攻',
+          Text(context.l10n.weeklyFocus,
               style: TextStyle(
                   fontSize: rpx(24),
                   color: BrandColors.onPrimaryMuted,
@@ -841,7 +842,7 @@ class _ReportPageState extends State<ReportPage> {
                   color: BrandColors.onPrimaryMuted)),
           if (drill != null) ...[
             SizedBox(height: rpx(12)),
-            Text('推荐练习：${drill.name}',
+            Text(context.l10n.recommendedDrill(drill.name),
                 style: TextStyle(
                     fontSize: rpx(24), color: BrandColors.onPrimary)),
           ],
@@ -860,7 +861,7 @@ class _ReportPageState extends State<ReportPage> {
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Text('去练这个动作'),
+                    : Text(context.l10n.goPracticeThis),
               ),
             ),
           ],
@@ -1142,7 +1143,7 @@ class _ReportPageState extends State<ReportPage> {
                 child: OutlinedButton.icon(
                   onPressed: _askCoach,
                   icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                  label: const Text('问 AI 教练'),
+                  label: Text(context.l10n.askCoachBtn),
                 ),
               ),
             ],
@@ -1158,7 +1159,7 @@ class _ReportPageState extends State<ReportPage> {
                             builder: (_) =>
                                 ProComparePage(analysisId: widget.analysisId))),
                     icon: const Icon(Icons.compare_arrows, size: 18),
-                    label: const Text('职业对比'),
+                    label: Text(context.l10n.proCompare),
                   ),
                 ),
                 SizedBox(width: rpx(16)),
@@ -1168,7 +1169,7 @@ class _ReportPageState extends State<ReportPage> {
                         MaterialPageRoute(
                             builder: (_) => PosterPage(report: r))),
                     icon: const Icon(Icons.image_outlined, size: 18),
-                    label: const Text('成绩海报'),
+                    label: Text(context.l10n.scorePoster),
                   ),
                 ),
               ],
@@ -1186,7 +1187,7 @@ class _ReportPageState extends State<ReportPage> {
                           subject: '领翼golf 挥杆报告');
                     },
                     icon: const Icon(Icons.ios_share, size: 18),
-                    label: const Text('分享'),
+                    label: Text(context.l10n.share),
                   ),
                 ),
               ],
@@ -1198,7 +1199,7 @@ class _ReportPageState extends State<ReportPage> {
               Expanded(
                 child: ElevatedButton(
                   onPressed: _shootAgain,
-                  child: const Text('再拍一段'),
+                  child: Text(context.l10n.shootAgain),
                 ),
               ),
               SizedBox(width: rpx(20)),
@@ -1206,7 +1207,7 @@ class _ReportPageState extends State<ReportPage> {
                 child: OutlinedButton(
                   onPressed: () =>
                       Navigator.of(context).popUntil((r) => r.isFirst),
-                  child: const Text('返回首页'),
+                  child: Text(context.l10n.backHome),
                 ),
               ),
             ],

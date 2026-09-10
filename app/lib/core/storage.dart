@@ -18,9 +18,11 @@ class AppStorage {
   static const _analysisGuideSeenKey = 'analysis_guide_seen';
   static const _mockCodeKey = 'mock_login_code';
   static const _apiBaseKey = 'last_api_base';
+  static const _aiDataConsentKey = 'ai_data_consent_v1';
+  static const _localeKey = 'ui_locale_pref';
 
   /// 协议版本，对齐 storage.ts CURRENT_TERMS_VERSION，修订须 bump。
-  static const currentTermsVersion = 'v1.3';
+  static const currentTermsVersion = 'v1.4';
 
   final _secure = const FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
@@ -104,6 +106,23 @@ class AppStorage {
       _prefs.setBool(_analysisGuideSeenKey, true);
   Future<void> clearAnalysisGuideSeen() =>
       _prefs.remove(_analysisGuideSeenKey);
+
+  // ---- 第三方 AI 数据发送同意（App Store 5.1.1 / 5.1.2）----
+  bool get hasAiDataConsent => _prefs.getBool(_aiDataConsentKey) ?? false;
+  Future<void> setAiDataConsent(bool value) =>
+      _prefs.setBool(_aiDataConsentKey, value);
+
+  /// UI 语言：空=跟随系统，`zh` / `en` 为强制。
+  String get localePreference => _prefs.getString(_localeKey) ?? '';
+  Future<void> setLocalePreference(String code) =>
+      _prefs.setString(_localeKey, code);
+
+  String acceptLanguageHeader() {
+    final pref = localePreference;
+    if (pref == 'en') return 'en-US';
+    if (pref == 'zh') return 'zh-CN';
+    return '';
+  }
 
   /// 退出登录 / 注销：只清账号身份，保留设备级数据（协议同意、引导）。
   Future<void> clearAuthSession() async {

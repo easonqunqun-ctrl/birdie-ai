@@ -72,6 +72,18 @@ ROLE_AND_STYLE = """你是"领翼golf 高尔夫教练"，为业余球手提供�
    drill_towel_arm（修复抛杆）、drill_hip_rotation（修复提前伸展）、drill_half_swing（改善节奏）。
 """
 
+ROLE_AND_STYLE_EN = """You are Lingyi Golf's AI coach for amateur golfers.
+
+Reply rules (follow strictly):
+1. Reply entirely in natural English (US coaching tone);
+2. Keep each reply under 300 words, in 2–3 short paragraphs;
+3. Use numbered lists of 2–3 points when helpful;
+4. Explain jargon in one clause on first use (e.g. X-Factor = shoulder-to-hip turn difference);
+5. If the question is unrelated to golf (medical, politics, finance), decline politely and steer back to golf;
+6. Do not pretend you watched the user's video; only use the analysis summary and their description;
+7. When recommending drills, prefer: drill_towel_arm (casting), drill_hip_rotation (early extension), drill_half_swing (tempo).
+"""
+
 
 async def load_recent_analyses(
     db: AsyncSession, user: User, *, limit: int = RECENT_ANALYSES_COUNT
@@ -128,6 +140,8 @@ def build_system_prompt(
     user: User,
     recent_analyses: list[SwingAnalysis],
     profile_v2=None,
+    *,
+    reply_locale: str = "zh",
 ) -> str:
     """合成 system prompt 文本。
 
@@ -147,7 +161,23 @@ def build_system_prompt(
     """
     profile = _format_user_profile(user)
     v2_block = build_v2_context(profile_v2)
-    if recent_analyses:
+    if reply_locale == "en":
+        if recent_analyses:
+            analyses_section = "\n".join(
+                f"- {_format_analysis_brief(a)}" for a in recent_analyses
+            )
+            context_block = (
+                f"User profile: {profile}\n"
+                + (f"{v2_block}\n" if v2_block else "")
+                + f"\nLast {len(recent_analyses)} swing analyses:\n{analyses_section}\n"
+            )
+        else:
+            context_block = (
+                f"User profile: {profile}\n"
+                + (f"{v2_block}\n" if v2_block else "")
+                + "\nRecent swing analyses: none yet. Answer from general golf knowledge.\n"
+            )
+    elif recent_analyses:
         analyses_section = "\n".join(
             f"- {_format_analysis_brief(a)}" for a in recent_analyses
         )
@@ -163,4 +193,5 @@ def build_system_prompt(
             + "\n【最近挥杆分析】暂无分析记录，请基于通用高尔夫知识回答。\n"
         )
 
-    return f"{ROLE_AND_STYLE}\n{context_block}"
+    role = ROLE_AND_STYLE_EN if reply_locale == "en" else ROLE_AND_STYLE
+    return f"{role}\n{context_block}"

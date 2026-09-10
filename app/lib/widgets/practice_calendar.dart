@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/practice_calendar_layout.dart';
 import '../theme/brand_colors.dart';
 import '../theme/dimens.dart';
+import '../l10n/l10n.dart';
 
 /// 训练打卡月历：对照 client PracticeCalendar。
 class PracticeCalendar extends StatelessWidget {
@@ -49,7 +50,15 @@ class PracticeCalendar extends StatelessWidget {
           SizedBox(height: rpx(16)),
           Row(
             children: [
-              for (final w in practiceCalendarWeekdayLabels)
+              for (final w in [
+                context.l10n.weekdayMon,
+                context.l10n.weekdayTue,
+                context.l10n.weekdayWed,
+                context.l10n.weekdayThu,
+                context.l10n.weekdayFri,
+                context.l10n.weekdaySat,
+                context.l10n.weekdaySun,
+              ])
                 Expanded(
                   child: Text(w,
                       textAlign: TextAlign.center,
@@ -70,7 +79,7 @@ class PracticeCalendar extends StatelessWidget {
               ),
             ),
           SizedBox(height: rpx(8)),
-          Text('本月打卡 ${grid.monthTotal} 次',
+          Text(context.l10n.monthCheckins(grid.monthTotal),
               style: TextStyle(
                   fontSize: rpx(24), color: BrandColors.textSecondary)),
         ],

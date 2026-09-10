@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/app_info.dart';
+import '../../../core/locale_controller.dart';
 import '../../../core/storage.dart';
+import '../../../l10n/l10n.dart';
 import '../../../theme/brand_colors.dart';
 import '../../../theme/dimens.dart';
 import '../../auth/auth_controller.dart';
@@ -16,34 +18,46 @@ class SettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final localeCtl = context.watch<LocaleController>();
+    final langLabel = switch (localeCtl.preference) {
+      'en' => l10n.languageEn,
+      'zh' => l10n.languageZh,
+      _ => l10n.languageSystem,
+    };
     return Scaffold(
-      appBar: AppBar(title: const Text('设置')),
+      appBar: AppBar(title: Text(l10n.settings)),
       body: ListView(
         padding: EdgeInsets.all(rpx(32)),
         children: [
-          _sectionTitle('体验'),
+          _sectionTitle(l10n.sectionExperience),
           _group([
-            _row(context, '重新查看拍摄指南', onTap: () => _replayGuide(context)),
+            _row(context, l10n.language,
+                trailing: langLabel, onTap: () => _pickLanguage(context)),
             _divider(),
-            _row(context, '清除本地缓存', onTap: () => _clearCache(context)),
+            _row(context, l10n.replayCaptureGuide,
+                onTap: () => _replayGuide(context)),
+            _divider(),
+            _row(context, l10n.clearCache, onTap: () => _clearCache(context)),
           ]),
           SizedBox(height: rpx(32)),
-          _sectionTitle('法律与协议'),
+          _sectionTitle(l10n.sectionLegal),
           _group([
-            _row(context, '用户服务协议',
-                onTap: () => _go(context, const LegalPage(kind: LegalKind.terms))),
+            _row(context, l10n.userAgreement,
+                onTap: () =>
+                    _go(context, const LegalPage(kind: LegalKind.terms))),
             _divider(),
-            _row(context, '隐私政策',
+            _row(context, l10n.privacyPolicy,
                 onTap: () =>
                     _go(context, const LegalPage(kind: LegalKind.privacy))),
             _divider(),
-            _row(context, '关于领翼golf',
+            _row(context, l10n.aboutApp,
                 trailing: 'v$kClientVersion',
                 onTap: () => _go(context, const AboutPage())),
           ]),
           SizedBox(height: rpx(32)),
           _group([
-            _row(context, '注销账号',
+            _row(context, l10n.deleteAccount,
                 onTap: () => _go(context, const AccountDeletionPage())),
           ]),
           SizedBox(height: rpx(32)),
@@ -56,24 +70,57 @@ class SettingsPage extends StatelessWidget {
   void _go(BuildContext context, Widget page) =>
       Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
 
+  Future<void> _pickLanguage(BuildContext context) async {
+    final l10n = context.l10n;
+    final ctl = context.read<LocaleController>();
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      builder: (c) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text(l10n.languageSystem),
+              onTap: () => Navigator.pop(c, ''),
+            ),
+            ListTile(
+              title: Text(l10n.languageZh),
+              onTap: () => Navigator.pop(c, 'zh'),
+            ),
+            ListTile(
+              title: Text(l10n.languageEn),
+              onTap: () => Navigator.pop(c, 'en'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (picked != null && context.mounted) {
+      await ctl.setPreference(picked);
+    }
+  }
+
   Future<void> _replayGuide(BuildContext context) async {
     await AppStorage.instance.clearAnalysisGuideSeen();
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已重置，下次分析会再次显示拍摄指南')));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(context.l10n.guideResetToast)));
   }
 
   Future<void> _clearCache(BuildContext context) async {
+    final l10n = context.l10n;
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('清除本地缓存'),
-        content: const Text('将清除本地登录态与设置缓存，需要重新登录。确认继续？'),
+        title: Text(l10n.clearCache),
+        content: Text(l10n.clearCacheBody),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
+              onPressed: () => Navigator.pop(c, false),
+              child: Text(l10n.cancel)),
           TextButton(
-              onPressed: () => Navigator.pop(c, true), child: const Text('清除')),
+              onPressed: () => Navigator.pop(c, true),
+              child: Text(l10n.confirmClear)),
         ],
       ),
     );
@@ -82,39 +129,42 @@ class SettingsPage extends StatelessWidget {
     if (context.mounted) await context.read<AuthController>().logout();
   }
 
-  Widget _logoutButton(BuildContext context) => GestureDetector(
-        onTap: () async {
-          final ok = await showDialog<bool>(
-            context: context,
-            builder: (c) => AlertDialog(
-              title: const Text('提示'),
-              content: const Text('确认退出登录？'),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(c, false),
-                    child: const Text('取消')),
-                TextButton(
-                    onPressed: () => Navigator.pop(c, true),
-                    child: const Text('退出登录')),
-              ],
-            ),
-          );
-          if (ok == true && context.mounted) {
-            await context.read<AuthController>().logout();
-          }
-        },
-        child: Container(
-          height: rpx(96),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: BrandColors.bgCard,
-            borderRadius: BorderRadius.circular(Radii.md),
-            border: Border.all(color: BrandColors.border),
+  Widget _logoutButton(BuildContext context) {
+    final l10n = context.l10n;
+    return GestureDetector(
+      onTap: () async {
+        final ok = await showDialog<bool>(
+          context: context,
+          builder: (c) => AlertDialog(
+            title: Text(l10n.prompt),
+            content: Text(l10n.logoutConfirm),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(c, false),
+                  child: Text(l10n.cancel)),
+              TextButton(
+                  onPressed: () => Navigator.pop(c, true),
+                  child: Text(l10n.logout)),
+            ],
           ),
-          child: Text('退出登录',
-              style: TextStyle(fontSize: rpx(32), color: BrandColors.error)),
+        );
+        if (ok == true && context.mounted) {
+          await context.read<AuthController>().logout();
+        }
+      },
+      child: Container(
+        height: rpx(96),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: BrandColors.bgCard,
+          borderRadius: BorderRadius.circular(Radii.md),
+          border: Border.all(color: BrandColors.border),
         ),
-      );
+        child: Text(l10n.logout,
+            style: TextStyle(fontSize: rpx(32), color: BrandColors.error)),
+      ),
+    );
+  }
 
   Widget _sectionTitle(String t) => Padding(
         padding: EdgeInsets.only(left: rpx(8), bottom: rpx(16)),

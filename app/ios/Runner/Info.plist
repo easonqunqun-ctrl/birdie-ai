@@ -4,6 +4,9 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<!-- 仅使用 HTTPS/TLS 等系统标准加密，声明豁免，避免 ASC「缺少出口合规证明」 -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSCameraUsageDescription</key>
 	<string>领翼golf 需要使用相机拍摄挥杆视频，以便 AI 分析动作并生成训练建议</string>
 	<key>NSMicrophoneUsageDescription</key>
@@ -19,6 +22,11 @@
 	</dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>zh-Hans</string>
+		<string>en</string>
+	</array>
 	<key>CFBundleDisplayName</key>
 	<string>领翼golf</string>
 	<key>CFBundleExecutable</key>

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/storage.dart';
+import '../../../l10n/l10n.dart';
 import '../../../theme/brand_colors.dart';
 import '../../../theme/dimens.dart';
 import '../../../widgets/brand_logo.dart';
@@ -19,16 +20,16 @@ class _ConsentPageState extends State<ConsentPage> {
   bool _agreed = false;
   bool _rejected = false;
 
-  static const _bullets = [
-    '微信 OpenID：用于账号登录与标识（由微信授权获取，我们无法单独获取到你的微信号）。',
-    '挥杆视频：仅在你主动拍摄/选择后上传，用于 AI 分析并生成报告。',
-    '对话内容：用于 AI 教练问答；会通过国内合规 LLM 通道生成回复。',
-  ];
+  List<String> _bullets(AppLocalizations l10n) => [
+        l10n.consentBulletApple,
+        l10n.consentBulletVideo,
+        l10n.consentBulletChat,
+      ];
 
   Future<void> _agree() async {
     if (!_agreed) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先勾选协议')),
+        SnackBar(content: Text(context.l10n.agreeFirst)),
       );
       return;
     }
@@ -39,7 +40,7 @@ class _ConsentPageState extends State<ConsentPage> {
   void _reject() {
     setState(() => _rejected = true);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('不同意将无法使用本产品')),
+      SnackBar(content: Text(context.l10n.disagreeCannotUse)),
     );
   }
 
@@ -68,13 +69,13 @@ class _ConsentPageState extends State<ConsentPage> {
                       SizedBox(height: rpx(20)),
                       const BrandLogo(size: 100),
                       SizedBox(height: rpx(20)),
-                      Text('欢迎使用领翼golf',
+                      Text(context.l10n.consentWelcome,
                           style: TextStyle(
                               fontSize: rpx(50),
                               fontWeight: FontWeight.w700,
                               color: BrandColors.primary)),
                       SizedBox(height: rpx(12)),
-                      Text('你的随身高尔夫智能教练',
+                      Text(context.l10n.tagline,
                           style: TextStyle(
                               fontSize: rpx(32),
                               color: BrandColors.textSecondary)),
@@ -104,19 +105,19 @@ class _ConsentPageState extends State<ConsentPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('在开始之前',
+          Text(context.l10n.consentBefore,
               style: TextStyle(
                   fontSize: rpx(36),
                   fontWeight: FontWeight.w700,
                   color: BrandColors.primary)),
           SizedBox(height: rpx(16)),
-          Text('我们非常重视你的个人信息保护。使用本产品，我们需要收集：',
+          Text(context.l10n.consentIntro,
               style: TextStyle(
                   fontSize: rpx(30),
                   height: 1.5,
                   color: BrandColors.textSecondary)),
           SizedBox(height: rpx(16)),
-          ..._bullets.map((t) => Padding(
+          ..._bullets(context.l10n).map((t) => Padding(
                 padding: EdgeInsets.only(bottom: rpx(12)),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -140,7 +141,7 @@ class _ConsentPageState extends State<ConsentPage> {
               )),
           SizedBox(height: rpx(4)),
           Text(
-            '所有数据均存储在中国境内服务器，采用加密传输与存储。你可在「我的」页面随时查看、删除或注销账号。',
+            context.l10n.consentStorage,
             style: TextStyle(
                 fontSize: rpx(30),
                 height: 1.5,
@@ -186,15 +187,15 @@ class _ConsentPageState extends State<ConsentPage> {
           ),
           GestureDetector(
             onTap: () => setState(() => _agreed = !_agreed),
-            child: Text('我已阅读并同意',
+            child: Text(context.l10n.agreeReadPrefix,
                 style: TextStyle(
                     fontSize: rpx(30), color: BrandColors.textSecondary)),
           ),
-          _link('《用户服务协议》', LegalKind.terms),
-          Text('与',
+          _link(context.l10n.userAgreement, LegalKind.terms),
+          Text(context.l10n.withWord,
               style: TextStyle(
                   fontSize: rpx(30), color: BrandColors.textSecondary)),
-          _link('《隐私政策》', LegalKind.privacy),
+          _link(context.l10n.privacyPolicy, LegalKind.privacy),
         ],
       ),
     );
@@ -227,7 +228,7 @@ class _ConsentPageState extends State<ConsentPage> {
               decoration: BoxDecoration(
                   color: BrandColors.primary,
                   borderRadius: BorderRadius.circular(Radii.md)),
-              child: Text('同意并继续',
+              child: Text(context.l10n.agreeContinue,
                   style: TextStyle(
                       fontSize: rpx(36),
                       fontWeight: FontWeight.w600,
@@ -241,7 +242,7 @@ class _ConsentPageState extends State<ConsentPage> {
           child: SizedBox(
             height: rpx(64),
             child: Center(
-              child: Text('暂不同意',
+              child: Text(context.l10n.notNow,
                   style: TextStyle(
                       fontSize: rpx(32), color: BrandColors.textTertiary)),
             ),
@@ -250,7 +251,7 @@ class _ConsentPageState extends State<ConsentPage> {
         if (_rejected)
           Padding(
             padding: EdgeInsets.only(top: rpx(24)),
-            child: Text('若暂不同意，请退出。你可以随时重新进入并选择同意。',
+            child: Text(context.l10n.consentDisagreeExit,
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: rpx(28), color: BrandColors.warning)),
           ),

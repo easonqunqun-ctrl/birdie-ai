@@ -39,6 +39,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user, resolve_request_role
 from app.constants.chat_quick_questions import QUICK_QUESTIONS
 from app.core.database import get_db
+from app.core.locale import reply_locale_from_accept_language
 from app.core.rate_limit import check_chat_send_rate
 from app.core.redis import get_redis
 from app.models.user import User
@@ -246,6 +247,8 @@ async def send_message(
     # 速率限制：每分钟 20 次；超限直接抛 40009（在 service 前置，节省 LLM 开销）
     await check_chat_send_rate(redis, user.id)
 
+    reply_locale = reply_locale_from_accept_language(request.headers.get("accept-language"))
+
     if not _wants_sse(request, stream):
         result = await chat_service.send_message_sync(
             user=user,
@@ -254,6 +257,7 @@ async def send_message(
             db=db,
             request_role=request_role,
             redis=redis,
+            reply_locale=reply_locale,
         )
         await db.commit()
         return ok(result, message="发送成功")
@@ -266,6 +270,7 @@ async def send_message(
         content=payload.content,
         request_role=request_role,
         redis=redis,
+        reply_locale=reply_locale,
     )
     if prepared.boundary_assistant is not None:
         gen = chat_service.stream_boundary_reply(

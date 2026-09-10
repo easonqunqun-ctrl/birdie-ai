@@ -205,3 +205,6 @@ secrets/
 *.env.cvm.*
 cvm-*.env*
 .env.cvm*
+
+# 运营材料（软著证件等，勿提交）
+运营/

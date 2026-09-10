@@ -6,6 +6,7 @@ import '../../../core/golf_options.dart';
 import '../../../theme/brand_colors.dart';
 import '../../../theme/dimens.dart';
 import '../../auth/auth_controller.dart';
+import '../../../l10n/l10n.dart';
 
 /// 新用户引导：对照 client/src/pages/onboarding/index.tsx（v1 三步流）。
 class OnboardingPage extends StatefulWidget {
@@ -62,15 +63,15 @@ class _OnboardingPageState extends State<OnboardingPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('跳过档案？'),
-        content: const Text('你可以在「我的 · 我的画像」里随时补填，AI 教练会更懂你。'),
+        title: Text(context.l10n.skipProfileTitle),
+        content: Text(context.l10n.skipProfileBody),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('继续填写')),
+              child: Text(context.l10n.keepFilling)),
           TextButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('确认跳过')),
+              child: Text(context.l10n.confirmSkip)),
         ],
       ),
     );
@@ -138,7 +139,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
         SizedBox(width: rpx(16)),
         GestureDetector(
           onTap: _submitting ? null : _skip,
-          child: Text(_submitting ? '跳过中…' : '跳过',
+          child: Text(_submitting ? context.l10n.skipping : context.l10n.skip,
               style: TextStyle(
                   fontSize: rpx(28), color: BrandColors.textTertiary)),
         ),
@@ -147,22 +148,28 @@ class _OnboardingPageState extends State<OnboardingPage> {
   }
 
   Widget _stepBody() {
+    final l10n = context.l10n;
     switch (_step) {
       case 1:
-        return _stepColumn('你的高尔夫水平？', [
+        return _stepColumn(l10n.onboardingLevelQ, [
           for (final l in levels)
-            _option(l.label, _level == l.value, () => setState(() => _level = l.value),
-                desc: l.desc),
+            _option(
+                localizedLevel(l10n, l.value),
+                _level == l.value,
+                () => setState(() => _level = l.value),
+                desc: localizedLevelDesc(l10n, l.value)),
         ]);
       case 2:
-        return _stepColumn('主要目标？（最多 $maxGoals 个）', [
+        return _stepColumn(l10n.onboardingGoalsQ(maxGoals), [
           for (final g in goals)
-            _option(g.label, _goals.contains(g.value), () => _toggleGoal(g.value)),
+            _option(localizedGoal(l10n, g.value), _goals.contains(g.value),
+                () => _toggleGoal(g.value)),
         ]);
       default:
-        return _stepColumn('练习频率？', [
+        return _stepColumn(l10n.onboardingFreqQ, [
           for (final f in freqs)
-            _option(f.label, _freq == f.value, () => setState(() => _freq = f.value)),
+            _option(localizedFreq(l10n, f.value), _freq == f.value,
+                () => setState(() => _freq = f.value)),
         ]);
     }
   }
@@ -249,7 +256,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   borderRadius: BorderRadius.circular(Radii.md),
                   border: Border.all(color: BrandColors.border),
                 ),
-                child: Text('上一步',
+                child: Text(context.l10n.previousStep,
                     style: TextStyle(
                         fontSize: rpx(34), color: BrandColors.textSecondary)),
               ),
@@ -282,7 +289,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
                             strokeWidth: 2,
                             valueColor: AlwaysStoppedAnimation<Color>(
                                 BrandColors.onPrimary)))
-                    : Text(_step < _totalSteps ? '下一步' : '完成',
+                    : Text(_step < _totalSteps
+                        ? context.l10n.nextStep
+                        : context.l10n.done,
                         style: TextStyle(
                             fontSize: rpx(34),
                             fontWeight: FontWeight.w600,

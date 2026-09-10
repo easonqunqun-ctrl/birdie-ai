@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../l10n/l10n.dart';
 import '../../../theme/brand_colors.dart';
 import '../../../theme/dimens.dart';
 
@@ -7,28 +8,22 @@ import '../../../theme/dimens.dart';
 class HelpPage extends StatelessWidget {
   const HelpPage({super.key});
 
-  static const _faqs = <(String, String)>[
-    ('如何拍摄一段合格的挥杆视频？',
-        '建议在光线充足的场地，手机横屏或竖屏固定，完整拍下从预备到收杆的动作；'
-            '正面（Face-On）或侧面（Down-the-Line）机位皆可，时长 2-30 秒。'),
-    ('分析需要多久？',
-        '视频上传后，AI 通常在 30 秒内完成分析并生成报告，弱网时可能稍长。'),
-    ('分析次数用完了怎么办？',
-        '免费额度每月刷新；开通会员可享无限次挥杆分析与 AI 教练对话。'),
-    ('AI 教练能回答哪些问题？',
-        '挥杆技术、训练计划、规则疑问、装备选择等高尔夫相关问题都可以问。'),
-    ('我的数据安全吗？',
-        '所有数据存储在中国境内服务器，加密传输与存储；你可随时在「我的」删除或注销账号。'),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final faqs = <(String, String)>[
+      (l10n.faqShootQ, l10n.faqShootA),
+      (l10n.faqHowLongQ, l10n.faqHowLongA),
+      (l10n.faqQuotaQ, l10n.faqQuotaA),
+      (l10n.faqCoachQ, l10n.faqCoachA),
+      (l10n.faqDataQ, l10n.faqDataA),
+    ];
     return Scaffold(
-      appBar: AppBar(title: const Text('帮助中心')),
+      appBar: AppBar(title: Text(l10n.helpCenter)),
       body: ListView(
         padding: EdgeInsets.all(rpx(32)),
         children: [
-          for (final f in _faqs)
+          for (final f in faqs)
             Container(
               margin: EdgeInsets.only(bottom: rpx(20)),
               decoration: BoxDecoration(

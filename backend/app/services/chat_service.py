@@ -347,6 +347,7 @@ async def _build_llm_messages(
     session: ChatSession,
     user_message_content: str,
     history: list[ChatMessage],
+    reply_locale: str = "zh",
 ) -> tuple[list[dict[str, str]], str]:
     """构造 LLM 输入 messages：system + 最近 N 条历史 + 当前 user message。
 
@@ -360,7 +361,9 @@ async def _build_llm_messages(
             profile_v2 = await user_profile_v2_service.get_profile(db, user.id)
         except Exception:  # 防御：V2 表暂未迁移 / service 异常都退回 V1
             profile_v2 = None
-    system_prompt = build_system_prompt(user, recent_analyses, profile_v2=profile_v2)
+    system_prompt = build_system_prompt(
+        user, recent_analyses, profile_v2=profile_v2, reply_locale=reply_locale
+    )
 
     llm_messages: list[dict[str, str]] = [
         {"role": "system", "content": system_prompt},
@@ -381,6 +384,7 @@ async def prepare_turn(
     content: str,
     request_role: str | None = None,
     redis: Redis | None = None,
+    reply_locale: str = "zh",
 ) -> PreparedTurn:
     """发消息前置流程（同步/流式共用；**必须在 SSE 开流前调用**）:
 
@@ -464,6 +468,7 @@ async def prepare_turn(
         session=session,
         user_message_content=content,
         history=history,
+        reply_locale=reply_locale,
     )
     # 首次或升版时写入 session
     if session.system_prompt_version != prompt_version:
@@ -546,6 +551,7 @@ async def send_message_sync(
     llm_client: AbstractLLMClient | None = None,
     request_role: str | None = None,
     redis: Redis | None = None,
+    reply_locale: str = "zh",
 ) -> SendMessageResponse:
     """发消息并等 LLM 全部回完再整条返回（非流式 JSON）.
 
@@ -565,6 +571,7 @@ async def send_message_sync(
         content=content,
         request_role=request_role,
         redis=redis,
+        reply_locale=reply_locale,
     )
 
     if prepared.boundary_assistant is not None:

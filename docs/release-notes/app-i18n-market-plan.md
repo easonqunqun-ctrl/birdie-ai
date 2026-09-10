@@ -1,8 +1,8 @@
 # App 多语言 · 第一 / 第二梯队市场计划
 
-> **状态**：已入队（2026-07-20）· **未开工**  
-> **载体**：以 **RN App** 为主（微信小程序仍服务中国大陆简体；不做「小程序全球多语言」）  
-> **真源互链**：[`docs/19`](../19-产品开发迭代计划-当前队列.md) **Q-D3 / I18N-*** · [`docs/18-W10`](../18-W10-RN-App端规划.md) · [`product-priority-memo-2026-07-18.md`](./product-priority-memo-2026-07-18.md) **PP-15**  
+> **状态**：I18N-00 **进行中**（2026-09-10）· Flutter App 可切简体 / 英语  
+> **载体**：以 **Flutter App**（`app/`）为主；原规划写 RN，已由 Flutter 替代。微信小程序仍服务中国大陆简体，**不做**小程序全球多语言。  
+> **真源互链**：[`docs/19`](../19-产品开发迭代计划-当前队列.md) **Q-D3 / I18N-*** · [`docs/02`](../02-API接口设计文档.md) **§1.2.1 Accept-Language** · 英文商店文案 [`app-store-asc-copy-en.md`](./app-store-asc-copy-en.md)  
 > **旧链**：原 [`app-i18n-tier2-market-plan.md`](./app-i18n-tier2-market-plan.md) 已并入本文，请以本文为准。
 
 ---
@@ -24,9 +24,9 @@
 ## 2. 建议落地顺序（总序）
 
 ```text
-Q-D1 RN App 主链路可内测
-  → I18N-00    框架 + zh-Hans 默认资源
-  → I18N-T1-EN 英语（美加 / 英联邦商店与教练文案）     ← 第一梯队 Phase A
+Q-D1 Flutter App 主链路可内测
+  → I18N-00    框架 + zh-Hans 默认资源 + en 主路径 chrome     ← 进行中（2026-09-10）
+  → I18N-T1-EN 英语（issue/drill 人工审 + 美加英澳新商店）     ← 第一梯队 Phase A
   → I18N-T1-HANT 繁体中文（港澳台 / 海外华人）         ← 第一梯队 Phase B
   → I18N-T2-SG 新马英+中运营试点                        ← 第二梯队
   → I18N-T2-JP / I18N-T2-KR 二选一深本地化（默认先日）
@@ -60,7 +60,7 @@ Q-D1 RN App 主链路可内测
 
 | PLAN-ID | 梯队 | P | 事项 | 验收要点 |
 |---------|------|---|------|----------|
-| **I18N-00** | 底座 | P1（App） | locale 框架、资源目录、引擎/后端 `locale` 契约；默认 `zh-Hans` | RN 可切换语言；契约写入 `docs/02` |
+| **I18N-00** | 底座 | P1（App） | Flutter l10n、`LocaleController`、后端 `Accept-Language`；默认 `zh` + `en` | 设置可切语言；主路径 chrome 英/中；契约写入 `docs/02` §1.2.1 |
 | **I18N-T1-EN** | T1 | P1（App） | 英语 UI 全量 + issue/drill/分数说明/LLM prompt；美加英澳新商店材料 | 英语球友可走完「拍→报告→训练→对话」；术语表教研签 |
 | **I18N-T1-HANT** | T1 | P1（App） | 繁体资源 + 港澳台商店/合规抽检 | 繁体主路径无简繁混杂硬伤 |
 | **I18N-T2-SG** | T2 | P2 | 新马：上架、定价、客服、PDPA 等；不强制新语言包 | 英+中可完整主路径 |
@@ -76,7 +76,7 @@ Q-D1 RN App 主链路可内测
 
 | 阶段 | 门禁 |
 |------|------|
-| 开工 **I18N-00 / T1** | **Q-D1** RN 主链路可内测（登录 / 拍摄 / 分析 / 报告）；勾选面见 [`app-m0-m1-kickoff-checklist.md`](./app-m0-m1-kickoff-checklist.md) **M1** |
+| 开工 **I18N-00 / T1** | Flutter 主链路可内测（登录 / 拍摄 / 分析 / 报告）；勾选面见 [`app-m0-m1-kickoff-checklist.md`](./app-m0-m1-kickoff-checklist.md) **M1** |
 | 开工 **T2 日/韩深翻** | **I18N-T1-EN** 已合并（英语教练内容过审）；「可机翻 / 必须人工审」清单已定 |
 | 各市场上架付费 | 该市场 IAP / 本地支付有一页决策（可先隐藏付费） |
 
@@ -96,3 +96,4 @@ Q-D1 RN App 主链路可内测
 |------|------|------|
 | v0.1 | 2026-07-20 | 初版仅第二梯队（见旧文件名 tier2） |
 | v0.2 | 2026-07-20 | **扩为第一+第二梯队**；总序 T1-EN → T1-HANT → T2；新增 **I18N-T1-EN / I18N-T1-HANT**；文件更名为 `app-i18n-market-plan.md` |
+| v0.3 | 2026-09-10 | 载体改为 Flutter；**I18N-00 开工**：l10n 框架 + 英语主路径 chrome；教练 `Accept-Language`；英文商店文案另见 `app-store-asc-copy-en.md`。issue/drill 仍中文，待 I18N-T1-EN 人工审。未开全球 175 区、未做 IAP。 |

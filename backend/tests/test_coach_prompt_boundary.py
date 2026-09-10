@@ -6,7 +6,7 @@ import pytest
 
 from app.integrations.llm import FakeLLMClient
 from app.models.user import User
-from app.services.chat_prompt import ROLE_AND_STYLE, build_system_prompt
+from app.services.chat_prompt import ROLE_AND_STYLE, ROLE_AND_STYLE_EN, build_system_prompt
 from app.services.chat_topic_boundary import (
     OFF_TOPIC_EVAL_CASES,
     TopicCategory,
@@ -14,6 +14,20 @@ from app.services.chat_topic_boundary import (
     eval_classifier_accuracy,
     reply_matches_refusal_hint,
 )
+
+
+def test_build_system_prompt_english_locale() -> None:
+    u = User(
+        id="usr_testcoach_en",
+        invite_code="ABCDE2",
+        nickname="Pat",
+        golf_level="beginner",
+    )
+    sp = build_system_prompt(u, [], reply_locale="en")
+    assert "Reply entirely in natural English" in sp
+    assert "User profile:" in sp
+    assert "Recent swing analyses" in sp
+    assert ROLE_AND_STYLE_EN.split("\n", 1)[0] in sp
 
 
 def test_system_prompt_requires_golf_only_boundary() -> None:

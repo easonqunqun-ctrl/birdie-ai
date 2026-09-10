@@ -19,6 +19,7 @@ import 'clubs_page.dart';
 import 'edit_profile_page.dart';
 import 'membership_page.dart';
 import 'settings_page.dart';
+import '../../../l10n/l10n.dart';
 
 /// 我的：对照 client/src/pages/profile/index。头部资料卡 + 统计 + 档案 + 功能入口。
 class ProfilePage extends StatelessWidget {
@@ -34,7 +35,7 @@ class ProfilePage extends StatelessWidget {
         padding: EdgeInsets.fromLTRB(rpx(32), inset.top + rpx(48), rpx(32), rpx(48)),
         child: Column(
           children: [
-            Text('我的',
+            Text(context.l10n.tabProfile,
                 style: TextStyle(
                     fontSize: rpx(40),
                     fontWeight: FontWeight.w800,
@@ -49,7 +50,7 @@ class ProfilePage extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  Text('登录后同步个人资料与分析记录',
+                  Text(context.l10n.profileSyncHint,
                       textAlign: TextAlign.center,
                       style: TextStyle(
                           fontSize: rpx(30),
@@ -66,7 +67,7 @@ class ProfilePage extends StatelessWidget {
                         backgroundColor: BrandColors.gold,
                         foregroundColor: Colors.black,
                       ),
-                      child: const Text('去登录'),
+                      child: Text(context.l10n.goLogin),
                     ),
                   ),
                 ],
@@ -74,7 +75,7 @@ class ProfilePage extends StatelessWidget {
             ),
             SizedBox(height: rpx(24)),
             _menuGroup([
-              _MenuItem(Icons.info_outline, '关于领翼golf',
+              _MenuItem(Icons.info_outline, context.l10n.aboutApp,
                   () => _go(context, const AboutPage())),
             ]),
           ],
@@ -99,34 +100,34 @@ class ProfilePage extends StatelessWidget {
           ],
           _header(context, user),
           SizedBox(height: rpx(24)),
-          _statsRow(user),
+          _statsRow(context, user),
           SizedBox(height: rpx(24)),
           _golfProfile(context, user),
           SizedBox(height: rpx(24)),
           _menuGroup([
-            _MenuItem(Icons.description_outlined, '我的分析报告',
+            _MenuItem(Icons.description_outlined, context.l10n.myReports,
                 () => _go(context, const HistoryPage())),
-            _MenuItem(Icons.chat_bubble_outline, 'AI 教练对话',
+            _MenuItem(Icons.chat_bubble_outline, context.l10n.coachChat,
                 () => _go(context, const CoachPage())),
-            _MenuItem(Icons.card_membership, '会员中心',
+            _MenuItem(Icons.card_membership, context.l10n.membershipCenter,
                 () => _go(context, const MembershipPage())),
-            _MenuItem(Icons.golf_course, '我的装备',
+            _MenuItem(Icons.golf_course, context.l10n.myClubs,
                 () => _go(context, const ClubsPage())),
           ]),
           SizedBox(height: rpx(24)),
           _menuGroup([
-            _MenuItem(Icons.school_outlined, '课程学习',
+            _MenuItem(Icons.school_outlined, context.l10n.lessons,
                 () => _go(context, const CoursesPage())),
-            _MenuItem(Icons.sports_golf, '球手对比库',
+            _MenuItem(Icons.sports_golf, context.l10n.proLibrary,
                 () => _go(context, const ProsPage())),
-            _MenuItem(Icons.groups_outlined, '约球邀请',
+            _MenuItem(Icons.groups_outlined, context.l10n.meetup,
                 () => _go(context, const MeetupPage())),
           ]),
           SizedBox(height: rpx(24)),
           _menuGroup([
-            _MenuItem(Icons.settings_outlined, '设置',
+            _MenuItem(Icons.settings_outlined, context.l10n.settings,
                 () => _go(context, const SettingsPage())),
-            _MenuItem(Icons.info_outline, '关于领翼golf',
+            _MenuItem(Icons.info_outline, context.l10n.aboutApp,
                 () => _go(context, const AboutPage())),
           ]),
           SizedBox(height: rpx(32)),
@@ -150,7 +151,7 @@ class ProfilePage extends StatelessWidget {
               const Icon(Icons.warning_amber_rounded, color: BrandColors.error),
               SizedBox(width: rpx(16)),
               Expanded(
-                child: Text('账号已排期注销，点此查看或撤销',
+                child: Text(context.l10n.deletionPending,
                     style: TextStyle(
                         fontSize: rpx(26), color: BrandColors.error)),
               ),
@@ -179,7 +180,9 @@ class ProfilePage extends StatelessWidget {
                   : null,
               child: (user?.avatarUrl?.isNotEmpty ?? false)
                   ? null
-                  : Text((user?.nickname ?? '球').characters.first,
+                  : Text((user?.nickname ?? context.l10n.golferFallback)
+                      .characters
+                      .first,
                       style: TextStyle(
                           fontSize: rpx(44),
                           color: Colors.white,
@@ -190,17 +193,17 @@ class ProfilePage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(user?.nickname ?? '球友',
+                  Text(user?.nickname ?? context.l10n.golferFallback,
                       style: TextStyle(
                           fontSize: rpx(38),
                           fontWeight: FontWeight.w800,
                           color: Colors.white)),
                   SizedBox(height: rpx(10)),
-                  _membershipBadge(user),
+                  _membershipBadge(context, user),
                 ],
               ),
             ),
-            const Text('编辑',
+            Text(context.l10n.edit,
                 style: TextStyle(color: BrandColors.onPrimaryMuted)),
             const Icon(Icons.chevron_right, color: BrandColors.onPrimaryMuted),
           ],
@@ -209,12 +212,13 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _membershipBadge(User? user) {
+  Widget _membershipBadge(BuildContext context, User? user) {
+    final l10n = context.l10n;
     if (user?.isMember == true) {
       final typeLabel = switch (user!.membershipType) {
-        'annual' => '年度会员',
-        'monthly' => '月度会员',
-        _ => '会员',
+        'annual' => l10n.memberYearly,
+        'monthly' => l10n.memberMonthly,
+        _ => l10n.memberGeneric,
       };
       return Container(
         padding: EdgeInsets.symmetric(horizontal: rpx(16), vertical: rpx(6)),
@@ -222,20 +226,22 @@ class ProfilePage extends StatelessWidget {
           color: BrandColors.gold,
           borderRadius: BorderRadius.circular(rpx(8)),
         ),
-        child: Text('$typeLabel · ${user.membershipDaysRemaining}天',
+        child: Text(
+            l10n.memberRemainingDays(typeLabel, user.membershipDaysRemaining),
             style: TextStyle(
                 fontSize: rpx(22),
                 color: Colors.black,
                 fontWeight: FontWeight.w600)),
       );
     }
-    return Text('免费用户',
+    return Text(l10n.freeUser,
         style:
             TextStyle(fontSize: rpx(26), color: BrandColors.onPrimaryMuted));
   }
 
-  Widget _statsRow(User? user) {
+  Widget _statsRow(BuildContext context, User? user) {
     final s = user?.stats;
+    final l10n = context.l10n;
     return Container(
       padding: EdgeInsets.symmetric(vertical: rpx(28)),
       decoration: BoxDecoration(
@@ -245,11 +251,11 @@ class ProfilePage extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _stat('分析次数', '${s?.totalAnalyses ?? 0}'),
+          _stat(l10n.statAnalyses, '${s?.totalAnalyses ?? 0}'),
           _divider(),
-          _stat('连续打卡', '${s?.streakDays ?? 0}'),
+          _stat(l10n.statCheckin, '${s?.streakDays ?? 0}'),
           _divider(),
-          _stat('最高分',
+          _stat(l10n.statHighScore,
               (s != null && s.bestScore > 0) ? '${s.bestScore.round()}' : '—'),
         ],
       ),
@@ -276,9 +282,10 @@ class ProfilePage extends StatelessWidget {
       );
 
   Widget _golfProfile(BuildContext context, User? user) {
+    final l10n = context.l10n;
     final goalsText = (user?.primaryGoals.isNotEmpty ?? false)
-        ? user!.primaryGoals.map((g) => goalLabels[g] ?? g).join('、')
-        : '未设置';
+        ? user!.primaryGoals.map((g) => localizedGoal(l10n, g)).join(l10n.listSep)
+        : l10n.notSet;
     return Container(
       padding: EdgeInsets.all(rpx(32)),
       decoration: BoxDecoration(
@@ -292,24 +299,24 @@ class ProfilePage extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('高尔夫档案',
+              Text(l10n.golfProfile,
                   style: TextStyle(
                       fontSize: rpx(32),
                       fontWeight: FontWeight.w700,
                       color: BrandColors.textPrimary)),
               GestureDetector(
                 onTap: () => _go(context, const EditProfilePage()),
-                child: Text('修改',
+                child: Text(l10n.modify,
                     style: TextStyle(
                         fontSize: rpx(26), color: BrandColors.primary)),
               ),
             ],
           ),
           SizedBox(height: rpx(20)),
-          _profileRow('水平', levelLabels[user?.golfLevel] ?? '未设置'),
-          _profileRow('目标', goalsText),
+          _profileRow(l10n.level, localizedLevel(l10n, user?.golfLevel)),
+          _profileRow(l10n.goals, goalsText),
           _profileRow(
-              '练习频率', freqLabels[user?.weeklyPracticeFrequency] ?? '未设置'),
+              l10n.practiceFreq, localizedFreq(l10n, user?.weeklyPracticeFrequency)),
         ],
       ),
     );
@@ -339,15 +346,15 @@ class ProfilePage extends StatelessWidget {
           final ok = await showDialog<bool>(
             context: context,
             builder: (c) => AlertDialog(
-              title: const Text('提示'),
-              content: const Text('确认退出登录？'),
+              title: Text(context.l10n.prompt),
+              content: Text(context.l10n.logoutConfirm),
               actions: [
                 TextButton(
                     onPressed: () => Navigator.pop(c, false),
-                    child: const Text('取消')),
+                    child: Text(context.l10n.cancel)),
                 TextButton(
                     onPressed: () => Navigator.pop(c, true),
-                    child: const Text('退出登录')),
+                    child: Text(context.l10n.logout)),
               ],
             ),
           );
@@ -363,7 +370,7 @@ class ProfilePage extends StatelessWidget {
             borderRadius: BorderRadius.circular(Radii.md),
             border: Border.all(color: BrandColors.border),
           ),
-          child: Text('退出登录',
+          child: Text(context.l10n.logout,
               style: TextStyle(fontSize: rpx(32), color: BrandColors.error)),
         ),
       );

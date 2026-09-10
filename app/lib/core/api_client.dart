@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' as ui;
 import 'package:http/http.dart' as http;
 
 import 'env.dart';
@@ -90,6 +91,7 @@ class ApiClient {
 
     final h = <String, String>{
       'Content-Type': 'application/json',
+      'Accept-Language': _acceptLanguage(),
       ...?headers,
     };
     if (!noAuth) {
@@ -192,6 +194,13 @@ class ApiClient {
     if (fromBody is String && fromBody.trim().isNotEmpty) return fromBody.trim();
     final raw = headers['x-request-id'];
     return (raw != null && raw.trim().isNotEmpty) ? raw.trim() : null;
+  }
+
+  String _acceptLanguage() {
+    final stored = AppStorage.instance.acceptLanguageHeader();
+    if (stored.isNotEmpty) return stored;
+    final code = ui.PlatformDispatcher.instance.locale.languageCode;
+    return code == 'en' ? 'en-US' : 'zh-CN';
   }
 
   String _friendlyNetwork(String raw) {

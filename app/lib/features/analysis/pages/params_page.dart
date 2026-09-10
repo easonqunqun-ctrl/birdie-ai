@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/ai_data_consent.dart';
 import '../../../core/analysis_options.dart';
 import '../../../core/sanitize_swing_candidates.dart';
 import '../../../theme/brand_colors.dart';
@@ -9,6 +10,7 @@ import '../../../widgets/primary_button.dart';
 import '../analysis_controller.dart';
 import 'select_swing_page.dart';
 import 'waiting_page.dart';
+import '../../../l10n/l10n.dart';
 
 /// 分析参数页：球杆 / 机位 → 上传 →（可选选段）→ waiting。
 /// 对照 client/src/pages/analysis/params.tsx（精简版：无质量预检/模式切换）。
@@ -34,11 +36,16 @@ class _ParamsPageState extends State<ParamsPage> {
   String _cameraAngle = 'face_on';
   String _statusHint = '';
 
-  static const _modes = <(String, String, String)>[
-    ('full_swing', '全挥杆', '铁木杆 / 一号木'),
-    ('putting', '推杆', '果岭推杆'),
-    ('chipping', '切杆', '短切 / 劈起'),
-  ];
+  static const _modeIds = <String>['full_swing', 'putting', 'chipping'];
+
+  (String, String) _modeCopy(String id) {
+    final l = context.l10n;
+    return switch (id) {
+      'putting' => (l.modePutting, l.modePuttingSub),
+      'chipping' => (l.modeChipping, l.modeChippingSub),
+      _ => (l.modeFullSwing, l.modeFullSwingSub),
+    };
+  }
 
   void _toast(String m) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
@@ -66,9 +73,15 @@ class _ParamsPageState extends State<ParamsPage> {
   }
 
   Future<void> _submit() async {
+    final agreed = await AiDataConsent.ensure(
+      context,
+      kind: AiConsentKind.swingAnalysis,
+    );
+    if (!agreed || !mounted) return;
+
     final ctl = context.read<AnalysisController>();
     ctl.reset();
-    setState(() => _statusHint = '上传中…');
+    setState(() => _statusHint = context.l10n.paramsUploading);
     try {
       final token = await ctl.uploadOnly(
         filePath: widget.filePath,
@@ -79,7 +92,7 @@ class _ParamsPageState extends State<ParamsPage> {
 
       // putting / chipping 跳过选段（对齐 docs/02）
       if (_mode == 'full_swing') {
-        setState(() => _statusHint = '识别挥杆段…');
+        setState(() => _statusHint = context.l10n.paramsDetecting);
         final detected = await ctl.tryDetectSwings(token.uploadId);
         if (!mounted) return;
 
@@ -109,7 +122,7 @@ class _ParamsPageState extends State<ParamsPage> {
             detected.swingCandidates,
             detected.defaultSelectedIndex,
           );
-          setState(() => _statusHint = '创建分析任务…');
+          setState(() => _statusHint = context.l10n.paramsCreating);
           final id = await ctl.createAnalysisTask(
             uploadId: token.uploadId,
             cameraAngle: _cameraAngle,
@@ -127,7 +140,7 @@ class _ParamsPageState extends State<ParamsPage> {
         }
       }
 
-      setState(() => _statusHint = '创建分析任务…');
+      setState(() => _statusHint = context.l10n.paramsCreating);
       final id = await ctl.createAnalysisTask(
         uploadId: token.uploadId,
         cameraAngle: _cameraAngle,
@@ -139,7 +152,7 @@ class _ParamsPageState extends State<ParamsPage> {
         MaterialPageRoute(builder: (_) => WaitingPage(analysisId: id)),
       );
     } catch (_) {
-      _toast(ctl.error ?? '发起分析失败');
+      _toast(ctl.error ?? context.l10n.paramsStartFailed);
       if (mounted) setState(() => _statusHint = '');
     }
   }
@@ -151,7 +164,7 @@ class _ParamsPageState extends State<ParamsPage> {
     final bottom = MediaQuery.of(context).padding.bottom;
     return Scaffold(
       backgroundColor: BrandColors.bgPage,
-      appBar: AppBar(title: const Text('分析参数')),
+      appBar: AppBar(title: Text(context.l10n.paramsTitle)),
       body: Column(
         children: [
           Expanded(
@@ -162,22 +175,22 @@ class _ParamsPageState extends State<ParamsPage> {
                 children: [
                   _videoMeta(),
                   SizedBox(height: rpx(32)),
-                  _sectionTitle('分析模式'),
+                  _sectionTitle(context.l10n.paramsMode),
                   SizedBox(height: rpx(16)),
                   _modeSelector(),
                   if (_mode != 'full_swing') ...[
                     SizedBox(height: rpx(8)),
-                    Text('推杆/切杆需服务端灰度开启；若创建失败请改回全挥杆。',
+                    Text(context.l10n.paramsModeHint,
                         style: TextStyle(
                             fontSize: rpx(22),
                             color: BrandColors.textTertiary)),
                   ],
                   SizedBox(height: rpx(32)),
-                  _sectionTitle('球杆'),
+                  _sectionTitle(context.l10n.paramsClub),
                   SizedBox(height: rpx(16)),
                   _clubSelector(),
                   SizedBox(height: rpx(32)),
-                  _sectionTitle('拍摄机位'),
+                  _sectionTitle(context.l10n.paramsCamera),
                   SizedBox(height: rpx(16)),
                   _angleSelector(),
                   if (_statusHint.isNotEmpty) ...[
@@ -203,7 +216,7 @@ class _ParamsPageState extends State<ParamsPage> {
               border: Border(top: BorderSide(color: BrandColors.border)),
             ),
             child: PrimaryButton(
-              label: busy ? '处理中…' : '开始分析',
+              label: busy ? context.l10n.paramsProcessing : context.l10n.paramsStart,
               loading: busy,
               height: rpx(88),
               onTap: _submit,
@@ -228,7 +241,10 @@ class _ParamsPageState extends State<ParamsPage> {
             SizedBox(width: rpx(16)),
             Expanded(
               child: Text(
-                '已选视频 · ${widget.duration.toStringAsFixed(1)}s · ${_formatSize(widget.fileSize)}',
+                context.l10n.captureSelected(
+                  widget.duration.toStringAsFixed(1),
+                  _formatSize(widget.fileSize),
+                ),
                 style: TextStyle(
                     fontSize: rpx(28), color: BrandColors.textPrimary),
               ),
@@ -245,25 +261,25 @@ class _ParamsPageState extends State<ParamsPage> {
 
   Widget _modeSelector() => Column(
         children: [
-          for (final m in _modes)
+          for (final id in _modeIds)
             Padding(
               padding: EdgeInsets.only(bottom: rpx(12)),
               child: GestureDetector(
-                onTap: () => _onModeChanged(m.$1),
+                onTap: () => _onModeChanged(id),
                 child: Container(
                   width: double.infinity,
                   padding: EdgeInsets.symmetric(
                       horizontal: rpx(24), vertical: rpx(20)),
                   decoration: BoxDecoration(
-                    color: _mode == m.$1
+                    color: _mode == id
                         ? BrandColors.primaryTint
                         : BrandColors.bgCard,
                     borderRadius: BorderRadius.circular(Radii.md),
                     border: Border.all(
-                        color: _mode == m.$1
+                        color: _mode == id
                             ? BrandColors.primary
                             : BrandColors.border,
-                        width: _mode == m.$1 ? 2 : 1),
+                        width: _mode == id ? 2 : 1),
                   ),
                   child: Row(
                     children: [
@@ -271,19 +287,19 @@ class _ParamsPageState extends State<ParamsPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(m.$2,
+                            Text(_modeCopy(id).$1,
                                 style: TextStyle(
                                     fontSize: rpx(30),
                                     fontWeight: FontWeight.w700,
                                     color: BrandColors.primary)),
-                            Text(m.$3,
+                            Text(_modeCopy(id).$2,
                                 style: TextStyle(
                                     fontSize: rpx(24),
                                     color: BrandColors.textTertiary)),
                           ],
                         ),
                       ),
-                      if (_mode == m.$1)
+                      if (_mode == id)
                         const Icon(Icons.check_circle,
                             color: BrandColors.primary),
                     ],

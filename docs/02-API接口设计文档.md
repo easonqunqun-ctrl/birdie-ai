@@ -45,6 +45,17 @@ Authorization: Bearer <jwt_token>
 }
 ```
 
+### 1.2.1 语言（`Accept-Language`）
+
+App 端通过请求头声明 UI 语言；**仅 AI 教练回复**据此切换英文 prompt，其它接口仍返回既有中文字段（issue / drill 名称等需人工审校后再国际化）。
+
+| 请求头 | 示例 | 服务端行为 |
+|--------|------|------------|
+| `Accept-Language` | `zh-CN` / `zh-Hans` / 缺省 | 教练回复中文（默认） |
+| `Accept-Language` | `en` / `en-US` / `en-GB` | 教练 system prompt 使用英文角色设定，要求整段英文回复 |
+
+解析见 `backend/app/core/locale.py`：取第一个 tag，`en*` → `en`，其余 → `zh`。微信小程序不发送此头，保持简体。
+
 ### 1.3 统一响应格式
 
 **成功响应**：

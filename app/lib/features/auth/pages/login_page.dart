@@ -9,6 +9,7 @@ import '../../../core/apple_auth.dart';
 import '../../../theme/brand_colors.dart';
 import '../../../theme/dimens.dart';
 import '../../../widgets/brand_logo.dart';
+import '../../../l10n/l10n.dart';
 import '../auth_controller.dart';
 import '../../legal/pages/legal_page.dart';
 
@@ -27,11 +28,11 @@ class _LoginPageState extends State<LoginPage> {
   bool _showInvite = false;
   final _inviteCtl = TextEditingController();
 
-  static const _features = [
-    ('📹', 'AI 挥杆分析，30 秒出报告'),
-    ('💬', '24 小时 AI 教练在线问答'),
-    ('📈', '个性化训练方案'),
-  ];
+  List<(String, String)> _features(AppLocalizations l10n) => [
+        ('📹', l10n.featureSwing),
+        ('💬', l10n.featureCoach),
+        ('📈', l10n.featurePlan),
+      ];
 
   @override
   void dispose() {
@@ -47,7 +48,7 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _login() async {
     if (!_agreed) {
-      _toast('请先勾选协议');
+      _toast(context.l10n.agreeFirst);
       return;
     }
     if (_loading) return;
@@ -71,7 +72,7 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _loginApple() async {
     if (!_agreed) {
-      _toast('请先勾选协议');
+      _toast(context.l10n.agreeFirst);
       return;
     }
     if (_loading) return;
@@ -94,6 +95,7 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final inset = MediaQuery.of(context).padding;
     return Scaffold(
       body: Container(
@@ -115,51 +117,38 @@ class _LoginPageState extends State<LoginPage> {
                   children: [
                     const BrandLogo(size: 100),
                     SizedBox(height: rpx(16)),
-                    Text('领翼golf',
+                    Text(l10n.appName,
                         style: TextStyle(
                             fontSize: rpx(54),
                             fontWeight: FontWeight.w700,
                             color: BrandColors.primary)),
                     SizedBox(height: rpx(8)),
-                    Text('你的随身高尔夫智能教练',
+                    Text(l10n.tagline,
                         style: TextStyle(
                             fontSize: rpx(30),
                             color: BrandColors.textSecondary)),
                     SizedBox(height: rpx(48)),
-                    ..._features.map(_featureRow),
+                    ..._features(l10n).map(_featureRow),
                     SizedBox(height: rpx(28)),
                   ],
                 ),
               ),
               _agreement(),
               SizedBox(height: rpx(20)),
-              SizedBox(
-                width: double.infinity,
-                child: GestureDetector(
-                  onTap: (!_agreed || _loading) ? null : _login,
-                  child: Opacity(
-                    opacity: (!_agreed || _loading) ? 0.45 : 1,
-                    child: Container(
-                      height: rpx(88),
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                          color: BrandColors.primary,
-                          borderRadius: BorderRadius.circular(Radii.md)),
-                      child: Text(_loading ? '登录中...' : '微信一键登录',
-                          style: TextStyle(
-                              fontSize: rpx(36),
-                              fontWeight: FontWeight.w600,
-                              color: BrandColors.onPrimary)),
-                    ),
-                  ),
-                ),
-              ),
+              // iOS App Store：不得要求先安装微信才能登录（Guideline 4.2.3(i)）
               if (Platform.isIOS) ...[
-                SizedBox(height: rpx(16)),
                 FutureBuilder<bool>(
                   future: AppleAuth.isAvailable,
                   builder: (context, snap) {
-                    if (snap.data != true) return const SizedBox.shrink();
+                    if (snap.data != true) {
+                      return Text(
+                        l10n.appleDeviceRequired,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            fontSize: rpx(28),
+                            color: BrandColors.textSecondary),
+                      );
+                    }
                     return SignInWithAppleButton(
                       onPressed: (!_agreed || _loading) ? () {} : _loginApple,
                       style: SignInWithAppleButtonStyle.black,
@@ -167,6 +156,33 @@ class _LoginPageState extends State<LoginPage> {
                       height: rpx(88),
                     );
                   },
+                ),
+                SizedBox(height: rpx(12)),
+                Text(l10n.appleLoginHint,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: rpx(24), color: BrandColors.textTertiary)),
+              ] else ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: GestureDetector(
+                    onTap: (!_agreed || _loading) ? null : _login,
+                    child: Opacity(
+                      opacity: (!_agreed || _loading) ? 0.45 : 1,
+                      child: Container(
+                        height: rpx(88),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                            color: BrandColors.primary,
+                            borderRadius: BorderRadius.circular(Radii.md)),
+                        child: Text(_loading ? l10n.signingIn : l10n.wechatLogin,
+                            style: TextStyle(
+                                fontSize: rpx(36),
+                                fontWeight: FontWeight.w600,
+                                color: BrandColors.onPrimary)),
+                      ),
+                    ),
+                  ),
                 ),
               ],
               SizedBox(height: rpx(16)),
@@ -188,7 +204,7 @@ class _LoginPageState extends State<LoginPage> {
                     borderRadius: BorderRadius.circular(Radii.md),
                     border: Border.all(color: BrandColors.border),
                   ),
-                  child: Text('暂不登录，先逛逛',
+                  child: Text(l10n.browseAsGuest,
                       style: TextStyle(
                           fontSize: rpx(30),
                           fontWeight: FontWeight.w600,
@@ -262,15 +278,15 @@ class _LoginPageState extends State<LoginPage> {
           ),
           GestureDetector(
             onTap: () => setState(() => _agreed = !_agreed),
-            child: Text('我已阅读并同意',
+            child: Text(context.l10n.agreeReadPrefix,
                 style: TextStyle(
                     fontSize: rpx(28), color: BrandColors.textSecondary)),
           ),
-          _link('《用户服务协议》', LegalKind.terms),
-          Text('和',
+          _link(context.l10n.userAgreement, LegalKind.terms),
+          Text(context.l10n.andWord,
               style: TextStyle(
                   fontSize: rpx(28), color: BrandColors.textSecondary)),
-          _link('《隐私政策》', LegalKind.privacy),
+          _link(context.l10n.privacyPolicy, LegalKind.privacy),
         ],
       ),
     );
@@ -291,7 +307,7 @@ class _LoginPageState extends State<LoginPage> {
     if (!_showInvite) {
       return GestureDetector(
         onTap: () => setState(() => _showInvite = true),
-        child: Text('有邀请码？点击填写（可选）',
+        child: Text(context.l10n.inviteOptional,
             style: TextStyle(
                 fontSize: rpx(28),
                 color: BrandColors.primary,
@@ -308,7 +324,7 @@ class _LoginPageState extends State<LoginPage> {
           style: TextStyle(fontSize: rpx(34), letterSpacing: 4),
           decoration: InputDecoration(
             counterText: '',
-            hintText: '请输入 8 位邀请码',
+            hintText: context.l10n.inviteHint,
             filled: true,
             fillColor: BrandColors.bgCard,
             contentPadding: EdgeInsets.symmetric(horizontal: rpx(24)),
@@ -328,7 +344,7 @@ class _LoginPageState extends State<LoginPage> {
           },
         ),
         SizedBox(height: rpx(12)),
-        Text('使用邀请码：你与邀请人本月各 +1 次分析',
+        Text(context.l10n.inviteBonus,
             style: TextStyle(
                 fontSize: rpx(28), color: BrandColors.textSecondary)),
       ],

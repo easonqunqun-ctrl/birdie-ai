@@ -14,6 +14,8 @@ import '../../../widgets/progress_line_chart.dart';
 import '../../analysis/pages/capture_page.dart';
 import '../../auth/auth_controller.dart';
 import '../../auth/pages/login_page.dart';
+import '../../../l10n/l10n.dart';
+import '../../../core/golf_options.dart';
 
 /// 训练：对照 client training — 计划 + 打卡月历 + 进步曲线。
 class TrainingPage extends StatefulWidget {
@@ -139,7 +141,7 @@ class _TrainingPageState extends State<TrainingPage> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('打卡失败，请稍后重试')));
+          .showSnackBar(SnackBar(content: Text(context.l10n.checkinFailed)));
     } finally {
       if (mounted) setState(() => _submitting = null);
     }
@@ -149,18 +151,21 @@ class _TrainingPageState extends State<TrainingPage> {
     showDialog<void>(
       context: context,
       builder: (c) => AlertDialog(
-        title: Text(streak != null && streak > 0 ? '打卡成功！连续 $streak 天' : '打卡成功！'),
-        content: const Text('建议用相同机位再拍一次挥杆，对比是否改善。'),
+        title: Text(streak != null && streak > 0
+            ? context.l10n.checkinStreak(streak)
+            : context.l10n.checkinOk),
+        content: Text(context.l10n.checkinSuggestReshoot),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(c), child: const Text('稍后再说')),
+              onPressed: () => Navigator.pop(c),
+              child: Text(context.l10n.later)),
           TextButton(
             onPressed: () {
               Navigator.pop(c);
               Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const CapturePage()));
             },
-            child: const Text('去拍摄'),
+            child: Text(context.l10n.goCapture),
           ),
         ],
       ),
@@ -172,7 +177,7 @@ class _TrainingPageState extends State<TrainingPage> {
     final loggedIn = context.watch<AuthController>().isLoggedIn;
     return Scaffold(
       backgroundColor: BrandColors.bgPage,
-      appBar: AppBar(title: const Text('训练')),
+      appBar: AppBar(title: Text(context.l10n.training)),
       body: !loggedIn
           ? _guest()
           : _loading
@@ -211,13 +216,13 @@ class _TrainingPageState extends State<TrainingPage> {
               Icon(Icons.fitness_center_outlined,
                   size: rpx(100), color: BrandColors.textTertiary),
               SizedBox(height: rpx(24)),
-              Text('登录后查看训练计划',
+              Text(context.l10n.loginToSeePlan,
                   style: TextStyle(
                       fontSize: rpx(34),
                       fontWeight: FontWeight.w700,
                       color: BrandColors.textPrimary)),
               SizedBox(height: rpx(12)),
-              Text('打卡日历与进步曲线也会在登录后展示',
+              Text(context.l10n.loginToSeeCalendar,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                       fontSize: rpx(26), color: BrandColors.textSecondary)),
@@ -225,7 +230,7 @@ class _TrainingPageState extends State<TrainingPage> {
               ElevatedButton(
                 onPressed: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const LoginPage())),
-                child: const Text('去登录'),
+                child: Text(context.l10n.goLogin),
               ),
             ],
           ),
@@ -242,7 +247,7 @@ class _TrainingPageState extends State<TrainingPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('练习日历',
+            Text(context.l10n.practiceCalendar,
                 style: TextStyle(
                     fontSize: rpx(30),
                     fontWeight: FontWeight.w700,
@@ -274,20 +279,20 @@ class _TrainingPageState extends State<TrainingPage> {
         children: [
           Row(
             children: [
-              Text('进步曲线',
+              Text(context.l10n.progressCurve,
                   style: TextStyle(
                       fontSize: rpx(30),
                       fontWeight: FontWeight.w700,
                       color: BrandColors.textPrimary)),
               const Spacer(),
-              _windowPill(90, '近 90 天'),
+              _windowPill(90, context.l10n.last90),
               SizedBox(width: rpx(12)),
-              _windowPill(0, '全部'),
+              _windowPill(0, context.l10n.allTime),
             ],
           ),
           SizedBox(height: rpx(16)),
           if (!isMember && _progressPoints.isEmpty)
-            Text('完成分析后可查看得分趋势；会员可见更完整曲线。',
+            Text(context.l10n.progressHint,
                 style: TextStyle(
                     fontSize: rpx(26), color: BrandColors.textSecondary))
           else
@@ -348,13 +353,13 @@ class _TrainingPageState extends State<TrainingPage> {
         padding: EdgeInsets.symmetric(vertical: rpx(48)),
         child: Column(
           children: [
-            Text('还没有训练计划',
+            Text(context.l10n.noPlanTitle,
                 style: TextStyle(
                     fontSize: rpx(34),
                     fontWeight: FontWeight.w700,
                     color: BrandColors.textPrimary)),
             SizedBox(height: rpx(12)),
-            Text('先上传一次挥杆视频，AI 会根据分析结果为你生成本周专属训练',
+            Text(context.l10n.noPlanBody,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                     fontSize: rpx(26), color: BrandColors.textSecondary)),
@@ -366,7 +371,7 @@ class _TrainingPageState extends State<TrainingPage> {
                 Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const CapturePage()));
               },
-              child: const Text('去上传视频'),
+              child: Text(context.l10n.goUpload),
             ),
           ],
         ),
@@ -390,7 +395,7 @@ class _TrainingPageState extends State<TrainingPage> {
                   fontSize: rpx(32),
                   fontWeight: FontWeight.w700,
                   color: BrandColors.textPrimary)),
-          Text('$count 个任务',
+          Text(context.l10n.taskCount(count),
               style: TextStyle(
                   fontSize: rpx(24), color: BrandColors.textTertiary)),
         ],
@@ -402,11 +407,11 @@ class _TrainingPageState extends State<TrainingPage> {
           children: [
             Text('😣', style: TextStyle(fontSize: rpx(80))),
             SizedBox(height: rpx(20)),
-            Text('加载失败，请稍后再试',
+            Text(context.l10n.loadFailedRetry,
                 style: TextStyle(
                     fontSize: rpx(28), color: BrandColors.textSecondary)),
             SizedBox(height: rpx(24)),
-            OutlinedButton(onPressed: _reload, child: const Text('重新加载')),
+            OutlinedButton(onPressed: _reload, child: Text(context.l10n.reload)),
           ],
         ),
       );
@@ -426,7 +431,7 @@ class _TrainingPageState extends State<TrainingPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('本周训练',
+              Text(context.l10n.weekPlan,
                   style: TextStyle(
                       fontSize: rpx(28), color: BrandColors.onPrimaryMuted)),
               if (_weekRange(plan).isNotEmpty)
@@ -446,7 +451,7 @@ class _TrainingPageState extends State<TrainingPage> {
                       fontWeight: FontWeight.w800,
                       color: BrandColors.onPrimary)),
               SizedBox(width: rpx(12)),
-              Text('已完成',
+              Text(context.l10n.completed,
                   style: TextStyle(
                       fontSize: rpx(26), color: BrandColors.onPrimaryMuted)),
             ],
@@ -464,7 +469,7 @@ class _TrainingPageState extends State<TrainingPage> {
           ),
           if (streak > 0) ...[
             SizedBox(height: rpx(16)),
-            Text('连续打卡 $streak 天',
+            Text(context.l10n.streakDays(streak),
                 style: TextStyle(
                     fontSize: rpx(24), color: BrandColors.onPrimaryMuted)),
           ],
@@ -516,7 +521,7 @@ class _TrainingPageState extends State<TrainingPage> {
                     decoration:
                         t.isCompleted ? TextDecoration.lineThrough : null,
                     color: BrandColors.textPrimary)),
-            subtitle: Text(t.isCompleted ? '已完成' : '待完成',
+            subtitle: Text(t.isCompleted ? context.l10n.completed : context.l10n.pending,
                 style: TextStyle(
                     fontSize: rpx(24),
                     color: t.isCompleted
@@ -545,7 +550,9 @@ class _TrainingPageState extends State<TrainingPage> {
                       width: double.infinity,
                       child: ElevatedButton(
                         onPressed: submitting ? null : () => _complete(t),
-                        child: Text(submitting ? '提交中…' : '完成打卡'),
+                        child: Text(submitting
+                            ? context.l10n.submitting
+                            : context.l10n.completeCheckin),
                       ),
                     ),
                   ],
@@ -560,8 +567,8 @@ class _TrainingPageState extends State<TrainingPage> {
   String _dayLabel(String date) {
     final d = DateTime.tryParse(date);
     if (d == null) return date;
-    const weekdays = ['一', '二', '三', '四', '五', '六', '日'];
-    return '${d.month}/${d.day} 周${weekdays[d.weekday - 1]}';
+    return context.l10n.dateWeekday(
+        '${d.month}/${d.day}', localizedWeekday(context.l10n, d.weekday));
   }
 
   String _weekRange(TrainingPlan plan) {

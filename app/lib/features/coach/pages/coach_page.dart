@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/ai_data_consent.dart';
 import '../../../data/models/chat.dart';
 import '../../../nav/require_login.dart';
 import '../../../theme/brand_colors.dart';
@@ -9,9 +10,7 @@ import '../../../theme/dimens.dart';
 import '../../analysis/pages/report_page.dart';
 import '../../auth/auth_controller.dart';
 import '../chat_controller.dart';
-
-const _kWelcomeText =
-    '你好！我是领翼golf 的 AI 高尔夫教练。随时问我挥杆技术、练习方法或高尔夫知识方面的问题。';
+import '../../../l10n/l10n.dart';
 
 /// AI 教练：对照 client/src/pages/coach/index。SSE 流式对话 + 快捷问题 + 三态。
 class CoachPage extends StatefulWidget {
@@ -70,6 +69,11 @@ class _CoachPageState extends State<CoachPage> {
   Future<void> _send(String text) async {
     final t = text.trim();
     if (t.isEmpty) return;
+    final agreed = await AiDataConsent.ensure(
+      context,
+      kind: AiConsentKind.coachChat,
+    );
+    if (!agreed || !mounted) return;
     _input.clear();
     final ctl = context.read<ChatController>();
     _scrollToBottom();
@@ -79,8 +83,8 @@ class _CoachPageState extends State<CoachPage> {
     } on ChatSubmitException catch (e) {
       if (!mounted) return;
       final msg = switch (e.kind) {
-        ChatErrorKind.quotaExhausted => '今日对话次数已用完',
-        ChatErrorKind.rateLimit => '操作太快了，稍等片刻再试',
+        ChatErrorKind.quotaExhausted => context.l10n.chatQuotaExhausted,
+        ChatErrorKind.rateLimit => context.l10n.rateLimited,
         _ => e.message,
       };
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
@@ -101,15 +105,17 @@ class _CoachPageState extends State<CoachPage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('清空对话？'),
+        title: Text(context.l10n.clearChatTitle),
         content: Text(ctl.sending
-            ? '当前 AI 正在回复，点击清空会立即中断。'
-            : '会删除本次会话的全部历史，AI 将以新会话身份开始。'),
+            ? context.l10n.clearChatStreaming
+            : context.l10n.clearChatBody),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
+              onPressed: () => Navigator.pop(c, false),
+              child: Text(context.l10n.cancel)),
           TextButton(
-              onPressed: () => Navigator.pop(c, true), child: const Text('清空')),
+              onPressed: () => Navigator.pop(c, true),
+              child: Text(context.l10n.clearAction)),
         ],
       ),
     );
@@ -124,7 +130,7 @@ class _CoachPageState extends State<CoachPage> {
     if (!loggedIn) {
       return Scaffold(
         backgroundColor: BrandColors.bgPage,
-        appBar: AppBar(title: const Text('AI 教练')),
+        appBar: AppBar(title: Text(context.l10n.tabCoach)),
         body: Padding(
           padding: EdgeInsets.all(rpx(48)),
           child: Column(
@@ -132,13 +138,13 @@ class _CoachPageState extends State<CoachPage> {
             children: [
               Text('💬', style: TextStyle(fontSize: rpx(72))),
               SizedBox(height: rpx(20)),
-              Text('登录后与 AI 教练对话',
+              Text(context.l10n.loginToChat,
                   style: TextStyle(
                       fontSize: rpx(34),
                       fontWeight: FontWeight.w700,
                       color: BrandColors.textPrimary)),
               SizedBox(height: rpx(12)),
-              Text(_kWelcomeText,
+              Text(context.l10n.coachWelcome,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                       fontSize: rpx(26),
@@ -158,7 +164,7 @@ class _CoachPageState extends State<CoachPage> {
                   await chat.bootstrapSession(
                       contextAnalysisId: widget.contextAnalysisId);
                 },
-                child: const Text('去登录'),
+                child: Text(context.l10n.goLogin),
               ),
             ],
           ),
@@ -169,7 +175,7 @@ class _CoachPageState extends State<CoachPage> {
     return Scaffold(
       backgroundColor: BrandColors.bgPage,
       appBar: AppBar(
-        title: const Text('AI 教练'),
+        title: Text(context.l10n.tabCoach),
         actions: [
           if (ctl.messages.isNotEmpty)
             IconButton(
@@ -195,15 +201,15 @@ class _CoachPageState extends State<CoachPage> {
     );
   }
 
-  Widget _bootstrapLoading() => const Center(
+  Widget _bootstrapLoading() => Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(
+            const CircularProgressIndicator(
                 valueColor: AlwaysStoppedAnimation<Color>(BrandColors.primary)),
-            SizedBox(height: 16),
-            Text('正在接入 AI 教练...',
-                style: TextStyle(color: BrandColors.textSecondary)),
+            const SizedBox(height: 16),
+            Text(context.l10n.connectingCoach,
+                style: const TextStyle(color: BrandColors.textSecondary)),
           ],
         ),
       );
@@ -214,7 +220,7 @@ class _CoachPageState extends State<CoachPage> {
           children: [
             Text('😣', style: TextStyle(fontSize: rpx(80))),
             SizedBox(height: rpx(20)),
-            Text(ctl.bootstrapError ?? '加载失败',
+            Text(ctl.bootstrapError ?? context.l10n.loadFailed,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                     fontSize: rpx(28), color: BrandColors.textSecondary)),
@@ -222,7 +228,7 @@ class _CoachPageState extends State<CoachPage> {
             OutlinedButton(
                 onPressed: () => ctl.bootstrapSession(
                     contextAnalysisId: widget.contextAnalysisId),
-                child: const Text('重新加载')),
+                child: Text(context.l10n.reload)),
           ],
         ),
       );
@@ -237,7 +243,7 @@ class _CoachPageState extends State<CoachPage> {
                 size: rpx(32), color: BrandColors.primary),
             SizedBox(width: rpx(12)),
             Expanded(
-              child: Text('基于报告的对话',
+              child: Text(context.l10n.reportBasedChat,
                   style: TextStyle(
                       fontSize: rpx(24), color: BrandColors.primaryDark)),
             ),
@@ -245,7 +251,7 @@ class _CoachPageState extends State<CoachPage> {
               onTap: () => Navigator.of(context).push(MaterialPageRoute(
                   builder: (_) =>
                       ReportPage(analysisId: ctl.contextAnalysisId!))),
-              child: Text('查看原报告 ›',
+              child: Text(context.l10n.viewOriginalReport,
                   style: TextStyle(
                       fontSize: rpx(24),
                       color: BrandColors.primary,
@@ -269,7 +275,7 @@ class _CoachPageState extends State<CoachPage> {
   }
 
   Widget _welcomeBubble() => _assistantWrap(
-        child: Text(_kWelcomeText,
+        child: Text(context.l10n.coachWelcome,
             style: TextStyle(
                 fontSize: rpx(30),
                 height: 1.55,
@@ -284,7 +290,7 @@ class _CoachPageState extends State<CoachPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('试试这些问题：',
+          Text(context.l10n.tryThese,
               style: TextStyle(
                   fontSize: rpx(28), color: BrandColors.textSecondary)),
           SizedBox(height: rpx(20)),
@@ -328,7 +334,7 @@ class _CoachPageState extends State<CoachPage> {
                               color: BrandColors.gold.withValues(alpha: 0.18),
                               borderRadius: BorderRadius.circular(rpx(6)),
                             ),
-                            child: Text('需分析',
+                            child: Text(context.l10n.needsAnalysis,
                                 style: TextStyle(
                                     fontSize: rpx(18),
                                     color: BrandColors.goldDark)),
@@ -349,11 +355,12 @@ class _CoachPageState extends State<CoachPage> {
     showDialog<void>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('需要先上传一次挥杆'),
-        content: const Text('这个问题需要结合你的挥杆分析，先去「首页 → 开始分析」拍一次吧。'),
+        title: Text(context.l10n.needUploadFirstTitle),
+        content: Text(context.l10n.needUploadFirstBody),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(c), child: const Text('我知道了')),
+              onPressed: () => Navigator.pop(c),
+              child: Text(context.l10n.gotIt)),
         ],
       ),
     );
@@ -369,7 +376,7 @@ class _CoachPageState extends State<CoachPage> {
     final initial = (context.read<AuthController>().user?.nickname?.isNotEmpty ??
             false)
         ? context.read<AuthController>().user!.nickname!.characters.first
-        : '我';
+        : context.l10n.me;
     return Padding(
       padding: EdgeInsets.only(bottom: rpx(24)),
       child: Row(
@@ -455,7 +462,7 @@ class _CoachPageState extends State<CoachPage> {
                           ),
                           if (m.errored) ...[
                             SizedBox(height: rpx(8)),
-                            Text('↻ 点击重试',
+                            Text(context.l10n.tapRetry,
                                 style: TextStyle(
                                     fontSize: rpx(24),
                                     color: BrandColors.primary)),
@@ -501,7 +508,7 @@ class _CoachPageState extends State<CoachPage> {
   void _copy(String text) {
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('已复制')));
+        .showSnackBar(SnackBar(content: Text(context.l10n.copied)));
   }
 
   Widget _typing() => Row(
@@ -525,10 +532,10 @@ class _CoachPageState extends State<CoachPage> {
     final r = ctl.quotaRemaining;
     final t = ctl.quotaTotal;
     final quotaText = r < 0
-        ? '会员无限次'
+        ? context.l10n.memberUnlimited
         : r == 0
-            ? '今日已用完'
-            : '今日剩余 $r/$t 次';
+            ? context.l10n.chatUsedUp
+            : context.l10n.chatRemainFrac(r, t);
     final len = _input.text.characters.length;
     return Padding(
       padding: EdgeInsets.fromLTRB(rpx(32), rpx(8), rpx(32), 0),
@@ -573,10 +580,10 @@ class _CoachPageState extends State<CoachPage> {
               decoration: InputDecoration(
                 counterText: '',
                 hintText: exhausted
-                    ? '今日对话已用完'
+                    ? context.l10n.chatUsedUpHint
                     : ctl.sending
-                        ? 'AI 正在回复，稍等片刻...'
-                        : '问问 AI 教练...',
+                        ? context.l10n.aiReplying
+                        : context.l10n.askCoachHint,
                 filled: true,
                 fillColor: BrandColors.bgSubtle,
                 isDense: true,
