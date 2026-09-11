@@ -195,14 +195,10 @@ class _HomePageState extends State<HomePage> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: _goLogin,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: BrandColors.gold,
-                  foregroundColor: Colors.black,
-                  padding: EdgeInsets.symmetric(vertical: rpx(24)),
-                ),
+                style: _heroCtaStyle(),
                 child: Text(context.l10n.loginToAnalyze,
                     style: TextStyle(
-                        fontSize: rpx(30), fontWeight: FontWeight.w700)),
+                        fontSize: rpx(30), fontWeight: FontWeight.w800)),
               ),
             ),
           ],
@@ -344,6 +340,22 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  /// 靛蓝 Hero 上的反色 CTA：白底 + 主色字，对齐小程序 `home__hero-cta`。
+  ButtonStyle _heroCtaStyle() {
+    return ElevatedButton.styleFrom(
+      backgroundColor: BrandColors.onPrimary,
+      foregroundColor: BrandColors.primary,
+      disabledBackgroundColor: BrandColors.onPrimary.withValues(alpha: 0.7),
+      disabledForegroundColor: BrandColors.primary.withValues(alpha: 0.5),
+      elevation: 4,
+      shadowColor: Colors.black.withValues(alpha: 0.28),
+      padding: EdgeInsets.symmetric(vertical: rpx(24)),
+      shape: StadiumBorder(
+        side: BorderSide(color: BrandColors.primaryTint, width: rpx(2)),
+      ),
+    );
+  }
+
   // -------------------- Hero --------------------
   Widget _hero(User? user) {
     final latest = _recent.isNotEmpty ? _recent.first : null;
@@ -369,14 +381,10 @@ class _HomePageState extends State<HomePage> {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () => _startAnalysis(user),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: BrandColors.gold,
-                foregroundColor: Colors.black,
-                padding: EdgeInsets.symmetric(vertical: rpx(24)),
-              ),
+              style: _heroCtaStyle(),
               child: Text(scoreMode ? context.l10n.uploadNewSwing : context.l10n.startFirstAnalysis,
                   style: TextStyle(
-                      fontSize: rpx(30), fontWeight: FontWeight.w700)),
+                      fontSize: rpx(30), fontWeight: FontWeight.w800)),
             ),
           ),
           SizedBox(height: rpx(12)),
