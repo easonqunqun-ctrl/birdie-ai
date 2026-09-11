@@ -9,10 +9,13 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
-  String get appName => 'Lingyi Golf';
+  String get appName => 'Birdie AI';
 
   @override
-  String get appNameShort => 'Lingyi';
+  String get appNameShort => 'Birdie';
+
+  @override
+  String get appNameAccent => 'AI';
 
   @override
   String get tagline => 'Your on-demand AI golf coach';
@@ -263,7 +266,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sectionLegal => 'Legal';
 
   @override
-  String get aboutApp => 'About Lingyi Golf';
+  String get aboutApp => 'About Birdie AI';
 
   @override
   String get deleteAccount => 'Delete account';
@@ -285,7 +288,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get memberThanks =>
-      'Thanks for supporting Lingyi. Enjoy full member access.';
+      'Thanks for supporting Birdie. Enjoy full member access.';
 
   @override
   String get membershipFreeHint =>
@@ -402,7 +405,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiConsentOurCloud =>
-      'Lingyi Golf cloud (Beijing Siwujie Holdings Co., Ltd.)';
+      'Birdie AI cloud (Beijing Siwujie Holdings Co., Ltd.)';
 
   @override
   String get aiConsentProvider =>
@@ -420,7 +423,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get coachWelcome =>
-      'Hi — I’m Lingyi Golf’s AI coach. Ask about swing technique, practice, or golf knowledge anytime.';
+      'Hi — I’m the Birdie AI coach. Ask about swing technique, practice, or golf knowledge anytime.';
 
   @override
   String get chatQuotaExhausted => 'Daily chat quota used up';
@@ -640,7 +643,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statHighScore => 'Best score';
 
   @override
-  String get consentWelcome => 'Welcome to Lingyi Golf';
+  String get consentWelcome => 'Welcome to Birdie AI';
 
   @override
   String get consentBefore => 'Before you start';

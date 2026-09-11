@@ -2,6 +2,7 @@
   "@@locale": "zh",
   "appName": "领翼golf",
   "appNameShort": "领翼",
+  "appNameAccent": "golf",
   "tagline": "你的随身高尔夫智能教练",
   "language": "语言",
   "languageSystem": "跟随系统",

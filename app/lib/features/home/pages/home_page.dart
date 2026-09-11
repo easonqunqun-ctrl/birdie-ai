@@ -130,7 +130,7 @@ class _HomePageState extends State<HomePage> {
                         fontWeight: FontWeight.w900,
                         color: BrandColors.primary)),
                 TextSpan(
-                    text: 'golf',
+                    text: context.l10n.appNameAccent,
                     style: TextStyle(
                         fontSize: rpx(38),
                         fontWeight: FontWeight.w900,
@@ -309,7 +309,7 @@ class _HomePageState extends State<HomePage> {
                       fontWeight: FontWeight.w900,
                       color: BrandColors.primary)),
               TextSpan(
-                  text: 'golf',
+                  text: context.l10n.appNameAccent,
                   style: TextStyle(
                       fontSize: rpx(38),
                       fontWeight: FontWeight.w900,

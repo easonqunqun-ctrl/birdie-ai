@@ -1,6 +1,6 @@
-CFBundleDisplayName = "Lingyi Golf";
-CFBundleName = "Lingyi Golf";
-NSCameraUsageDescription = "Lingyi Golf uses the camera to film swing videos so AI can analyze your motion and suggest practice.";
+CFBundleDisplayName = "Birdie AI";
+CFBundleName = "Birdie AI";
+NSCameraUsageDescription = "Birdie AI uses the camera to film swing videos so AI can analyze your motion and suggest practice.";
 NSMicrophoneUsageDescription = "Recording a swing video may use the microphone for ambient audio (optional).";
-NSPhotoLibraryUsageDescription = "Lingyi Golf needs photo library access to pick an existing swing video for analysis.";
+NSPhotoLibraryUsageDescription = "Birdie AI needs photo library access to pick an existing swing video for analysis.";
 NSLocalNetworkUsageDescription = "Used in internal testing to reach a development server on the same local network.";

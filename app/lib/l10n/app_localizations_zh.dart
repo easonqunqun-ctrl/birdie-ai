@@ -15,6 +15,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get appNameShort => '领翼';
 
   @override
+  String get appNameAccent => 'golf';
+
+  @override
   String get tagline => '你的随身高尔夫智能教练';
 
   @override

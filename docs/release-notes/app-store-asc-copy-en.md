@@ -1,7 +1,8 @@
-# App Store Connect copy (English · Lingyi Golf)
+# App Store Connect copy (English · Birdie AI)
 
-> 2026-09-10  
-> Paste under App Store Connect → **Lingyi** → English (U.S.) localization.  
+> 2026-09-11  
+> Paste under App Store Connect → **领翼** → English (U.S.) localization.  
+> English store name matches the app icon wordmark **Birdie AI**.  
 > Chinese listing: [`app-store-asc-copy.md`](./app-store-asc-copy.md).  
 > Do **not** open all territories until this localization is live. IAP is not in this build.
 
@@ -21,16 +22,28 @@ Review contact: `easongolf@outlook.com` · `+86 13718065377`
 
 ## 2. Listing (English)
 
+**Name** (≤30 characters):
+
+```
+Birdie AI Golf
+```
+
+**Subtitle** (≤30 characters):
+
+```
+AI golf coach
+```
+
 **Promotional text** (≤170 characters):
 
 ```
-Film a golf swing. Lingyi Golf scores it with AI, explains what to fix, and gives you a coach chat plus practice check-ins.
+Film a golf swing. Birdie AI scores it, explains what to fix, and gives you a coach chat plus practice check-ins.
 ```
 
 **Description** (≤4000 characters):
 
 ```
-Lingyi Golf is an AI golf coach for amateurs.
+Birdie AI is an AI golf coach for amateurs.
 
 [Film. Get a report.]
 Shoot a swing on your phone or pick one from Photos. AI analyzes the motion and builds a structured report so you can see what to work on.
@@ -59,13 +72,7 @@ golf,swing,AI coach,swing analysis,practice,putting,irons,driver,tempo
 **What’s New**:
 
 ```
-AI swing analysis, AI coach chat, practice check-ins, and a progress curve. Sign in with Apple.
-```
-
-**Subtitle** (≤30 characters):
-
-```
-AI golf coach
+Chinese/English UI, more reliable quota checks, Sign in with Apple. No In-App Purchases in this build.
 ```
 
 ---

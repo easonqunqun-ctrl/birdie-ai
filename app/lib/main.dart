@@ -91,13 +91,13 @@ class BirdieApp extends StatelessWidget {
         builder: (context, localeCtl, _) {
           return MaterialApp(
             title: localeCtl.preference == 'en'
-                ? 'Lingyi Golf'
+                ? 'Birdie AI'
                 : (localeCtl.preference == 'zh'
                     ? '领翼golf'
                     : (WidgetsBinding.instance.platformDispatcher.locale
                                 .languageCode ==
                             'en'
-                        ? 'Lingyi Golf'
+                        ? 'Birdie AI'
                         : '领翼golf')),
             debugShowCheckedModeBanner: false,
             theme: AppTheme.light,
