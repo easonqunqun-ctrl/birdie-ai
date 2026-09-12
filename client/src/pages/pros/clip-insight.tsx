@@ -3,7 +3,7 @@
  */
 
 import { FC, useCallback, useEffect, useState } from 'react'
-import { View, Text, ScrollView, Button } from '@tarojs/components'
+import { View, Text, ScrollView, Button, Video } from '@tarojs/components'
 import Taro, { useRouter } from '@tarojs/taro'
 import { PHASE2_PROS_ENABLED_FLAG } from '@/constants/flags'
 import { useUserStore } from '@/store/userStore'
@@ -179,6 +179,19 @@ const ClipInsightPage: FC = () => {
           {clip.overall_score != null ? ` · ${clip.overall_score} 分` : ''}
         </Text>
       </View>
+
+      {clip.video_url ? (
+        <Video
+          className='clip-insight__video'
+          src={clip.video_url}
+          poster={clip.thumbnail_url || undefined}
+          controls
+          showCenterPlayBtn
+          objectFit='contain'
+        />
+      ) : (
+        <Text className='clip-insight__empty'>暂无示范视频</Text>
+      )}
 
       <View className='clip-insight__actions'>
         <View

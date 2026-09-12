@@ -17,10 +17,17 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
+from app.config import settings
 from app.integrations.llm import FakeLLMClient
 from app.integrations.minio import get_minio_storage
 from app.main import app
 from tests.fakes import FakeAIEngine, FakeMinioStorage
+
+
+@pytest.fixture(autouse=True)
+def _cn_market_free_off_in_tests(monkeypatch: pytest.MonkeyPatch) -> None:
+    """存量用例按月度 3/5 断言；欢迎包由 test_market_quota 显式打开。"""
+    monkeypatch.setattr(settings, "CN_MARKET_FREE", False)
 
 
 @pytest.fixture

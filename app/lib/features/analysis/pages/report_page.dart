@@ -8,6 +8,7 @@ import 'package:video_player/video_player.dart';
 import '../../../core/analysis_options.dart';
 import '../../../core/drill_library.dart';
 import '../../../core/env.dart';
+import '../../../core/score_honesty.dart';
 import '../../../core/swing_constants.dart';
 import '../../../data/models/analysis.dart';
 import '../../../data/repositories/training_repository.dart';
@@ -281,6 +282,12 @@ class _ReportPageState extends State<ReportPage> {
                         fontWeight: FontWeight.w600,
                         color: BrandColors.primary)),
               ),
+              SizedBox(height: rpx(12)),
+              Text(ScoreHonestyCopy.footnote,
+                  style: TextStyle(
+                      fontSize: rpx(22),
+                      height: 1.5,
+                      color: BrandColors.textTertiary)),
               if (r.analysisConfidence != null) ...[
                 SizedBox(height: rpx(24)),
                 TrustBadge(

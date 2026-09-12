@@ -22,6 +22,15 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
     # Sign in with Apple 稳定用户标识（JWT `sub`）
     apple_sub: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
+    # 市场分流（0046）：cn|intl；各市场前 100 名欢迎包，否则月度标准配额
+    market: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    intl_welcome_granted: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
+    )
+    intl_welcome_remaining: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0"
+    )
+
     # 资料
     nickname: Mapped[str | None] = mapped_column(String(48), nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
@@ -104,6 +113,14 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
         CheckConstraint(
             "membership_type IN ('free', 'monthly', 'yearly', 'family')",
             name="chk_membership_type",
+        ),
+        CheckConstraint(
+            "market IS NULL OR market IN ('cn', 'intl')",
+            name="chk_users_market",
+        ),
+        CheckConstraint(
+            "intl_welcome_remaining >= 0",
+            name="chk_users_intl_welcome_remaining",
         ),
         CheckConstraint(
             "meetup_credit_score BETWEEN 0 AND 100",

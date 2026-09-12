@@ -42,6 +42,7 @@ import {
 import { CAMERA_ANGLE_LABEL, CLUB_TYPE_LABEL } from '@/types/analysis'
 import type { AnalysisReportResponse, PhaseWindow } from '@/types/analysis'
 import { linesForQualityWarnings, QUALITY_WARNING_IMPACT_FOOTNOTE } from '@/constants/qualityWarnings'
+import { SCORE_HONESTY_FOOTNOTE } from '@/constants/scoreHonesty'
 import {
   canTogglePlaybackSource,
   defaultPlaybackMode,
@@ -703,6 +704,7 @@ const ReportPage: FC = () => {
         <View className='report__score-guide-row' onClick={goScoreGuide}>
           <Text className='report__score-guide-link'>分数说明</Text>
         </View>
+        <Text className='report__score-honesty'>{SCORE_HONESTY_FOOTNOTE}</Text>
 
         {publicQualityLines.length > 0 && (
           <View className='report__quality-warnings'>
@@ -914,6 +916,7 @@ const ReportPage: FC = () => {
       <View className='report__score-guide-row' onClick={goScoreGuide}>
         <Text className='report__score-guide-link'>分数说明</Text>
       </View>
+      <Text className='report__score-honesty'>{SCORE_HONESTY_FOOTNOTE}</Text>
 
       {showPromoValueCard && (
         <View className='report__promo-value'>

@@ -207,6 +207,15 @@
     padding: 8rpx 4rpx;
   }
 
+  /* PP-16：杆面/触球诚实脚注（不上追踪） */
+  &__score-honesty {
+    display: block;
+    margin: -8rpx 8rpx 20rpx;
+    font-size: 24rpx;
+    line-height: 1.5;
+    color: var(--color-text-tertiary);
+  }
+
   /* PP-06 公测价值感知 */
   &__promo-value {
     margin-bottom: 24rpx;

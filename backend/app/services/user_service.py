@@ -126,6 +126,7 @@ async def login_or_create_user(
         invited_by_user_id=inviter_id,
         membership_type="free",
         last_login_at=datetime.now(UTC),
+        market="cn",
     )
     db.add(user)
     await db.flush()
@@ -183,6 +184,7 @@ async def login_or_create_user_app_oauth(
         invited_by_user_id=inviter_id,
         membership_type="free",
         last_login_at=datetime.now(UTC),
+        market="cn",
     )
     db.add(user)
     await db.flush()

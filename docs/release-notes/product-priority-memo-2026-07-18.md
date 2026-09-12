@@ -132,3 +132,4 @@ PP-12/13 真机收口
 | v0.3 | 2026-07-20 | **PP-15**：App 多语言入队（初版仅 T2） |
 | v0.4 | 2026-07-20 | **PP-15** 扩为第一+第二梯队；真源改 [`app-i18n-market-plan.md`](./app-i18n-market-plan.md)；序 en → 繁中 → T2 |
 | v0.5 | 2026-07-20 | P4 App：挂 [`app-m0-m1-kickoff-checklist.md`](./app-m0-m1-kickoff-checklist.md) 为 Q-D1 开工执行面 |
+| v0.6 | 2026-09-12 | 近两周执行面改挂 [`product-2week-close-2026-09-12.md`](./product-2week-close-2026-09-12.md)（PP-16 / PP-17）；本备忘仍为优先级真源 |

@@ -4,6 +4,7 @@
 
 import { FC } from 'react'
 import { View, Text, ScrollView } from '@tarojs/components'
+import { SCORE_HONESTY_GUIDE_BODY, SCORE_HONESTY_GUIDE_TITLE } from '@/constants/scoreHonesty'
 import './score-guide.scss'
 
 const ScoreGuidePage: FC = () => {
@@ -46,6 +47,11 @@ const ScoreGuidePage: FC = () => {
               建议按拍摄引导重新录制后再看报告。
             </Text>
           </View>
+        </View>
+
+        <View className='legal__section'>
+          <Text className='legal__section-title'>{SCORE_HONESTY_GUIDE_TITLE}</Text>
+          <Text className='legal__paragraph'>{SCORE_HONESTY_GUIDE_BODY}</Text>
         </View>
 
         <View className='legal__section'>

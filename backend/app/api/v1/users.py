@@ -41,6 +41,7 @@ from app.schemas.yardage_book import YardageBookResponse, YardageBookUpdateReque
 from app.services import (
     account_deletion_service,
     analysis_service,
+    market_service,
     promo_service,
     quota_service,
     user_clubs_service,
@@ -92,14 +93,13 @@ async def get_me(
     )
     # W8-T3：会员 / QUOTA_MODE=unlimited 都走 -1 表示无限。
     #   前端约定：值 < 0 显示"无限"，>= 0 显示具体数字。
+    welcome_active = quota_service.welcome_bucket_active(user)
     resp.quota = UserQuota(
-        analysis_remaining=quota_service.analysis_remaining(a_quota),
-        analysis_total=(
-            a_quota.total + a_quota.bonus
-            if a_quota.total >= 0
-            else quota_service.UNLIMITED_REMAINING
+        analysis_remaining=quota_service.effective_analysis_remaining(user, a_quota),
+        analysis_total=quota_service.effective_analysis_total(user, a_quota),
+        analysis_reset_at=(
+            None if welcome_active else quota_service.next_month_reset_iso()
         ),
-        analysis_reset_at=quota_service.next_month_reset_iso(),
         chat_remaining_today=quota_service.chat_remaining(c_quota),
         chat_total_today=(
             c_quota.total
@@ -108,6 +108,7 @@ async def get_me(
         ),
     )
     resp.promo_free = promo_service.status_for_response()
+    resp.market_offer = market_service.offer_for(user)
     return ok(resp)
 
 

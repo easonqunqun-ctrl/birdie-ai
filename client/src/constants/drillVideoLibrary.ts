@@ -9,15 +9,17 @@
  *   - DRILL_VIDEO_ALIGNED_IDS 暂为空 → `getDrillVideoDetail` 对所有 drill_id
  *     都返回 null → 训练页 / AI 教练对话页 / 报告页**不再渲染错配视频卡片**，
  *     用户只看文字步骤与配图，避免被误导。
- *   - 链路保持完整：当 M8 教练上传自定义视频或 M11 课程体系上线后，
- *     重新把对应 drill_id 加回 DRILL_VIDEO_ALIGNED_IDS 即恢复展示。
+ *   - **PP-08 优先 3 条**见 `PP08_PRIORITY_DRILL_IDS`；片子到了且产品签字后
+ *     **只把这几个 id** 写入 `DRILL_VIDEO_ALIGNED_IDS`，禁止把 Mixkit 旧片加回。
+ *   - 上传：本地 `{drill_id}.mp4` → `bash scripts/drill-demo-videos/upload-aligned.sh <dir>`
+ *     → MinIO `samples/drills/{drill_id}.mp4`（同源代理，前端拼装不用改）。
  *   - 用户直传 video_url（如 attachment 里带）的路径 **不受影响**，
  *     `resolveVideoCardDetail` 仍可正常解析；为 M8 / M12 自定义视频留余地。
  *
  * 重建计划：详见 [`docs/release-notes/drill-demo-video-revamp.md`](
  *   ../../../docs/release-notes/drill-demo-video-revamp.md)
- * 素材 key 仍按 `samples/drills/{drill_id}.mp4` 约定（CVM MinIO 同源代理），
- * 二期重录视频上传同路径即可，无需改前端代码。
+ *   与 [`product-2week-close-2026-09-12.md`](
+ *   ../../../docs/release-notes/product-2week-close-2026-09-12.md) §四。
  */
 
 import { getDrillDetail } from '@/constants/drillLibrary'
@@ -40,9 +42,40 @@ export interface DrillVideoDetail {
  *   3. 视频文件已上传至 MinIO `samples/drills/{drill_id}.mp4`
  *      且海报 `{drill_id}_thumb.jpg` 同步就位。
  *
- * **当前为空**：等待二期专属素材库（详见上方 JSDoc 与重建文档）。
+ * **当前为空**：等 PP-08 成片 + 产品确认画面与步骤一致后再写入。
  */
 export const DRILL_VIDEO_ALIGNED_IDS: readonly string[] = [] as const
+
+/**
+ * PP-08 两周窗口优先拍摄的 drill（最少 3 条出门）。
+ * 仅作拍摄 / 上传脚本白名单，**不等于**已上架。
+ */
+export const PP08_PRIORITY_DRILL_IDS = [
+  'drill_weight_shift',
+  'drill_hip_rotation',
+  'drill_towel_arm',
+  'drill_alignment_stick',
+  'drill_half_swing',
+] as const
+
+export const PP08_MUST_SHIP_DRILL_IDS = [
+  'drill_weight_shift',
+  'drill_hip_rotation',
+  'drill_towel_arm',
+] as const
+
+export function isPp08PriorityDrill(drillId: string): boolean {
+  return (PP08_PRIORITY_DRILL_IDS as readonly string[]).includes(drillId)
+}
+
+/** MinIO / 同源代理 object key（上传脚本与前端拼装共用约定） */
+export function drillVideoObjectKey(drillId: string): string {
+  return `samples/drills/${drillId}.mp4`
+}
+
+export function drillPosterObjectKey(drillId: string): string {
+  return `samples/drills/${drillId}_thumb.jpg`
+}
 
 /**
  * @deprecated v1.1.1 时按全部 13 个 drill_id 拼 Mixkit 通用视频造成误导。
@@ -52,11 +85,11 @@ export const DRILL_VIDEO_ALIGNED_IDS: readonly string[] = [] as const
 export const DRILL_VIDEO_IDS = DRILL_VIDEO_ALIGNED_IDS
 
 function drillVideoKey(drillId: string): string {
-  return `samples/drills/${drillId}.mp4`
+  return drillVideoObjectKey(drillId)
 }
 
 function drillPosterKey(drillId: string): string {
-  return `samples/drills/${drillId}_thumb.jpg`
+  return drillPosterObjectKey(drillId)
 }
 
 /** 示范视频卡片标题后缀（专属示范片，与文字步骤一一呼应） */

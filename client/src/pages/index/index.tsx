@@ -11,6 +11,7 @@ import { analysisService } from '@/services/analysisService'
 import { deferReLaunch } from '@/utils/deferNavigation'
 import { PAYMENT_ENABLED_FLAG } from '@/constants/flags'
 import { isPromoFreeActive, promoFreeBannerText } from '@/utils/promoFree'
+import { quotaBannerText, shouldHideMembershipPaywall } from '@/utils/marketOffer'
 import { SCORE_LEVEL_META, scoreLevelFromScore } from '@/constants/scoreLevel'
 import { CLUB_TYPE_LABEL } from '@/types/analysis'
 import { APP_SHARE_MESSAGE, APP_SHARE_TIMELINE, BRAND_LOGO } from '@/constants/brandAssets'
@@ -205,7 +206,7 @@ const HomePage: FC = () => {
     const exhausted =
       user != null &&
       !user.is_member &&
-      !isPromoFreeActive(user) &&
+      !shouldHideMembershipPaywall(user) &&
       typeof remaining === 'number' &&
       remaining === 0
     if (exhausted) {
@@ -265,8 +266,7 @@ const HomePage: FC = () => {
     if (!user.quota) return ''
     if (isPromoFreeActive(user)) return '公测期·不限次'
     if (user.is_member) return '会员·分析次数无限'
-    if (user.quota.analysis_remaining < 0) return '内测期·次数无限'
-    return `本月剩余 ${user.quota.analysis_remaining} / ${user.quota.analysis_total} 次`
+    return quotaBannerText(user)
   })()
 
   const chatRemainingText = (() => {

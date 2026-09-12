@@ -71,6 +71,6 @@ fi
 docker compose "${COMPOSE_FILES[@]}" --env-file "$ENVF" build backend celery-worker
 docker compose "${COMPOSE_FILES[@]}" --env-file "$ENVF" up -d --force-recreate backend celery-worker
 if docker ps --format '{{.Names}}' | grep -qx 'xiaoniao-nginx'; then
-  docker restart xiaoniao-nginx || true
+  docker exec xiaoniao-nginx nginx -s reload || true
 fi
 echo "=> 完成。可 curl -sk https://你的API/v1/health"

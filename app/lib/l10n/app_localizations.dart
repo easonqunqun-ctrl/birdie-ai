@@ -110,7 +110,7 @@ abstract class AppLocalizations {
   /// **'领翼'**
   String get appNameShort;
 
-  /// Wordmark accent after the short name (zh: golf / en: AI).
+  /// No description provided for @appNameAccent.
   ///
   /// In zh, this message translates to:
   /// **'golf'**

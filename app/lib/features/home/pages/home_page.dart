@@ -472,6 +472,16 @@ class _HomePageState extends State<HomePage> {
   String _quotaLine(User? user) {
     final q = user?.quota;
     if (q == null) return '';
+    final en = context.l10n.localeName.toLowerCase().startsWith('en');
+    final offer = user?.marketOffer;
+    if (q.analysisRemaining < 0) {
+      return en ? 'Unlimited analyses' : '分析次数无限';
+    }
+    if (offer?.isWelcome == true) {
+      final n = offer!.intlWelcomeRemaining ?? q.analysisRemaining;
+      final t = offer.intlWelcomeTotal;
+      return en ? 'Trial left: $n/$t' : '试用剩余 $n / $t 次';
+    }
     if ((user?.isMember ?? false) || q.analysisRemaining < 0) {
       return context.l10n.quotaMemberUnlimited;
     }

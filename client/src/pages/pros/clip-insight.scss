@@ -31,6 +31,14 @@
     display: block;
   }
 
+  &__video {
+    width: 100%;
+    height: 400rpx;
+    border-radius: 16rpx;
+    background: #111111;
+    margin-bottom: 20rpx;
+  }
+
   &__actions {
     display: flex;
     flex-direction: row;

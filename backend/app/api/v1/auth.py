@@ -1,6 +1,6 @@
 """认证相关接口：微信登录、Token 刷新."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_token_payload
@@ -110,6 +110,7 @@ async def wechat_open_login(
 )
 async def apple_login(
     payload: AppleLoginRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """校验 Apple `identity_token` 后签发与微信登录同形 JWT.
@@ -123,6 +124,15 @@ async def apple_login(
         invite_code=payload.invite_code,
         full_name=payload.full_name,
     )
+    from app.core.redis import get_redis
+    from app.services import market_service
+
+    redis = None
+    try:
+        redis = await get_redis()
+    except Exception:
+        redis = None
+    await market_service.ensure_user_market(db, user, request=request, redis=redis)
     await db.commit()
 
     token, expires_in = create_access_token(

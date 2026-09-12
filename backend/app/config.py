@@ -268,6 +268,14 @@ class Settings(BaseSettings):
     PROMO_FREE_UNTIL: str = ""
     PROMO_FREE_SKIP_HISTORY_PAYWALL: bool = True
 
+    # 各市场前 N 名各获 M 次终身分析（docs/01 §2.2.1）；国内不再不限次
+    CN_MARKET_FREE: bool = False
+    WELCOME_USER_CAP: int = 100
+    WELCOME_ANALYSES: int = 100
+    # 旧名兼容，读配置时优先 WELCOME_*
+    INTL_WELCOME_USER_CAP: int = 100
+    INTL_WELCOME_ANALYSES: int = 100
+
     # ==================== Sentry（监控告警；PMF 阶段必装） ====================
     # DSN 为空 → ``setup_sentry()`` 直接 no-op，本地开发与 CI 不需要配置；
     # 生产环境填上 Sentry 项目 DSN 后 backend / Celery 异常会自动上报。

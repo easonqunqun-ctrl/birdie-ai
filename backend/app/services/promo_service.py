@@ -36,7 +36,7 @@ def promo_free_until_iso() -> str | None:
     return until.isoformat() if until else None
 
 
-def should_skip_free_history_paywall() -> bool:
+def should_skip_free_history_paywall(user=None) -> bool:
     return (
         settings.PROMO_FREE_SKIP_HISTORY_PAYWALL and is_promo_free_active()
     )

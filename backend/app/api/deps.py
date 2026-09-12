@@ -1,6 +1,6 @@
 """API 层的依赖注入：当前用户、可选用户."""
 
-from fastapi import Depends, Header
+from fastapi import Depends, Header, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -23,6 +23,7 @@ async def get_token_payload(
 
 
 async def get_current_user(
+    request: Request,
     payload: dict = Depends(get_token_payload),
     db: AsyncSession = Depends(get_db),
 ) -> User:
@@ -30,7 +31,18 @@ async def get_current_user(
     user_id = payload.get("sub")
     if not user_id:
         raise UnauthorizedError(code=40102, message="Token 无效")
-    return await get_user_by_id(db, user_id)
+    user = await get_user_by_id(db, user_id)
+    from app.services import market_service
+
+    redis = None
+    try:
+        from app.core.redis import get_redis
+
+        redis = await get_redis()
+    except Exception:
+        redis = None
+    await market_service.ensure_user_market(db, user, request=request, redis=redis)
+    return user
 
 
 async def get_coach_role_user(

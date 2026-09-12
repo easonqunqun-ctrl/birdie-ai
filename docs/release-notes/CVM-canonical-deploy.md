@@ -44,7 +44,7 @@
 2. **本机发版**：仓库根 **`SSH_BATCH_MODE=yes make publish-backend-cvm`**（脚本：**scp compose 三件套** + **SSH keepalive** + rsync **backend + ai_engine**、远端 **compose build** + **alembic**）；长构建仍可能久，**断线则上服务器 `tmux attach`** 看是否还在跑，不要立刻再叠第二条。云上确需自备 compose：**`REMOTE_RSYNC_COMPOSE=no`**（少用）。
 3. **迁移**：发版后确认 **`alembic upgrade head`** 成功（脚本默认会跑）；线上 500 先核对 **迁移版本 vs 代码**。
 4. **三件套同事到场**：backend / celery / **ai_engine** 同一轮构建或同一脚本带齐（避免只更后端、推理仍旧）。
-5. **收尾**：compose 成功后 **`docker restart xiaoniao-nginx`**（脚本已尝试）；仍有域名侧问题见本文 **§8**。
+5. **收尾**：compose **不要 recreate `xiaoniao-nginx`**（与居境等其它站点共用）；只允许 **`docker exec xiaoniao-nginx nginx -s reload`**。仍有领翼域名侧问题见本文 **§8**。
 6. 与发版链路 **并行** 的工程排期见 **`release-notes/parallel-engineering-backlog.md`**。
 
 ### 发版与排障口令（O2 · Runbook 摘要）
@@ -168,10 +168,12 @@ Mac 若要 rsync：**必须** `--exclude '.env.local'`，且 **不要盲目 `--d
 
 ```bash
 cd ~/lingniao-golf
-docker compose -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.cvm.yml --env-file .env.local up -d --build
+# 日常发版不要带 nginx：共享入口还挂着其它站点（居境等）
+docker compose -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.cvm.yml \
+  --env-file .env.local up -d --build backend celery-worker celery-beat ai_engine
 ```
 
-一键脚本（等价于：**§2 `git pull` + 上式 `up -d --build` + `alembic upgrade head` + `docker restart xiaoniao-nginx`**）：在仓库根 **`bash infra/deploy/release-cvm-on-server.sh`**（若存在 **`docker-compose.wechat-pay-key.yml`** 会自动叠加；**`WECHAT_PAY_MOCK_MODE=false`** 时会先执行 **`infra/deploy/check-cvm-pay-mount.sh`**）。服务端若尚无 **`.git`**（仅 rsync 代码）：**`SKIP_GIT=1 bash infra/deploy/release-cvm-on-server.sh`**。
+一键脚本（等价于：**§2 `git pull` + 上式 `up -d --build`（不含 nginx）+ `alembic upgrade head` + `nginx -s reload`**）：在仓库根 **`bash infra/deploy/release-cvm-on-server.sh`**（若存在 **`docker-compose.wechat-pay-key.yml`** 会自动叠加；**`WECHAT_PAY_MOCK_MODE=false`** 时会先执行 **`infra/deploy/check-cvm-pay-mount.sh`**）。服务端若尚无 **`.git`**（仅 rsync 代码）：**`SKIP_GIT=1 bash infra/deploy/release-cvm-on-server.sh`**。
 
 或在本机仓库根（依赖 `.env.local` 与 Docker）：
 
@@ -244,7 +246,7 @@ docker compose -f docker-compose.yml -f docker-compose.test.yml -f docker-compos
 - **代码已在远端**：本机 **`make cvm-remote-release`** 或 **`bash scripts/cvm-remote-release.sh`**（SSH 执行 `infra/deploy/release-cvm-on-server.sh`；可调 `SKIP_GIT=1` / `GIT_BRANCH=` / `DEPLOY_HOST=`）。可选 SSH 前先跑与 **`--local-preflight`** 相同的两段检查：**`CVM_LOCAL_PREFLIGHT=1 ENV_FILE=~/secrets/…`**。
 - **HTTPS 冒烟**：`DOMAIN=api.birdieai.cn bash scripts/cvm-smoke.sh`；带 JWT：`TOKEN='<paste>' bash scripts/cvm-smoke.sh`；可选：`LOGIN_CODE=…`。→ **`make cvm-smoke DOMAIN=… TOKEN=…`**。
 
-**`infra/deploy/release-cvm-on-server.sh`**：若服务端 **暂无 `.git`**（rsync-only 过渡期），可先 **`SKIP_GIT=1 bash infra/deploy/release-cvm-on-server.sh`**（仍会跑 compose · alembic · nginx）。
+**`infra/deploy/release-cvm-on-server.sh`**：若服务端 **暂无 `.git`**（rsync-only 过渡期），可先 **`SKIP_GIT=1 bash infra/deploy/release-cvm-on-server.sh`**（仍会跑 compose · alembic · `nginx -s reload`，**不 recreate nginx**）。
 
 ---
 
@@ -266,25 +268,16 @@ docker compose -f docker-compose.yml -f docker-compose.test.yml -f docker-compos
 | 现象 | 可先当「误判」处理的条件 | 下一步 |
 |------|--------------------------|--------|
 | **`ps` 中 nginx `(unhealthy)`** | **`curl -sf https://<域名>/v1/health`** 已返回 **`"status"`** JSON，且 **`services.database/redis`** 在健康检查里也为 ok | **健康检查探测窗口**：仅等满 **`start_period`** 后再看一眼；仍为 unhealthy 多数是 **阈值过紧**：一次超时即失败。**`docker inspect xiaoniao-nginx --format '{{json .State.Health.Log}}'`** 若多为 **timeout/connect**，可在叠层 compose 略增大 **`interval`/`timeout`**，或确认 **后端启动时间变长（迁移/预热）**。 |
-| **nginx healthy 但公网间歇 502** | 与用户侧 **同一时间** **`docker exec xiaoniao-nginx`** 内设变量反代 **`/v1/health`** 也失败 | 优先按 **§8 根治段**：`resolver + $backend_host`，并 **`docker restart xiaoniao-nginx`** 或 **`--force-recreate nginx`**。 |
+| **nginx healthy 但公网间歇 502** | 与用户侧 **同一时间** **`docker exec xiaoniao-nginx`** 内设变量反代 **`/v1/health`** 也失败 | 优先按 **§8 根治段**：`resolver + $backend_host`，再 **`docker exec xiaoniao-nginx nginx -s reload`**。**禁止** `--force-recreate nginx`（会丢掉其它站点挂载）。 |
 
 **不要将 `depends_on.service.condition: service_healthy` 的失败**笼统当成「网关坏了」：若 **仅是 nginx 自检偶发超时**，可改为 **`service_started`** 或放宽检查后 **仍用外网 `/v1/health`** 作主验收。
 
-**处理**（仍建议在合并 nginx.conf 变更后执行一次，或旧镜像未更新时兜底）：
+**处理**（backend / minio 重建后，只 reload，不 recreate）：
 
 ```bash
-docker restart xiaoniao-nginx
+docker exec xiaoniao-nginx nginx -s reload
 ```
 
-或与其它服务一并重建 **nginx + backend + minio**（若使用商户 PEM 叠层，续加 **`-f docker-compose.wechat-pay-key.yml`**）：
+**禁止** `--force-recreate nginx` / 用仓库 compose 重新 `up nginx`：`xiaoniao-nginx` 还挂着其它站点（居境等），仓库 compose 没有那些挂载。
 
-```bash
-cd ~/lingniao-golf
-docker compose -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.cvm.yml \
-  -f docker-compose.wechat-pay-key.yml \
-  --env-file .env.local up -d --force-recreate nginx backend minio
-```
-
-未使用 **`docker-compose.wechat-pay-key.yml`** 时删掉对应 **`-f`** 即可。
-
-**惯例**：若服务器尚未 **`git pull`** 拿到上述 nginx 变更，日后每次 **仅重建 backend / minio** 之后，仍可 **`docker restart xiaoniao-nginx`** 兜底。
+**惯例**：日后每次 **仅重建 backend / minio** 之后，用 **`nginx -s reload`** 兜底即可；`resolver + $backend_host` 已按请求解析上游。

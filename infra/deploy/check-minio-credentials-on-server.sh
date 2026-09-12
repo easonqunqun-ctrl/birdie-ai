@@ -49,5 +49,5 @@ else
   echo "  请在 ~/lingniao-golf/.env.local 中把 MINIO_ACCESS_KEY / MINIO_SECRET_KEY"
   echo "  改成与 MinIO ROOT 完全相同，然后："
   echo "    docker compose --env-file .env.local up -d --force-recreate backend celery-worker"
-  echo "    docker restart xiaoniao-nginx"
+  echo "    docker exec xiaoniao-nginx nginx -s reload"
 fi

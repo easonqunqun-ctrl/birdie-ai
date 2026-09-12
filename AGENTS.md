@@ -140,6 +140,7 @@ make backend-migrate
 - 不要引入新的 UI 库（NutUI / TDesign 等）除非经过产品与工程双方确认，当前只用 `@tarojs/components` + 自研样式。
 - 不要把 `.env.local`、`*.p8`、`*.key`、`*.mobileprovision` 等敏感文件加入提交。
 - 不要把 `UI/*.png`（几 MB 的图）二次复制到代码目录，引用时保持在 `UI/`。
+- **不要动共享公网 Nginx（`xiaoniao-nginx`）**：上面还挂着用户其它站点（居境等）。领翼发版禁止 recreate / restart 该容器，禁止改其挂载或机上 `nginx.conf` 的其它站点 include。
 
 ---
 

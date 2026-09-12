@@ -25,6 +25,15 @@ class ContentRepository {
         .toList();
   }
 
+  Future<List<ProSwingClip>> listPlayerClips(String playerId) async {
+    final data = await _api.get<dynamic>('/pros/$playerId/clips');
+    if (data is! List) return const [];
+    return data
+        .whereType<Map>()
+        .map((e) => ProSwingClip.fromJson(e.cast<String, dynamic>()))
+        .toList();
+  }
+
   /// M12-04 · 为分析报告匹配职业镜头。灰度关闭时后端 404。
   Future<ProMatchResult> matchForAnalysis(
     String analysisId, {

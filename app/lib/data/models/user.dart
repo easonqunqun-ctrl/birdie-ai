@@ -25,6 +25,29 @@ class UserStats {
       );
 }
 
+class MarketOffer {
+  final String market;
+  final String policy;
+  final int? intlWelcomeRemaining;
+  final int intlWelcomeTotal;
+
+  const MarketOffer({
+    required this.market,
+    required this.policy,
+    this.intlWelcomeRemaining,
+    this.intlWelcomeTotal = 100,
+  });
+
+  factory MarketOffer.fromJson(Map<String, dynamic> j) => MarketOffer(
+        market: j['market']?.toString() ?? 'cn',
+        policy: j['policy']?.toString() ?? 'standard',
+        intlWelcomeRemaining: (j['intl_welcome_remaining'] as num?)?.toInt(),
+        intlWelcomeTotal: (j['intl_welcome_total'] as num?)?.toInt() ?? 100,
+      );
+
+  bool get isWelcome => policy == 'welcome' || policy == 'intl_welcome';
+}
+
 class UserQuota {
   final int analysisRemaining;
   final int analysisTotal;
@@ -64,6 +87,7 @@ class User {
   final bool hasCompletedRealAnalysis;
   final UserStats? stats;
   final UserQuota? quota;
+  final MarketOffer? marketOffer;
   final String? createdAt;
   final String? accountDeletionScheduledAt;
   final bool isActiveCoach;
@@ -83,6 +107,7 @@ class User {
     this.hasCompletedRealAnalysis = false,
     this.stats,
     this.quota,
+    this.marketOffer,
     this.createdAt,
     this.accountDeletionScheduledAt,
     this.isActiveCoach = false,
@@ -109,6 +134,9 @@ class User {
             : null,
         quota: j['quota'] is Map<String, dynamic>
             ? UserQuota.fromJson(j['quota'] as Map<String, dynamic>)
+            : null,
+        marketOffer: j['market_offer'] is Map<String, dynamic>
+            ? MarketOffer.fromJson(j['market_offer'] as Map<String, dynamic>)
             : null,
         createdAt: j['created_at'] as String?,
         accountDeletionScheduledAt:
@@ -167,6 +195,7 @@ class User {
         hasCompletedRealAnalysis: hasCompletedRealAnalysis,
         stats: stats,
         quota: quota,
+        marketOffer: marketOffer,
         createdAt: createdAt,
         accountDeletionScheduledAt: accountDeletionScheduledAt,
         isActiveCoach: isActiveCoach,

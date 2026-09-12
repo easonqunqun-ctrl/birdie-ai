@@ -1,7 +1,12 @@
 import {
   DRILL_VIDEO_ALIGNED_IDS,
   DRILL_VIDEO_IDS,
+  PP08_MUST_SHIP_DRILL_IDS,
+  PP08_PRIORITY_DRILL_IDS,
+  drillPosterObjectKey,
+  drillVideoObjectKey,
   getDrillVideoDetail,
+  isPp08PriorityDrill,
   resolveVideoCardDetail,
 } from '@/constants/drillVideoLibrary'
 
@@ -21,6 +26,23 @@ describe('drillVideoLibrary', () => {
     for (const id of sampleIds) {
       expect(getDrillVideoDetail(id)).toBeNull()
     }
+  })
+
+  it('PP-08 优先清单已锁定，但未写入上架白名单', () => {
+    expect(PP08_MUST_SHIP_DRILL_IDS).toHaveLength(3)
+    expect(PP08_PRIORITY_DRILL_IDS).toEqual(
+      expect.arrayContaining([...PP08_MUST_SHIP_DRILL_IDS]),
+    )
+    for (const id of PP08_PRIORITY_DRILL_IDS) {
+      expect(isPp08PriorityDrill(id)).toBe(true)
+      expect(DRILL_VIDEO_ALIGNED_IDS).not.toContain(id)
+      expect(getDrillVideoDetail(id)).toBeNull()
+    }
+    expect(isPp08PriorityDrill('drill_impact_bag')).toBe(false)
+    expect(drillVideoObjectKey('drill_towel_arm')).toBe('samples/drills/drill_towel_arm.mp4')
+    expect(drillPosterObjectKey('drill_towel_arm')).toBe(
+      'samples/drills/drill_towel_arm_thumb.jpg',
+    )
   })
 
   it('白名单内 drill_id 走 samples/drills 同源代理 url', () => {

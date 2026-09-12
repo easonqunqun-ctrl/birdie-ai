@@ -92,6 +92,7 @@ class ApiClient {
     final h = <String, String>{
       'Content-Type': 'application/json',
       'Accept-Language': _acceptLanguage(),
+      'X-App-Market': _appMarket(),
       ...?headers,
     };
     if (!noAuth) {
@@ -201,6 +202,11 @@ class ApiClient {
     if (stored.isNotEmpty) return stored;
     final code = ui.PlatformDispatcher.instance.locale.languageCode;
     return code == 'en' ? 'en-US' : 'zh-CN';
+  }
+
+  String _appMarket() {
+    final lang = _acceptLanguage().toLowerCase();
+    return lang.startsWith('en') ? 'intl' : 'cn';
   }
 
   String _friendlyNetwork(String raw) {

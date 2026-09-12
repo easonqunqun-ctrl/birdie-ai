@@ -59,6 +59,14 @@ export interface PromoFreeStatus {
   message: string | null
 }
 
+/** 国内 / 国外配额（``GET /users/me``.market_offer） */
+export interface MarketOffer {
+  market: 'cn' | 'intl'
+  policy: 'welcome' | 'standard'
+  intl_welcome_remaining: number | null
+  intl_welcome_total: number
+}
+
 export interface User {
   id: string
   nickname: string | null
@@ -94,6 +102,8 @@ export interface User {
   is_active_coach?: boolean
   /** 公测免费至 PROMO_FREE_UNTIL；active 时配额视同无限 */
   promo_free?: PromoFreeStatus | null
+  /** 各市场前 100 名欢迎包 / 月度标准配额 */
+  market_offer?: MarketOffer | null
 }
 
 export interface WechatLoginRequest {

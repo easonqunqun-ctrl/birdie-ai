@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # CVM 上整包发版（人已登录服务器 shell / 控制台）：
-#   git 更新 → docker compose（含 cvm 叠层）全栈 build 拉起 → alembic → nginx 重启（防仅重建 backend 后 502）
+#   git 更新 → docker compose（含 cvm 叠层）build 拉起（不含 nginx）→ alembic → nginx -s reload
 #
 # 用法（仓库根）：
 #   bash infra/deploy/release-cvm-on-server.sh
@@ -49,8 +49,9 @@ if [[ -d .git && "${SKIP_GIT:-0}" != "1" && "${ALLOW_DIRTY_GIT:-0}" != "1" ]]; t
     echo "✗ 工作区不干净：继续发版可能导致 git pull 失败或镜像混入未提交改动。" >&2
     git status -sb >&2
     echo "" >&2
-    echo "  在确认无未备份内容后，可在仓库根执行（将丢弃本地修改与未跟踪文件）：" >&2
-    echo "    git fetch origin && git reset --hard \"origin/$GIT_BRANCH\" && git clean -fd" >&2
+    echo "  在确认无未备份内容后，可在仓库根执行（将丢弃本地修改；勿 git clean 其它站点文件）：" >&2
+    echo "    git fetch origin && git reset --hard \"origin/$GIT_BRANCH\"" >&2
+    echo "  保留 .env.local；保留 thinkfree / 居境 等机上站点文件；勿 checkout infra/test/nginx.conf。" >&2
     echo "  仅应急可：ALLOW_DIRTY_GIT=1 bash infra/deploy/release-cvm-on-server.sh" >&2
     exit 1
   fi
@@ -66,14 +67,29 @@ fi
 
 bash infra/deploy/check-cvm-pay-mount.sh ".env.local"
 
-echo "→ docker compose up -d --build"
-dc up -d --build
+# 公网 xiaoniao-nginx 与领翼共用，挂有其它站点（居境等）。禁止 recreate。
+UP_SERVICES=()
+while IFS= read -r svc; do
+  [[ -z "$svc" || "$svc" == "nginx" ]] && continue
+  UP_SERVICES+=("$svc")
+done < <(dc config --services)
+if [[ ${#UP_SERVICES[@]} -eq 0 ]]; then
+  echo "✗ compose 服务列表为空" >&2
+  exit 1
+fi
+echo "→ docker compose up -d --build（跳过 nginx：${UP_SERVICES[*]})"
+dc up -d --build "${UP_SERVICES[@]}"
 
 echo "→ alembic upgrade head"
 dc exec -T backend uv run alembic upgrade head
 
-echo "→ docker restart xiaoniao-nginx（见 CVM-canonical-deploy §8）"
-docker restart xiaoniao-nginx 2>/dev/null || echo "⚠ 未重启 nginx（容器不存在或非此名时可忽略）"
+if docker ps --format '{{.Names}}' | grep -qx xiaoniao-nginx; then
+  echo "→ nginx -s reload（禁止 recreate / restart xiaoniao-nginx）"
+  docker exec xiaoniao-nginx nginx -s reload \
+    || echo "⚠ nginx reload 失败；不要 recreate，只排障"
+else
+  echo "⚠ xiaoniao-nginx 未在运行；禁止用仓库 compose 拉起（会丢掉其它站点挂载）"
+fi
 
 echo "→ curl health"
 curl -sS https://api.birdieai.cn/v1/health | head -c 400 || true

@@ -26,6 +26,7 @@ alwaysApply: true
 ## 约束
 
 - **禁止**在 CVM 上改业务代码；密钥只存在于服务器 `.env.local`，勿提交 Git。
-- CVM `git pull` 失败（脏工作区）：SSH 执行 `git fetch && git reset --hard origin/main && git clean -fd`（**勿删** `.env.local`），再 `make release-cvm`。
+- **共享公网 Nginx（`xiaoniao-nginx`）禁止动**：同一入口还挂着用户的其它站点（居境等，WIN 服务 + 隧道）。发版只重建 backend / ai_engine / celery，**不要** `compose up nginx`、`--force-recreate nginx`、`docker restart xiaoniao-nginx`、改 `infra/test/nginx.conf`、或 `git checkout`/`git clean` 掉机上其它站点文件。后端重建后若需刷新反代，只允许 `docker exec xiaoniao-nginx nginx -s reload`。
+- CVM `git pull` 失败（脏工作区）：SSH 执行 `git fetch && git reset --hard origin/main`（**勿删** `.env.local`；**不要** `git clean -fd` 清其它站点文件；**不要**用仓库版覆盖已含其它站点 include 的 `infra/test/nginx.conf`），再 `make release-cvm`。
 - 用户未明确要求时 **不要** force push / 改 git config。
 - 发版相关 engine 改动：发版前跑 `make ai-engine-test-rotation`（或等价 pytest 子集）。

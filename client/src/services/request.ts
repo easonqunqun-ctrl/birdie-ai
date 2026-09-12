@@ -228,6 +228,7 @@ export async function request<T = unknown>(opts: RequestOptions): Promise<T> {
 
   const header: Record<string, string> = {
     'Content-Type': 'application/json',
+    'X-App-Market': 'cn',
     ...(opts.header || {})
   }
 

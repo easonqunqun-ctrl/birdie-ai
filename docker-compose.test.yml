@@ -72,6 +72,7 @@ services:
     command: ["/app/.venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "9000"]
 
   # ==================== 新增：nginx 反代 ====================
+  # CVM 上 xiaoniao-nginx 还挂着其它站点（居境等）。发版脚本不得 recreate 本服务。
   nginx:
     image: nginx:1.27-alpine
     container_name: xiaoniao-nginx

@@ -6,7 +6,7 @@
 
 Makefile 上还常用：**`make cvm-stable-from-mac ENV_FILE=~/secrets/…`**（预检 + TLS + SSH 远端 **`release-cvm-on-server.sh`**；**`DRY_RUN=1`** 只预检）、**`make cvm-preflight`**、**`make cvm-remote-release`**（可选 **`CVM_LOCAL_PREFLIGHT=1 ENV_FILE=…`** 与预检对齐）。
 
-**已在 CVM shell 里登录（控制台 / SSH）要一键发版**：在仓库根执行 **`bash infra/deploy/release-cvm-on-server.sh`**（`git pull` + 全栈 compose build + `alembic upgrade head` + `nginx` 重启）；可选 **`USE_WECHAT_PAY_COMPOSE=1`** 叠加商户 PEM compose。
+**已在 CVM shell 里登录（控制台 / SSH）要一键发版**：在仓库根执行 **`bash infra/deploy/release-cvm-on-server.sh`**（`git pull` + compose build **不含 nginx** + `alembic upgrade head` + `nginx -s reload`）；可选 **`USE_WECHAT_PAY_COMPOSE=1`** 叠加商户 PEM compose。**禁止 recreate `xiaoniao-nginx`**（还挂着其它站点）。
 
 ## 微信公众平台域名怎么填
 
@@ -134,7 +134,7 @@ docker compose --env-file .env.local restart backend
 bash infra/deploy/check-minio-credentials-on-server.sh
 ```
 
-按脚本提示对齐 `~/lingniao-golf/.env.local` 后 **`--force-recreate backend`**，并 **`docker restart xiaoniao-nginx`**。
+按脚本提示对齐 `~/lingniao-golf/.env.local` 后 **`--force-recreate backend`**，再 **`docker exec xiaoniao-nginx nginx -s reload`**（不要 recreate / restart nginx）。
 
 ### 8. 已有服务器仍是 server.crt / server.key（旧 nginx 配置）
 

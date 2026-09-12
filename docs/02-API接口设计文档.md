@@ -56,6 +56,18 @@ App 端通过请求头声明 UI 语言；**仅 AI 教练回复**据此切换英�
 
 解析见 `backend/app/core/locale.py`：取第一个 tag，`en*` → `en`，其余 → `zh`。微信小程序不发送此头，保持简体。
 
+### 1.2.2 市场（`X-App-Market`）
+
+国内外配额分流。服务端写入 `users.market` 后 **粘性**，不因用户改语言而改市场。
+
+| 请求头 | 示例 | 服务端行为 |
+|--------|------|------------|
+| `X-App-Market` | `cn` / `intl` | 仅当用户尚未写入 `market` 时采用 |
+| （缺省） | 微信登录 | 强制 `cn` |
+| （缺省） | `Accept-Language: en*` | `intl`；否则 `cn` |
+
+**配额**：`cn` / `intl` **各**前 `WELCOME_USER_CAP`（默认 100）名各获 `WELCOME_ANALYSES`（默认 100）次终身分析；用尽或未占到名额则回落月度 3 次。见 `GET /users/me`.market_offer。
+
 ### 1.3 统一响应格式
 
 **成功响应**：
@@ -463,12 +475,20 @@ GET /v1/users/me
       "until": "2026-07-30",
       "message": "公测免费至 2026-07-30"
     },
+    "market_offer": {
+      "market": "cn",
+      "policy": "welcome",
+      "intl_welcome_remaining": 88,
+      "intl_welcome_total": 100
+    },
     "created_at": "2026-04-01T10:30:00+08:00"
   }
 }
 ```
 
 > **`promo_free`**：当服务端配置 `PROMO_FREE_UNTIL=YYYY-MM-DD` 且当前仍在该日（UTC+8 自然日 inclusive）内时为 `active=true`；此时 `quota.*_remaining` 通常为 `-1`（无限），且 `GET /v1/analyses` 对免费用户不触发历史 paywall（见 `PROMO_FREE_SKIP_HISTORY_PAYWALL`）。
+>
+> **`market_offer`**：`market=cn|intl`；`policy=welcome|standard`。`welcome` 时 `quota.analysis_remaining/total` 为欢迎包剩余/100，`analysis_reset_at=null`（终身，不按月刷新）。`standard` 回落月度 3 次。字段名 `intl_welcome_*` 为历史兼容，国内外欢迎包共用。
 
 ---
 

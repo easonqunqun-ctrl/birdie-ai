@@ -80,6 +80,15 @@ class PromoFreeStatus(BaseModel):
     message: str | None = None
 
 
+class MarketOffer(BaseModel):
+    """国内 / 国外配额策略（docs/01 §2.2.1）。"""
+
+    market: Literal["cn", "intl"] = "cn"
+    policy: Literal["welcome", "standard"] = "standard"
+    intl_welcome_remaining: int | None = None
+    intl_welcome_total: int = 100
+
+
 class UserBrief(BaseModel):
     """简化版用户信息（首页等场景用）."""
 
@@ -114,6 +123,7 @@ class UserResponse(BaseModel):
     stats: UserStats | None = None
     quota: UserQuota | None = None
     promo_free: PromoFreeStatus | None = None
+    market_offer: MarketOffer | None = None
     created_at: datetime
     # MVP §3.4 注销冷静期：非空表示将于该 UTC 时间后硬删
     account_deletion_scheduled_at: datetime | None = None

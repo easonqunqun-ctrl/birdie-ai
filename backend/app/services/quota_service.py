@@ -164,6 +164,31 @@ def analysis_remaining(quota: AnalysisQuota) -> int:
     return max(0, quota.total + quota.bonus - quota.used)
 
 
+def effective_analysis_remaining(user: User, quota: AnalysisQuota) -> int:
+    """对客户端展示的剩余：会员为 -1；欢迎包优先于月配额."""
+    if _is_unlimited_user(user):
+        return UNLIMITED_REMAINING
+    if user.intl_welcome_granted and user.intl_welcome_remaining > 0:
+        return user.intl_welcome_remaining
+    return analysis_remaining(quota)
+
+
+def effective_analysis_total(user: User, quota: AnalysisQuota) -> int:
+    from app.services import market_service
+
+    if _is_unlimited_user(user):
+        return UNLIMITED_REMAINING
+    if user.intl_welcome_granted and user.intl_welcome_remaining > 0:
+        return market_service.welcome_analyses()
+    if quota.total < 0:
+        return UNLIMITED_REMAINING
+    return quota.total + quota.bonus
+
+
+def welcome_bucket_active(user: User) -> bool:
+    return bool(user.intl_welcome_granted and user.intl_welcome_remaining > 0)
+
+
 async def check_analysis_quota(
     db: AsyncSession,
     user: User,
@@ -191,11 +216,11 @@ async def check_analysis_quota(
         return quota
     # W8-T3：剩余 = -1（unlimited / 会员）或 > 0 都放行；
     #   "==0" 才算耗尽。原 `<= 0` 会把 -1 误判为耗尽。
-    remaining = analysis_remaining(quota)
+    remaining = effective_analysis_remaining(user, quota)
     if remaining == 0:
         raise QuotaExceededError(
             code=40006,
-            message="本月分析次数已用完",
+            message="分析次数已用完",
         )
     return quota
 
@@ -238,8 +263,20 @@ async def consume_analysis_quota(
     )
     quota = (await db.execute(locked_stmt)).scalar_one()
 
+    if _is_unlimited_user(user):
+        return quota
+
+    locked_user = (
+        await db.execute(select(User).where(User.id == user.id).with_for_update())
+    ).scalar_one()
+    if welcome_bucket_active(locked_user):
+        locked_user.intl_welcome_remaining -= 1
+        user.intl_welcome_remaining = locked_user.intl_welcome_remaining
+        await db.flush()
+        return quota
+
     if analysis_remaining(quota) == 0:
-        raise QuotaExceededError(code=40006, message="本月分析次数已用完")
+        raise QuotaExceededError(code=40006, message="分析次数已用完")
     # total=-1 表示无限（会员 / QUOTA_MODE=unlimited），不计数（避免 used 无意义累加）
     if quota.total >= 0:
         quota.used += 1
@@ -270,9 +307,23 @@ async def refund_analysis_quota_by_user_month(
         AnalysisQuota.user_id == user_id,
         AnalysisQuota.quota_month == quota_month,
     )
+    from app.services import market_service
+
     quota = (await db.execute(stmt)).scalar_one_or_none()
     if quota is None:
         return False
+    locked_user = (
+        await db.execute(select(User).where(User.id == user_id).with_for_update())
+    ).scalar_one_or_none()
+    if (
+        locked_user is not None
+        and locked_user.intl_welcome_granted
+        and (quota.total < 0 or quota.used <= 0)
+        and locked_user.intl_welcome_remaining < market_service.welcome_analyses()
+    ):
+        locked_user.intl_welcome_remaining += 1
+        await db.flush()
+        return True
     await refund_analysis_quota(db, quota)
     return True
 

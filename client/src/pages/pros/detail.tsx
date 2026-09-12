@@ -8,7 +8,7 @@
  */
 
 import { FC, useCallback, useState } from 'react'
-import { View, Text, ScrollView, Image } from '@tarojs/components'
+import { View, Text, ScrollView, Image, Video } from '@tarojs/components'
 import Taro, { useDidShow, useRouter } from '@tarojs/taro'
 import { PHASE2_PROS_ENABLED_FLAG } from '@/constants/flags'
 import {
@@ -170,58 +170,62 @@ const ProDetailPage: FC = () => {
         ) : (
           clips.map((clip) => (
             <View key={clip.id} className='pro-detail__clip-card'>
-              {clip.thumbnail_url && (
+              {clip.video_url ? (
+                <Video
+                  className='pro-detail__clip-video'
+                  src={clip.video_url}
+                  poster={clip.thumbnail_url || undefined}
+                  controls
+                  showCenterPlayBtn
+                  objectFit='contain'
+                />
+              ) : clip.thumbnail_url ? (
                 <Image
                   className='pro-detail__clip-thumb'
                   src={clip.thumbnail_url}
                   mode='aspectFill'
                 />
+              ) : (
+                <View className='pro-detail__clip-thumb pro-detail__clip-thumb--empty'>
+                  <Text>暂无视频</Text>
+                </View>
               )}
-              <View className='pro-detail__clip-main'>
-                <Text className='pro-detail__clip-title'>
-                  {clip.club_type} · {clip.camera_angle === 'face_on' ? '正面' : '侧线'}
-                </Text>
-                <View className='pro-detail__clip-meta'>
-                  {clip.duration_ms && (
-                    <Text className='pro-detail__clip-meta-item'>
-                      {(clip.duration_ms / 1000).toFixed(1)}s
-                    </Text>
-                  )}
-                  {clip.fps && (
-                    <Text className='pro-detail__clip-meta-item'>{clip.fps}fps</Text>
-                  )}
-                  {clip.overall_score != null && (
-                    <Text className='pro-detail__clip-meta-item pro-detail__clip-score'>
-                      {clip.overall_score}分
-                    </Text>
-                  )}
+              <View className='pro-detail__clip-body'>
+                <View className='pro-detail__clip-main'>
+                  <Text className='pro-detail__clip-title'>
+                    {clip.club_type} · {clip.camera_angle === 'face_on' ? '正面' : '侧线'}
+                  </Text>
+                  <View className='pro-detail__clip-meta'>
+                    {clip.duration_ms && (
+                      <Text className='pro-detail__clip-meta-item'>
+                        {(clip.duration_ms / 1000).toFixed(1)}s
+                      </Text>
+                    )}
+                    {clip.fps && (
+                      <Text className='pro-detail__clip-meta-item'>{clip.fps}fps</Text>
+                    )}
+                    {clip.overall_score != null && (
+                      <Text className='pro-detail__clip-meta-item pro-detail__clip-score'>
+                        {clip.overall_score}分
+                      </Text>
+                    )}
+                  </View>
+                  <Text className='pro-detail__clip-credit'>
+                    来源：{clip.source_credit}
+                  </Text>
                 </View>
-                <Text className='pro-detail__clip-credit'>
-                  来源：{clip.source_credit}
-                </Text>
-              </View>
-              <View className='pro-detail__clip-actions'>
-                <View
-                  className='pro-detail__clip-cta pro-detail__clip-cta--pgc'
-                  onClick={(e) => {
-                    e.stopPropagation?.()
-                    Taro.navigateTo({
-                      url: `/pages/pros/clip-insight?clipId=${encodeURIComponent(clip.id)}&playerId=${encodeURIComponent(playerId || player.id)}`,
-                    })
-                  }}
-                >
-                  <Text>解说</Text>
-                </View>
-                <View
-                  className='pro-detail__clip-cta'
-                  onClick={() =>
-                    Taro.showToast({
-                      title: '视频播放将在后续版本上线',
-                      icon: 'none',
-                    })
-                  }
-                >
-                  <Text>▶</Text>
+                <View className='pro-detail__clip-actions'>
+                  <View
+                    className='pro-detail__clip-cta pro-detail__clip-cta--pgc'
+                    onClick={(e) => {
+                      e.stopPropagation?.()
+                      Taro.navigateTo({
+                        url: `/pages/pros/clip-insight?clipId=${encodeURIComponent(clip.id)}&playerId=${encodeURIComponent(playerId || player.id)}`,
+                      })
+                    }}
+                  >
+                    <Text>解说</Text>
+                  </View>
                 </View>
               </View>
             </View>

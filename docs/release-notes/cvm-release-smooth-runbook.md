@@ -37,7 +37,9 @@
 DEPLOY_HOST=ubuntu@<公网IP> ENV_FILE=~/secrets/lingniao-prod.env make ship-cvm
 ```
 
-含义：**本机预检**（占位符 + 微信支付 compose）→ **`git push origin main`** → **SSH 远端**执行 `release-cvm-on-server.sh`（`pull` + `compose up --build` + `alembic` + nginx）。
+含义：**本机预检**（占位符 + 微信支付 compose）→ **`git push origin main`** → **SSH 远端**执行 `release-cvm-on-server.sh`（`pull` + `compose up --build` **不含 nginx** + `alembic` + `nginx -s reload`）。
+
+**共享公网 Nginx**：`xiaoniao-nginx` 还挂着其它站点（居境等）。发版**禁止** recreate / restart 该容器，禁止改机上其它站点挂载或 `nginx.conf` include。
 
 若代码已 push，只触发远端：
 
@@ -73,6 +75,7 @@ make client-build-weapp-prod
 
 - 发版机 **`~/lingniao-golf` 只当构建机**：不在上面手改业务代码；要改在 Mac 上改完 **push** 再发版。
 - 自 **`release-cvm-on-server.sh`** 起：默认若 `git status` 不干净会直接 **失败**，并打印修复命令；**不要**日常使用 `ALLOW_DIRTY_GIT=1`，仅应急。
+- **不要** `git clean -fd` 清掉机上其它站点文件（居境 / thinkfree 等）；**不要**用仓库版覆盖已含其它站点 include 的 `infra/test/nginx.conf`。
 
 **确认无未备份内容后**在 CVM 仓库根对齐远端（示例分支 `main`）：
 
@@ -80,10 +83,10 @@ make client-build-weapp-prod
 cd ~/lingniao-golf
 git fetch origin
 git reset --hard origin/main
-git clean -fd
+# 不要 git clean -fd（会删其它站点未跟踪文件）
 ```
 
-然后再由 Mac 执行 `make release-cvm`（不要只在服务器上盲目 `compose up` 而跳过 `pull`）。
+然后再由 Mac 执行 `make release-cvm`（不要只在服务器上盲目 `compose up` 而跳过 `pull`；**不要**把 `nginx` 列入 recreate）。
 
 ---
 

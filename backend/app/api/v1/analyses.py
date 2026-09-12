@@ -317,7 +317,7 @@ async def list_analyses(
 
     free_cap = (
         None
-        if promo_service.should_skip_free_history_paywall()
+        if promo_service.should_skip_free_history_paywall(user)
         else FREE_HISTORY_VISIBLE_LIMIT
     )
     items, total, capped_to = await analysis_service.list_analyses(

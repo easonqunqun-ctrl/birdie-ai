@@ -89,10 +89,12 @@ COMPOSE_STACK="docker compose -f docker-compose.yml -f docker-compose.test.yml -
 # 若有商户私钥挂载：
 [[ -f docker-compose.wechat-pay-key.yml ]] && COMPOSE_STACK="$COMPOSE_STACK -f docker-compose.wechat-pay-key.yml"
 
-$COMPOSE_STACK --env-file .env.local up -d --build
+# 禁止 up nginx：共享入口还挂着其它站点（居境等）
+UP_SERVICES=$($COMPOSE_STACK --env-file .env.local config --services | grep -vx nginx | tr '\n' ' ')
+$COMPOSE_STACK --env-file .env.local up -d --build $UP_SERVICES
 $COMPOSE_STACK --env-file .env.local exec -T backend uv run alembic upgrade head
 
-docker restart xiaoniao-nginx 2>/dev/null || true
+docker exec xiaoniao-nginx nginx -s reload 2>/dev/null || true
 
 curl -sfS "https://api.birdieai.cn/v1/health" | head -c 300
 EOF

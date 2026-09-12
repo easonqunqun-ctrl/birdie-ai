@@ -309,9 +309,9 @@ deploy-cvm-up:
 		echo "✗ 未找到 docker-compose.cvm.yml"; exit 1; \
 	fi
 	@$(MAKE) deploy-check-cvm-pay ENV_FILE="$(or $(ENV_FILE),.env.local)"
-	$(CVM_COMPOSE) up -d --build
+	$(CVM_COMPOSE) up -d --build $$($(CVM_COMPOSE) config --services | grep -vx nginx | tr '\n' ' ')
 	@echo ""
-	@echo "✓ CVM 栈已更新（镜像内后端/引擎；详见 docs/release-notes/CVM-canonical-deploy.md）"
+	@echo "✓ CVM 栈已更新（未 recreate nginx；详见 docs/release-notes/CVM-canonical-deploy.md）"
 
 deploy-cvm-ps:
 	$(CVM_COMPOSE) ps

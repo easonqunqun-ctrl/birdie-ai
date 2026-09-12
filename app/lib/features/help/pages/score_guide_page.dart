@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/score_honesty.dart';
 import '../../../theme/brand_colors.dart';
 import '../../../theme/dimens.dart';
 
@@ -28,6 +29,9 @@ class ScoreGuidePage extends StatelessWidget {
             '不能替代球场杆数、比赛成绩或教练的现场综合判断。',
             '在机位不佳、身体未完整入镜、光线过暗或挥杆被遮挡时，分数可能不稳定；建议按拍摄引导重新录制后再看报告。',
           ], bullets: true),
+          _section(ScoreHonestyCopy.guideTitle, [
+            ScoreHonestyCopy.guideBody,
+          ]),
           _section('如何更好地使用分数', [
             '建议您在相近日期、相似拍摄条件下多拍几次，观察分数与诊断的变化趋势，往往比盯着单次分数更有参考价值。',
           ]),

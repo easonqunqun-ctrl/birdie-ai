@@ -177,12 +177,16 @@ if [[ -f docker-compose.wechat-pay-key.yml ]]; then
   PAY_KEY_FLAGS="-f docker-compose.wechat-pay-key.yml"
 fi
 
-# 与 release-cvm-on-server.sh 对齐：整栈 build（compose 中出现 celery-beat 等会自动拉起）
+# 与 release-cvm-on-server.sh 对齐：build 拉起业务容器，禁止 recreate 共享 nginx
 # shellcheck disable=SC2086
+UP_SERVICES=\$(docker compose --project-directory '${DEPLOY_REPO}' \\
+  -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.cvm.yml \\
+  \${PAY_KEY_FLAGS} ${REMOTE_EXTRA_COMPOSE_FLAGS} \\
+  --env-file '${DEPLOY_REPO}/.env.local' config --services | grep -vx nginx | tr '\\n' ' ')
 docker compose --project-directory '${DEPLOY_REPO}' \\
   -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.cvm.yml \\
   \${PAY_KEY_FLAGS} ${REMOTE_EXTRA_COMPOSE_FLAGS} \\
-  --env-file '${DEPLOY_REPO}/.env.local' up -d --build
+  --env-file '${DEPLOY_REPO}/.env.local' up -d --build \${UP_SERVICES}
 
 if [[ '${REMOTE_ALEMBIC}' != 'no' ]]; then
   echo "→ alembic upgrade head"
@@ -193,11 +197,11 @@ if [[ '${REMOTE_ALEMBIC}' != 'no' ]]; then
     --env-file '${DEPLOY_REPO}/.env.local' exec -T backend uv run alembic upgrade head
 fi
 
-docker restart xiaoniao-nginx 2>/dev/null || true
+docker exec xiaoniao-nginx nginx -s reload 2>/dev/null || true
 EOF
 fi
 
 echo ""
 echo "✓ 发版流程结束（git pull（若有）→ compose yml → rsync backend+ai_engine → rebuild → alembic）。"
 echo "  自检：curl -sS https://api.birdieai.cn/v1/health && echo"
-echo "  若改过 infra/test/nginx.conf 而未用 git pull，请自行 scp 该文件以保持与 compose 挂载一致。"
+echo "  共享 nginx 未 recreate；其它站点挂载保持不动。"

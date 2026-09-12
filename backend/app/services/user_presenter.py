@@ -10,7 +10,7 @@ from app.schemas.user import (
     sanitize_optional_weekly_freq,
     sanitize_primary_goals_for_response,
 )
-from app.services import payment_service
+from app.services import market_service, payment_service
 from app.services.coach_annotation_service import can_user_coach_annotate
 
 
@@ -44,6 +44,7 @@ def build_user_response(
         if include_stats
         else None,
         quota=None,
+        market_offer=market_service.offer_for(user),
         created_at=user.created_at,
         account_deletion_scheduled_at=user.account_deletion_scheduled_at,
         can_coach_annotate=can_user_coach_annotate(user) or is_active_coach,

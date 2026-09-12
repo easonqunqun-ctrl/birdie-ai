@@ -6,6 +6,7 @@ import '../../../data/models/content.dart';
 import '../../../data/repositories/content_repository.dart';
 import '../../../theme/brand_colors.dart';
 import '../../../theme/dimens.dart';
+import 'pro_player_detail_page.dart';
 
 /// 高手对比：对照 client/src/pages/pros。球手列表只读。
 class ProsPage extends StatefulWidget {
@@ -65,7 +66,11 @@ class _ProsPageState extends State<ProsPage> {
     );
   }
 
-  Widget _card(ProPlayer p) => Container(
+  Widget _card(ProPlayer p) => GestureDetector(
+        onTap: () => Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => ProPlayerDetailPage(player: p),
+        )),
+        child: Container(
         padding: EdgeInsets.all(rpx(28)),
         decoration: BoxDecoration(
           color: BrandColors.bgCard,
@@ -107,7 +112,9 @@ class _ProsPageState extends State<ProsPage> {
                 ],
               ),
             ),
+            Icon(Icons.chevron_right, color: BrandColors.textTertiary),
           ],
         ),
+      ),
       );
 }
