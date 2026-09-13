@@ -268,12 +268,12 @@ class Settings(BaseSettings):
     PROMO_FREE_UNTIL: str = ""
     PROMO_FREE_SKIP_HISTORY_PAYWALL: bool = True
 
-    # 各市场前 N 名各获 M 次终身分析（docs/01 §2.2.1）；国内不再不限次
+    # 注册起 N 个自然月不限次；到期后每月 FREE_USER_MONTHLY_ANALYSES 次，再多用走会员
+    SIGNUP_TRIAL_MONTHS: int = 3
     CN_MARKET_FREE: bool = False
-    WELCOME_USER_CAP: int = 100
+    WELCOME_USER_CAP: int = 0
     WELCOME_ANALYSES: int = 100
-    # 旧名兼容，读配置时优先 WELCOME_*
-    INTL_WELCOME_USER_CAP: int = 100
+    INTL_WELCOME_USER_CAP: int = 0
     INTL_WELCOME_ANALYSES: int = 100
 
     # ==================== Sentry（监控告警；PMF 阶段必装） ====================

@@ -264,7 +264,7 @@ const HomePage: FC = () => {
   // ====== 配额文案 ======
   const quotaText = (() => {
     if (!user.quota) return ''
-    if (isPromoFreeActive(user)) return '公测期·不限次'
+    if (isPromoFreeActive(user)) return '免费体验期·不限次'
     if (user.is_member) return '会员·分析次数无限'
     return quotaBannerText(user)
   })()

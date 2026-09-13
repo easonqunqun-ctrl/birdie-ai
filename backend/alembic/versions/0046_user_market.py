@@ -58,28 +58,6 @@ def upgrade() -> None:
             "wechat_openid IS NOT NULL OR wechat_app_openid IS NOT NULL)"
         )
     )
-    # 各市场按注册时间最早的 100 人发放欢迎包（docs/01 §2.2.1）
-    op.execute(
-        sa.text(
-            """
-            WITH ranked AS (
-              SELECT id,
-                     ROW_NUMBER() OVER (
-                       PARTITION BY market
-                       ORDER BY created_at ASC NULLS LAST, id ASC
-                     ) AS rn
-              FROM users
-              WHERE deleted_at IS NULL
-                AND market IN ('cn', 'intl')
-            )
-            UPDATE users AS u
-            SET intl_welcome_granted = true,
-                intl_welcome_remaining = 100
-            FROM ranked AS r
-            WHERE u.id = r.id AND r.rn <= 100
-            """
-        )
-    )
 
 
 def downgrade() -> None:

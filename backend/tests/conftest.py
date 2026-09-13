@@ -26,8 +26,10 @@ from tests.fakes import FakeAIEngine, FakeMinioStorage
 
 @pytest.fixture(autouse=True)
 def _cn_market_free_off_in_tests(monkeypatch: pytest.MonkeyPatch) -> None:
-    """存量用例按月度 3/5 断言；欢迎包由 test_market_quota 显式打开。"""
+    """存量用例按月度 3/5 断言；注册体验期由 test_signup_trial 显式打开。"""
     monkeypatch.setattr(settings, "CN_MARKET_FREE", False)
+    monkeypatch.setattr(settings, "SIGNUP_TRIAL_MONTHS", 0)
+    monkeypatch.setattr(settings, "WELCOME_USER_CAP", 0)
 
 
 @pytest.fixture

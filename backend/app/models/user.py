@@ -22,7 +22,7 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
     # Sign in with Apple 稳定用户标识（JWT `sub`）
     apple_sub: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
-    # 市场分流（0046）：cn|intl；各市场前 100 名欢迎包，否则月度标准配额
+    # 市场分流（0046）：cn|intl。配额：注册起 SIGNUP_TRIAL_MONTHS 个月不限次，其后每月 3 次
     market: Mapped[str | None] = mapped_column(String(8), nullable=True)
     intl_welcome_granted: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="false"

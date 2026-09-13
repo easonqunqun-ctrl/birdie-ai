@@ -98,16 +98,22 @@ async def get_me(
         analysis_remaining=quota_service.effective_analysis_remaining(user, a_quota),
         analysis_total=quota_service.effective_analysis_total(user, a_quota),
         analysis_reset_at=(
-            None if welcome_active else quota_service.next_month_reset_iso()
+            None
+            if welcome_active or quota_service._is_unlimited_user(user)
+            else quota_service.next_month_reset_iso()
         ),
-        chat_remaining_today=quota_service.chat_remaining(c_quota),
+        chat_remaining_today=(
+            quota_service.UNLIMITED_REMAINING
+            if quota_service._is_unlimited_user(user)
+            else quota_service.chat_remaining(c_quota)
+        ),
         chat_total_today=(
-            c_quota.total
-            if c_quota.total >= 0
-            else quota_service.UNLIMITED_REMAINING
+            quota_service.UNLIMITED_REMAINING
+            if quota_service._is_unlimited_user(user) or c_quota.total < 0
+            else c_quota.total
         ),
     )
-    resp.promo_free = promo_service.status_for_response()
+    resp.promo_free = promo_service.status_for_response(user)
     resp.market_offer = market_service.offer_for(user)
     return ok(resp)
 

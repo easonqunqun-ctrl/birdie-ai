@@ -66,7 +66,7 @@ App 端通过请求头声明 UI 语言；**仅 AI 教练回复**据此切换英�
 | （缺省） | 微信登录 | 强制 `cn` |
 | （缺省） | `Accept-Language: en*` | `intl`；否则 `cn` |
 
-**配额**：`cn` / `intl` **各**前 `WELCOME_USER_CAP`（默认 100）名各获 `WELCOME_ANALYSES`（默认 100）次终身分析；用尽或未占到名额则回落月度 3 次。见 `GET /users/me`.market_offer。
+**配额**：注册起 `SIGNUP_TRIAL_MONTHS`（默认 3）个自然月不限次；到期后月度 3 次 / 每日 5 轮对话。见 `GET /users/me`.promo_free。
 
 ### 1.3 统一响应格式
 
@@ -472,8 +472,8 @@ GET /v1/users/me
     },
     "promo_free": {
       "active": true,
-      "until": "2026-07-30",
-      "message": "公测免费至 2026-07-30"
+      "until": "2026-12-13",
+      "message": "新用户免费体验至 2026-12-13"
     },
     "market_offer": {
       "market": "cn",
@@ -486,9 +486,9 @@ GET /v1/users/me
 }
 ```
 
-> **`promo_free`**：当服务端配置 `PROMO_FREE_UNTIL=YYYY-MM-DD` 且当前仍在该日（UTC+8 自然日 inclusive）内时为 `active=true`；此时 `quota.*_remaining` 通常为 `-1`（无限），且 `GET /v1/analyses` 对免费用户不触发历史 paywall（见 `PROMO_FREE_SKIP_HISTORY_PAYWALL`）。
+> **`promo_free`**：注册未满 `SIGNUP_TRIAL_MONTHS` 个月时 `active=true`，`until` 为体验截止日（UTC+8），`quota.*_remaining` 为 `-1`。亦可叠加全局 `PROMO_FREE_UNTIL`。体验期内 `GET /v1/analyses` 对免费用户不触发历史 paywall。
 >
-> **`market_offer`**：`market=cn|intl`；`policy=welcome|standard`。`welcome` 时 `quota.analysis_remaining/total` 为欢迎包剩余/100，`analysis_reset_at=null`（终身，不按月刷新）。`standard` 回落月度 3 次。字段名 `intl_welcome_*` 为历史兼容，国内外欢迎包共用。
+> **`market_offer`**：`market=cn|intl` 仅分流；欢迎包已停发，`policy` 一般为 `standard`。到期后月度 3 次。
 
 ---
 

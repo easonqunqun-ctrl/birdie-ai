@@ -36,7 +36,11 @@ describe('promoFree', () => {
       promoFreeBannerText({
         promo_free: { active: true, until: '2026-07-30', message: null },
       } as never),
-    ).toBe('公测免费至 7 月 30 日')
+    ).toBe('免费体验至 7 月 30 日')
+  })
+
+  it('未登录展示注册即享 3 个月', () => {
+    expect(promoFreeBannerText(null)).toBe('注册即享 3 个月免费体验')
   })
 
   it('isPromoFreeActive false when inactive', () => {

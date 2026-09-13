@@ -38,14 +38,15 @@ export function isPromoFreeActive(user?: User | null): boolean {
   return resolvePromoFreeStatus(user)?.active === true
 }
 
-/** 展示用，如「公测免费至 7 月 30 日」 */
+/** 展示用，如「免费体验至 12 月 13 日」 */
 export function promoFreeBannerText(user?: User | null): string | null {
+  if (!user) return '注册即享 3 个月免费体验'
   const status = resolvePromoFreeStatus(user)
   if (!status?.active) return null
   if (status.message) return status.message
   if (status.until) {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(status.until)
-    if (m) return `公测免费至 ${Number(m[2])} 月 ${Number(m[3])} 日`
+    if (m) return `免费体验至 ${Number(m[2])} 月 ${Number(m[3])} 日`
   }
-  return '公测免费中'
+  return '新用户免费体验中'
 }

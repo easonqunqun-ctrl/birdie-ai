@@ -1,7 +1,4 @@
-"""国内 / 国外市场分流与欢迎包（docs/01 §2.2.1）。
-
-各市场前 ``WELCOME_USER_CAP`` 名用户各获 ``WELCOME_ANALYSES`` 次终身分析。
-"""
+"""国内 / 国外市场分流。欢迎包已停发，配额见 ``signup_trial`` / 月度 3 次。"""
 
 from __future__ import annotations
 
@@ -96,8 +93,7 @@ async def ensure_user_market(
             "user_market_assigned",
             extra={"user_id": user.id, "market": user.market},
         )
-    if not user.intl_welcome_granted:
-        await _try_grant_welcome(db, user, redis=redis)
+    # 欢迎包已停发：全员注册起 SIGNUP_TRIAL_MONTHS 个月不限次，其后每月 3 次
     await db.flush()
     return user
 

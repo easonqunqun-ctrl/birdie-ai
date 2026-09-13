@@ -317,7 +317,7 @@ const MembershipPage: FC = () => {
     if (!user) return ''
     if (user.is_member) return '感谢你的支持，继续精进挥杆'
     if (isPromoFreeActive(user)) {
-      return '公测不限次体验中 · 会员把进步曲线延续到公测之后'
+      return '免费体验期内不限次 · 会员把进步曲线延续到体验之后'
     }
     return '开通会员：无限分析 + 完整进步曲线与本周训练'
   }, [user])
@@ -331,7 +331,7 @@ const MembershipPage: FC = () => {
         <View className='membership__notice membership__notice--promo'>
           <Text className='membership__notice-text'>{promoBanner}</Text>
           <Text className='membership__notice-sub'>
-            公测期间全员不限次；7 月 30 日后恢复免费版月度配额
+            注册起 3 个月不限次；到期后每月 3 次，再多用请开通会员
           </Text>
         </View>
       ) : null}

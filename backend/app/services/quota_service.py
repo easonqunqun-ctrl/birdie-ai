@@ -56,7 +56,14 @@ def _is_member(user: User) -> bool:
 
 
 def _is_unlimited_user(user: User) -> bool:
-    """该用户是否享有无限配额（会员 / QUOTA_MODE=unlimited）."""
+    """会员 / 全局促销 / 注册体验期内不限次."""
+    from app.services.signup_trial import is_signup_trial_active
+
+    return _is_unlimited_mode() or _is_member(user) or is_signup_trial_active(user)
+
+
+def _persist_unlimited_quota(user: User) -> bool:
+    """写入 quota.total=-1 的情况：不含注册体验（体验按 created_at 计算，到期当月仍用月度 3 次行）。"""
     return _is_unlimited_mode() or _is_member(user)
 
 
@@ -145,7 +152,7 @@ async def get_or_create_analysis_quota(
     if not create:
         return None
 
-    total = -1 if _is_unlimited_user(user) else settings.FREE_USER_MONTHLY_ANALYSES
+    total = -1 if _persist_unlimited_quota(user) else settings.FREE_USER_MONTHLY_ANALYSES
     quota = AnalysisQuota(
         id=new_id("aq"),
         user_id=user.id,
@@ -347,7 +354,7 @@ async def get_or_create_chat_quota(
     if not create:
         return None
 
-    total = -1 if _is_unlimited_user(user) else settings.FREE_USER_DAILY_CHATS
+    total = -1 if _persist_unlimited_quota(user) else settings.FREE_USER_DAILY_CHATS
     quota = ChatQuota(
         id=new_id("cq"),
         user_id=user.id,
@@ -385,6 +392,8 @@ async def check_chat_quota(
         track_abuse=False,
     ):
         return quota
+    if _is_unlimited_user(user):
+        return quota
     if chat_remaining(quota) == 0:
         raise ChatQuotaExhaustedError()
     return quota
@@ -421,6 +430,8 @@ async def consume_chat_quota(
     )
     quota = (await db.execute(locked_stmt)).scalar_one()
 
+    if _is_unlimited_user(user):
+        return quota
     if chat_remaining(quota) == 0:
         raise ChatQuotaExhaustedError()
     if quota.total >= 0:
