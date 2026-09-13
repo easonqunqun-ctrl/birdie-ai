@@ -64,7 +64,14 @@ class _MembershipPageState extends State<MembershipPage> {
                 Text(
                   isMember
                       ? l10n.memberThanks
-                      : l10n.membershipFreeHint,
+                      : (user?.promoFree?.active == true
+                          ? (user!.promoFree!.message ??
+                              (context.l10n.localeName
+                                      .toLowerCase()
+                                      .startsWith('en')
+                                  ? 'New-user trial: unlimited for 3 months from sign-up, then 3 analyses per month.'
+                                  : '注册起 3 个月不限次；到期后每月 3 次，再多用请开通会员'))
+                          : l10n.membershipFreeHint),
                   style: TextStyle(fontSize: rpx(28), color: Colors.white70),
                 ),
               ],

@@ -473,6 +473,20 @@ class _HomePageState extends State<HomePage> {
     final q = user?.quota;
     if (q == null) return '';
     final en = context.l10n.localeName.toLowerCase().startsWith('en');
+    final promo = user?.promoFree;
+    if (promo?.active == true) {
+      final msg = promo!.message?.trim();
+      if (msg != null && msg.isNotEmpty) return msg;
+      final until = promo.until;
+      if (until != null && until.length >= 10) {
+        final m = int.tryParse(until.substring(5, 7)) ?? 0;
+        final d = int.tryParse(until.substring(8, 10)) ?? 0;
+        return en
+            ? 'Free trial until $until'
+            : '免费体验至 $m 月 $d 日';
+      }
+      return en ? 'Free trial · Unlimited' : '免费体验期·不限次';
+    }
     final offer = user?.marketOffer;
     if (q.analysisRemaining < 0) {
       return en ? 'Unlimited analyses' : '分析次数无限';

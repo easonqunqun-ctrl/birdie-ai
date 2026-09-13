@@ -48,6 +48,24 @@ class MarketOffer {
   bool get isWelcome => policy == 'welcome' || policy == 'intl_welcome';
 }
 
+class PromoFree {
+  final bool active;
+  final String? until;
+  final String? message;
+
+  const PromoFree({
+    required this.active,
+    this.until,
+    this.message,
+  });
+
+  factory PromoFree.fromJson(Map<String, dynamic> j) => PromoFree(
+        active: j['active'] == true,
+        until: j['until']?.toString(),
+        message: j['message']?.toString(),
+      );
+}
+
 class UserQuota {
   final int analysisRemaining;
   final int analysisTotal;
@@ -88,6 +106,7 @@ class User {
   final UserStats? stats;
   final UserQuota? quota;
   final MarketOffer? marketOffer;
+  final PromoFree? promoFree;
   final String? createdAt;
   final String? accountDeletionScheduledAt;
   final bool isActiveCoach;
@@ -108,6 +127,7 @@ class User {
     this.stats,
     this.quota,
     this.marketOffer,
+    this.promoFree,
     this.createdAt,
     this.accountDeletionScheduledAt,
     this.isActiveCoach = false,
@@ -137,6 +157,9 @@ class User {
             : null,
         marketOffer: j['market_offer'] is Map<String, dynamic>
             ? MarketOffer.fromJson(j['market_offer'] as Map<String, dynamic>)
+            : null,
+        promoFree: j['promo_free'] is Map<String, dynamic>
+            ? PromoFree.fromJson(j['promo_free'] as Map<String, dynamic>)
             : null,
         createdAt: j['created_at'] as String?,
         accountDeletionScheduledAt:
@@ -175,6 +198,13 @@ class User {
                 'chat_remaining_today': quota!.chatRemainingToday,
                 'chat_total_today': quota!.chatTotalToday,
               },
+        'promo_free': promoFree == null
+            ? null
+            : {
+                'active': promoFree!.active,
+                'until': promoFree!.until,
+                'message': promoFree!.message,
+              },
         'created_at': createdAt,
         'account_deletion_scheduled_at': accountDeletionScheduledAt,
         'is_active_coach': isActiveCoach,
@@ -196,6 +226,7 @@ class User {
         stats: stats,
         quota: quota,
         marketOffer: marketOffer,
+        promoFree: promoFree,
         createdAt: createdAt,
         accountDeletionScheduledAt: accountDeletionScheduledAt,
         isActiveCoach: isActiveCoach,
