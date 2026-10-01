@@ -11,7 +11,8 @@
         deploy-test test-logs test-ps test-reset test-restart test-certs test-health \
         issue-le-cert sync-le-certs renew-le-cert verify-weapp-https \
         deploy-cvm-up deploy-cvm-ps deploy-cvm-logs publish-backend-cvm publish-monitoring-cvm setup-cvm-ssh-key \
-        release-cvm ship-cvm cvm-migrate-git-doc cvm-stable-from-mac cvm-deploy-help cvm-deploy-dry-run cvm-env-preflight cvm-preflight cvm-preflight-tls cvm-remote-release cvm-smoke
+        release-cvm ship-cvm cvm-migrate-git-doc cvm-stable-from-mac cvm-deploy-help cvm-deploy-dry-run cvm-env-preflight cvm-preflight cvm-preflight-tls cvm-remote-release cvm-smoke \
+        app-ios-ipa app-ship-ios app-ios-upload
 
 # 默认目标：显示帮助
 help:
@@ -58,6 +59,7 @@ help:
 	@echo "  make client-dev-weapp       开发：编译微信小程序（用 微信开发者工具 打开 client/dist）"
 	@echo "  make client-build-weapp     微信小程序构建（默认 dev 变量）"
 	@echo "  make client-build-weapp-prod  正式小程序包（校验 .env.production 后 production 构建）"
+	@echo "  make app-ship-ios           iOS 打 IPA 并用 ASC API Key 上传 TestFlight（须 ASC_KEY_ID / ASC_ISSUER_ID）"
 	@echo "  make client-tsc             客户端 TS 类型检查（已并入 make test）"
 	@echo ""
 	@echo "  ===== 健康检查 ====="
@@ -255,6 +257,16 @@ client-build-weapp:
 # 正式上线：校验 https API 占位 → dist/（详见 docs/release-notes/go-live-weapp-fool-checklist.md）
 client-build-weapp-prod:
 	cd client && pnpm build:weapp:prod:check
+
+# iOS：打 IPA；app-ship-ios 再用本机 ASC_KEY_ID / ASC_ISSUER_ID 上传 TestFlight（同向野）
+app-ios-ipa:
+	cd app && bash scripts/ios-archive.sh
+
+app-ship-ios:
+	cd app && UPLOAD=1 bash scripts/ios-archive.sh
+
+app-ios-upload:
+	cd app && bash scripts/ios-upload.sh
 
 # W6-T5：客户端 TS 类型检查（不出 bundle，单纯类型门）
 client-tsc:

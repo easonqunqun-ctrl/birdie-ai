@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # 打 App Store Connect 用 IPA（组织 Team H5ZY5QNKRW）。
-# 用法（在 app/ 目录）：bash scripts/ios-archive.sh
+# 用法（在 app/ 目录）：
+#   bash scripts/ios-archive.sh
+#   UPLOAD=1 bash scripts/ios-archive.sh   # 打完用 ASC API Key 自动上传（同向野）
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -15,4 +17,10 @@ flutter build ipa \
 
 echo ""
 echo "✓ IPA: $ROOT/build/ios/ipa/*.ipa"
-echo "  用 Transporter 或 Xcode Organizer → Distribute 上传到 App Store Connect。"
+
+if [[ "${UPLOAD:-0}" == "1" ]]; then
+  bash "$ROOT/scripts/ios-upload.sh"
+else
+  echo "  上传：UPLOAD=1 bash scripts/ios-archive.sh"
+  echo "  或：  bash scripts/ios-upload.sh"
+fi

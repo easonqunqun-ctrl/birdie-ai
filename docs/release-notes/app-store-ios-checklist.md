@@ -69,14 +69,16 @@
 下一步见 [`app-store-testflight-next.md`](./app-store-testflight-next.md)。
 
 ```bash
-cd app
-bash scripts/ios-archive.sh
+# 打包 + 自动上传（与向野同一套 ASC_KEY_ID / ASC_ISSUER_ID + ~/.appstoreconnect/private_keys）
+make app-ship-ios
+# 仅上传已有 IPA
+make app-ios-upload
 ```
 
 或 Xcode：`app/ios/Runner.xcworkspace` → Product → Archive → Distribute App → App Store Connect。
 
-**上传**：用 **Transporter** 拖入 `.ipa`，或 Xcode Organizer → Distribute。  
-上传后 ASC → TestFlight 等 Processing（约 5–30 分钟），再加内部测试员。
+**上传**：默认走 `app/scripts/ios-upload.sh`（`xcrun altool`）。无 API Key 时仍可用 Transporter 拖 `app/build/ios/ipa/*.ipa`。  
+上传后 ASC → TestFlight 处理约 5–30 分钟，再加内部测试员。
 
 审核备注可写：登录使用 **Sign in with Apple**；微信登录后续版本提供。
 
